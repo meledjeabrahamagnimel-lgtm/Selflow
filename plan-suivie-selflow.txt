@@ -1,0 +1,23 @@
+bonsoir 
+
+voila avant de commencer sache que tous ce que nous allons faire dois etre en francais , que ce soit le noms des dossiers , des fichiers , le code , les tables de base de données tes reponses et toutes autres en francais .
+
+Nous commencons un nouveau projet appeler Selflow : selflow c'est une application  intelligente  de vente  
+de stocks en temps réel et d'achat , le coeur se trouve aussi au niveau de la facturation 
+
+pour tous les code que tu vas génerer , fais tres attention a la sécurité , aucun code défaillant ne dois etre dans le projet , adopte des pratique propre de code , génere pas du n'importe quoi .
+
+optimise le code , optimise toutes les requette de base de données pour permettre une rapidité tres optimale , utilise des indexe pôur les tables des base de données , je repete ; optimise toutes les requete de base de données .
+
+
+L'application aura trois interface : 
+INNTERFACE  SUPERADMIN , INNTERFACE ADMIN , INTERFACE POINT-VENTE
+
+CONTEXTE (un peut mélanger mais c'est juste pour te metre l'idée ) : 
+nous voulons créer une nouvelle application du nom de selflow , cette application va concerner les points de ventes de chaque clients et sur cette application , on devra avoir une section ou en egregistre toutes les ventes , un endroit pour les achats ( on devra avoir un endroit ou on met le stock de chaque article acheter , aussi savoir un le stock global , pour les stock , a chaque stock , lorsque lorsque on fait des ventes le stock concerner doit diminuer ) , seflow concerne les ventes et achats , les facturations , le coeur c'est la facturation , pour chaque opération de vente ou d'achat , ils doivent etre enregistrer dans une table , ca dois etre comme dans les supermarcher mais ici on dois faire et aussi on dois génerer des factures pour chaque type ( vente ou achat ) , la facture devra etre en fonction de l'entreprise et de ses point de vente , une tables qui stock cela et de plus on dois avoir un bouton action facture (icone imptimer ) dans le tableau tableau pour imprimer la fature et tirer et cela ne dois pas durer normalement des que les chmps de la factutre sont rempli et enregistrer , la facture doit etre generer , cela nous permet de garder une trace numérique de chaque opération , les champs de saisie ne doivent pas etre voluminueux , soit on fait plus de champ de sélection et moin de champ de saisie ,les champ de saisie doivent etre vraiment nécessiare comme les montants , cette partie concerne l'interface client ,on a deux interface , l'interface superadmin ( ou on fais les paramétrages des clients , on gere le suivi et bien d'autre ) et l'interface client , centrer sur la gestion des achats et vente des diférent point de vente de de l'entreprises . NB : pour chaque achat , quelque soit le type de chose acheter , cela dois etre saisie , prévoir aussi une partie tréso qui fais enregistre les encaissements et décaisement faite de facon automatique  . j'ai aussi une idée , comme seflow concerne les diférent point de vente , pour une entreprise , elle peut configurer plusieurs point de vente comme une créaton de surcusal donc apres la création avec ses informations , on dois avoir des cartes disponible sur l'interface avec des acces pour ouvrir l'autre interface d'un point de vente car l'emploé 1 d'un espace de vente ne peux avoir acces a l'interface d'un point de vente 2 si on ne lui a pas donner l'acces et de plus cela permet a l'admin de l'entrerpise d'avoir une vue sur l'activiter de chaque point de vent et de nous notre par on dois pourvoir limiter les entreprises a un nombre de point de vente ou augmenter en fonction de leur abonnement voici un peut de tous .
+
+Nous avons déja les vue de l'application : la page de login , superadmin , admin , point de vente ( caisier )  . les vues se trouvent dans le dossier vues de ce projet  NB : pour la page de connexion bien vrai que le fichier html de login est disponible mais je veux le desagn du pdf la reproduction du pf ( identiquement seulement qu'ici , tu met met connexion a la place de bon retour et centrer  .
+
+NB: pour le sidebarr de tous les interface , utilise la meme couleur identique bleue du login et le blanc du div vas concerner le contenu avec un peut de bleue pour les boutons 
+
+NB: on a déja commencer et avancer lis , soit intelligent , c'est juste pour te mettre dans le contexte , beaucoup de chose on déja été faite , assez de chose on déja été dévélopper ( on t'a pas demander de tous reprendre )  , garde en memoire les recommandation lors du codage 

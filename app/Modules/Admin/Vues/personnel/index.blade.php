@@ -1,0 +1,429 @@
+@extends('admin::gabarits.application')
+@section('titre', 'Personnels & Accès')
+@section('topbar_titre', 'Points de vente — Personnels & Accès')
+
+@section('contenu')
+<div class="page-header">
+    <div>
+        <h1><i class="fas fa-users-gear"></i> Gestion des Personnels & Accès</h1>
+        <p>Gérez les comptes des administrateurs et des caissiers, leurs contrats, notes et habilitations.</p>
+    </div>
+    <button class="btn btn-primary" data-modal-open="modalNouveauPersonnel">
+        <i class="fas fa-user-plus"></i> Créer un accès
+    </button>
+</div>
+
+{{-- Onglets de navigation --}}
+<div style="display:flex; gap:10px; margin-bottom:20px; border-bottom:1px solid var(--border); padding-bottom:10px;">
+    <button class="btn @if(request('tab') !== 'habilitations') btn-primary @else btn-outline @endif" id="tab-btn-liste" onclick="changerOnglet('liste')">
+        <i class="fas fa-list"></i> Liste du personnel
+    </button>
+    <button class="btn @if(request('tab') === 'habilitations') btn-primary @else btn-outline @endif" id="tab-btn-habs" onclick="changerOnglet('habilitations')">
+        <i class="fas fa-shield-halved"></i> Grille des Habilitations
+    </button>
+</div>
+
+{{-- CONTENU : ONGLET LISTE --}}
+<div id="onglet-liste" class="card" style="display: @if(request('tab') !== 'habilitations') block @else none @endif;">
+    <div class="card-header">
+        <h2>Membres de l'entreprise</h2>
+    </div>
+    <div class="table-wrap">
+        <table>
+            <thead>
+                <tr>
+                    <th>Nom & Prénom</th>
+                    <th>Rôle</th>
+                    <th>Point de vente</th>
+                    <th>Fonction</th>
+                    <th>Contrat</th>
+                    <th>Statut</th>
+                    <th style="text-align: right;">Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                @forelse($personnels as $pers)
+                <tr>
+                    <td>
+                        <div style="font-weight: 600;">{{ $pers->nom }} {{ $pers->prenom }}</div>
+                        <div style="font-size: 11px; color: var(--text-3);">{{ $pers->email }}</div>
+                    </td>
+                    <td>
+                        @if($pers->estSuperAdmin())
+                            <span class="badge badge-purple">Super Admin</span>
+                        @elseif($pers->estAdmin())
+                            <span class="badge badge-info">Admin</span>
+                        @else
+                            <span class="badge badge-gray">Caissier</span>
+                        @endif
+                    </td>
+                    <td>
+                        @if($pers->pointDeVente)
+                            <span style="font-weight: 500;"><i class="fas fa-store" style="color:var(--text-3); font-size:12px; margin-right:4px;"></i> {{ $pers->pointDeVente->nom }}</span>
+                        @else
+                            <span style="color:var(--text-3); font-style:italic;">Aucun (Siège)</span>
+                        @endif
+                    </td>
+                    <td>{{ $pers->fonction ?? 'Non spécifiée' }}</td>
+                    <td>
+                        @if($pers->date_debut_contrat)
+                            <div style="font-size: 11px;">Du {{ \Carbon\Carbon::parse($pers->date_debut_contrat)->format('d/m/Y') }}</div>
+                            @if($pers->date_fin_contrat)
+                                <div style="font-size: 11px; color: var(--text-3);">Au {{ \Carbon\Carbon::parse($pers->date_fin_contrat)->format('d/m/Y') }}</div>
+                            @else
+                                <div style="font-size: 11px; color: var(--success);">Indéterminé</div>
+                            @endif
+                        @else
+                            <span style="color:var(--text-3); font-style:italic;">Non défini</span>
+                        @endif
+                    </td>
+                    <td>
+                        @if($pers->statut === 'actif')
+                            <span class="badge badge-success"><i class="fas fa-circle-check"></i> Actif</span>
+                        @else
+                            <span class="badge badge-danger"><i class="fas fa-user-slash"></i> Bloqué</span>
+                        @endif
+                    </td>
+                    <td style="text-align: right;">
+                        <div style="display:inline-flex; gap:6px;">
+                            <a href="{{ route('admin.personnel.details', $pers) }}" class="btn btn-outline btn-sm" title="Voir détails et modifier">
+                                <i class="fas fa-user-pen"></i> Détails
+                            </a>
+                            @if($pers->id !== auth()->id())
+                                <form method="POST" action="{{ route('admin.personnel.statut', $pers) }}">
+                                    @csrf
+                                    @if($pers->statut === 'actif')
+                                        <button type="submit" class="btn btn-outline btn-sm" style="color:var(--danger); border-color:var(--danger);" title="Bloquer l'accès">
+                                            <i class="fas fa-ban"></i> Bloquer
+                                        </button>
+                                    @else
+                                        <button type="submit" class="btn btn-success btn-sm" title="Débloquer l'accès">
+                                            <i class="fas fa-check"></i> Activer
+                                        </button>
+                                    @endif
+                                </form>
+                                <form method="POST" action="{{ route('admin.personnel.supprimer', $pers) }}" onsubmit="return confirm('Êtes-vous sûr de vouloir supprimer ce compte personnel ? Cette action est irréversible.')">
+                                    @csrf
+                                    @method('DELETE')
+                                    <button type="submit" class="btn btn-outline btn-sm" style="color:var(--danger); border-color:rgba(239,68,68,0.2);" title="Supprimer définitivement">
+                                        <i class="fas fa-trash-can"></i>
+                                    </button>
+                                </form>
+                            @endif
+                        </div>
+                    </td>
+                </tr>
+                @empty
+                <tr>
+                    <td colspan="7" style="text-align: center; color: var(--text-3); padding: 40px 0;">
+                        <i class="fas fa-users" style="font-size: 32px; margin-bottom: 10px;"></i>
+                        <div>Aucun membre du personnel enregistré.</div>
+                    </td>
+                </tr>
+                @endforelse
+            </tbody>
+        </table>
+    </div>
+</div>
+
+{{-- CONTENU : ONGLET GRILLE HABILITATIONS --}}
+<div id="onglet-habilitations" class="card" style="display: @if(request('tab') === 'habilitations') block @else none @endif;">
+    <div class="card-header">
+        <h2>Matrice globale des habilitations (Accès Pages)</h2>
+    </div>
+    <div class="table-wrap">
+        <table>
+            <thead>
+                <tr>
+                    <th>Personnel</th>
+                    <th>Rôle</th>
+                    <th style="text-align: center;" title="Tableau de bord">TDB</th>
+                    <th style="text-align: center;" title="Nouvelle vente">N.Vente</th>
+                    <th style="text-align: center;" title="Factures Ventes">F.Vente</th>
+                    <th style="text-align: center;" title="Nouvel achat">N.Achat</th>
+                    <th style="text-align: center;" title="Factures Achats">F.Achat</th>
+                    <th style="text-align: center;" title="Stock">Stock</th>
+                    <th style="text-align: center;" title="Trésorerie">Tréso</th>
+                    <th style="text-align: center;" title="Points de vente">PDV</th>
+                    <th style="text-align: center;" title="Personnel">Pers</th>
+                    <th style="text-align: center;" title="Produits">Prod</th>
+                    <th style="text-align: center;" title="Clients & Fournisseurs">Tiers</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach($personnels as $pers)
+                <tr>
+                    <td>
+                        <strong>{{ $pers->nom }} {{ $pers->prenom }}</strong>
+                        <div style="font-size: 11px; color:var(--text-3);">{{ $pers->fonction ?? 'Non spécifiée' }}</div>
+                    </td>
+                    <td>
+                        @if($pers->estAdmin() || $pers->estSuperAdmin())
+                            <span class="badge badge-info btn-sm">Admin</span>
+                        @else
+                            <span class="badge badge-gray btn-sm">Caissier</span>
+                        @endif
+                    </td>
+                    {{-- Checkboxes indicatifs --}}
+                    @php
+                        $pagesCheck = [
+                            'tableau_de_bord', 'nouvelle_vente', 'factures_vente',
+                            'nouvel_achat', 'factures_achat', 'stock_articles',
+                            'tresorerie_encaissements', 'gestion_pdv', 'gestion_personnel',
+                            'catalogue_produits', 'tiers_clients'
+                        ];
+                    @endphp
+                    @foreach($pagesCheck as $pKey)
+                    <td style="text-align: center; font-size: 16px;">
+                        @if($pers->aHabilitation($pKey))
+                            <i class="fas fa-square-check" style="color:var(--success);"></i>
+                        @else
+                            <i class="fas fa-square" style="color:var(--border);"></i>
+                        @endif
+                    </td>
+                    @endforeach
+                </tr>
+                @endforeach
+            </tbody>
+        </table>
+    </div>
+</div>
+
+{{-- MODAL : NOUVEAU PERSONNEL --}}
+<div class="modal-overlay" id="modalNouveauPersonnel">
+    <div class="modal" style="max-width: 780px;">
+        <div class="modal-header">
+            <h3><i class="fas fa-user-plus"></i> Créer un accès utilisateur</h3>
+            <button class="modal-close" data-modal-close>✕</button>
+        </div>
+        <form method="POST" action="{{ route('admin.personnel.creer') }}">
+            @csrf
+            
+            <div style="display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-bottom: 14px;">
+                <div class="form-group">
+                    <label class="form-label">Nom <span style="color:var(--danger)">*</span></label>
+                    <input type="text" name="nom" class="form-control" placeholder="Ex: Diomandé" required>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Prénom <span style="color:var(--danger)">*</span></label>
+                    <input type="text" name="prenom" class="form-control" placeholder="Ex: Kouamé" required>
+                </div>
+            </div>
+
+            <div style="display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-bottom: 14px;">
+                <div class="form-group">
+                    <label class="form-label">Adresse Email <span style="color:var(--danger)">*</span></label>
+                    <input type="email" name="email" class="form-control" placeholder="nom@entreprise.com" required>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Mot de passe provisoire <span style="color:var(--danger)">*</span></label>
+                    <input type="password" name="password" class="form-control" placeholder="Min 6 caractères" required minlength="6">
+                </div>
+            </div>
+
+            <div style="display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-bottom: 14px;">
+                <div class="form-group">
+                    <label class="form-label">Rôle <span style="color:var(--danger)">*</span></label>
+                    <select name="role" id="role-select" class="form-control" required onchange="verifierRoleChange()">
+                        <option value="caissier" selected>Caissier (Accès restreint par défaut)</option>
+                        <option value="admin">Administrateur (Tous les droits)</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Affectation Point de Vente</label>
+                    <select name="point_de_vente_id" class="form-control">
+                        <option value="">Aucun (Siège)</option>
+                        @foreach($pointsDeVente as $pdv)
+                            <option value="{{ $pdv->id }}">{{ $pdv->nom }} ({{ $pdv->ville }})</option>
+                        @endforeach
+                    </select>
+                </div>
+            </div>
+
+            <div style="display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-bottom: 14px;">
+                <div class="form-group">
+                    <label class="form-label">Fonction / Poste</label>
+                    <input type="text" name="fonction" class="form-control" placeholder="Ex: Caissier principal, Gérant...">
+                </div>
+                <div class="form-group" style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">
+                    <div>
+                        <label class="form-label" style="font-size:10px;">Début Contrat</label>
+                        <input type="date" name="date_debut_contrat" class="form-control">
+                    </div>
+                    <div>
+                        <label class="form-label" style="font-size:10px;">Fin Contrat</label>
+                        <input type="date" name="date_fin_contrat" class="form-control">
+                    </div>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">Notes internes</label>
+                <textarea name="notes" class="form-control" rows="2" placeholder="Suivi de recrutement, détails contractuels, notes RH..."></textarea>
+            </div>
+
+            {{-- Habilitations matrix checkboxes --}}
+            <div id="habilitations-container" style="border:1px solid var(--border); border-radius:8px; padding:16px; background:#F8FAFC; margin-bottom:20px;">
+                <div style="font-weight:700; font-size:13px; margin-bottom:12px; display:flex; justify-content:space-between; align-items:center;">
+                    <span><i class="fas fa-shield-halved" style="color:var(--primary);"></i> Configuration des habilitations d'accès</span>
+                    <label style="font-weight:500; font-size:12px; cursor:pointer; display:flex; align-items:center; gap:6px;">
+                        <input type="checkbox" id="check-all-habs" onchange="toggleToutCocher(this)"> Tout cocher
+                    </label>
+                </div>
+                
+                <div style="display:grid; grid-template-columns:repeat(3, 1fr); gap:16px;" id="habs-checkboxes-grid">
+                    <div>
+                        <div style="font-weight:600; font-size:11px; text-transform:uppercase; color:var(--text-2); margin-bottom:6px; border-bottom:1px solid var(--border); padding-bottom:3px;">Principal</div>
+                        <label style="display:flex; align-items:center; gap:8px; font-size:12px; margin-bottom:5px; cursor:pointer;">
+                            <input type="checkbox" name="habilitations[]" value="tableau_de_bord" checked> Tableau de bord
+                        </label>
+                    </div>
+
+                    <div>
+                        <div style="font-weight:600; font-size:11px; text-transform:uppercase; color:var(--text-2); margin-bottom:6px; border-bottom:1px solid var(--border); padding-bottom:3px;">Ventes</div>
+                        <label style="display:flex; align-items:center; gap:8px; font-size:12px; margin-bottom:5px; cursor:pointer;">
+                            <input type="checkbox" name="habilitations[]" value="nouvelle_vente" checked> Nouvelle vente
+                        </label>
+                        <label style="display:flex; align-items:center; gap:8px; font-size:12px; margin-bottom:5px; cursor:pointer;">
+                            <input type="checkbox" name="habilitations[]" value="factures_vente"> Factures vente
+                        </label>
+                        <label style="display:flex; align-items:center; gap:8px; font-size:12px; margin-bottom:5px; cursor:pointer;">
+                            <input type="checkbox" name="habilitations[]" value="historique_ventes"> Historique ventes
+                        </label>
+                    </div>
+
+                    <div>
+                        <div style="font-weight:600; font-size:11px; text-transform:uppercase; color:var(--text-2); margin-bottom:6px; border-bottom:1px solid var(--border); padding-bottom:3px;">Achats</div>
+                        <label style="display:flex; align-items:center; gap:8px; font-size:12px; margin-bottom:5px; cursor:pointer;">
+                            <input type="checkbox" name="habilitations[]" value="nouvel_achat"> Nouvel achat
+                        </label>
+                        <label style="display:flex; align-items:center; gap:8px; font-size:12px; margin-bottom:5px; cursor:pointer;">
+                            <input type="checkbox" name="habilitations[]" value="factures_achat"> Factures achat
+                        </label>
+                        <label style="display:flex; align-items:center; gap:8px; font-size:12px; margin-bottom:5px; cursor:pointer;">
+                            <input type="checkbox" name="habilitations[]" value="historique_achats"> Historique achats
+                        </label>
+                    </div>
+
+                    <div>
+                        <div style="font-weight:600; font-size:11px; text-transform:uppercase; color:var(--text-2); margin-bottom:6px; border-bottom:1px solid var(--border); padding-bottom:3px;">Stock</div>
+                        <label style="display:flex; align-items:center; gap:8px; font-size:12px; margin-bottom:5px; cursor:pointer;">
+                            <input type="checkbox" name="habilitations[]" value="stock_articles"> Articles & stock
+                        </label>
+                        <label style="display:flex; align-items:center; gap:8px; font-size:12px; margin-bottom:5px; cursor:pointer;">
+                            <input type="checkbox" name="habilitations[]" value="stock_mouvements"> Mouvements stock
+                        </label>
+                    </div>
+
+                    <div>
+                        <div style="font-weight:600; font-size:11px; text-transform:uppercase; color:var(--text-2); margin-bottom:6px; border-bottom:1px solid var(--border); padding-bottom:3px;">Trésorerie</div>
+                        <label style="display:flex; align-items:center; gap:8px; font-size:12px; margin-bottom:5px; cursor:pointer;">
+                            <input type="checkbox" name="habilitations[]" value="tresorerie_encaissements"> Encaissements
+                        </label>
+                        <label style="display:flex; align-items:center; gap:8px; font-size:12px; margin-bottom:5px; cursor:pointer;">
+                            <input type="checkbox" name="habilitations[]" value="tresorerie_decaissements"> Décaissements
+                        </label>
+                        <label style="display:flex; align-items:center; gap:8px; font-size:12px; margin-bottom:5px; cursor:pointer;">
+                            <input type="checkbox" name="habilitations[]" value="tresorerie_journal"> Solde & journal
+                        </label>
+                    </div>
+
+                    <div>
+                        <div style="font-weight:600; font-size:11px; text-transform:uppercase; color:var(--text-2); margin-bottom:6px; border-bottom:1px solid var(--border); padding-bottom:3px;">Configuration</div>
+                        <label style="display:flex; align-items:center; gap:8px; font-size:12px; margin-bottom:5px; cursor:pointer;">
+                            <input type="checkbox" name="habilitations[]" value="gestion_pdv"> Points de vente
+                        </label>
+                        <label style="display:flex; align-items:center; gap:8px; font-size:12px; margin-bottom:5px; cursor:pointer;">
+                            <input type="checkbox" name="habilitations[]" value="gestion_personnel"> Personnel & accès
+                        </label>
+                        <label style="display:flex; align-items:center; gap:8px; font-size:12px; margin-bottom:5px; cursor:pointer;">
+                            <input type="checkbox" name="habilitations[]" value="gestion_habilitations"> Habilitations
+                        </label>
+                    </div>
+
+                    <div>
+                        <div style="font-weight:600; font-size:11px; text-transform:uppercase; color:var(--text-2); margin-bottom:6px; border-bottom:1px solid var(--border); padding-bottom:3px;">Catalogue & Tiers</div>
+                        <label style="display:flex; align-items:center; gap:8px; font-size:12px; margin-bottom:5px; cursor:pointer;">
+                            <input type="checkbox" name="habilitations[]" value="catalogue_produits"> Produits
+                        </label>
+                        <label style="display:flex; align-items:center; gap:8px; font-size:12px; margin-bottom:5px; cursor:pointer;">
+                            <input type="checkbox" name="habilitations[]" value="tiers_clients"> Clients
+                        </label>
+                        <label style="display:flex; align-items:center; gap:8px; font-size:12px; margin-bottom:5px; cursor:pointer;">
+                            <input type="checkbox" name="habilitations[]" value="tiers_fournisseurs"> Fournisseurs
+                        </label>
+                    </div>
+
+                    <div>
+                        <div style="font-weight:600; font-size:11px; text-transform:uppercase; color:var(--text-2); margin-bottom:6px; border-bottom:1px solid var(--border); padding-bottom:3px;">Analyses</div>
+                        <label style="display:flex; align-items:center; gap:8px; font-size:12px; margin-bottom:5px; cursor:pointer;">
+                            <input type="checkbox" name="habilitations[]" value="rapports_analyse"> Analyse d'activité
+                        </label>
+                    </div>
+                </div>
+                
+                <div id="admin-notice" style="display:none; color:var(--info); font-size:12.5px; font-weight:500;">
+                    <i class="fas fa-circle-info"></i> Les administrateurs disposent de tous les privilèges et accès par défaut. Il n'est pas nécessaire de configurer individuellement leurs habilitations.
+                </div>
+            </div>
+
+            <div style="display:flex; gap:10px; justify-content:flex-end; margin-top:8px;">
+                <button type="button" class="btn btn-outline" data-modal-close>Annuler</button>
+                <button type="submit" class="btn btn-primary"><i class="fas fa-check"></i> Enregistrer le personnel</button>
+            </div>
+        </form>
+    </div>
+</div>
+@endsection
+
+@section('scripts')
+<script>
+    function changerOnglet(onglet) {
+        const divListe = document.getElementById('onglet-liste');
+        const divHabs = document.getElementById('onglet-habilitations');
+        const btnListe = document.getElementById('tab-btn-liste');
+        const btnHabs = document.getElementById('tab-btn-habs');
+
+        if (onglet === 'liste') {
+            divListe.style.display = 'block';
+            divHabs.style.display = 'none';
+            btnListe.className = 'btn btn-primary';
+            btnHabs.className = 'btn btn-outline';
+        } else {
+            divListe.style.display = 'none';
+            divHabs.style.display = 'block';
+            btnListe.className = 'btn btn-outline';
+            btnHabs.className = 'btn btn-primary';
+        }
+    }
+
+    function toggleToutCocher(source) {
+        const checkboxes = document.querySelectorAll('#habs-checkboxes-grid input[type="checkbox"]');
+        checkboxes.forEach(cb => cb.checked = source.checked);
+    }
+
+    function verifierRoleChange() {
+        const role = document.getElementById('role-select').value;
+        const grid = document.getElementById('habs-checkboxes-grid');
+        const notice = document.getElementById('admin-notice');
+        const selectAllLabel = document.querySelector('label[for="check-all-habs"]') || document.getElementById('check-all-habs').closest('label');
+
+        if (role === 'admin') {
+            grid.style.opacity = '0.4';
+            grid.style.pointerEvents = 'none';
+            notice.style.display = 'block';
+            if (selectAllLabel) selectAllLabel.style.display = 'none';
+        } else {
+            grid.style.opacity = '1';
+            grid.style.pointerEvents = 'auto';
+            notice.style.display = 'none';
+            if (selectAllLabel) selectAllLabel.style.display = 'flex';
+        }
+    }
+
+    // Appel initial au chargement
+    document.addEventListener('DOMContentLoaded', () => {
+        verifierRoleChange();
+    });
+</script>
+@endsection

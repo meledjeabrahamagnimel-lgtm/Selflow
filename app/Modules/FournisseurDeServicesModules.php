@@ -1,0 +1,54 @@
+<?php
+
+namespace App\Modules;
+
+use Illuminate\Support\ServiceProvider;
+use Illuminate\Support\Facades\Route;
+
+class FournisseurDeServicesModules extends ServiceProvider
+{
+    /**
+     * Enregistrer les services du module.
+     */
+    public function register(): void
+    {
+        //
+    }
+
+    /**
+     * Bootstrapper les services du module.
+     */
+    public function boot(): void
+    {
+        $cheminModules = app_path('Modules');
+
+        if (!is_dir($cheminModules)) {
+            return;
+        }
+
+        $dossiersModules = array_filter(glob($cheminModules . '/*'), 'is_dir');
+
+        foreach ($dossiersModules as $cheminModule) {
+            $nomModule = basename($cheminModule);
+
+            // Enregistrer les routes
+            $cheminRoute = $cheminModule . '/Routes/web.php';
+            if (file_exists($cheminRoute)) {
+                Route::middleware('web')
+                    ->group($cheminRoute);
+            }
+
+            // Enregistrer les vues
+            $cheminVues = $cheminModule . '/Vues';
+            if (is_dir($cheminVues)) {
+                $this->loadViewsFrom($cheminVues, strtolower($nomModule));
+            }
+
+            // Enregistrer les migrations
+            $cheminMigrations = $cheminModule . '/Migrations';
+            if (is_dir($cheminMigrations)) {
+                $this->loadMigrationsFrom($cheminMigrations);
+            }
+        }
+    }
+}

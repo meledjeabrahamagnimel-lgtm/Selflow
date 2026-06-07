@@ -1,0 +1,165 @@
+@extends('admin::gabarits.application')
+@section('titre', 'Catalogue produits')
+@section('topbar_titre', 'Catalogue — Produits')
+
+@section('contenu')
+<div class="page-header">
+    <div>
+        <h1><i class="fas fa-barcode"></i> Catalogue produits</h1>
+        <p>{{ $produits->total() }} produit(s) enregistré(s)</p>
+    </div>
+    <button class="btn btn-primary" data-modal-open="modalNouveauProduit">
+        <i class="fas fa-plus"></i> Ajouter un produit
+    </button>
+</div>
+
+<div class="card">
+    <div class="table-wrap">
+        <table>
+            <thead>
+                <tr>
+                    <th>Référence</th>
+                    <th>Produit</th>
+                    <th>Catégorie</th>
+                    <th>Prix achat</th>
+                    <th>Prix vente</th>
+                    <th>Marge</th>
+                    <th>Stock</th>
+                    <th>Min.</th>
+                    <th>État</th>
+                    <th>Action</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach($produits as $p)
+                <tr>
+                    <td style="font-family:monospace; font-size:12px; color:var(--text-3);">{{ $p->reference }}</td>
+                    <td style="font-weight:600;">{{ $p->nom }}</td>
+                    <td><span class="badge badge-purple">{{ $p->categorie ?? '—' }}</span></td>
+                    <td>{{ number_format($p->prix_achat, 0, ',', ' ') }} F</td>
+                    <td style="color:var(--success); font-weight:600;">{{ number_format($p->prix_vente, 0, ',', ' ') }} F</td>
+                    <td style="color:var(--info);">
+                        @php $marge = $p->prix_achat > 0 ? round((($p->prix_vente - $p->prix_achat) / $p->prix_achat) * 100) : 0; @endphp
+                        +{{ $marge }}%
+                    </td>
+                    <td style="font-weight:800; {{ $p->stock_actuel == 0 ? 'color:var(--danger)' : ($p->stock_actuel <= $p->stock_minimum ? 'color:var(--warning)' : 'color:var(--success)') }}">
+                        {{ $p->stock_actuel }} {{ $p->unite }}
+                    </td>
+                    <td style="color:var(--text-3);">{{ $p->stock_minimum }}</td>
+                    <td>
+                        @if($p->stock_actuel == 0)
+                            <span class="badge badge-danger">Rupture</span>
+                        @elseif($p->stock_actuel <= $p->stock_minimum)
+                            <span class="badge badge-warning">Faible</span>
+                        @else
+                            <span class="badge badge-success">OK</span>
+                        @endif
+                    </td>
+                    <td>
+                        <button class="btn btn-outline btn-sm" data-modal-open="modalModifier{{ $p->id }}">
+                            <i class="fas fa-pen"></i>
+                        </button>
+                    </td>
+                </tr>
+
+                {{-- Modal modifier --}}
+                <div class="modal-overlay" id="modalModifier{{ $p->id }}">
+                    <div class="modal">
+                        <div class="modal-header">
+                            <h3>Modifier — {{ $p->nom }}</h3>
+                            <button class="modal-close" data-modal-close>✕</button>
+                        </div>
+                        <form method="POST" action="{{ route('admin.produits.modifier', $p) }}">
+                            @csrf @method('PUT')
+                            <div class="form-grid-2">
+                                <div class="form-group" style="grid-column:1/-1;">
+                                    <label class="form-label">Nom</label>
+                                    <input type="text" name="nom" class="form-control" value="{{ $p->nom }}" required>
+                                </div>
+                                <div class="form-group">
+                                    <label class="form-label">Catégorie</label>
+                                    <input type="text" name="categorie" class="form-control" value="{{ $p->categorie }}">
+                                </div>
+                                <div class="form-group">
+                                    <label class="form-label">Unité</label>
+                                    <input type="text" name="unite" class="form-control" value="{{ $p->unite }}">
+                                </div>
+                                <div class="form-group">
+                                    <label class="form-label">Prix achat</label>
+                                    <input type="number" name="prix_achat" class="form-control" value="{{ $p->prix_achat }}" min="0" required>
+                                </div>
+                                <div class="form-group">
+                                    <label class="form-label">Prix vente</label>
+                                    <input type="number" name="prix_vente" class="form-control" value="{{ $p->prix_vente }}" min="0" required>
+                                </div>
+                                <div class="form-group" style="grid-column:1/-1;">
+                                    <label class="form-label">Stock minimum</label>
+                                    <input type="number" name="stock_minimum" class="form-control" value="{{ $p->stock_minimum }}" min="0" required>
+                                </div>
+                            </div>
+                            <div style="display:flex; gap:10px; justify-content:flex-end; margin-top:8px;">
+                                <button type="button" class="btn btn-outline" data-modal-close>Annuler</button>
+                                <button type="submit" class="btn btn-primary"><i class="fas fa-check"></i> Sauvegarder</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+
+                @endforeach
+            </tbody>
+        </table>
+        <div style="padding: 0 16px;">{{ $produits->links() }}</div>
+    </div>
+</div>
+
+{{-- Modal Nouveau Produit --}}
+<div class="modal-overlay" id="modalNouveauProduit">
+    <div class="modal" style="max-width:600px;">
+        <div class="modal-header">
+            <h3><i class="fas fa-plus"></i> Nouveau produit</h3>
+            <button class="modal-close" data-modal-close>✕</button>
+        </div>
+        <form method="POST" action="{{ route('admin.produits.creer') }}">
+            @csrf
+            <div class="form-grid-2">
+                <div class="form-group">
+                    <label class="form-label">Référence <span style="color:var(--danger)">*</span></label>
+                    <input type="text" name="reference" class="form-control" placeholder="ART-001" required>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Nom produit <span style="color:var(--danger)">*</span></label>
+                    <input type="text" name="nom" class="form-control" placeholder="Huile Dinor 1L" required>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Catégorie</label>
+                    <input type="text" name="categorie" class="form-control" placeholder="Épicerie">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Unité</label>
+                    <input type="text" name="unite" class="form-control" placeholder="pcs, kg, L…">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Prix d'achat (FCFA) <span style="color:var(--danger)">*</span></label>
+                    <input type="number" name="prix_achat" class="form-control" min="0" required>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Prix de vente (FCFA) <span style="color:var(--danger)">*</span></label>
+                    <input type="number" name="prix_vente" class="form-control" min="0" required>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Stock initial <span style="color:var(--danger)">*</span></label>
+                    <input type="number" name="stock_actuel" class="form-control" min="0" value="0" required>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Stock minimum <span style="color:var(--danger)">*</span></label>
+                    <input type="number" name="stock_minimum" class="form-control" min="0" value="5" required>
+                </div>
+            </div>
+            <div style="display:flex; gap:10px; justify-content:flex-end; margin-top:8px;">
+                <button type="button" class="btn btn-outline" data-modal-close>Annuler</button>
+                <button type="submit" class="btn btn-primary"><i class="fas fa-check"></i> Ajouter au catalogue</button>
+            </div>
+        </form>
+    </div>
+</div>
+@endsection
