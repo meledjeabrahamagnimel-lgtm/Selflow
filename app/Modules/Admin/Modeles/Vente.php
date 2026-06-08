@@ -19,16 +19,22 @@ class Vente extends Model
         'montant_ht',
         'montant_tva',
         'montant_ttc',
+        'remise',
         'statut',
+        'type_facture',
+        'normalise',
+        'qr_code_data',
     ];
 
     protected function casts(): array
     {
         return [
-            'date_vente'   => 'date',
-            'montant_ht'   => 'decimal:2',
-            'montant_tva'  => 'decimal:2',
-            'montant_ttc'  => 'decimal:2',
+            'date_vente'    => 'date',
+            'montant_ht'    => 'decimal:2',
+            'montant_tva'   => 'decimal:2',
+            'montant_ttc'   => 'decimal:2',
+            'remise'        => 'decimal:2',
+            'normalise'     => 'boolean',
         ];
     }
 

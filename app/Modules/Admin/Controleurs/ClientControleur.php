@@ -26,14 +26,16 @@ class ClientControleur
         $entreprise = Auth::user()->entreprise;
 
         $request->validate([
-            'nom'       => ['required', 'string', 'max:150'],
-            'telephone' => ['nullable', 'string', 'max:30'],
-            'email'     => ['nullable', 'email', 'max:150'],
-            'adresse'   => ['nullable', 'string', 'max:255'],
+            'nom'               => ['required', 'string', 'max:150'],
+            'telephone'         => ['nullable', 'string', 'max:30'],
+            'email'             => ['nullable', 'email', 'max:150'],
+            'adresse'           => ['nullable', 'string', 'max:255'],
+            'ncc'               => ['nullable', 'string', 'max:50'],
+            'regime_imposition' => ['nullable', 'string', 'max:100'],
         ]);
 
         Client::create(array_merge(
-            $request->only(['nom', 'telephone', 'email', 'adresse']),
+            $request->only(['nom', 'telephone', 'email', 'adresse', 'ncc', 'regime_imposition']),
             ['entreprise_id' => $entreprise->id]
         ));
 

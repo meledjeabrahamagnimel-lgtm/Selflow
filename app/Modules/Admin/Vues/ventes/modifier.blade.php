@@ -1,7 +1,7 @@
 @extends('admin::gabarits.application')
 
-@section('titre', 'Nouvelle vente')
-@section('topbar_titre', 'Nouvelle vente')
+@section('titre', 'Modifier la vente')
+@section('topbar_titre', 'Modifier la vente')
 
 @section('styles')
 <style>
@@ -92,22 +92,32 @@
 @endsection
 
 @section('contenu')
+@php
+    $routeFactures = request()->routeIs('caissier.*') ? route('caissier.ventes.factures') : route('admin.ventes.factures');
+    $routeEnregistrer = request()->routeIs('caissier.*') ? route('caissier.ventes.modifier.enregistrer', $vente) : route('admin.ventes.modifier.enregistrer', $vente);
+    
+    $modeSimple = $vente->mode_paiement;
+    $selectedBanqueId = null;
+    if (str_starts_with($vente->mode_paiement, 'Banque : ')) {
+        $modeSimple = 'Banque';
+        $nomBanque = substr($vente->mode_paiement, 9);
+        $selectedBanqueId = $banques->where('nom', $nomBanque)->first()?->id;
+    }
+@endphp
+
 <div class="page-header">
     <div>
-        <h1><i class="fas fa-cash-register"></i> Nouvelle vente</h1>
-        <p>Sélectionnez les articles, ajustez les quantités et finalisez la vente</p>
+        <h1><i class="fas fa-edit"></i> Modifier la vente {{ $vente->numero_facture }}</h1>
+        <p>Ajustez les articles, la remise, le client ou le mode de règlement puis enregistrez</p>
     </div>
-    @php
-        $routeHistorique = request()->routeIs('caissier.*') ? route('caissier.ventes.historique') : route('admin.ventes.historique');
-        $routeEnregistrer = request()->routeIs('caissier.*') ? route('caissier.ventes.enregistrer') : route('admin.ventes.enregistrer');
-    @endphp
-    <a href="{{ $routeHistorique }}" class="btn btn-outline">
-        <i class="fas fa-history"></i> Historique
+    <a href="{{ $routeFactures }}" class="btn btn-outline">
+        <i class="fas fa-arrow-left"></i> Annuler et retourner
     </a>
 </div>
 
 <form method="POST" action="{{ $routeEnregistrer }}" id="formVente">
 @csrf
+@method('PUT')
 <div class="pos-grid">
 
     {{-- ── COLONNE GAUCHE : Catalogue produits ── --}}
@@ -168,9 +178,9 @@
             <div class="card-body">
 
                 {{-- Articles du panier --}}
-                <div id="panierVide" style="text-align:center; padding:24px 0; color:var(--text-3);">
+                <div id="panierVide" style="text-align:center; padding:24px 0; color:var(--text-3); display: none;">
                     <i class="fas fa-cart-plus" style="font-size:28px; display:block; margin-bottom:8px; opacity:.3;"></i>
-                    Cliquez sur un produit pour l'ajouter
+                    Le panier est vide
                 </div>
                 <div id="panierItems"></div>
 
@@ -184,11 +194,11 @@
                     <div class="total-row"><span>Sous-total HT</span><span id="totalHt">0 F</span></div>
                     <div class="total-row" style="align-items:center;">
                         <span>Remise (F)</span>
-                        <input type="number" id="remiseInput" name="remise" class="form-control" value="0" min="0" oninput="calculerTotaux()" style="width: 100px; height: 28px; text-align: right; font-weight: 700; padding: 2px 8px; font-size: 13px; margin: 0;">
+                        <input type="number" id="remiseInput" name="remise" class="form-control" value="{{ $vente->remise }}" min="0" oninput="calculerTotaux()" style="width: 100px; height: 28px; text-align: right; font-weight: 700; padding: 2px 8px; font-size: 13px; margin: 0;">
                     </div>
                     <div class="total-row" style="align-items:center;">
                         <label style="display:flex; align-items:center; gap:8px; cursor:pointer; font-weight:inherit; color:inherit; margin:0;">
-                            <input type="checkbox" id="tvaActiveCheckbox" name="tva_active" value="1" checked onchange="calculerTotaux()">
+                            <input type="checkbox" id="tvaActiveCheckbox" name="tva_active" value="1" {{ $vente->montant_tva > 0 ? 'checked' : '' }} onchange="calculerTotaux()">
                             TVA (18%)
                         </label>
                         <span id="totalTva">0 F</span>
@@ -203,30 +213,30 @@
                         <select name="client_id" class="form-control">
                             <option value="">— Client de passage —</option>
                             @foreach($clients as $client)
-                            <option value="{{ $client->id }}">{{ $client->nom }}</option>
+                            <option value="{{ $client->id }}" {{ $vente->client_id === $client->id ? 'selected' : '' }}>{{ $client->nom }}</option>
                             @endforeach
                         </select>
                     </div>
 
                     {{-- Mode de paiement style buttons --}}
-                    <input type="hidden" name="mode_paiement" id="modePaiementInput" value="Caisse">
+                    <input type="hidden" name="mode_paiement" id="modePaiementInput" value="{{ $modeSimple }}">
                     <div class="form-group">
                         <label class="form-label">Mode de paiement <span style="color:var(--danger)">*</span></label>
                         <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:10px; margin-bottom:12px;">
-                            <button type="button" class="btn payment-toggle-btn active" data-mode="Caisse" onclick="selectionnerModePaiement(this)" style="justify-content:center;">Caisse</button>
-                            <button type="button" class="btn payment-toggle-btn" data-mode="Banque" onclick="selectionnerModePaiement(this)" style="justify-content:center;">Banque</button>
-                            <button type="button" class="btn payment-toggle-btn" data-mode="Crédit" onclick="selectionnerModePaiement(this)" style="justify-content:center;">Crédit</button>
+                            <button type="button" class="btn payment-toggle-btn {{ $modeSimple === 'Caisse' ? 'active' : '' }}" data-mode="Caisse" onclick="selectionnerModePaiement(this)" style="justify-content:center;">Caisse</button>
+                            <button type="button" class="btn payment-toggle-btn {{ $modeSimple === 'Banque' ? 'active' : '' }}" data-mode="Banque" onclick="selectionnerModePaiement(this)" style="justify-content:center;">Banque</button>
+                            <button type="button" class="btn payment-toggle-btn {{ $modeSimple === 'Crédit' ? 'active' : '' }}" data-mode="Crédit" onclick="selectionnerModePaiement(this)" style="justify-content:center;">Crédit</button>
                         </div>
                     </div>
 
                     {{-- Sélection de la banque --}}
-                    <div id="selectionBanqueContainer" style="display:none; margin-bottom:16px;">
+                    <div id="selectionBanqueContainer" style="{{ $modeSimple === 'Banque' ? 'display:block;' : 'display:none;' }} margin-bottom:16px;">
                         <label class="form-label">Sélectionner la Banque <span style="color:var(--danger)">*</span></label>
                         <div style="display:flex; gap:8px;">
-                            <select name="banque_id" id="banqueSelect" class="form-control" style="flex:1;">
+                            <select name="banque_id" id="banqueSelect" class="form-control" style="flex:1;" {{ $modeSimple === 'Banque' ? 'required' : '' }}>
                                 <option value="">— Choisir un compte banque —</option>
                                 @foreach($banques as $b)
-                                <option value="{{ $b->id }}">{{ $b->nom }} ({{ $b->numero_compte }})</option>
+                                <option value="{{ $b->id }}" {{ $selectedBanqueId === $b->id ? 'selected' : '' }}>{{ $b->nom }} ({{ $b->numero_compte }})</option>
                                 @endforeach
                             </select>
                             <button type="button" class="btn btn-primary" onclick="ouvrirModalNouvelleBanque()" style="padding:0 14px;"><i class="fas fa-plus"></i></button>
@@ -236,12 +246,12 @@
                     {{-- Montant reçu --}}
                     <div class="form-group">
                         <label class="form-label">Montant à encaisser / reçu</label>
-                        <input type="number" name="montant_paye" id="montantPayeInput" class="form-control" placeholder="Laisser vide pour la totalité">
+                        <input type="number" name="montant_paye" id="montantPayeInput" class="form-control" placeholder="Laisser vide pour la totalité" value="{{ $vente->statut === 'Payé' ? '' : ($vente->statut === 'Avance' ? $vente->montant_ttc - ($vente->reste_a_payer ?? 0) : '') }}">
                     </div>
                 </div>
 
-                <button type="submit" class="btn btn-success" id="btnValider" style="width:100%; justify-content:center; margin-top:4px;" disabled>
-                    <i class="fas fa-check-circle"></i> Valider et générer la facture
+                <button type="submit" class="btn btn-primary" id="btnValider" style="width:100%; justify-content:center; margin-top:4px;">
+                    <i class="fas fa-save"></i> Enregistrer les modifications
                 </button>
             </div>
         </div>
@@ -329,7 +339,33 @@
 
 @section('scripts')
 <script>
-const panier = {};
+// Initialisation du panier pré-rempli avec les détails existants de la vente
+const panier = {
+    @foreach($vente->details as $detail)
+        @if($detail->produit_id)
+            "{{ $detail->produit_id }}": {
+                nom: "{!! addslashes($detail->produit->nom) !!}",
+                prix: {{ $detail->prix_unitaire }},
+                qte: {{ $detail->quantite }},
+                stock: {{ $detail->produit->stock_actuel + $detail->quantite }},
+                stock_minimum: {{ $detail->produit->stock_minimum }},
+                unite: "{!! addslashes($detail->unite ?? 'Unité') !!}",
+                isVirtual: false
+            },
+        @else
+            "v_{{ $detail->id }}": {
+                nom: "{!! addslashes($detail->libelle_virtuel) !!}",
+                prix: {{ $detail->prix_unitaire }},
+                qte: {{ $detail->quantite }},
+                stock: 99999,
+                stock_minimum: 0,
+                unite: "{!! addslashes($detail->unite ?? 'Unité') !!}",
+                isVirtual: true
+            },
+        @endif
+    @endforeach
+};
+
 const stocks = {};
 
 // Initialisation des stocks
@@ -415,9 +451,15 @@ function ajouterAuPanier(card) {
     const stock_min = parseInt(card.dataset.stockMin || 5);
     const unite     = card.dataset.unite || 'Unité';
 
+    // When modifying, if item was already in sale, we add back the sold qty
+    let stockDispo = stock;
+    if (panier[id]) {
+        stockDispo = panier[id].stock;
+    }
+
     if (panier[id]) {
         const nouvelleQte = panier[id].qte + 1;
-        if (nouvelleQte > stock) {
+        if (nouvelleQte > stockDispo) {
             ouvrirModalRupture(id, nouvelleQte);
         } else {
             panier[id].qte++;
@@ -425,10 +467,10 @@ function ajouterAuPanier(card) {
             renderPanier();
         }
     } else {
-        if (stock <= 0) {
-            ouvrirModalRuptureVirtual(id, nom, prix, stock, stock_min, unite);
+        if (stockDispo <= 0) {
+            ouvrirModalRuptureVirtual(id, nom, prix, stockDispo, stock_min, unite);
         } else {
-            panier[id] = { nom, prix, qte: 1, stock, stock_minimum: stock_min, unite: unite, isVirtual: false };
+            panier[id] = { nom, prix, qte: 1, stock: stockDispo, stock_minimum: stock_min, unite: unite, isVirtual: false };
             verifierLimiteMinimale(panier[id]);
             renderPanier();
         }
@@ -739,5 +781,8 @@ document.getElementById('rechercheInput').addEventListener('input', function() {
         card.style.display = card.dataset.nom.toLowerCase().includes(q) ? '' : 'none';
     });
 });
+
+// Initial render
+renderPanier();
 </script>
 @endsection

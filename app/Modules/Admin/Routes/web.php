@@ -10,6 +10,7 @@ use App\Modules\Admin\Controleurs\ProduitControleur;
 use App\Modules\Admin\Controleurs\ClientControleur;
 use App\Modules\Admin\Controleurs\FournisseurControleur;
 use App\Modules\Admin\Controleurs\PersonnelControleur;
+use App\Modules\Admin\Controleurs\EntrepriseControleur;
 use Illuminate\Support\Facades\Route;
 
 Route::prefix('admin')
@@ -27,6 +28,9 @@ Route::prefix('admin')
             Route::get('/factures',        [VenteControleur::class, 'factures'])->name('factures');
             Route::get('/historique',      [VenteControleur::class, 'historique'])->name('historique');
             Route::get('/facture/{vente}', [VenteControleur::class, 'imprimer'])->name('imprimer');
+            Route::post('/{vente}/normaliser', [VenteControleur::class, 'normaliser'])->name('normaliser');
+            Route::get('/{vente}/modifier',    [VenteControleur::class, 'modifierFormulaire'])->name('modifier');
+            Route::put('/{vente}/modifier',    [VenteControleur::class, 'enregistrerModification'])->name('modifier.enregistrer');
         });
 
         // ── Achats ──
@@ -92,6 +96,10 @@ Route::prefix('admin')
 
         // ── Banques ──
         Route::post('/banques/creer', [TresorerieControleur::class, 'creerBanqueAjax'])->name('banques.creer');
+
+        // ── Paramètres entreprise ──
+        Route::get('/entreprise/parametres', [EntrepriseControleur::class, 'parametres'])->name('entreprise.parametres');
+        Route::put('/entreprise/parametres', [EntrepriseControleur::class, 'enregistrerParametres'])->name('entreprise.parametres.enregistrer');
     });
 
 // ───────────────────────────────────────────────────────────────────────
@@ -110,6 +118,9 @@ Route::prefix('caissier')
             Route::get('/factures',        [VenteControleur::class, 'factures'])->name('factures');
             Route::get('/historique',      [VenteControleur::class, 'historique'])->name('historique');
             Route::get('/facture/{vente}', [VenteControleur::class, 'imprimer'])->name('imprimer');
+            Route::post('/{vente}/normaliser', [VenteControleur::class, 'normaliser'])->name('normaliser');
+            Route::get('/{vente}/modifier',    [VenteControleur::class, 'modifierFormulaire'])->name('modifier');
+            Route::put('/{vente}/modifier',    [VenteControleur::class, 'enregistrerModification'])->name('modifier.enregistrer');
         });
 
         Route::prefix('stock')->name('stock.')->group(function () {

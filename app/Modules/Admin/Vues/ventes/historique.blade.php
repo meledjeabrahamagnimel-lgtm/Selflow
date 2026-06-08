@@ -43,7 +43,17 @@
                     <td><span class="badge badge-purple">{{ $vente->pointDeVente->nom }}</span></td>
                     <td>{{ $vente->mode_paiement }}</td>
                     <td style="font-weight:700; color:var(--success);">{{ number_format($vente->montant_ttc, 0, ',', ' ') }} F</td>
-                    <td><span class="badge badge-success">{{ $vente->statut }}</span></td>
+                    <td>
+                        @if($vente->statut === 'Payé')
+                            <span class="badge badge-success">{{ $vente->statut }}</span>
+                        @elseif($vente->statut === 'Avance')
+                            <span class="badge badge-warning">{{ $vente->statut }}</span>
+                        @elseif($vente->statut === 'Crédit')
+                            <span class="badge badge-danger">{{ $vente->statut }}</span>
+                        @else
+                            <span class="badge badge-gray">{{ $vente->statut }}</span>
+                        @endif
+                    </td>
                     <td>
                         <a href="{{ route('admin.ventes.imprimer', $vente) }}" class="btn btn-outline btn-sm">
                             <i class="fas fa-print"></i> Facture

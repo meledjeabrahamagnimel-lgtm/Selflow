@@ -569,6 +569,14 @@
             </a>
             @endif
 
+            <!-- 10. Paramètres entreprise (admin uniquement) -->
+            @if(auth()->user()->role === 'admin')
+            <div class="nav-section"><span>Entreprise</span></div>
+            <a href="{{ route('admin.entreprise.parametres') }}" class="nav-item {{ request()->routeIs('admin.entreprise.parametres') ? 'active' : '' }}">
+                <i class="fas fa-gear"></i> Paramètres &amp; logos
+            </a>
+            @endif
+
         @endif
     </nav>
 

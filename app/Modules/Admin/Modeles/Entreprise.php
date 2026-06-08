@@ -16,6 +16,12 @@ class Entreprise extends Model
         'email',
         'rccm',
         'compte_contribuable',
+        'ncc',
+        'regime_imposition',
+        'centre_impots',
+        'ref_bancaire',
+        'logo_path',
+        'logo_fne_path',
         'quota_points_de_vente',
         'plan_abonnement',
     ];

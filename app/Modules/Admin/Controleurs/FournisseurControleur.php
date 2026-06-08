@@ -26,15 +26,17 @@ class FournisseurControleur
         $entreprise = Auth::user()->entreprise;
 
         $request->validate([
-            'nom'       => ['required', 'string', 'max:150'],
-            'telephone' => ['nullable', 'string', 'max:30'],
-            'email'     => ['nullable', 'email', 'max:150'],
-            'adresse'   => ['nullable', 'string', 'max:255'],
-            'secteur'   => ['nullable', 'string', 'max:100'],
+            'nom'               => ['required', 'string', 'max:150'],
+            'telephone'         => ['nullable', 'string', 'max:30'],
+            'email'             => ['nullable', 'email', 'max:150'],
+            'adresse'           => ['nullable', 'string', 'max:255'],
+            'secteur'           => ['nullable', 'string', 'max:100'],
+            'ncc'               => ['nullable', 'string', 'max:50'],
+            'regime_imposition' => ['nullable', 'string', 'max:100'],
         ]);
 
         Fournisseur::create(array_merge(
-            $request->only(['nom', 'telephone', 'email', 'adresse', 'secteur']),
+            $request->only(['nom', 'telephone', 'email', 'adresse', 'secteur', 'ncc', 'regime_imposition']),
             ['entreprise_id' => $entreprise->id]
         ));
 

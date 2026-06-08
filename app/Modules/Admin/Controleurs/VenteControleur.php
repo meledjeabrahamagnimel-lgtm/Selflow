@@ -60,10 +60,12 @@ class VenteControleur
         $request->validate([
             'client_id'      => ['nullable', 'integer', 'exists:clients,id'],
             'mode_paiement'  => ['required', 'string'],
+            'remise'         => ['nullable', 'numeric', 'min:0'],
             'articles'       => ['required', 'array', 'min:1'],
             'articles.*.produit_id'      => ['nullable', 'integer', 'exists:produits,id'],
             'articles.*.libelle_virtuel' => ['nullable', 'string', 'max:255'],
             'articles.*.quantite'        => ['required', 'integer', 'min:1'],
+            'articles.*.unite'           => ['nullable', 'string', 'max:50'],
             'articles.*.prix_unitaire'   => ['nullable', 'numeric', 'min:0'],
         ], [
             'articles.required' => 'Veuillez ajouter au moins un article au panier.',
@@ -79,8 +81,8 @@ class VenteControleur
 
         DB::transaction(function () use ($request, $pointDeVenteId, &$venteId) {
             $montantHt  = 0;
-            $montantTva = 0;
             $tvaActive = $request->boolean('tva_active', false);
+            $remise = floatval($request->input('remise', 0));
 
             // Précalcul des montants
             foreach ($request->articles as $article) {
@@ -92,12 +94,12 @@ class VenteControleur
                 }
 
                 $ht = $article['quantite'] * $prix;
-                $tva = $tvaActive ? ($ht * 0.18) : 0;
                 $montantHt  += $ht;
-                $montantTva += $tva;
             }
 
-            $montantTtc = $montantHt + $montantTva;
+            $montantHtNet = max(0, $montantHt - $remise);
+            $montantTva = $tvaActive ? ($montantHtNet * 0.18) : 0;
+            $montantTtc = $montantHtNet + $montantTva;
 
             // Déterminer la valeur finale du mode de paiement pour l'enregistrement
             $modePaiementFinal = $request->mode_paiement;
@@ -112,8 +114,21 @@ class VenteControleur
                 4, '0', STR_PAD_LEFT
             );
 
-            // Statut de la vente
-            $statutVente = $request->mode_paiement === 'Crédit' ? 'A crédit' : 'Payé';
+            // Calcul du montant payé et statut de la vente
+            $montantPaye = 0;
+            if ($request->mode_paiement === 'Crédit') {
+                $statutVente = 'Crédit';
+            } else {
+                $montantPaye = $request->filled('montant_paye') ? floatval($request->montant_paye) : $montantTtc;
+                if ($montantPaye <= 0) {
+                    $statutVente = 'Crédit';
+                    $montantPaye = 0;
+                } elseif ($montantPaye >= $montantTtc) {
+                    $statutVente = 'Payé';
+                } else {
+                    $statutVente = 'Avance';
+                }
+            }
 
             $vente = Vente::create([
                 'point_de_vente_id' => $pointDeVenteId,
@@ -123,6 +138,7 @@ class VenteControleur
                 'mode_paiement'     => $modePaiementFinal,
                 'montant_ht'        => $montantHt,
                 'montant_tva'       => $montantTva,
+                'remise'            => $remise,
                 'montant_ttc'       => $montantTtc,
                 'statut'            => $statutVente,
             ]);
@@ -146,6 +162,7 @@ class VenteControleur
                     'produit_id'      => $produit ? $produit->id : null,
                     'libelle_virtuel' => $produit ? null : $nomElement,
                     'quantite'        => $article['quantite'],
+                    'unite'           => $article['unite'] ?? 'Unité',
                     'prix_unitaire'   => $prix,
                     'montant_tva'     => $tva,
                     'montant_ttc'     => $ht + $tva,
@@ -167,10 +184,8 @@ class VenteControleur
                 }
             }
 
-            // Encaissement automatique en trésorerie uniquement si réglé (Espèces ou Banque)
-            if ($request->mode_paiement !== 'Crédit') {
-                $montantEntree = $request->filled('montant_paye') ? floatval($request->montant_paye) : $montantTtc;
-
+            // Encaissement automatique en trésorerie uniquement si réglé (Caisse ou Banque) et montant payé > 0
+            if ($statutVente !== 'Crédit' && $montantPaye > 0) {
                 $soldeActuel = TresorerieJournal::where('point_de_vente_id', $pointDeVenteId)
                     ->orderByDesc('created_at')->value('solde_resultat') ?? 0;
 
@@ -180,9 +195,9 @@ class VenteControleur
                     'type_operation'     => 'Encaissement',
                     'libelle'            => 'Vente — Facture ' . $numero,
                     'mode_paiement'      => $modePaiementFinal,
-                    'montant_entree'     => $montantEntree,
+                    'montant_entree'     => $montantPaye,
                     'montant_sortie'     => 0,
-                    'solde_resultat'     => $soldeActuel + $montantEntree,
+                    'solde_resultat'     => $soldeActuel + $montantPaye,
                     'reference_document' => $numero,
                 ]);
             }
@@ -226,6 +241,230 @@ class VenteControleur
             403
         );
         $vente->load(['client', 'pointDeVente.entreprise', 'details.produit']);
-        return view('admin::factures.vente', compact('vente'));
+        $vendeur = Auth::user();
+        return view('admin::factures.vente', compact('vente', 'vendeur'));
+    }
+
+    /**
+     * Simuler la normalisation DGI d'une facture.
+     */
+    public function normaliser(Vente $vente): \Illuminate\Http\RedirectResponse
+    {
+        abort_unless(
+            $vente->pointDeVente->entreprise_id === Auth::user()->entreprise_id,
+            403
+        );
+
+        if ($vente->normalise) {
+            return back()->with('info', 'Cette facture est d\'jà normalisée.');
+        }
+
+        // Simulation normalisation DGI — générer un code unique
+        $qrData = implode('|', [
+            $vente->numero_facture,
+            now()->format('YmdHis'),
+            'DGI-CI',
+            strtoupper(substr(md5($vente->id . $vente->numero_facture . now()->timestamp), 0, 12)),
+        ]);
+
+        $vente->update([
+            'normalise'     => true,
+            'type_facture'  => 'normale',
+            'qr_code_data'  => $qrData,
+        ]);
+
+        return redirect()->route(
+            request()->routeIs('caissier.*') ? 'caissier.ventes.factures' : 'admin.ventes.factures'
+        )->with('succes', 'Facture ' . $vente->numero_facture . ' normalisée avec succès.');
+    }
+
+    /**
+     * Formulaire de modification d'une vente.
+     */
+    public function modifierFormulaire(Vente $vente): View
+    {
+        abort_unless(
+            $vente->pointDeVente->entreprise_id === Auth::user()->entreprise_id,
+            403
+        );
+
+        $entreprise = Auth::user()->entreprise;
+        $clients    = Client::where('entreprise_id', $entreprise->id)->orderBy('nom')->get();
+        $produits   = Produit::where('entreprise_id', $entreprise->id)->orderBy('nom')->get();
+        $categories = $produits->pluck('categorie')->unique()->sort()->values();
+        $banques    = Banque::where('entreprise_id', $entreprise->id)->orderBy('nom')->get();
+
+        // Load details with products
+        $vente->load(['details.produit', 'client']);
+
+        return view('admin::ventes.modifier', compact('vente', 'clients', 'produits', 'categories', 'banques'));
+    }
+
+    /**
+     * Enregistrer la modification d'une vente.
+     */
+    public function enregistrerModification(Vente $vente, Request $request): RedirectResponse
+    {
+        abort_unless(
+            $vente->pointDeVente->entreprise_id === Auth::user()->entreprise_id,
+            403
+        );
+
+        $request->validate([
+            'client_id'      => ['nullable', 'integer', 'exists:clients,id'],
+            'mode_paiement'  => ['required', 'string'],
+            'remise'         => ['nullable', 'numeric', 'min:0'],
+            'articles'       => ['required', 'array', 'min:1'],
+            'articles.*.produit_id'      => ['nullable', 'integer', 'exists:produits,id'],
+            'articles.*.libelle_virtuel' => ['nullable', 'string', 'max:255'],
+            'articles.*.quantite'        => ['required', 'integer', 'min:1'],
+            'articles.*.unite'           => ['nullable', 'string', 'max:50'],
+            'articles.*.prix_unitaire'   => ['nullable', 'numeric', 'min:0'],
+        ], [
+            'articles.required' => 'Veuillez ajouter au moins un article au panier.',
+        ]);
+
+        if ($request->mode_paiement === 'Banque') {
+            $request->validate([
+                'banque_id' => ['required', 'integer', 'exists:banques,id'],
+            ]);
+        }
+
+        DB::transaction(function () use ($vente, $request) {
+            $pointDeVenteId = $vente->point_de_vente_id;
+
+            // 1. Restituer les stocks anciens
+            $oldDetails = VenteDetail::where('vente_id', $vente->id)->with('produit')->get();
+            foreach ($oldDetails as $oldDetail) {
+                if ($oldDetail->produit) {
+                    $oldDetail->produit->increment('stock_actuel', $oldDetail->quantite);
+                }
+            }
+
+            // 2. Supprimer les anciens détails, mouvements de stock et écritures de trésorerie
+            VenteDetail::where('vente_id', $vente->id)->delete();
+            MouvementStock::where('reference_document', $vente->numero_facture)->delete();
+            TresorerieJournal::where('reference_document', $vente->numero_facture)->delete();
+
+            // 3. Recalculer avec les nouveaux articles
+            $montantHt  = 0;
+            $tvaActive = $request->boolean('tva_active', false);
+            $remise = floatval($request->input('remise', 0));
+
+            foreach ($request->articles as $article) {
+                if (!empty($article['produit_id'])) {
+                    $produit = Produit::findOrFail($article['produit_id']);
+                    $prix = $produit->prix_vente;
+                } else {
+                    $prix = floatval($article['prix_unitaire'] ?? 0);
+                }
+                $ht = $article['quantite'] * $prix;
+                $montantHt  += $ht;
+            }
+
+            $montantHtNet = max(0, $montantHt - $remise);
+            $montantTva = $tvaActive ? ($montantHtNet * 0.18) : 0;
+            $montantTtc = $montantHtNet + $montantTva;
+
+            // Déterminer le mode de paiement final
+            $modePaiementFinal = $request->mode_paiement;
+            if ($request->mode_paiement === 'Banque' && $request->filled('banque_id')) {
+                $banque = Banque::findOrFail($request->banque_id);
+                $modePaiementFinal = 'Banque : ' . $banque->nom;
+            }
+
+            // Statut et montants
+            $montantPaye = 0;
+            if ($request->mode_paiement === 'Crédit') {
+                $statutVente = 'Crédit';
+            } else {
+                $montantPaye = $request->filled('montant_paye') ? floatval($request->montant_paye) : $montantTtc;
+                if ($montantPaye <= 0) {
+                    $statutVente = 'Crédit';
+                    $montantPaye = 0;
+                } elseif ($montantPaye >= $montantTtc) {
+                    $statutVente = 'Payé';
+                } else {
+                    $statutVente = 'Avance';
+                }
+            }
+
+            // Mettre à jour la vente
+            $vente->update([
+                'client_id'         => $request->client_id ?: null,
+                'mode_paiement'     => $modePaiementFinal,
+                'montant_ht'        => $montantHt,
+                'montant_tva'       => $montantTva,
+                'remise'            => $remise,
+                'montant_ttc'       => $montantTtc,
+                'statut'            => $statutVente,
+            ]);
+
+            // Re-créer les détails et mouvements
+            foreach ($request->articles as $article) {
+                if (!empty($article['produit_id'])) {
+                    $produit = Produit::lockForUpdate()->findOrFail($article['produit_id']);
+                    $prix = $produit->prix_vente;
+                    $nomElement = $produit->nom;
+                } else {
+                    $produit = null;
+                    $prix = floatval($article['prix_unitaire'] ?? 0);
+                    $nomElement = $article['libelle_virtuel'] ?? 'Saisie libre';
+                }
+
+                $ht = $article['quantite'] * $prix;
+                $tva = $tvaActive ? ($ht * 0.18) : 0;
+
+                VenteDetail::create([
+                    'coupon_id'       => null,
+                    'vente_id'        => $vente->id,
+                    'produit_id'      => $produit ? $produit->id : null,
+                    'libelle_virtuel' => $produit ? null : $nomElement,
+                    'quantite'        => $article['quantite'],
+                    'unite'           => $article['unite'] ?? 'Unité',
+                    'prix_unitaire'   => $prix,
+                    'montant_tva'     => $tva,
+                    'montant_ttc'     => $ht + $tva,
+                ]);
+
+                if ($produit) {
+                    $stockAvant = $produit->stock_actuel;
+                    $produit->decrement('stock_actuel', $article['quantite']);
+
+                    MouvementStock::create([
+                        'produit_id'         => $produit->id,
+                        'point_de_vente_id'  => $pointDeVenteId,
+                        'type_mouvement'     => 'Sortie',
+                        'quantite'           => $article['quantite'],
+                        'stock_avant'        => $stockAvant,
+                        'stock_apres'        => $stockAvant - $article['quantite'],
+                        'reference_document' => $vente->numero_facture,
+                    ]);
+                }
+            }
+
+            // Trésorerie
+            if ($statutVente !== 'Crédit' && $montantPaye > 0) {
+                $soldeActuel = TresorerieJournal::where('point_de_vente_id', $pointDeVenteId)
+                    ->orderByDesc('created_at')->value('solde_resultat') ?? 0;
+
+                TresorerieJournal::create([
+                    'point_de_vente_id'  => $pointDeVenteId,
+                    'date_operation'     => now()->toDateString(),
+                    'type_operation'     => 'Encaissement',
+                    'libelle'            => 'Modification Vente — Facture ' . $vente->numero_facture,
+                    'mode_paiement'      => $modePaiementFinal,
+                    'montant_entree'     => $montantPaye,
+                    'montant_sortie'     => 0,
+                    'solde_resultat'     => $soldeActuel + $montantPaye,
+                    'reference_document' => $vente->numero_facture,
+                ]);
+            }
+        });
+
+        $routeRetour = request()->routeIs('caissier.*') ? 'caissier.ventes.factures' : 'admin.ventes.factures';
+
+        return redirect()->route($routeRetour)
+            ->with('succes', 'Facture ' . $vente->numero_facture . ' modifiée avec succès.');
     }
 }

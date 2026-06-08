@@ -88,7 +88,17 @@
                         </td>
                         <td>{{ $vente->client?->nom ?? 'Client de passage' }}</td>
                         <td style="font-weight:700; color:var(--success);">{{ number_format($vente->montant_ttc, 0, ',', ' ') }} F</td>
-                        <td><span class="badge badge-success">{{ $vente->statut }}</span></td>
+                        <td>
+                            @if($vente->statut === 'Payé')
+                                <span class="badge badge-success">{{ $vente->statut }}</span>
+                            @elseif($vente->statut === 'Avance')
+                                <span class="badge badge-warning">{{ $vente->statut }}</span>
+                            @elseif($vente->statut === 'Crédit')
+                                <span class="badge badge-danger">{{ $vente->statut }}</span>
+                            @else
+                                <span class="badge badge-gray">{{ $vente->statut }}</span>
+                            @endif
+                        </td>
                     </tr>
                     @endforeach
                 </tbody>
