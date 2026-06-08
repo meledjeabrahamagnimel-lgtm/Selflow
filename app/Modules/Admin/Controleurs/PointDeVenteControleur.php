@@ -72,7 +72,7 @@ class PointDeVenteControleur
             'point_de_vente_actif_nom' => $pdv->nom,
         ]);
 
-        return redirect()->route('admin.tableau_de_bord')->with('succes', "Aperçu du point de vente « {$pdv->nom} » activé en mode lecture seule.");
+        return redirect()->route('caissier.tableau_de_bord')->with('succes', "Aperçu du point de vente « {$pdv->nom} » activé en mode lecture seule.");
     }
 
     public function desactiverApercu(): RedirectResponse

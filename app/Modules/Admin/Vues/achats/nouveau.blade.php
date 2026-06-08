@@ -27,12 +27,7 @@
     </a>
 </div>
 
-@if(!$pointDeVenteId)
-<div class="alert alert-warning">
-    <i class="fas fa-triangle-exclamation"></i>
-    Aucun point de vente actif ! Veuillez en sélectionner un depuis le tableau de bord.
-</div>
-@endif
+
 
 <form method="POST" action="{{ route('admin.achats.enregistrer') }}" id="formAchat">
 @csrf

@@ -388,31 +388,43 @@
         </div>
     </div>
 
-    @if(session()->has('apercu_pdv_id'))
+    @php
+        $nomPdvAffichage = session('apercu_pdv_nom') ?? session('point_de_vente_actif_nom') ?? auth()->user()->pointDeVente?->nom;
+        $estApercu = session()->has('apercu_pdv_id');
+    @endphp
+
+    @if($nomPdvAffichage)
     <div class="sidebar-pdv">
-        <div class="pdv-label"><i class="fas fa-store"></i> Aperçu Point de Vente</div>
-        <div class="pdv-name">{{ session('apercu_pdv_nom') }}</div>
+        <div class="pdv-label">
+            <i class="fas fa-store"></i> 
+            @if($estApercu)
+                Aperçu Point de Vente
+            @else
+                Point de Vente
+            @endif
+        </div>
+        <div class="pdv-name">{{ $nomPdvAffichage }}</div>
     </div>
     @endif
 
     <nav class="sidebar-nav">
-        @if(session()->has('apercu_pdv_id'))
-            <!-- ── CAISSIER SIDEBAR (MODE APERÇU LECTURE SEULE) ── -->
+        @if(request()->routeIs('caissier.*'))
+            <!-- ── CAISSIER SIDEBAR ── -->
             <div class="nav-section"><span>Caisse</span></div>
-            <a href="{{ route('admin.ventes.nouvelle') }}" class="nav-item {{ request()->routeIs('admin.ventes.nouvelle') ? 'active' : '' }}">
+            <a href="{{ route('caissier.ventes.nouvelle') }}" class="nav-item {{ request()->routeIs('caissier.ventes.nouvelle') ? 'active' : '' }}">
                 <i class="fas fa-cash-register"></i> Nouvelle vente
             </a>
-            <a href="{{ route('admin.ventes.factures') }}" class="nav-item {{ request()->routeIs('admin.ventes.factures') ? 'active' : '' }}">
+            <a href="{{ route('caissier.ventes.factures') }}" class="nav-item {{ request()->routeIs('caissier.ventes.factures') ? 'active' : '' }}">
                 <i class="fas fa-file-invoice"></i> Mes factures
             </a>
 
             <div class="nav-section"><span>Stock</span></div>
-            <a href="{{ route('admin.stock.index') }}" class="nav-item {{ request()->routeIs('admin.stock.index') ? 'active' : '' }}">
+            <a href="{{ route('caissier.stock.index') }}" class="nav-item {{ request()->routeIs('caissier.stock.index') ? 'active' : '' }}">
                 <i class="fas fa-boxes-stacked"></i> Consulter stock
             </a>
 
             <div class="nav-section"><span>Trésorerie</span></div>
-            <a href="{{ route('admin.tresorerie.encaissements') }}" class="nav-item {{ request()->routeIs('admin.tresorerie.encaissements') ? 'active' : '' }}">
+            <a href="{{ route('caissier.tresorerie.encaissements') }}" class="nav-item {{ request()->routeIs('caissier.tresorerie.encaissements') ? 'active' : '' }}">
                 <i class="fas fa-arrow-down" style="color:#10b981;"></i> Mes encaissements
             </a>
         @else
@@ -482,7 +494,7 @@
             @endif
 
             <!-- 5. Trésorerie -->
-            @if(auth()->user()->aHabilitation('tresorerie_encaissements') || auth()->user()->aHabilitation('tresorerie_decaissements') || auth()->user()->aHabilitation('tresorerie_journal'))
+            @if(auth()->user()->aHabilitation('tresorerie_encaissements') || auth()->user()->aHabilitation('tresorerie_decaissements') || auth()->user()->aHabilitation('tresorerie_journal') || auth()->user()->aHabilitation('tresorerie_codes_journaux'))
             <div class="nav-section"><span>Trésorerie</span></div>
             @if(auth()->user()->aHabilitation('tresorerie_encaissements'))
             <a href="{{ route('admin.tresorerie.encaissements') }}" class="nav-item {{ request()->routeIs('admin.tresorerie.encaissements') ? 'active' : '' }}">
@@ -497,6 +509,11 @@
             @if(auth()->user()->aHabilitation('tresorerie_journal'))
             <a href="{{ route('admin.tresorerie.journal') }}" class="nav-item {{ request()->routeIs('admin.tresorerie.journal') ? 'active' : '' }}">
                 <i class="fas fa-wallet"></i> Solde & journal
+            </a>
+            @endif
+            @if(auth()->user()->aHabilitation('tresorerie_codes_journaux'))
+            <a href="{{ route('admin.tresorerie.codes_journaux') }}" class="nav-item {{ request()->routeIs('admin.tresorerie.codes_journaux') ? 'active' : '' }}">
+                <i class="fas fa-book"></i> Codes Journaux
             </a>
             @endif
             @endif
@@ -579,17 +596,53 @@
     </button>
     <div class="topbar-title">
         @yield('topbar_titre', 'Tableau de bord')
-        <span>/ {{ auth()->user()->entreprise->nom ?? 'Selflow' }}</span>
+        <span>/ {{ auth()->user()->entreprise->nom ?? 'Selflow' }} — {{ session('apercu_pdv_nom') ?? session('point_de_vente_actif_nom') ?? auth()->user()->pointDeVente?->nom ?? 'Siège' }}</span>
     </div>
 
-    @if(!session('point_de_vente_actif_id'))
-    <div class="topbar-badge">
-        <i class="fas fa-triangle-exclamation"></i>
-        Aucun point de vente sélectionné
+    <div style="display:flex; align-items:center; gap:16px;">
+        <div class="topbar-clock" id="horloge">--:--:--</div>
+        
+        {{-- Bouton Profil et Menu Déroulant (Images 2 et 3) --}}
+        <div class="user-dropdown" style="position:relative; display:inline-block;">
+            <button class="user-dropdown-btn" onclick="toggleUserDropdown()" style="display:flex; align-items:center; gap:8px; background:#ffffff; border:1px solid var(--border); border-radius:30px; padding:4px 14px 4px 4px; cursor:pointer; font-family:inherit; transition: all 0.15s; outline:none;">
+                <div style="width:30px; height:30px; border-radius:50%; background:#002B5C; color:#ffffff; display:flex; align-items:center; justify-content:center; font-weight:700; font-size:12px;">
+                    {{ strtoupper(substr(auth()->user()->nom, 0, 1)) }}
+                </div>
+                <span style="font-size:12.5px; font-weight:600; color:var(--primary); max-width:120px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">
+                    {{ auth()->user()->nom }}
+                </span>
+                <i class="fas fa-chevron-down" style="font-size:9px; color:var(--text-3);"></i>
+            </button>
+            
+            <div class="user-dropdown-menu" id="userDropdownMenu" style="display:none; position:absolute; right:0; top:calc(100% + 8px); width:230px; background:#ffffff; border:1px solid var(--border); border-radius:12px; box-shadow:0 10px 25px rgba(0,0,0,0.08); z-index:1000; padding:6px 0;">
+                <div style="padding:10px 14px; border-bottom:1px solid var(--border); display:flex; align-items:center; gap:10px;">
+                    <div style="width:34px; height:34px; border-radius:50%; background:#002B5C; color:#ffffff; display:flex; align-items:center; justify-content:center; font-weight:700; font-size:13px;">
+                        {{ strtoupper(substr(auth()->user()->nom, 0, 1)) }}
+                    </div>
+                    <div style="overflow:hidden;">
+                        <div style="font-weight:700; font-size:12.5px; color:var(--text); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">{{ auth()->user()->nom }}</div>
+                        <div style="font-size:11px; color:var(--text-3); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">{{ auth()->user()->email }}</div>
+                    </div>
+                </div>
+                <a href="#" style="display:flex; align-items:center; gap:8px; padding:8px 14px; font-size:12.5px; color:var(--text); text-decoration:none; transition:background 0.15s;" onmouseover="this.style.background='#F1F5F9'" onmouseout="this.style.background='none'">
+                    <i class="far fa-user" style="width:14px; color:var(--text-2);"></i> Mon profil
+                </a>
+                <a href="#" style="display:flex; align-items:center; gap:8px; padding:8px 14px; font-size:12.5px; color:var(--text); text-decoration:none; transition:background 0.15s;" onmouseover="this.style.background='#F1F5F9'" onmouseout="this.style.background='none'">
+                    <i class="fas fa-gear" style="width:14px; color:var(--text-2);"></i> Paramètres
+                </a>
+                <a href="#" style="display:flex; align-items:center; gap:8px; padding:8px 14px; font-size:12.5px; color:var(--text); text-decoration:none; transition:background 0.15s;" onmouseover="this.style.background='#F1F5F9'" onmouseout="this.style.background='none'">
+                    <i class="far fa-credit-card" style="width:14px; color:var(--text-2);"></i> Facturation
+                </a>
+                <div style="border-top:1px solid var(--border); margin:4px 0;"></div>
+                <form method="POST" action="{{ route('deconnexion') }}" id="formDeconnexionDropdown" style="margin:0;">
+                    @csrf
+                    <button type="submit" style="width:100%; display:flex; align-items:center; gap:8px; padding:8px 14px; font-size:12.5px; color:var(--danger); border:none; background:none; cursor:pointer; text-align:left; font-family:inherit; transition:background 0.15s;" onmouseover="this.style.background='#FEF2F2'" onmouseout="this.style.background='none'">
+                        <i class="fas fa-right-from-bracket" style="width:14px;"></i> Se déconnecter
+                    </button>
+                </form>
+            </div>
+        </div>
     </div>
-    @endif
-
-    <div class="topbar-clock" id="horloge">--:--:--</div>
 </header>
 
 <!-- ────────────────── CONTENU PRINCIPAL ────────────────── -->
@@ -634,6 +687,22 @@
             document.body.classList.toggle('sidebar-open');
         } else {
             document.body.classList.toggle('sidebar-collapsed');
+        }
+    });
+
+    // Menu déroulant Profil utilisateur
+    function toggleUserDropdown() {
+        const menu = document.getElementById('userDropdownMenu');
+        if (menu) {
+            menu.style.display = menu.style.display === 'block' ? 'none' : 'block';
+        }
+    }
+    // Fermeture automatique au clic extérieur
+    document.addEventListener('click', (e) => {
+        const btn = document.querySelector('.user-dropdown-btn');
+        const menu = document.getElementById('userDropdownMenu');
+        if (btn && menu && !btn.contains(e.target) && !menu.contains(e.target)) {
+            menu.style.display = 'none';
         }
     });
 

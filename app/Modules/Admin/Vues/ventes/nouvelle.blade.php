@@ -15,7 +15,8 @@
         user-select: none;
     }
     .produit-card:hover { border-color: var(--primary); background: rgba(99,102,241,.08); transform: translateY(-2px); }
-    .produit-card.out-of-stock { opacity: .4; cursor: not-allowed; }
+    .produit-card.out-of-stock { opacity: .65; border-color: rgba(239,68,68,.3); }
+    .produit-card.out-of-stock:hover { border-color: var(--warning); background: rgba(245,158,11,.08); }
     .produit-card .produit-nom { font-weight: 600; font-size: 13px; margin-bottom: 4px; }
     .produit-card .produit-prix { color: var(--success); font-weight: 700; font-size: 15px; }
     .produit-card .produit-stock { font-size: 11px; color: var(--text-3); margin-top: 4px; }
@@ -28,15 +29,20 @@
     }
     .panier-item .item-nom { flex: 1; font-weight: 600; font-size: 13px; }
     .panier-item .item-prix { color: var(--text-3); font-size: 12px; }
-    .qte-ctrl { display: flex; align-items: center; gap: 6px; }
+    .qte-ctrl { display: flex; align-items: center; gap: 4px; }
     .qte-btn {
         width: 26px; height: 26px; border-radius: 6px;
         border: none; cursor: pointer; font-size: 14px; font-weight: 700;
         display: flex; align-items: center; justify-content: center;
         background: var(--border); color: var(--text); transition: background .12s;
     }
-    .qte-btn:hover { background: var(--primary); }
-    .qte-val { min-width: 28px; text-align: center; font-weight: 700; }
+    .qte-btn:hover { background: var(--primary); color: #fff; }
+    .qte-input {
+        width: 44px; height: 26px; text-align: center; font-weight: 700;
+        border: 1px solid var(--border); border-radius: 6px; background: #fff;
+        outline: none; font-size: 13px;
+    }
+    .qte-input:focus { border-color: var(--primary); }
     .remove-btn {
         background: none; border: none; color: var(--text-3);
         cursor: pointer; font-size: 14px; transition: color .12s;
@@ -60,6 +66,25 @@
     .search-produit {
         width: 100%; margin-bottom: 14px;
     }
+
+    .payment-toggle-btn {
+        border: 1px solid var(--border);
+        background: #fff;
+        color: var(--text-2);
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.15s;
+    }
+    .payment-toggle-btn.active {
+        background: #002B5C !important;
+        color: #ffffff !important;
+        border-color: #002B5C !important;
+    }
+
+    @keyframes slideIn {
+        from { transform: translateX(-100%); opacity: 0; }
+        to { transform: translateX(0); opacity: 1; }
+    }
 </style>
 @endsection
 
@@ -69,19 +94,16 @@
         <h1><i class="fas fa-cash-register"></i> Nouvelle vente</h1>
         <p>Sélectionnez les articles, ajustez les quantités et finalisez la vente</p>
     </div>
-    <a href="{{ route('admin.ventes.historique') }}" class="btn btn-outline">
+    @php
+        $routeHistorique = request()->routeIs('caissier.*') ? route('caissier.ventes.historique') : route('admin.ventes.historique');
+        $routeEnregistrer = request()->routeIs('caissier.*') ? route('caissier.ventes.enregistrer') : route('admin.ventes.enregistrer');
+    @endphp
+    <a href="{{ $routeHistorique }}" class="btn btn-outline">
         <i class="fas fa-history"></i> Historique
     </a>
 </div>
 
-@if(!$pointDeVenteId)
-<div class="alert alert-warning">
-    <i class="fas fa-triangle-exclamation"></i>
-    Aucun point de vente actif ! Veuillez en sélectionner un depuis le tableau de bord avant d'enregistrer une vente.
-</div>
-@endif
-
-<form method="POST" action="{{ route('admin.ventes.enregistrer') }}" id="formVente">
+<form method="POST" action="{{ $routeEnregistrer }}" id="formVente">
 @csrf
 <div class="pos-grid">
 
@@ -112,12 +134,19 @@
                          data-nom="{{ $produit->nom }}"
                          data-prix="{{ $produit->prix_vente }}"
                          data-stock="{{ $produit->stock_actuel }}"
+                         data-stock-min="{{ $produit->stock_minimum }}"
                          data-cat="{{ $produit->categorie }}"
                          onclick="ajouterAuPanier(this)">
                         <div class="produit-cat">{{ $produit->categorie }}</div>
                         <div class="produit-nom">{{ $produit->nom }}</div>
                         <div class="produit-prix">{{ number_format($produit->prix_vente, 0, ',', ' ') }} F</div>
-                        <div class="produit-stock">Stock : {{ $produit->stock_actuel }} {{ $produit->unite }}</div>
+                        <div class="produit-stock" style="{{ $produit->stock_actuel <= 0 ? 'color:var(--danger);font-weight:700;' : '' }}">
+                            @if($produit->stock_actuel <= 0)
+                                Rupture de stock
+                            @else
+                                Stock : {{ $produit->stock_actuel }} {{ $produit->unite ?? 'unités' }}
+                            @endif
+                        </div>
                     </div>
                     @endforeach
                 </div>
@@ -142,10 +171,21 @@
                     </div>
                 </div>
 
+                {{-- Bouton Saisie Libre --}}
+                <button type="button" class="btn btn-outline btn-sm" onclick="ouvrirSaisieLibre()" style="width:100%; justify-content:center; margin-top:10px; margin-bottom:15px; border-style:dashed;">
+                    <i class="fas fa-plus"></i> Saisie libre / Service
+                </button>
+
                 {{-- Totaux --}}
                 <div class="total-box">
                     <div class="total-row"><span>Sous-total HT</span><span id="totalHt">0 F</span></div>
-                    <div class="total-row"><span>TVA (18%)</span><span id="totalTva">0 F</span></div>
+                    <div class="total-row" style="align-items:center;">
+                        <label style="display:flex; align-items:center; gap:8px; cursor:pointer; font-weight:inherit; color:inherit; margin:0;">
+                            <input type="checkbox" id="tvaActiveCheckbox" name="tva_active" value="1" checked onchange="calculerTotaux()">
+                            TVA (18%)
+                        </label>
+                        <span id="totalTva">0 F</span>
+                    </div>
                     <div class="total-row grand"><span>Total TTC</span><span id="totalTtc">0 F</span></div>
                 </div>
 
@@ -160,15 +200,36 @@
                             @endforeach
                         </select>
                     </div>
+
+                    {{-- Mode de paiement style buttons --}}
+                    <input type="hidden" name="mode_paiement" id="modePaiementInput" value="Espèces">
                     <div class="form-group">
                         <label class="form-label">Mode de paiement <span style="color:var(--danger)">*</span></label>
-                        <select name="mode_paiement" class="form-control" required>
-                            <option value="Espèces">Espèces</option>
-                            <option value="Mobile Money">Mobile Money</option>
-                            <option value="Carte bancaire">Carte bancaire</option>
-                            <option value="Chèque">Chèque</option>
-                            <option value="Virement">Virement</option>
-                        </select>
+                        <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:10px; margin-bottom:12px;">
+                            <button type="button" class="btn payment-toggle-btn active" data-mode="Espèces" onclick="selectionnerModePaiement(this)" style="justify-content:center;">Espèces</button>
+                            <button type="button" class="btn payment-toggle-btn" data-mode="Banque" onclick="selectionnerModePaiement(this)" style="justify-content:center;">Banque</button>
+                            <button type="button" class="btn payment-toggle-btn" data-mode="Crédit" onclick="selectionnerModePaiement(this)" style="justify-content:center;">Crédit</button>
+                        </div>
+                    </div>
+
+                    {{-- Sélection de la banque --}}
+                    <div id="selectionBanqueContainer" style="display:none; margin-bottom:16px;">
+                        <label class="form-label">Sélectionner la Banque <span style="color:var(--danger)">*</span></label>
+                        <div style="display:flex; gap:8px;">
+                            <select name="banque_id" id="banqueSelect" class="form-control" style="flex:1;">
+                                <option value="">— Choisir un compte banque —</option>
+                                @foreach($banques as $b)
+                                <option value="{{ $b->id }}">{{ $b->nom }} ({{ $b->numero_compte }})</option>
+                                @endforeach
+                            </select>
+                            <button type="button" class="btn btn-primary" onclick="ouvrirModalNouvelleBanque()" style="padding:0 14px;"><i class="fas fa-plus"></i></button>
+                        </div>
+                    </div>
+
+                    {{-- Montant reçu --}}
+                    <div class="form-group">
+                        <label class="form-label">Montant à encaisser / reçu</label>
+                        <input type="number" name="montant_paye" id="montantPayeInput" class="form-control" placeholder="Laisser vide pour la totalité">
                     </div>
                 </div>
 
@@ -180,6 +241,78 @@
     </div>
 </div>
 </form>
+
+<!-- Modal Saisie Libre -->
+<div class="modal-overlay" id="modalSaisieLibre">
+    <div class="modal">
+        <div class="modal-header">
+            <h3><i class="fas fa-pen-to-square"></i> Saisie libre / Service</h3>
+            <button type="button" class="modal-close" onclick="fermerSaisieLibre()">&times;</button>
+        </div>
+        <form onsubmit="ajouterSaisieLibre(event)">
+            <div class="form-group">
+                <label class="form-label">Désignation / Service <span style="color:var(--danger)">*</span></label>
+                <input type="text" id="saisieNomInput" class="form-control" placeholder="Ex: Prestation de service, Produit hors stock" required>
+            </div>
+            <div style="display:grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+                <div class="form-group">
+                    <label class="form-label">Prix unitaire (F) <span style="color:var(--danger)">*</span></label>
+                    <input type="number" id="saisiePrixInput" class="form-control" min="0" placeholder="Ex: 5000" required>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Quantité <span style="color:var(--danger)">*</span></label>
+                    <input type="number" id="saisieQteInput" class="form-control" min="1" value="1" required>
+                </div>
+            </div>
+            <div style="display:flex; justify-content:flex-end; gap:12px; margin-top:24px;">
+                <button type="button" class="btn btn-outline" onclick="fermerSaisieLibre()">Annuler</button>
+                <button type="submit" class="btn btn-primary">Ajouter au panier</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Modal Banque -->
+<div class="modal-overlay" id="modalNouvelleBanque">
+    <div class="modal">
+        <div class="modal-header">
+            <h3><i class="fas fa-building-columns"></i> Nouveau compte banque</h3>
+            <button type="button" class="modal-close" onclick="fermerModalNouvelleBanque()">&times;</button>
+        </div>
+        <form id="formNouvelleBanque" onsubmit="soumettreNouvelleBanque(event)">
+            <div class="form-group">
+                <label class="form-label">Nom de la banque <span style="color:var(--danger)">*</span></label>
+                <input type="text" id="banqueNomInput" class="form-control" placeholder="Ex: SGCI, ECOBANK" required>
+            </div>
+            <div class="form-group">
+                <label class="form-label">Numéro de compte <span style="color:var(--danger)">*</span></label>
+                <input type="text" id="banqueNumeroInput" class="form-control" placeholder="Ex: CI093 01001 1234567890 12" required>
+            </div>
+            <div style="display:flex; justify-content:flex-end; gap:12px; margin-top:24px;">
+                <button type="button" class="btn btn-outline" onclick="fermerModalNouvelleBanque()">Annuler</button>
+                <button type="submit" class="btn btn-primary">Enregistrer</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Modal Rupture de Stock -->
+<div class="modal-overlay" id="modalRuptureStock">
+    <div class="modal" style="max-width: 480px; text-align: center;">
+        <div style="font-size: 48px; color: var(--warning); margin-bottom: 16px;">
+            <i class="fas fa-triangle-exclamation"></i>
+        </div>
+        <h3 style="font-size:18px; font-weight:700; margin-bottom:12px;">Stock local épuisé</h3>
+        <p style="color:var(--text-2); font-size:13.5px; line-height:1.6; margin-bottom:20px;">
+            Le produit <strong id="ruptureNomProduit" style="color:var(--primary);">—</strong> est en rupture de stock en local (Stock dispo : <span id="ruptureStockDispo">0</span>, Demandé : <span id="ruptureQteDemandee">0</span>).<br>
+            Voulez-vous tout de même continuer et autoriser la vente ?
+        </p>
+        <div style="display:flex; justify-content:center; gap:12px;">
+            <button type="button" class="btn btn-outline" onclick="fermerModalRupture()">Annuler</button>
+            <button type="button" class="btn btn-primary" id="btnConfirmerRupture">Oui, continuer</button>
+        </div>
+    </div>
+</div>
 @endsection
 
 @section('scripts')
@@ -196,41 +329,208 @@ function formatFcfa(n) {
     return new Intl.NumberFormat('fr-FR').format(Math.round(n)) + ' F';
 }
 
-function ajouterAuPanier(card) {
-    const id    = parseInt(card.dataset.id);
-    const nom   = card.dataset.nom;
-    const prix  = parseFloat(card.dataset.prix);
-    const stock = parseInt(card.dataset.stock);
+function selectionnerModePaiement(btn) {
+    document.querySelectorAll('.payment-toggle-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    
+    const mode = btn.dataset.mode;
+    document.getElementById('modePaiementInput').value = mode;
+    
+    const banqueContainer = document.getElementById('selectionBanqueContainer');
+    const banqueSelect = document.getElementById('banqueSelect');
+    
+    if (mode === 'Banque') {
+        banqueContainer.style.display = 'block';
+        banqueSelect.required = true;
+    } else {
+        banqueContainer.style.display = 'none';
+        banqueSelect.required = false;
+        banqueSelect.value = '';
+    }
+}
 
-    if (stock <= 0) return;
+function ouvrirSaisieLibre() {
+    document.getElementById('modalSaisieLibre').classList.add('open');
+}
+
+function fermerSaisieLibre() {
+    document.getElementById('modalSaisieLibre').classList.remove('open');
+    document.getElementById('saisieNomInput').value = '';
+    document.getElementById('saisiePrixInput').value = '';
+    document.getElementById('saisieQteInput').value = '1';
+}
+
+function ajouterSaisieLibre(e) {
+    e.preventDefault();
+    const nom = document.getElementById('saisieNomInput').value;
+    const prix = parseFloat(document.getElementById('saisiePrixInput').value);
+    const qte = parseInt(document.getElementById('saisieQteInput').value);
+    
+    const id = 'v_' + Date.now();
+    panier[id] = { nom, prix, qte, stock: 99999, stock_minimum: 0, isVirtual: true };
+    
+    fermerSaisieLibre();
+    renderPanier();
+}
+
+function ajouterAuPanier(card) {
+    const id        = parseInt(card.dataset.id);
+    const nom       = card.dataset.nom;
+    const prix      = parseFloat(card.dataset.prix);
+    const stock     = parseInt(card.dataset.stock);
+    const stock_min = parseInt(card.dataset.stockMin || 5);
 
     if (panier[id]) {
-        if (panier[id].qte >= stock) {
-            alert('Stock insuffisant pour ' + nom);
-            return;
+        const nouvelleQte = panier[id].qte + 1;
+        if (nouvelleQte > stock) {
+            ouvrirModalRupture(id, nouvelleQte);
+        } else {
+            panier[id].qte++;
+            verifierLimiteMinimale(panier[id]);
+            renderPanier();
         }
-        panier[id].qte++;
     } else {
-        panier[id] = { nom, prix, qte: 1, stock };
+        if (stock <= 0) {
+            ouvrirModalRuptureVirtual(id, nom, prix, stock, stock_min);
+        } else {
+            panier[id] = { nom, prix, qte: 1, stock, stock_minimum: stock_min, isVirtual: false };
+            verifierLimiteMinimale(panier[id]);
+            renderPanier();
+        }
     }
-    renderPanier();
 }
 
 function changerQte(id, delta) {
     if (!panier[id]) return;
-    panier[id].qte += delta;
-    if (panier[id].qte <= 0) {
-        delete panier[id];
-    } else if (panier[id].qte > panier[id].stock) {
-        panier[id].qte = panier[id].stock;
-        alert('Stock maximum atteint');
+    const item = panier[id];
+
+    if (item.isVirtual) {
+        item.qte += delta;
+        if (item.qte <= 0) {
+            delete panier[id];
+        }
+        renderPanier();
+        return;
     }
-    renderPanier();
+
+    const nouvelleQte = item.qte + delta;
+
+    if (nouvelleQte <= 0) {
+        delete panier[id];
+        renderPanier();
+        return;
+    }
+
+    if (nouvelleQte > item.stock) {
+        ouvrirModalRupture(id, nouvelleQte);
+    } else {
+        item.qte = nouvelleQte;
+        verifierLimiteMinimale(item);
+        renderPanier();
+    }
+}
+
+function saisirQte(id, val) {
+    let q = parseInt(val);
+    if (isNaN(q) || q <= 0) q = 1;
+
+    const item = panier[id];
+    if (!item) return;
+
+    if (item.isVirtual) {
+        item.qte = q;
+        renderPanier();
+        return;
+    }
+
+    if (q > item.stock) {
+        ouvrirModalRupture(id, q);
+    } else {
+        item.qte = q;
+        verifierLimiteMinimale(item);
+        renderPanier();
+    }
 }
 
 function supprimerItem(id) {
     delete panier[id];
     renderPanier();
+}
+
+function ouvrirModalRupture(id, qte) {
+    const item = panier[id];
+    document.getElementById('ruptureNomProduit').textContent = item.nom;
+    document.getElementById('ruptureQteDemandee').textContent = qte;
+    document.getElementById('ruptureStockDispo').textContent = item.stock;
+    
+    document.getElementById('btnConfirmerRupture').onclick = function() {
+        item.qte = qte;
+        fermerModalRupture();
+        verifierLimiteMinimale(item);
+        renderPanier();
+    };
+    
+    document.getElementById('modalRuptureStock').classList.add('open');
+}
+
+function ouvrirModalRuptureVirtual(id, nom, prix, stock, stock_min) {
+    document.getElementById('ruptureNomProduit').textContent = nom;
+    document.getElementById('ruptureQteDemandee').textContent = 1;
+    document.getElementById('ruptureStockDispo').textContent = stock;
+    
+    document.getElementById('btnConfirmerRupture').onclick = function() {
+        panier[id] = { nom, prix, qte: 1, stock, stock_minimum: stock_min, isVirtual: false };
+        fermerModalRupture();
+        renderPanier();
+    };
+    
+    document.getElementById('modalRuptureStock').classList.add('open');
+}
+
+function fermerModalRupture() {
+    document.getElementById('modalRuptureStock').classList.remove('open');
+}
+
+function verifierLimiteMinimale(item) {
+    const stockRestant = item.stock - item.qte;
+    if (stockRestant <= item.stock_minimum) {
+        afficherAlerteStockMin(item.nom, item.stock_minimum);
+    }
+}
+
+function afficherAlerteStockMin(nom, limite) {
+    let alertContainer = document.getElementById('alertesStocksContainer');
+    if (!alertContainer) {
+        alertContainer = document.createElement('div');
+        alertContainer.id = 'alertesStocksContainer';
+        alertContainer.style.position = 'fixed';
+        alertContainer.style.bottom = '20px';
+        alertContainer.style.left = '20px';
+        alertContainer.style.zIndex = '9999';
+        alertContainer.style.display = 'flex';
+        alertContainer.style.flexDirection = 'column';
+        alertContainer.style.gap = '10px';
+        document.body.appendChild(alertContainer);
+    }
+    
+    const existing = document.querySelector(`[data-alert-prod="${nom}"]`);
+    if (existing) return;
+
+    const toast = document.createElement('div');
+    toast.className = 'alert alert-warning';
+    toast.setAttribute('data-alert-prod', nom);
+    toast.style.margin = '0';
+    toast.style.boxShadow = '0 4px 12px rgba(0,0,0,0.15)';
+    toast.style.animation = 'slideIn 0.3s ease';
+    toast.innerHTML = `<i class="fas fa-triangle-exclamation"></i> <div><strong>${nom}</strong> : Stock minimum atteint (${limite}) !</div>`;
+    
+    alertContainer.appendChild(toast);
+    
+    setTimeout(() => {
+        toast.style.transition = 'opacity 0.4s';
+        toast.style.opacity = '0';
+        setTimeout(() => toast.remove(), 400);
+    }, 3500);
 }
 
 function renderPanier() {
@@ -246,22 +546,19 @@ function renderPanier() {
         vide.style.display = 'block';
         nbArt.textContent = '0 article(s)';
         btnVal.disabled = true;
-        updateTotaux(0, 0);
-        // Supprimer les inputs cachés
+        
         document.querySelectorAll('.article-input').forEach(e => e.remove());
+        calculerTotaux();
         return;
     }
 
     vide.style.display = 'none';
     container.innerHTML = '';
-    // Supprimer anciens inputs
     document.querySelectorAll('.article-input').forEach(e => e.remove());
 
-    let totalHt = 0;
     ids.forEach((id, idx) => {
         const item = panier[id];
         const sousTotal = item.prix * item.qte;
-        totalHt += sousTotal;
 
         const div = document.createElement('div');
         div.className = 'panier-item';
@@ -271,23 +568,32 @@ function renderPanier() {
                 <div class="item-prix">${formatFcfa(item.prix)} × ${item.qte} = <strong>${formatFcfa(sousTotal)}</strong></div>
             </div>
             <div class="qte-ctrl">
-                <button type="button" class="qte-btn" onclick="changerQte(${id}, -1)">−</button>
-                <span class="qte-val">${item.qte}</span>
-                <button type="button" class="qte-btn" onclick="changerQte(${id}, 1)">+</button>
+                <button type="button" class="qte-btn" onclick="changerQte('${id}', -1)">−</button>
+                <input type="number" class="qte-input" value="${item.qte}" min="1" onchange="saisirQte('${id}', this.value)">
+                <button type="button" class="qte-btn" onclick="changerQte('${id}', 1)">+</button>
             </div>
-            <button type="button" class="remove-btn" onclick="supprimerItem(${id})">
+            <button type="button" class="remove-btn" onclick="supprimerItem('${id}')">
                 <i class="fas fa-trash"></i>
             </button>
         `;
         container.appendChild(div);
 
-        // Inputs cachés pour le formulaire
         const form = document.getElementById('formVente');
-        ['produit_id', 'quantite'].forEach(field => {
+        ['produit_id', 'quantite', 'libelle_virtuel', 'prix_unitaire'].forEach(field => {
             const input = document.createElement('input');
             input.type = 'hidden';
             input.name = `articles[${idx}][${field}]`;
-            input.value = field === 'produit_id' ? id : item.qte;
+            
+            if (field === 'produit_id') {
+                input.value = item.isVirtual ? '' : id;
+            } else if (field === 'quantite') {
+                input.value = item.qte;
+            } else if (field === 'libelle_virtuel') {
+                input.value = item.isVirtual ? item.nom : '';
+            } else if (field === 'prix_unitaire') {
+                input.value = item.isVirtual ? item.prix : '';
+            }
+            
             input.className = 'article-input';
             form.appendChild(input);
         });
@@ -295,13 +601,73 @@ function renderPanier() {
 
     nbArt.textContent = ids.length + ' article(s)';
     btnVal.disabled = false;
-    updateTotaux(totalHt, totalHt * 0.18);
+    calculerTotaux();
 }
 
-function updateTotaux(ht, tva) {
-    document.getElementById('totalHt').textContent  = formatFcfa(ht);
+function calculerTotaux() {
+    let totalHt = 0;
+    Object.keys(panier).forEach(id => {
+        const item = panier[id];
+        totalHt += item.prix * item.qte;
+    });
+    
+    const tvaActive = document.getElementById('tvaActiveCheckbox').checked;
+    const tva = tvaActive ? (totalHt * 0.18) : 0;
+    const totalTtc = totalHt + tva;
+    
+    document.getElementById('totalHt').textContent  = formatFcfa(totalHt);
     document.getElementById('totalTva').textContent = formatFcfa(tva);
-    document.getElementById('totalTtc').textContent = formatFcfa(ht + tva);
+    document.getElementById('totalTtc').textContent = formatFcfa(totalTtc);
+    
+    const inputMontant = document.getElementById('montantPayeInput');
+    if (inputMontant) {
+        inputMontant.placeholder = `${Math.round(totalTtc)}`;
+    }
+}
+
+function ouvrirModalNouvelleBanque() {
+    document.getElementById('modalNouvelleBanque').classList.add('open');
+}
+
+function fermerModalNouvelleBanque() {
+    document.getElementById('modalNouvelleBanque').classList.remove('open');
+    document.getElementById('formNouvelleBanque').reset();
+}
+
+function soumettreNouvelleBanque(e) {
+    e.preventDefault();
+    const nom = document.getElementById('banqueNomInput').value;
+    const numero_compte = document.getElementById('banqueNumeroInput').value;
+    
+    const routeCreation = "{{ request()->routeIs('caissier.*') ? route('caissier.banques.creer') : route('admin.banques.creer') }}";
+    
+    fetch(routeCreation, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
+        },
+        body: JSON.stringify({ nom, numero_compte })
+    })
+    .then(res => res.json())
+    .then(data => {
+        if (data.succes) {
+            const select = document.getElementById('banqueSelect');
+            const opt = document.createElement('option');
+            opt.value = data.banque.id;
+            opt.textContent = `${data.banque.nom} (${data.banque.numero_compte})`;
+            opt.selected = true;
+            select.appendChild(opt);
+            
+            fermerModalNouvelleBanque();
+        } else {
+            alert("Erreur lors de la création du compte banque.");
+        }
+    })
+    .catch(err => {
+        console.error(err);
+        alert("Une erreur est survenue.");
+    });
 }
 
 // Filtre catégorie

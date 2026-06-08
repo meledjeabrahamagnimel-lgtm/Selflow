@@ -65,6 +65,7 @@
                 @endif
             </div>
 
+            @if($pdv->nom !== 'Siège')
             <div style="display: flex; flex-direction: column; gap: 8px;">
                 <form method="POST" action="{{ route('admin.pdv.activer', $pdv) }}">
                     @csrf
@@ -92,6 +93,11 @@
                     @endif
                 </form>
             </div>
+            @else
+            <div style="text-align: center; font-size: 12.5px; color: var(--primary); font-weight: 600; padding: 10px; border: 1px dashed rgba(0, 43, 92, 0.3); border-radius: 8px; background: rgba(0, 43, 92, 0.03);">
+                <i class="fas fa-building"></i> Point de vente principal (Siège)
+            </div>
+            @endif
         </div>
     </div>
     @endforeach

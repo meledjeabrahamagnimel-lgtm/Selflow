@@ -15,7 +15,11 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->alias([
             'role' => \App\Modules\Authentification\Middleware\VerifierRole::class,
             'apercu.readonly' => \App\Modules\Authentification\Middleware\ApercuLectureSeule::class,
+            'caissier.acces' => \App\Modules\Authentification\Middleware\VerifierAccesCaissier::class,
+            'habilitation' => \App\Modules\Authentification\Middleware\VerifierHabilitationRoute::class,
         ]);
+
+        $middleware->redirectTo('/connexion');
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         $exceptions->shouldRenderJsonWhen(

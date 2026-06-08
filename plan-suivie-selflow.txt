@@ -1,4 +1,4 @@
-bonsoir 
+bonsoir , j'espere que tu va bien 
 
 voila avant de commencer sache que tous ce que nous allons faire dois etre en francais , que ce soit le noms des dossiers , des fichiers , le code , les tables de base de données tes reponses et toutes autres en francais .
 
@@ -20,4 +20,14 @@ Nous avons déja les vue de l'application : la page de login , superadmin , admi
 
 NB: pour le sidebarr de tous les interface , utilise la meme couleur identique bleue du login et le blanc du div vas concerner le contenu avec un peut de bleue pour les boutons 
 
-NB: on a déja commencer et avancer lis , soit intelligent , c'est juste pour te mettre dans le contexte , beaucoup de chose on déja été faite , assez de chose on déja été dévélopper ( on t'a pas demander de tous reprendre )  , garde en memoire les recommandation lors du codage 
+NB: on a déja commencer et avancer lis , soit intelligent , c'est juste pour te mettre dans le contexte , beaucoup de chose on déja été faite , assez de chose on déja été dévélopper ( on t'a pas demander de tous reprendre )  , garde en memoire les recommandation lors du codage.
+
+NB: optimise le code , optimise toutes les requette de base de données pour permettre une rapidité tres optimale , utilise des indexe pôur les tables des base de données , je repete ; optimise toutes les requete de base de données .
+
+NB: pour tous les code que tu vas génerer , fais tres attention a la sécurité , aucun code défaillant ne dois etre dans le projet , adopte des pratique propre de code , génere pas du n'importe quoi .
+
+NB: met l'accent sur la sécurité , sécurise le code pour qu'il soit impiratable 
+ 
+NB: sache que tous ce que nous allons faire dois etre en francais , que ce soit le noms des dossiers , des fichiers , le code , les tables de base de données tes reponses et toutes autres en francais .
+
+NB: si tu ulilise des fichiers de debug apres supprime les , ils ne doivent pas etre dans le code , le code dois etre propre 

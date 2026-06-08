@@ -326,6 +326,9 @@
                         <label style="display:flex; align-items:center; gap:8px; font-size:12px; margin-bottom:5px; cursor:pointer;">
                             <input type="checkbox" name="habilitations[]" value="tresorerie_journal"> Solde & journal
                         </label>
+                        <label style="display:flex; align-items:center; gap:8px; font-size:12px; margin-bottom:5px; cursor:pointer;">
+                            <input type="checkbox" name="habilitations[]" value="tresorerie_codes_journaux"> Codes Journaux
+                        </label>
                     </div>
 
                     <div>

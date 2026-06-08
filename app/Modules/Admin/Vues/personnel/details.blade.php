@@ -155,6 +155,9 @@
                             <label style="display:flex; align-items:center; gap:8px; font-size:12px; margin-bottom:5px; cursor:pointer;">
                                 <input type="checkbox" name="habilitations[]" value="tresorerie_journal" @if(in_array('tresorerie_journal', $userHabs)) checked @endif> Solde & journal
                             </label>
+                            <label style="display:flex; align-items:center; gap:8px; font-size:12px; margin-bottom:5px; cursor:pointer;">
+                                <input type="checkbox" name="habilitations[]" value="tresorerie_codes_journaux" @if(in_array('tresorerie_codes_journaux', $userHabs)) checked @endif> Codes Journaux
+                            </label>
                         </div>
 
                         <div>

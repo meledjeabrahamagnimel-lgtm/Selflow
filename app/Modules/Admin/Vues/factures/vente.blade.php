@@ -137,8 +137,8 @@
                 @foreach($vente->details as $i => $detail)
                 <tr>
                     <td style="color:#94a3b8;">{{ $i + 1 }}</td>
-                    <td style="font-weight:600;">{{ $detail->produit->nom }}</td>
-                    <td style="color:#94a3b8;">{{ $detail->produit->reference }}</td>
+                    <td style="font-weight:600;">{{ $detail->libelle_virtuel ?? $detail->produit->nom }}</td>
+                    <td style="color:#94a3b8;">{{ $detail->produit->reference ?? '—' }}</td>
                     <td style="text-align:center;">{{ $detail->quantite }}</td>
                     <td>{{ number_format($detail->prix_unitaire, 0, ',', ' ') }} F</td>
                     <td>{{ number_format($detail->quantite * $detail->prix_unitaire, 0, ',', ' ') }} F</td>

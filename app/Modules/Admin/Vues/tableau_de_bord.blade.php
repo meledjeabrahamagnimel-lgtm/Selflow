@@ -188,7 +188,9 @@
                         @endif
                     </td>
                     <td>
-                        @if($pointDeVenteId != $pdv->id)
+                        @if($pdv->nom === 'Siège')
+                            <span style="color:var(--primary); font-size:12px; font-weight:600;"><i class="fas fa-building"></i> Siège</span>
+                        @elseif($pointDeVenteId != $pdv->id)
                         <form method="POST" action="{{ route('admin.pdv.activer', $pdv) }}">
                             @csrf
                             <button type="submit" class="btn btn-outline btn-sm">

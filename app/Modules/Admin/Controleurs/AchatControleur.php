@@ -21,14 +21,35 @@ class AchatControleur
         $entreprise  = Auth::user()->entreprise;
         $fournisseurs = Fournisseur::where('entreprise_id', $entreprise->id)->orderBy('nom')->get();
         $produits     = Produit::where('entreprise_id', $entreprise->id)->orderBy('nom')->get();
-        $pointDeVenteId = session('point_de_vente_actif_id');
+        $pointDeVenteId = session('point_de_vente_actif_id') 
+            ?? Auth::user()->point_de_vente_id 
+            ?? (\App\Modules\Admin\Modeles\PointDeVente::firstOrCreate([
+                'entreprise_id' => $entreprise->id,
+                'nom'           => 'Siège',
+            ], [
+                'ville'         => 'Abidjan',
+                'commune'       => 'Cocody',
+                'responsable'   => 'Superviseur',
+                'statut'        => 'Ouvert',
+            ]))->id;
 
         return view('admin::achats.nouveau', compact('fournisseurs', 'produits', 'pointDeVenteId'));
     }
 
     public function enregistrer(Request $request): RedirectResponse
     {
-        $pointDeVenteId = session('point_de_vente_actif_id');
+        $entreprise = Auth::user()->entreprise;
+        $pointDeVenteId = session('point_de_vente_actif_id') 
+            ?? Auth::user()->point_de_vente_id 
+            ?? (\App\Modules\Admin\Modeles\PointDeVente::firstOrCreate([
+                'entreprise_id' => $entreprise->id,
+                'nom'           => 'Siège',
+            ], [
+                'ville'         => 'Abidjan',
+                'commune'       => 'Cocody',
+                'responsable'   => 'Superviseur',
+                'statut'        => 'Ouvert',
+            ]))->id;
 
         $request->validate([
             'fournisseur_id' => ['required', 'integer', 'exists:fournisseurs,id'],
@@ -43,9 +64,7 @@ class AchatControleur
             'articles.required'       => 'Veuillez ajouter au moins un article.',
         ]);
 
-        if (! $pointDeVenteId) {
-            return back()->withErrors(['general' => 'Aucun point de vente actif. Veuillez en sélectionner un.']);
-        }
+
 
         DB::transaction(function () use ($request, $pointDeVenteId) {
             $montantHt  = 0;

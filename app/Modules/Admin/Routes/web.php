@@ -13,7 +13,7 @@ use App\Modules\Admin\Controleurs\PersonnelControleur;
 use Illuminate\Support\Facades\Route;
 
 Route::prefix('admin')
-    ->middleware(['auth', 'role:admin', 'apercu.readonly'])
+    ->middleware(['auth', 'role:admin', 'habilitation', 'apercu.readonly'])
     ->name('admin.')
     ->group(function () {
 
@@ -49,6 +49,9 @@ Route::prefix('admin')
             Route::get('/encaissements', [TresorerieControleur::class, 'encaissements'])->name('encaissements');
             Route::get('/decaissements', [TresorerieControleur::class, 'decaissements'])->name('decaissements');
             Route::get('/journal',       [TresorerieControleur::class, 'journal'])->name('journal');
+            Route::get('/codes-journaux', [TresorerieControleur::class, 'codesJournaux'])->name('codes_journaux');
+            Route::post('/codes-journaux', [TresorerieControleur::class, 'creerCodeJournal'])->name('creer_code_journal');
+            Route::delete('/codes-journaux/{code}', [TresorerieControleur::class, 'supprimerCodeJournal'])->name('supprimer_code_journal');
         });
 
         // ── Points de vente ──
@@ -86,4 +89,39 @@ Route::prefix('admin')
             Route::get('/',       [FournisseurControleur::class, 'index'])->name('index');
             Route::post('/',      [FournisseurControleur::class, 'creer'])->name('creer');
         });
+
+        // ── Banques ──
+        Route::post('/banques/creer', [TresorerieControleur::class, 'creerBanqueAjax'])->name('banques.creer');
     });
+
+// ───────────────────────────────────────────────────────────────────────
+// Routes pour l'interface Caissier (Point de Vente)
+// ───────────────────────────────────────────────────────────────────────
+Route::prefix('caissier')
+    ->middleware(['auth', 'role:admin,caissier', 'caissier.acces', 'habilitation', 'apercu.readonly'])
+    ->name('caissier.')
+    ->group(function () {
+        // Le tableau de bord du caissier est l'écran de caisse/nouvelle vente
+        Route::get('/', [VenteControleur::class, 'nouvelle'])->name('tableau_de_bord');
+
+        Route::prefix('ventes')->name('ventes.')->group(function () {
+            Route::get('/nouvelle',        [VenteControleur::class, 'nouvelle'])->name('nouvelle');
+            Route::post('/enregistrer',    [VenteControleur::class, 'enregistrer'])->name('enregistrer');
+            Route::get('/factures',        [VenteControleur::class, 'factures'])->name('factures');
+            Route::get('/historique',      [VenteControleur::class, 'historique'])->name('historique');
+            Route::get('/facture/{vente}', [VenteControleur::class, 'imprimer'])->name('imprimer');
+        });
+
+        Route::prefix('stock')->name('stock.')->group(function () {
+            Route::get('/',           [StockControleur::class, 'index'])->name('index');
+            Route::get('/mouvements', [StockControleur::class, 'mouvements'])->name('mouvements');
+        });
+
+        Route::prefix('tresorerie')->name('tresorerie.')->group(function () {
+            Route::get('/encaissements', [TresorerieControleur::class, 'encaissements'])->name('encaissements');
+        });
+
+        // ── Banques ──
+        Route::post('/banques/creer', [TresorerieControleur::class, 'creerBanqueAjax'])->name('banques.creer');
+    });
+

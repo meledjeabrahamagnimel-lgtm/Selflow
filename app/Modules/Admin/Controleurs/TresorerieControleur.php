@@ -3,7 +3,11 @@
 namespace App\Modules\Admin\Controleurs;
 
 use App\Modules\Admin\Modeles\TresorerieJournal;
+use App\Modules\Admin\Modeles\CodeJournal;
+use App\Modules\Admin\Modeles\Banque;
 use Illuminate\Http\Request;
+use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\View\View;
 
@@ -46,5 +50,58 @@ class TresorerieControleur
         $soldeFinal    = $totalEntrees - $totalSorties;
 
         return view('admin::tresorerie.journal', compact('operations', 'totalEntrees', 'totalSorties', 'soldeFinal'));
+    }
+
+    public function codesJournaux(): View
+    {
+        $entreprise = Auth::user()->entreprise;
+        $codes = CodeJournal::where('entreprise_id', $entreprise->id)->latest()->get();
+        return view('admin::tresorerie.codes_journaux', compact('codes'));
+    }
+
+    public function creerCodeJournal(Request $request): RedirectResponse
+    {
+        $request->validate([
+            'type'     => 'required|string|max:255',
+            'code'     => 'required|string|max:50',
+            'intitule' => 'required|string|max:255',
+            'compte'   => 'required|string|max:50',
+        ]);
+
+        CodeJournal::create([
+            'entreprise_id' => Auth::user()->entreprise_id,
+            'type'          => $request->type,
+            'code'          => $request->code,
+            'intitule'      => $request->intitule,
+            'compte'        => $request->compte,
+        ]);
+
+        return redirect()->back()->with('succes', 'Code journal créé avec succès !');
+    }
+
+    public function supprimerCodeJournal(CodeJournal $code): RedirectResponse
+    {
+        abort_unless($code->entreprise_id === Auth::user()->entreprise_id, 403);
+        $code->delete();
+        return redirect()->back()->with('succes', 'Code journal supprimé avec succès !');
+    }
+
+    public function creerBanqueAjax(Request $request): JsonResponse
+    {
+        $request->validate([
+            'nom'           => 'required|string|max:255',
+            'numero_compte' => 'required|string|max:255',
+        ]);
+
+        $banque = Banque::create([
+            'entreprise_id' => Auth::user()->entreprise_id,
+            'nom'           => $request->nom,
+            'numero_compte' => $request->numero_compte,
+        ]);
+
+        return response()->json([
+            'succes' => true,
+            'banque' => $banque
+        ]);
     }
 }
