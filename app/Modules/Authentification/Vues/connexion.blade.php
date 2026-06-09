@@ -305,7 +305,7 @@
 
                 <div class="badge-promo">
                     <i class="ti ti-star-filled" aria-hidden="true"></i>
-                    Votre copilote IA pour mieux gérer
+                    La solution pour mieux gérer
                 </div>
 
                 <div class="slogan-titre">
