@@ -38,6 +38,14 @@ class FournisseurDeServicesModules extends ServiceProvider
                     ->group($cheminRoute);
             }
 
+            // Enregistrer les routes API
+            $cheminRouteApi = $cheminModule . '/Routes/api.php';
+            if (file_exists($cheminRouteApi)) {
+                Route::middleware('api')
+                    ->prefix('api')
+                    ->group($cheminRouteApi);
+            }
+
             // Enregistrer les vues
             $cheminVues = $cheminModule . '/Vues';
             if (is_dir($cheminVues)) {
