@@ -76,7 +76,7 @@
                     </td>
                     <td style="white-space: nowrap;">
                         <div style="display:flex; gap:6px; flex-wrap: nowrap; align-items: center; white-space: nowrap;">
-                            <a href="{{ $routeImprimer }}" target="_blank" class="btn btn-outline btn-sm" style="padding: 4px 8px; font-size:11px;" title="Voir la facture proformat">
+                            <a href="{{ $routeImprimer }}" class="btn btn-outline btn-sm" style="padding: 4px 8px; font-size:11px;" title="Voir la facture proformat">
                                 <i class="fas fa-eye"></i> Voir
                             </a>
                             <button type="button" onclick="telechargerDirectement('{{ $routeImprimer }}?download=1')" class="btn btn-outline btn-sm" style="padding: 4px 8px; font-size:11px;" title="Télécharger le PDF">
@@ -98,7 +98,7 @@
                     <td style="white-space: nowrap;">
                         @if($vente->normalise)
                         <div style="display:flex; gap:6px; flex-wrap: nowrap; align-items: center; white-space: nowrap;">
-                            <a href="{{ $routeImprimer }}" target="_blank" class="btn btn-primary btn-sm" style="padding: 4px 8px; font-size:11px; background:#002B5C; color:#fff;" title="Voir la facture normalisée">
+                            <a href="{{ $routeImprimer }}" class="btn btn-primary btn-sm" style="padding: 4px 8px; font-size:11px; background:#002B5C; color:#fff;" title="Voir la facture normalisée">
                                 <i class="fas fa-eye"></i> Voir
                             </a>
                             <button type="button" onclick="telechargerDirectement('{{ $routeImprimer }}?download=1')" class="btn btn-primary btn-sm" style="padding: 4px 8px; font-size:11px; background:#002B5C; color:#fff;" title="Télécharger le PDF">

@@ -287,11 +287,11 @@ function model1(d) {
     var sColor = statusColor(d.statut, d.badge_color);
     var isNorm = d.normalise;
     return `
+<div class="print-bar no-print" style="max-width: 760px; margin: 0 auto 15px; background: #fff; border: 0.5px solid var(--br); border-radius: 12px; padding: 12px 20px; display: flex; justify-content: flex-end; gap: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.02);">
+    <div class="print-btn main" onclick="telechargerPdf()"><i class="ti ti-download" style="font-size:13px"></i> Télécharger PDF</div>
+    <a id="btn-confirmer" href="${URL_CONFIRMER}" class="print-btn" style="background:#059669;color:#fff;border-color:#059669;display:none;text-decoration:none;align-items:center;gap:6px;"><i class="ti ti-check" style="font-size:13px"></i> Confirmer</a>
+</div>
 <div class="invoice">
-    <div class="print-bar no-print" data-html2pdf-ignore="true">
-        <div class="print-btn main" onclick="telechargerPdf()"><i class="ti ti-download" style="font-size:13px"></i> Télécharger PDF</div>
-        <a id="btn-confirmer" href="${URL_CONFIRMER}" class="print-btn" style="background:#059669;color:#fff;border-color:#059669;display:none;text-decoration:none;align-items:center;gap:6px;"><i class="ti ti-check" style="font-size:13px"></i> Confirmer</a>
-    </div>
     <div style="padding:28px 32px">
         <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:20px">
             <div style="display:flex;align-items:flex-start;gap:12px;">
@@ -307,7 +307,6 @@ function model1(d) {
                 </div>
             </div>
             <div style="text-align:right;flex-shrink:0;">
-                ${COMPANY.logo_fne ? `<div style="margin-bottom:8px;">${logoHtml(COMPANY.logo_fne, 'Logo FNE', 36)}</div>` : ''}
                 <div style="display:inline-block;padding:4px 12px;border-radius:20px;font-size:11px;font-weight:600;background:${d.badge_bg};color:${d.badge_tx};margin-bottom:6px">${isNorm ? 'NORMALISÉE' : d.type_badge}</div>
                 <div style="font-size:22px;font-weight:800;color:var(--tx)">${isNorm ? 'Facture Normalisée' : 'Facture'}</div>
                 <div style="font-size:13px;color:var(--mu);margin-top:2px;font-weight:600;">${d.num}</div>
@@ -387,11 +386,11 @@ function model2(d) {
     var sColor = statusColor(d.statut, d.badge_color);
     var isNorm = d.normalise;
     return `
+<div class="print-bar no-print" style="max-width: 760px; margin: 0 auto 15px; background: #fff; border: 0.5px solid var(--br); border-radius: 12px; padding: 12px 20px; display: flex; justify-content: flex-end; gap: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.02);">
+    <div class="print-btn main" onclick="telechargerPdf()"><i class="ti ti-download" style="font-size:13px"></i> Télécharger PDF</div>
+    <a id="btn-confirmer" href="${URL_CONFIRMER}" class="print-btn" style="background:#059669;color:#fff;border-color:#059669;display:none;text-decoration:none;align-items:center;gap:6px;"><i class="ti ti-check" style="font-size:13px"></i> Confirmer</a>
+</div>
 <div class="invoice">
-    <div class="print-bar no-print" data-html2pdf-ignore="true">
-        <div class="print-btn main" onclick="telechargerPdf()"><i class="ti ti-download" style="font-size:13px"></i> Télécharger PDF</div>
-        <a id="btn-confirmer" href="${URL_CONFIRMER}" class="print-btn" style="background:#059669;color:#fff;border-color:#059669;display:none;text-decoration:none;align-items:center;gap:6px;"><i class="ti ti-check" style="font-size:13px"></i> Confirmer</a>
-    </div>
     <div style="display:flex">
         <div style="width:210px;background:${d.badge_color};padding:28px 20px;flex-shrink:0;display:flex;flex-direction:column">
             <div style="margin-bottom:16px;text-align:center">
@@ -408,7 +407,6 @@ function model2(d) {
                 ${COMPANY.centre_impots ? '<br>' + COMPANY.centre_impots : ''}
                 ${COMPANY.rccm ? '<br>RCCM : ' + COMPANY.rccm : ''}
             </div>
-            ${COMPANY.logo_fne ? `<div style="margin-top:16px;padding-top:12px;border-top:1px solid rgba(255,255,255,.2);">${logoHtml(COMPANY.logo_fne, 'Logo FNE', 34)}</div>` : ''}
             ${isNorm ? `
             <div style="margin-top:16px;padding-top:12px;border-top:1px solid rgba(255,255,255,.2);text-align:center;">
                 <div style="display:inline-block;padding:5px;background:#fff;border-radius:4px;">
@@ -481,11 +479,11 @@ function model3(d) {
     var sColor = statusColor(d.statut, d.badge_color);
     var isNorm = d.normalise;
     return `
+<div class="print-bar no-print" style="max-width: 760px; margin: 0 auto 15px; background: #fff; border: 0.5px solid var(--br); border-radius: 12px; padding: 12px 20px; display: flex; justify-content: flex-end; gap: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.02);">
+    <div class="print-btn main" onclick="telechargerPdf()"><i class="ti ti-download" style="font-size:13px"></i> Télécharger PDF</div>
+    <a id="btn-confirmer" href="${URL_CONFIRMER}" class="print-btn" style="background:#059669;color:#fff;border-color:#059669;display:none;text-decoration:none;align-items:center;gap:6px;"><i class="ti ti-check" style="font-size:13px"></i> Confirmer</a>
+</div>
 <div class="invoice">
-    <div class="print-bar no-print" data-html2pdf-ignore="true">
-        <div class="print-btn main" onclick="telechargerPdf()"><i class="ti ti-download" style="font-size:13px"></i> Télécharger PDF</div>
-        <a id="btn-confirmer" href="${URL_CONFIRMER}" class="print-btn" style="background:#059669;color:#fff;border-color:#059669;display:none;text-decoration:none;align-items:center;gap:6px;"><i class="ti ti-check" style="font-size:13px"></i> Confirmer</a>
-    </div>
     <div style="border-top:4px solid ${d.badge_color};padding:28px 32px">
         <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:20px">
             <div style="display:flex;align-items:flex-start;gap:12px">
@@ -500,7 +498,6 @@ function model3(d) {
                 </div>
             </div>
             <div style="text-align:right">
-                ${COMPANY.logo_fne ? `<div style="margin-bottom:8px;text-align:right;">${logoHtml(COMPANY.logo_fne, 'Logo FNE', 32)}</div>` : ''}
                 <div style="font-size:24px;font-weight:800;color:var(--tx);letter-spacing:-0.5px;">${isNorm ? 'FACTURE NORMALISÉE' : 'FACTURE'}</div>
                 <div style="font-size:12px;margin-top:2px"><span style="color:var(--mu)">N° </span><span style="font-weight:700;color:${d.badge_color}">${d.num}</span></div>
                 <div style="display:inline-block;padding:3px 10px;border-radius:4px;font-size:11px;font-weight:600;background:${d.badge_bg};color:${d.badge_tx};margin-top:6px">${isNorm ? 'NORMALISÉE' : d.type_badge}</div>
@@ -600,11 +597,11 @@ function modelStandard(d) {
     var hasTva = d.items.some(r => r.tva > 0);
     
     return `
+<div class="print-bar no-print" style="max-width: 760px; margin: 0 auto 15px; background: #fff; border: 0.5px solid var(--br); border-radius: 12px; padding: 12px 20px; display: flex; justify-content: flex-end; gap: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.02);">
+    <div class="print-btn main" onclick="telechargerPdf()"><i class="ti ti-download" style="font-size:13px"></i> Télécharger PDF</div>
+    <a id="btn-confirmer" href="${URL_CONFIRMER}" class="print-btn" style="background:#059669;color:#fff;border-color:#059669;display:none;text-decoration:none;align-items:center;gap:6px;"><i class="ti ti-check" style="font-size:13px"></i> Confirmer</a>
+</div>
 <div class="invoice" style="border: 1px solid #000; border-radius: 0; background: #fff; box-shadow: none;">
-    <div class="print-bar no-print" data-html2pdf-ignore="true">
-        <div class="print-btn main" onclick="telechargerPdf()"><i class="ti ti-download" style="font-size:13px"></i> Télécharger PDF</div>
-        <a id="btn-confirmer" href="${URL_CONFIRMER}" class="print-btn" style="background:#059669;color:#fff;border-color:#059669;display:none;text-decoration:none;align-items:center;gap:6px;"><i class="ti ti-check" style="font-size:13px"></i> Confirmer</a>
-    </div>
     
     <div style="padding:40px; color:#000; font-family: 'Inter', sans-serif;">
         <!-- En-tête -->
@@ -640,10 +637,6 @@ function modelStandard(d) {
                     <!-- Place Logo Entreprise -->
                     <div style="width:110px; height:60px; border:1.5px dashed #000; display:flex; align-items:center; justify-content:center; background:#fff; font-size:9px; font-weight:700; color:#000; text-align:center; text-transform:uppercase;">
                         ${COMPANY.logo ? `<img src="${COMPANY.logo}" alt="${COMPANY.nom}" style="max-height:100%; max-width:100%; object-fit:contain;">` : 'LOGO ENTREPRISE'}
-                    </div>
-                    <!-- Place Logo FNE -->
-                    <div style="width:110px; height:60px; border:1.5px dashed #000; display:flex; align-items:center; justify-content:center; background:#fff; font-size:9px; font-weight:700; color:#000; text-align:center; text-transform:uppercase;">
-                        ${COMPANY.logo_fne ? `<img src="${COMPANY.logo_fne}" alt="Logo FNE" style="max-height:100%; max-width:100%; object-fit:contain;">` : 'LOGO FNE'}
                     </div>
                 </div>
                 
