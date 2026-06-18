@@ -89,19 +89,29 @@ class TresorerieControleur
     public function creerBanqueAjax(Request $request): JsonResponse
     {
         $request->validate([
-            'nom'           => 'required|string|max:255',
-            'numero_compte' => 'required|string|max:255',
+            'code'     => 'required|string|max:50',
+            'intitule' => 'required|string|max:255',
+            'compte'   => 'required|string|max:50',
         ]);
 
-        $banque = Banque::create([
+        $journal = CodeJournal::create([
             'entreprise_id' => Auth::user()->entreprise_id,
-            'nom'           => $request->nom,
-            'numero_compte' => $request->numero_compte,
+            'type'          => 'Banque',
+            'code'          => strtoupper($request->code),
+            'intitule'      => $request->intitule,
+            'compte'        => $request->compte,
         ]);
 
         return response()->json([
             'succes' => true,
-            'banque' => $banque
+            'banque' => [
+                'id'            => $journal->id,
+                'nom'           => $journal->intitule,
+                'numero_compte' => $journal->code . ' - ' . $journal->compte,
+                'code'          => $journal->code,
+                'intitule'      => $journal->intitule,
+                'compte'        => $journal->compte,
+            ]
         ]);
     }
 }

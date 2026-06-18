@@ -19,7 +19,10 @@
             <thead>
                 <tr>
                     <th>Nom &amp; Prénom</th>
+                    <th>N° tiers</th>
                     <th>NCC</th>
+                    <th>RCCM</th>
+                    <th>Compte général</th>
                     <th>Régime</th>
                     <th>Téléphone</th>
                     <th>E-mail</th>
@@ -32,7 +35,10 @@
                 @forelse($clients as $c)
                 <tr>
                     <td style="font-weight:600; color:var(--text);">{{ $c->nom }}</td>
+                    <td style="font-family: monospace; font-weight: 700; color: var(--primary);">{{ $c->numero_tiers ?? '—' }}</td>
                     <td>{{ $c->ncc ?? '—' }}</td>
+                    <td>{{ $c->rccm ?? '—' }}</td>
+                    <td style="font-family: monospace; font-weight: 700;">{{ $c->compte_comptable ?? '411100' }}</td>
                     <td>{{ $c->regime_imposition ?? '—' }}</td>
                     <td>{{ $c->telephone ?? '—' }}</td>
                     <td>{{ $c->email ?? '—' }}</td>
@@ -44,7 +50,7 @@
                 </tr>
                 @empty
                 <tr>
-                    <td colspan="8" style="text-align:center; color:var(--text-3); padding:30px;">
+                    <td colspan="11" style="text-align:center; color:var(--text-3); padding:30px;">
                         Aucun client enregistré pour le moment.
                     </td>
                 </tr>
@@ -85,15 +91,19 @@
                     <label class="form-label">Adresse physique</label>
                     <input type="text" name="adresse" class="form-control" placeholder="Ex: Cocody, Abidjan">
                 </div>
-                {{-- Informations fiscales --}}
+                {{-- Informations fiscales & Comptables --}}
                 <div style="grid-column:1/-1; padding:12px 14px; background:var(--bg3); border-radius:8px; border:1px solid var(--border); margin-top:4px;">
                     <div style="font-size:11px;font-weight:700;color:var(--text-2);text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px;">
-                        <i class="fas fa-file-invoice" style="margin-right:6px;"></i>Informations fiscales (optionnel)
+                        <i class="fas fa-file-invoice" style="margin-right:6px;"></i>Informations fiscales &amp; comptables
                     </div>
                     <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
                         <div class="form-group" style="margin-bottom:0;">
                             <label class="form-label">NCC (Nº Compte Contribuable)</label>
                             <input type="text" name="ncc" class="form-control" placeholder="Ex: 2302178R">
+                        </div>
+                        <div class="form-group" style="margin-bottom:0;">
+                            <label class="form-label">RCCM (Registre de commerce)</label>
+                            <input type="text" name="rccm" class="form-control" placeholder="Ex: CI-ABJ-03-2021-B13-05438">
                         </div>
                         <div class="form-group" style="margin-bottom:0;">
                             <label class="form-label">Régime d'imposition</label>
@@ -106,6 +116,26 @@
                                 <option value="Exonéré">Exonéré</option>
                             </select>
                         </div>
+                        <div class="form-group" style="margin-bottom:0;">
+                            <label class="form-label">Compte comptable général collective</label>
+                            <select name="compte_comptable" class="form-control" required>
+                                @foreach($comptes as $compte)
+                                    <option value="{{ $compte->numero }}" {{ $compte->numero == '411100' ? 'selected' : '' }}>
+                                        {{ $compte->numero }} - {{ $compte->libelle }}
+                                    </option>
+                                @endforeach
+                            </select>
+                        </div>
+                        <div class="form-group" style="margin-bottom:0; grid-column: 1/-1;">
+                            <label class="form-label" style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 4px;">
+                                <span>N° tiers auxiliaire (ex: 411001)</span>
+                                <label style="font-weight:normal; display:inline-flex; align-items:center; gap:6px; font-size:11px; cursor:pointer; margin: 0;">
+                                    <input type="checkbox" name="auto_numero_tiers" id="auto_numero_client" value="1" checked onchange="toggleClientNumeroTiers()">
+                                    Générer automatiquement
+                                </label>
+                            </label>
+                            <input type="text" name="numero_tiers" id="numero_client_input" class="form-control" placeholder="Ex: 411001" disabled>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -116,4 +146,20 @@
         </form>
     </div>
 </div>
+
+<script>
+function toggleClientNumeroTiers() {
+    const checkbox = document.getElementById('auto_numero_client');
+    const input = document.getElementById('numero_client_input');
+    if (checkbox.checked) {
+        input.disabled = true;
+        input.value = '';
+        input.required = false;
+    } else {
+        input.disabled = false;
+        input.required = true;
+        input.focus();
+    }
+}
+</script>
 @endsection

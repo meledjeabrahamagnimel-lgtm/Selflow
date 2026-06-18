@@ -8,6 +8,7 @@ use App\Modules\Admin\Modeles\Fournisseur;
 use App\Modules\Admin\Modeles\MouvementStock;
 use App\Modules\Admin\Modeles\Produit;
 use App\Modules\Admin\Modeles\TresorerieJournal;
+use App\Modules\Admin\Modeles\CodeJournal;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -32,8 +33,12 @@ class AchatControleur
                 'responsable'   => 'Superviseur',
                 'statut'        => 'Ouvert',
             ]))->id;
+        $banques = CodeJournal::where('type', 'Banque')
+            ->where('entreprise_id', $entreprise->id)
+            ->orderBy('intitule')
+            ->get();
 
-        return view('admin::achats.nouveau', compact('fournisseurs', 'produits', 'pointDeVenteId'));
+        return view('admin::achats.nouveau', compact('fournisseurs', 'produits', 'pointDeVenteId', 'banques'));
     }
 
     public function enregistrer(Request $request): RedirectResponse
@@ -64,83 +69,106 @@ class AchatControleur
             'articles.required'       => 'Veuillez ajouter au moins un article.',
         ]);
 
-
+        if ($request->mode_paiement === 'Banque') {
+            $request->validate([
+                'banque_id' => ['required', 'integer', 'exists:codes_journaux,id'],
+            ]);
+        }
 
         DB::transaction(function () use ($request, $pointDeVenteId) {
             $montantHt  = 0;
             $montantTva = 0;
+            $etape = $request->input('etape', 'Facture');
 
             foreach ($request->articles as $article) {
                 $ht          = $article['quantite'] * $article['prix_unitaire'];
-                $tva         = $ht * 0.18;
                 $montantHt  += $ht;
-                $montantTva += $tva;
             }
 
-            $montantTtc = $montantHt + $montantTva;
+            $montantTtc = $montantHt; // No VAT
+
+            // Déterminer le mode de paiement final
+            $modePaiementFinal = $request->mode_paiement;
+            if ($request->mode_paiement === 'Banque' && $request->filled('banque_id')) {
+                $codeJournal = CodeJournal::findOrFail($request->banque_id);
+                $modePaiementFinal = 'Banque : ' . $codeJournal->intitule;
+            }
 
             // Générer le numéro de facture d'achat
-            $numero = 'AC-' . now()->year . '-' . str_pad(
+            $numero = 'AC-' . now()->format('d-m-Y') . '-' . str_pad(
                 Achat::whereYear('created_at', now()->year)->count() + 1,
                 4, '0', STR_PAD_LEFT
             );
+
+            // Statut de départ de l'achat : "En attente de confirmation" par défaut
+            $statutInitial = ($etape === 'Facture') ? (($request->mode_paiement === 'Crédit') ? 'Crédit' : 'Payé') : 'En attente de confirmation';
 
             $achat = Achat::create([
                 'point_de_vente_id' => $pointDeVenteId,
                 'fournisseur_id'    => $request->fournisseur_id,
                 'numero_facture'    => $numero,
                 'date_achat'        => $request->date_achat,
-                'mode_paiement'     => $request->mode_paiement,
+                'mode_paiement'     => $modePaiementFinal,
                 'montant_ht'        => $montantHt,
-                'montant_tva'       => $montantTva,
+                'montant_tva'       => 0, // No VAT
                 'montant_ttc'       => $montantTtc,
-                'statut'            => 'Payé',
+                'statut'            => $statutInitial,
+                'etape'             => $etape,
             ]);
 
             foreach ($request->articles as $article) {
                 $produit = Produit::lockForUpdate()->find($article['produit_id']);
                 $ht      = $article['quantite'] * $article['prix_unitaire'];
-                $tva     = $ht * 0.18;
 
                 AchatDetail::create([
                     'achat_id'       => $achat->id,
                     'produit_id'     => $produit->id,
                     'quantite'       => $article['quantite'],
                     'prix_unitaire'  => $article['prix_unitaire'],
-                    'montant_tva'    => $tva,
-                    'montant_ttc'    => $ht + $tva,
+                    'montant_tva'    => 0,
+                    'montant_ttc'    => $ht,
                 ]);
 
-                // Augmenter le stock + mouvement
-                $stockAvant = $produit->stock_actuel;
-                $produit->increment('stock_actuel', $article['quantite']);
+                // Augmenter le stock + mouvement uniquement si Facture et stockable
+                if ($produit && $etape === 'Facture' && $produit->type === 'stockable') {
+                    $stockAvant = $produit->stock_actuel;
+                    $produit->increment('stock_actuel', $article['quantite']);
 
-                MouvementStock::create([
-                    'produit_id'         => $produit->id,
-                    'point_de_vente_id'  => $pointDeVenteId,
-                    'type_mouvement'     => 'Entrée',
-                    'quantite'           => $article['quantite'],
-                    'stock_avant'        => $stockAvant,
-                    'stock_apres'        => $stockAvant + $article['quantite'],
-                    'reference_document' => $numero,
-                ]);
+                    MouvementStock::create([
+                        'produit_id'         => $produit->id,
+                        'point_de_vente_id'  => $pointDeVenteId,
+                        'type_mouvement'     => 'Entrée',
+                        'quantite'           => $article['quantite'],
+                        'stock_avant'        => $stockAvant,
+                        'stock_apres'        => $stockAvant + $article['quantite'],
+                        'reference_document' => $numero,
+                    ]);
+                }
             }
 
-            // Enregistrement automatique en décaissement (trésorerie)
-            $soldeActuel = TresorerieJournal::where('point_de_vente_id', $pointDeVenteId)
-                ->orderByDesc('created_at')->value('solde_resultat') ?? 0;
+            // Trésorerie et Comptabilité (uniquement si Facture)
+            if ($etape === 'Facture') {
+                // Écriture comptable générale
+                \App\Modules\Admin\Services\ComptabiliteService::genererEcritureFactureAchat($achat);
 
-            TresorerieJournal::create([
-                'point_de_vente_id'  => $pointDeVenteId,
-                'date_operation'     => $request->date_achat,
-                'type_operation'     => 'Décaissement',
-                'libelle'            => 'Achat — Facture ' . $numero,
-                'mode_paiement'      => $request->mode_paiement,
-                'montant_entree'     => 0,
-                'montant_sortie'     => $montantTtc,
-                'solde_resultat'     => $soldeActuel - $montantTtc,
-                'reference_document' => $numero,
-            ]);
+                $soldeActuel = TresorerieJournal::where('point_de_vente_id', $pointDeVenteId)
+                    ->orderByDesc('created_at')->value('solde_resultat') ?? 0;
+
+                TresorerieJournal::create([
+                    'point_de_vente_id'  => $pointDeVenteId,
+                    'date_operation'     => $request->date_achat,
+                    'type_operation'     => 'Décaissement',
+                    'libelle'            => 'Achat — Facture ' . $numero,
+                    'mode_paiement'      => $modePaiementFinal,
+                    'montant_entree'     => 0,
+                    'montant_sortie'     => $montantTtc,
+                    'solde_resultat'     => $soldeActuel - $montantTtc,
+                    'reference_document' => $numero,
+                ]);
+
+                // Écriture comptable de règlement
+                \App\Modules\Admin\Services\ComptabiliteService::genererEcritureReglementAchat($achat, $montantTtc, $modePaiementFinal, $request->date_achat);
+            }
         });
 
         return redirect()->route('admin.achats.factures')
@@ -173,7 +201,8 @@ class AchatControleur
     {
         $this->autoriserAcces($achat);
         $achat->load(['fournisseur', 'pointDeVente.entreprise', 'details.produit']);
-        return view('admin::factures.achat', compact('achat'));
+        $dejaPaye = \App\Modules\Admin\Modeles\TresorerieJournal::where('reference_document', $achat->numero_facture)->sum('montant_sortie');
+        return view('admin::factures.achat', compact('achat', 'dejaPaye'));
     }
 
     private function autoriserAcces(Achat $achat): void
@@ -184,5 +213,74 @@ class AchatControleur
             403,
             'Accès non autorisé.'
         );
+    }
+
+    public function confirmerCommande(Achat $achat): RedirectResponse
+    {
+        $this->autoriserAcces($achat);
+        if ($achat->etape !== 'Demande de prix') {
+            return back()->with('info', 'Le document n\'est pas à l\'étape Demande de prix.');
+        }
+
+        $achat->update(['etape' => 'Bon de commande']);
+
+        return back()->with('succes', 'Commande fournisseur confirmée.');
+    }
+
+    public function facturer(Achat $achat): RedirectResponse
+    {
+        $this->autoriserAcces($achat);
+        if ($achat->etape === 'Facture') {
+            return back()->with('info', 'Cette facture est déjà validée.');
+        }
+
+        DB::transaction(function () use ($achat) {
+            $nouveauStatut = ($achat->mode_paiement === 'Crédit' || str_contains($achat->mode_paiement, 'Crédit')) ? 'Crédit' : 'Payé';
+            $achat->update(['etape' => 'Facture', 'statut' => $nouveauStatut]);
+
+            // 1. Incrémenter le stock uniquement pour les articles stockables
+            foreach ($achat->details as $detail) {
+                $produit = $detail->produit;
+                if ($produit && $produit->type === 'stockable') {
+                    $stockAvant = $produit->stock_actuel;
+                    $produit->increment('stock_actuel', $detail->quantite);
+
+                    MouvementStock::create([
+                        'produit_id'         => $produit->id,
+                        'point_de_vente_id'  => $achat->point_de_vente_id,
+                        'type_mouvement'     => 'Entrée',
+                        'quantite'           => $detail->quantite,
+                        'stock_avant'        => $stockAvant,
+                        'stock_apres'        => $stockAvant + $detail->quantite,
+                        'reference_document' => $achat->numero_facture,
+                    ]);
+                }
+            }
+
+            // 2. Écriture comptable de facturation
+            \App\Modules\Admin\Services\ComptabiliteService::genererEcritureFactureAchat($achat);
+
+            // 3. Trésorerie & Écriture de règlement
+            $montantPaye = $achat->montant_ttc;
+            $soldeActuel = TresorerieJournal::where('point_de_vente_id', $achat->point_de_vente_id)
+                ->orderByDesc('created_at')->value('solde_resultat') ?? 0;
+
+            TresorerieJournal::create([
+                'point_de_vente_id'  => $achat->point_de_vente_id,
+                'date_operation'     => $achat->date_achat->toDateString(),
+                'type_operation'     => 'Décaissement',
+                'libelle'            => 'Achat — Facture ' . $achat->numero_facture,
+                'mode_paiement'      => $achat->mode_paiement,
+                'montant_entree'     => 0,
+                'montant_sortie'     => $montantPaye,
+                'solde_resultat'     => $soldeActuel - $montantPaye,
+                'reference_document' => $achat->numero_facture,
+            ]);
+
+            // Écriture de règlement
+            \App\Modules\Admin\Services\ComptabiliteService::genererEcritureReglementAchat($achat, $montantPaye, $achat->mode_paiement, $achat->date_achat->toDateString());
+        });
+
+        return back()->with('succes', 'Facture d\'achat validée, stock mis à jour et écritures générées.');
     }
 }

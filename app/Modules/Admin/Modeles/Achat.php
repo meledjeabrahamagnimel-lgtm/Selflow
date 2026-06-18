@@ -20,6 +20,7 @@ class Achat extends Model
         'montant_tva',
         'montant_ttc',
         'statut',
+        'etape',
     ];
 
     protected function casts(): array

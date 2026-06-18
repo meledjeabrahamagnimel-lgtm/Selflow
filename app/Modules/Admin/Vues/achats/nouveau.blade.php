@@ -13,6 +13,20 @@
     }
     .btn-remove-ligne:hover { background: var(--danger); color: #fff; }
     .sous-total-row { text-align: right; font-size: 13px; color: var(--text-3); margin-top: 4px; }
+    
+    .payment-toggle-btn {
+        border: 1px solid var(--border);
+        background: #fff;
+        color: var(--text-2);
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.15s;
+    }
+    .payment-toggle-btn.active {
+        background: #002B5C !important;
+        color: #ffffff !important;
+        border-color: #002B5C !important;
+    }
 </style>
 @endsection
 
@@ -26,8 +40,6 @@
         <i class="fas fa-history"></i> Historique
     </a>
 </div>
-
-
 
 <form method="POST" action="{{ route('admin.achats.enregistrer') }}" id="formAchat">
 @csrf
@@ -62,37 +74,79 @@
                     <label class="form-label">Date d'achat <span style="color:var(--danger)">*</span></label>
                     <input type="date" name="date_achat" class="form-control" value="{{ date('Y-m-d') }}" required>
                 </div>
+
+                {{-- Mode de paiement style buttons --}}
+                <input type="hidden" name="mode_paiement" id="modePaiementInput" value="Caisse">
                 <div class="form-group">
                     <label class="form-label">Mode de paiement <span style="color:var(--danger)">*</span></label>
-                    <select name="mode_paiement" class="form-control" required>
-                        <option value="Espèces">Espèces</option>
-                        <option value="Mobile Money">Mobile Money</option>
-                        <option value="Virement">Virement</option>
-                        <option value="Chèque">Chèque</option>
-                        <option value="Crédit fournisseur">Crédit fournisseur</option>
-                    </select>
+                    <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:10px; margin-bottom:12px;">
+                        <button type="button" class="btn payment-toggle-btn active" data-mode="Caisse" onclick="selectionnerModePaiement(this)" style="justify-content:center;">Caisse</button>
+                        <button type="button" class="btn payment-toggle-btn" data-mode="Banque" onclick="selectionnerModePaiement(this)" style="justify-content:center;">Banque</button>
+                        <button type="button" class="btn payment-toggle-btn" data-mode="Crédit" onclick="selectionnerModePaiement(this)" style="justify-content:center;">Crédit</button>
+                    </div>
+                </div>
+
+                {{-- Sélection de la banque --}}
+                <div id="selectionBanqueContainer" style="display:none; margin-bottom:16px;">
+                    <label class="form-label">Sélectionner la Banque <span style="color:var(--danger)">*</span></label>
+                    <div style="display:flex; gap:8px;">
+                        <select name="banque_id" id="banqueSelect" class="form-control" style="flex:1;">
+                            <option value="">— Choisir un compte banque —</option>
+                            @foreach($banques as $b)
+                            <option value="{{ $b->id }}">{{ $b->intitule }} ({{ $b->code }} - {{ $b->compte }})</option>
+                            @endforeach
+                        </select>
+                        <button type="button" class="btn btn-primary" onclick="ouvrirModalNouvelleBanque()" style="padding:0 14px;"><i class="fas fa-plus"></i></button>
+                    </div>
                 </div>
 
                 <div class="total-box" style="border-top: 1px solid var(--border); padding-top:12px; margin-top:12px;">
-                    <div class="total-row" style="display:flex;justify-content:space-between;font-size:13px;padding:4px 0;color:var(--text-2);">
-                        <span>Sous-total HT</span><span id="totHt">0 F</span>
-                    </div>
-                    <div class="total-row" style="display:flex;justify-content:space-between;font-size:13px;padding:4px 0;color:var(--text-2);">
-                        <span>TVA (18%)</span><span id="totTva">0 F</span>
-                    </div>
                     <div class="total-row" style="display:flex;justify-content:space-between;font-size:17px;font-weight:800;color:var(--text);padding:8px 0 4px;">
-                        <span>Total TTC</span><span id="totTtc">0 F</span>
+                        <span>Total</span><span id="totTtc">0 F</span>
                     </div>
                 </div>
 
-                <button type="submit" class="btn btn-primary" id="btnValider" style="width:100%;justify-content:center;margin-top:12px;" disabled>
-                    <i class="fas fa-check-circle"></i> Enregistrer l'achat
-                </button>
+                <div style="display:flex; flex-direction:column; gap:8px; margin-top:12px;">
+                    <button type="submit" name="etape" value="Facture" class="btn btn-primary" id="btnValider" style="width:100%;justify-content:center;" disabled>
+                        <i class="fas fa-check-circle"></i> Valider et facturer
+                    </button>
+                    <button type="submit" name="etape" value="Demande de prix" class="btn btn-outline" id="btnDemande" style="width:100%;justify-content:center;border-color:var(--warning);color:var(--warning);" disabled>
+                        <i class="fas fa-file-invoice"></i> Enregistrer comme Demande de prix
+                    </button>
+                </div>
             </div>
         </div>
     </div>
 </div>
 </form>
+
+<!-- Modal Banque -->
+<div class="modal-overlay" id="modalNouvelleBanque">
+    <div class="modal">
+        <div class="modal-header">
+            <h3><i class="fas fa-building-columns"></i> Nouveau code journal banque</h3>
+            <button type="button" class="modal-close" onclick="fermerModalNouvelleBanque()">&times;</button>
+        </div>
+        <form id="formNouvelleBanque" onsubmit="soumettreNouvelleBanque(event)">
+            <div class="form-group">
+                <label class="form-label">Code <span style="color:var(--danger)">*</span></label>
+                <input type="text" id="banqueCodeInput" class="form-control" placeholder="Ex: BQE, SGCI" required>
+            </div>
+            <div class="form-group">
+                <label class="form-label">Intitulé <span style="color:var(--danger)">*</span></label>
+                <input type="text" id="banqueIntituleInput" class="form-control" placeholder="Ex: Journal Société Générale" required>
+            </div>
+            <div class="form-group">
+                <label class="form-label">Compte comptable <span style="color:var(--danger)">*</span></label>
+                <input type="text" id="banqueCompteInput" class="form-control" placeholder="Ex: 521100" required>
+            </div>
+            <div style="display:flex; justify-content:flex-end; gap:12px; margin-top:24px;">
+                <button type="button" class="btn btn-outline" onclick="fermerModalNouvelleBanque()">Annuler</button>
+                <button type="submit" class="btn btn-primary">Enregistrer</button>
+            </div>
+        </form>
+    </div>
+</div>
 
 {{-- Options produits pour JS --}}
 <script>
@@ -106,7 +160,44 @@ const produits = {!! json_encode($produits->map(function($p) {
 })->toArray()) !!};
 let idx = 0;
 
-function ajouterLigne() {
+function savePanier() {
+    const panierItems = [];
+    document.querySelectorAll('.ligne').forEach(l => {
+        const pSel = l.querySelector('.produit-sel');
+        const qInp = l.querySelector('.qte-inp');
+        const prInp = l.querySelector('.prix-inp');
+        
+        if (pSel.value) {
+            panierItems.push({
+                produit_id: pSel.value,
+                quantite: qInp.value,
+                prix_unitaire: prInp.value
+            });
+        }
+    });
+    localStorage.setItem('selflow_achat_panier', JSON.stringify(panierItems));
+}
+
+function loadPanier() {
+    const saved = localStorage.getItem('selflow_achat_panier');
+    if (saved) {
+        try {
+            const items = JSON.parse(saved);
+            if (items && items.length > 0) {
+                document.getElementById('lignesAchat').innerHTML = '';
+                items.forEach(item => {
+                    ajouterLigne(item);
+                });
+                return;
+            }
+        } catch (e) {
+            console.error("Erreur chargement panier d'achat", e);
+        }
+    }
+    ajouterLigne();
+}
+
+function ajouterLigne(prefill = null) {
     const container = document.getElementById('lignesAchat');
     const opts = produits.map(p => `<option value="${p.id}" data-prix="${p.prix}">${p.nom} (${p.ref})</option>`).join('');
     const div = document.createElement('div');
@@ -114,21 +205,26 @@ function ajouterLigne() {
     div.innerHTML = `
         <div class="form-group" style="margin-bottom:0;">
             <label class="form-label">Produit</label>
-            <select name="articles[${idx}][produit_id]" class="form-control produit-sel" onchange="majPrix(this, ${idx})" required>
+            <select name="articles[${idx}][produit_id]" class="form-control produit-sel" onchange="majPrix(this, ${idx}); savePanier();" required>
                 <option value="">— Choisir —</option>${opts}
             </select>
         </div>
         <div class="form-group" style="margin-bottom:0;">
             <label class="form-label">Quantité</label>
-            <input type="number" name="articles[${idx}][quantite]" class="form-control qte-inp" min="1" value="1" onchange="recalculer()" required>
+            <input type="number" name="articles[${idx}][quantite]" class="form-control qte-inp" min="1" value="${prefill ? prefill.quantite : 1}" oninput="recalculer(); savePanier();" required>
         </div>
         <div class="form-group" style="margin-bottom:0;">
             <label class="form-label">Prix unitaire</label>
-            <input type="number" name="articles[${idx}][prix_unitaire]" class="form-control prix-inp" min="0" step="1" value="0" onchange="recalculer()" required>
+            <input type="number" name="articles[${idx}][prix_unitaire]" class="form-control prix-inp" min="0" step="1" value="${prefill ? prefill.prix_unitaire : 0}" oninput="recalculer(); savePanier();" required>
         </div>
         <button type="button" class="btn-remove-ligne" onclick="supprimerLigne(${idx})"><i class="fas fa-trash"></i></button>
     `;
     container.appendChild(div);
+    
+    if (prefill && prefill.produit_id) {
+        div.querySelector('.produit-sel').value = prefill.produit_id;
+    }
+
     idx++;
     recalculer();
 }
@@ -142,8 +238,12 @@ function majPrix(sel, i) {
 }
 
 function supprimerLigne(i) {
-    document.querySelector(`[data-idx="${i}"]`).remove();
+    const ligne = document.querySelector(`[data-idx="${i}"]`);
+    if (ligne) {
+        ligne.remove();
+    }
     recalculer();
+    savePanier();
 }
 
 function recalculer() {
@@ -153,15 +253,86 @@ function recalculer() {
         const p  = parseFloat(l.querySelector('.prix-inp').value) || 0;
         ht += q * p;
     });
-    const tva = ht * 0.18;
     const fmt = n => new Intl.NumberFormat('fr-FR').format(Math.round(n)) + ' F';
-    document.getElementById('totHt').textContent  = fmt(ht);
-    document.getElementById('totTva').textContent = fmt(tva);
-    document.getElementById('totTtc').textContent = fmt(ht + tva);
-    document.getElementById('btnValider').disabled = document.querySelectorAll('.ligne').length === 0;
+    document.getElementById('totTtc').textContent = fmt(ht);
+    const noItems = document.querySelectorAll('.ligne').length === 0;
+    document.getElementById('btnValider').disabled = noItems;
+    document.getElementById('btnDemande').disabled = noItems;
 }
 
-// Ajouter une ligne au chargement
-ajouterLigne();
+function selectionnerModePaiement(btn) {
+    document.querySelectorAll('.payment-toggle-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    
+    const mode = btn.dataset.mode;
+    document.getElementById('modePaiementInput').value = mode;
+    
+    const banqueContainer = document.getElementById('selectionBanqueContainer');
+    const banqueSelect = document.getElementById('banqueSelect');
+    
+    if (mode === 'Banque') {
+        banqueContainer.style.display = 'block';
+        banqueSelect.required = true;
+    } else {
+        banqueContainer.style.display = 'none';
+        banqueSelect.required = false;
+        banqueSelect.value = '';
+    }
+}
+
+function ouvrirModalNouvelleBanque() {
+    document.getElementById('modalNouvelleBanque').classList.add('open');
+}
+
+function fermerModalNouvelleBanque() {
+    document.getElementById('modalNouvelleBanque').classList.remove('open');
+    document.getElementById('formNouvelleBanque').reset();
+}
+
+function soumettreNouvelleBanque(e) {
+    e.preventDefault();
+    const code = document.getElementById('banqueCodeInput').value;
+    const intitule = document.getElementById('banqueIntituleInput').value;
+    const compte = document.getElementById('banqueCompteInput').value;
+    
+    const routeCreation = "{{ route('admin.banques.creer') }}";
+    
+    fetch(routeCreation, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
+        },
+        body: JSON.stringify({ code, intitule, compte })
+    })
+    .then(res => res.json())
+    .then(data => {
+        if (data.succes) {
+            const select = document.getElementById('banqueSelect');
+            const opt = document.createElement('option');
+            opt.value = data.banque.id;
+            opt.textContent = `${data.banque.nom} (${data.banque.numero_compte})`;
+            opt.selected = true;
+            select.appendChild(opt);
+            
+            fermerModalNouvelleBanque();
+        } else {
+            alert("Erreur lors de la création du code journal banque.");
+        }
+    })
+    .catch(err => {
+        console.error(err);
+        alert("Une erreur est survenue.");
+    });
+}
+
+document.getElementById('formAchat').addEventListener('submit', function() {
+    setTimeout(() => {
+        localStorage.removeItem('selflow_achat_panier');
+    }, 100);
+});
+
+// Charger le panier au chargement
+loadPanier();
 </script>
 @endsection

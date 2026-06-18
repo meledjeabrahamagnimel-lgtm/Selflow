@@ -70,6 +70,15 @@ class VenteApiControleur
             ]);
         }
 
+        if ($request->mode_paiement !== 'Crédit') {
+            $request->validate([
+                'montant_paye' => ['required', 'numeric', 'min:0.01'],
+            ], [
+                'montant_paye.required' => 'Le montant payé est obligatoire pour ce mode de paiement.',
+                'montant_paye.min' => 'Le montant payé doit être supérieur à 0.',
+            ]);
+        }
+
         $venteData = [];
 
         DB::transaction(function () use ($request, $pointDeVenteId, &$venteData) {
@@ -102,7 +111,7 @@ class VenteApiControleur
             }
 
             // Génération numéro facture
-            $numero = 'VT-' . now()->year . '-' . str_pad(
+            $numero = 'VT-' . now()->format('d-m-Y') . '-' . str_pad(
                 Vente::whereYear('created_at', now()->year)->count() + 1,
                 4, '0', STR_PAD_LEFT
             );

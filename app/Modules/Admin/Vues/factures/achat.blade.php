@@ -1,108 +1,849 @@
-<!DOCTYPE html>
-<html lang="fr">
-<head>
-    <meta charset="UTF-8">
-    <title>Bon d'achat {{ $achat->numero_facture }}</title>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
-    <style>
-        * { box-sizing: border-box; margin: 0; padding: 0; }
-        body { font-family: 'Inter', sans-serif; font-size: 13px; color: #1e293b; background: #f8fafc; }
-        .page { max-width: 800px; margin: 30px auto; background: #fff; border-radius: 12px; box-shadow: 0 4px 24px rgba(0,0,0,.12); overflow: hidden; }
-        .header { background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%); color: #fff; padding: 36px 40px; display: flex; justify-content: space-between; align-items: flex-start; }
-        .logo-name { font-size: 26px; font-weight: 800; letter-spacing: -1px; }
-        .logo-sub  { font-size: 12px; opacity: .65; margin-top: 3px; }
-        .doc-type  { font-size: 10px; opacity: .6; text-transform: uppercase; letter-spacing: 1px; }
-        .doc-num   { font-size: 24px; font-weight: 800; margin-top: 4px; color: #60a5fa; }
-        .doc-date  { font-size: 12px; opacity: .75; margin-top: 6px; }
-        .body { padding: 36px 40px; }
-        .info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; margin-bottom: 30px; }
-        .info-block h4 { font-size: 10px; text-transform: uppercase; letter-spacing: 1px; color: #94a3b8; margin-bottom: 8px; }
-        .info-block strong { display: block; font-size: 15px; font-weight: 700; margin-bottom: 3px; }
-        .info-block p { font-size: 13px; color: #475569; line-height: 1.7; }
-        table { width: 100%; border-collapse: collapse; margin-bottom: 24px; }
-        thead th { background: #f1f5f9; padding: 10px 14px; text-align: left; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .5px; color: #64748b; }
-        thead th:last-child { text-align: right; }
-        tbody td { padding: 12px 14px; border-bottom: 1px solid #f1f5f9; font-size: 13px; }
-        tbody td:last-child { text-align: right; font-weight: 600; }
-        .totaux { margin-left: auto; width: 280px; }
-        .totaux-row { display: flex; justify-content: space-between; padding: 5px 0; font-size: 13px; color: #64748b; }
-        .totaux-row.grand { font-size: 16px; font-weight: 800; color: #1e293b; border-top: 2px solid #e2e8f0; margin-top: 8px; padding-top: 12px; }
-        .footer { background: #f8fafc; border-top: 1px solid #e2e8f0; padding: 20px 40px; display: flex; justify-content: space-between; color: #94a3b8; font-size: 12px; }
-        .no-print { display: flex; gap: 12px; justify-content: center; padding: 24px; background: #f1f5f9; }
-        @media print { body { background: #fff; } .page { box-shadow: none; margin: 0; border-radius: 0; max-width: 100%; } .no-print { display: none; } }
-    </style>
-</head>
-<body>
-<div class="no-print">
-    <button onclick="window.print()" style="padding:10px 24px; background:#0f172a; color:#fff; border:none; border-radius:8px; font-size:14px; font-weight:600; cursor:pointer;">🖨️ Imprimer / PDF</button>
-    <a href="{{ route('admin.achats.historique') }}" style="padding:10px 24px; background:#fff; color:#475569; border:1px solid #e2e8f0; border-radius:8px; font-size:14px; font-weight:600; text-decoration:none;">← Retour</a>
-</div>
-<div class="page">
-    <div class="header">
-        <div>
-            <div class="logo-name">{{ $achat->pointDeVente->entreprise->nom }}</div>
-            <div class="logo-sub">{{ $achat->pointDeVente->entreprise->adresse }}</div>
-            <div class="logo-sub">Tél : {{ $achat->pointDeVente->entreprise->telephone }}</div>
+@extends('admin::gabarits.application')
+@section('titre', 'Bon d\'achat ' . $achat->numero_facture)
+@section('topbar_titre', 'Achats — Détails')
+
+@section('styles')
+<style>
+    :root {
+        --navy: #0D1B3E;
+        --yellow: #F9CA24;
+        --br: #E2E5EC;
+        --tx: #1A1A2E;
+        --mu: #6B7280;
+        --white: #F5F6FA;
+    }
+
+    /* Styles pour la barre de contrôle */
+    .controls-card {
+        background: #fff;
+        border: 0.5px solid var(--border);
+        border-radius: 12px;
+        padding: 20px;
+        margin-bottom: 20px;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.02);
+    }
+    
+    .tabs {
+        display: flex;
+        gap: 8px;
+        margin-top: 10px;
+        flex-wrap: wrap;
+    }
+    
+    .tab {
+        padding: 8px 18px;
+        border-radius: 8px;
+        font-size: 13px;
+        font-weight: 600;
+        cursor: pointer;
+        border: 0.5px solid var(--border);
+        color: var(--text-2);
+        background: #fff;
+        transition: all .15s;
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+    }
+    
+    .tab:hover {
+        background: var(--bg3);
+        color: var(--text);
+    }
+    
+    .tab.act {
+        background: var(--primary);
+        color: #fff;
+        border-color: var(--primary);
+    }
+
+    /* Styles pour l'affichage du document */
+    .invoice-container {
+        display: flex;
+        justify-content: center;
+        padding: 10px 0;
+    }
+
+    .invoice {
+        background: #fff;
+        border: 0.5px solid var(--border);
+        border-radius: 12px;
+        overflow: hidden;
+        width: 100%;
+        max-width: 800px;
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.04);
+        position: relative;
+    }
+
+    .print-btn {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 8px 16px;
+        border-radius: 8px;
+        font-size: 13px;
+        font-weight: 600;
+        cursor: pointer;
+        border: 0.5px solid var(--border);
+        background: #fff;
+        color: var(--text);
+        transition: all 0.15s;
+        text-decoration: none;
+    }
+    
+    .print-btn:hover {
+        background: var(--bg3);
+    }
+    
+    .print-btn.main {
+        background: var(--primary);
+        color: #fff;
+        border-color: var(--primary);
+    }
+    
+    .print-btn.main:hover {
+        background: var(--primary-d);
+    }
+
+    /* Styles pour la table modèle 4 standard */
+    .table-m4 {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 11px;
+        margin-bottom: 20px;
+        border: 1px solid #000;
+    }
+    
+    .table-m4 th, .table-m4 td {
+        border: 1px solid #000;
+        padding: 8px 10px;
+    }
+
+    /* CSS Impression */
+    @media print {
+        * {
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
+        }
+        .sidebar, header, .topbar, .no-print, .banner-alert, .user-dropdown-menu, .sidebar-logo, .sidebar-pdv {
+            display: none !important;
+        }
+        body, .main-wrap, .main-content, main {
+            margin: 0 !important;
+            padding: 0 !important;
+            background: #fff !important;
+            width: 100% !important;
+            max-width: 100% !important;
+            position: static !important;
+        }
+        .invoice-container {
+            padding: 0 !important;
+        }
+        .invoice {
+            border: none !important;
+            box-shadow: none !important;
+            max-width: 100% !important;
+            width: 100% !important;
+            margin: 0 !important;
+            padding: 0 !important;
+            border-radius: 0 !important;
+        }
+    }
+</style>
+@endsection
+
+@section('contenu')
+<div class="no-print controls-card">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+        <a href="{{ route('admin.achats.historique') }}" class="print-btn">
+            <i class="fas fa-arrow-left"></i> Retour aux achats
+        </a>
+        <div style="font-weight: 700; font-size: 14px; text-transform: uppercase; letter-spacing: 0.5px;">Options du document</div>
+    </div>
+
+    <div class="tabs" id="model-tabs" style="margin-bottom: 15px;">
+        <div class="tab act" onclick="setModel(1, this)"><i class="fas fa-list"></i> Modèle 1 — Classique</div>
+        <div class="tab" onclick="setModel(2, this)"><i class="fas fa-columns"></i> Modèle 2 — Élégant</div>
+        <div class="tab" onclick="setModel(3, this)"><i class="fas fa-th-large"></i> Modèle 3 — Moderne</div>
+        <div class="tab" onclick="setModel(4, this)"><i class="fas fa-file-invoice"></i> Modèle 4 — Standard</div>
+    </div>
+
+    <div style="display: flex; justify-content: space-between; align-items: center; border-top: 0.5px solid var(--border); padding-top: 15px; flex-wrap: wrap; gap: 10px;">
+        <div style="display: flex; gap: 8px; align-items: center;">
+            <button class="tab" id="receipt-toggle-btn" onclick="toggleReceiptMode()" style="border-color: var(--primary); color: var(--primary);">
+                <i class="fas fa-truck-ramp-box"></i> Passer en Bon de réception
+            </button>
         </div>
-        <div style="text-align:right;">
-            <div class="doc-type">Bon d'achat</div>
-            <div class="doc-num">{{ $achat->numero_facture }}</div>
-            <div class="doc-date">{{ \Carbon\Carbon::parse($achat->date_achat)->isoFormat('D MMMM YYYY') }}</div>
+        
+        <div style="display: flex; gap: 8px; align-items: center;">
+            <button class="print-btn main" onclick="telechargerPdf()">
+                <i class="fas fa-download"></i> Télécharger PDF
+            </button>
+            <button class="print-btn" onclick="window.print()">
+                <i class="fas fa-print"></i> Imprimer
+            </button>
+            
+            @if($achat->etape === 'Demande de prix')
+                <button class="print-btn" style="background:var(--warning); color:#fff; border-color:var(--warning);" onclick="executerAction('{{ route('admin.achats.confirmer', $achat->id) }}')">
+                    <i class="fas fa-check-circle"></i> Confirmer la commande
+                </button>
+            @elseif($achat->etape === 'Bon de commande')
+                <button class="print-btn" style="background:#10b981; color:#fff; border-color:#10b981;" onclick="executerAction('{{ route('admin.achats.facturer', $achat->id) }}')">
+                    <i class="fas fa-file-invoice-dollar"></i> Valider & Facturer
+                </button>
+            @endif
         </div>
     </div>
-    <div class="body">
-        <div class="info-grid">
-            <div class="info-block">
-                <h4>Acheteur</h4>
-                <strong>{{ $achat->pointDeVente->nom }}</strong>
-                <p>{{ $achat->pointDeVente->commune }}, {{ $achat->pointDeVente->ville }}<br>Tél : {{ $achat->pointDeVente->telephone }}</p>
+</div>
+
+<form id="action-form" method="POST" style="display:none;">
+    @csrf
+</form>
+
+<div class="invoice-container">
+    <div id="invoice-wrap"></div>
+</div>
+@endsection
+
+@section('scripts')
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+<script>
+var curModel = 1;
+var isReceiptMode = false;
+
+@php
+    $entreprise = $achat->pointDeVente->entreprise;
+    $logoUrl = $entreprise->logo_path ? Storage::url($entreprise->logo_path) : null;
+@endphp
+
+var DATA = {
+    achat: {
+        num: {!! json_encode($achat->numero_facture) !!},
+        date: {!! json_encode(\Carbon\Carbon::parse($achat->date_achat)->isoFormat('D MMMM YYYY')) !!},
+        etape: {!! json_encode($achat->etape) !!},
+        mode: {!! json_encode($achat->mode_paiement) !!},
+        statut: {!! json_encode($achat->statut) !!},
+        montant_ht: {{ $achat->montant_ht }},
+        montant_tva: 0,
+        montant_ttc: {{ $achat->montant_ttc }},
+        fournisseur: {
+            nom: {!! json_encode($achat->fournisseur?->nom ?? 'Fournisseur divers') !!},
+            telephone: {!! json_encode($achat->fournisseur?->telephone ?? '') !!},
+            email: {!! json_encode($achat->fournisseur?->email ?? '') !!},
+            secteur: {!! json_encode($achat->fournisseur?->secteur ?? '') !!},
+            ncc: {!! json_encode($achat->fournisseur?->ncc ?? '') !!},
+            regime: {!! json_encode($achat->fournisseur?->regime_imposition ?? '') !!},
+            adresse: {!! json_encode($achat->fournisseur?->adresse ?? '') !!}
+        },
+        items: [
+            @foreach($achat->details as $i => $detail)
+            {
+                idx: {{ $i + 1 }},
+                ref: {!! json_encode($detail->produit->reference ?? 'REF-VIR-' . str_pad($detail->id, 3, '0', STR_PAD_LEFT)) !!},
+                nom: {!! json_encode($detail->produit->nom) !!},
+                qty: {{ $detail->quantite }},
+                unite: {!! json_encode($detail->unite ?? 'Unité') !!},
+                pu: {{ $detail->prix_unitaire }},
+                ht: {{ $detail->quantite * $detail->prix_unitaire }}
+            },
+            @endforeach
+        ]
+    }
+};
+
+var COMPANY = {
+    nom: {!! json_encode($entreprise->nom) !!},
+    pdv: {!! json_encode($achat->pointDeVente->nom) !!},
+    adresse: {!! json_encode($entreprise->adresse ?? '') !!},
+    tel: {!! json_encode($entreprise->telephone ?? '') !!},
+    email: {!! json_encode($entreprise->email ?? '') !!},
+    rccm: {!! json_encode($entreprise->rccm ?? '') !!},
+    ncc: {!! json_encode($entreprise->ncc ?? '') !!},
+    cc: {!! json_encode($entreprise->compte_contribuable ?? '') !!},
+    regime: {!! json_encode($entreprise->regime_imposition ?? '') !!},
+    centre_impots: {!! json_encode($entreprise->centre_impots ?? '') !!},
+    ref_bancaire: {!! json_encode($entreprise->ref_bancaire ?? '') !!},
+    logo: {!! json_encode($logoUrl) !!}
+};
+
+function fmt(n) {
+    return Math.round(n).toLocaleString('fr-FR') + ' F';
+}
+
+function fmtFcfa(n) {
+    return Math.round(n).toLocaleString('fr-FR') + ' FCFA';
+}
+
+function executerAction(url) {
+    if (confirm("Confirmer cette action ?")) {
+        var form = document.getElementById('action-form');
+        form.action = url;
+        form.submit();
+    }
+}
+
+function toggleReceiptMode() {
+    isReceiptMode = !isReceiptMode;
+    var btn = document.getElementById('receipt-toggle-btn');
+    if (isReceiptMode) {
+        btn.classList.add('act');
+        btn.innerHTML = '<i class="fas fa-truck-ramp-box"></i> Mode Facture / Commande';
+    } else {
+        btn.classList.remove('act');
+        btn.innerHTML = '<i class="fas fa-truck-ramp-box"></i> Passer en Bon de réception';
+    }
+    render();
+}
+
+function telechargerPdf() {
+    var controls = document.querySelector('.controls-card');
+    if (controls) controls.style.display = 'none';
+
+    var element = document.querySelector('.invoice');
+    var opt = {
+        margin:       [5, 5, 5, 5],
+        filename:     (isReceiptMode ? 'BR_' : 'Achat_') + DATA.achat.num + '.pdf',
+        image:        { type: 'jpeg', quality: 0.98 },
+        html2canvas:  { scale: 2.5, useCORS: true, logging: false },
+        jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' },
+        pagebreak:    { mode: 'avoid-all' }
+    };
+    
+    html2pdf().set(opt).from(element).save().then(function() {
+        if (controls) controls.style.display = '';
+    }).catch(function(err) {
+        if (controls) controls.style.display = '';
+        console.error(err);
+    });
+}
+
+function logoHtml(src, alt, maxH) {
+    if (!src) return '';
+    return `<img src="${src}" alt="${alt}" style="max-height:${maxH}px;max-width:140px;object-fit:contain;">`;
+}
+
+function fiscalLinesSeller(sep) {
+    var lines = [];
+    if (COMPANY.ncc)           lines.push('NCC : ' + COMPANY.ncc);
+    if (COMPANY.regime)        lines.push('Régime : ' + COMPANY.regime);
+    if (COMPANY.centre_impots) lines.push('Centre : ' + COMPANY.centre_impots);
+    if (COMPANY.rccm)          lines.push('RCCM : ' + COMPANY.rccm);
+    if (COMPANY.cc)            lines.push('CC : ' + COMPANY.cc);
+    return lines.join(sep || ' · ');
+}
+
+function fiscalLinesClient(c, sep) {
+    var lines = [];
+    if (c.adresse)   lines.push(c.adresse);
+    if (c.telephone) lines.push('Tél : ' + c.telephone);
+    if (c.email)     lines.push(c.email);
+    if (c.ncc)       lines.push('NCC : ' + c.ncc);
+    if (c.regime)    lines.push('Régime : ' + c.regime);
+    return lines.join(sep || '<br>');
+}
+
+function getDocTitle(d) {
+    if (isReceiptMode) return "BON DE RÉCEPTION";
+    if (d.etape === 'Demande de prix') return "DEMANDE DE PRIX";
+    if (d.etape === 'Bon de commande') return "BON DE COMMANDE FOURNISSEUR";
+    return "FACTURE D'ACHAT";
+}
+
+function getBadgeText(d) {
+    if (isReceiptMode) return "RÉCEPTION";
+    if (d.etape === 'Demande de prix') return "DEMANDE";
+    if (d.etape === 'Bon de commande') return "COMMANDE";
+    return "ACHAT";
+}
+
+function statusColor(statut, themeColor) {
+    if (statut === 'Payé')   return '#059669';
+    if (statut === 'Crédit') return '#dc2626';
+    return themeColor;
+}
+
+function getThemeColors() {
+    var themes = {
+        1: { color: '#0F6E56', bg: '#E1F5EE', tx: '#085041' },
+        2: { color: '#185FA5', bg: '#E6F1FB', tx: '#0C447C' },
+        3: { color: '#4F46E5', bg: '#EEF2FF', tx: '#3730A3' },
+        4: { color: '#1E293B', bg: '#F1F5F9', tx: '#0F172A' }
+    };
+    return themes[curModel];
+}
+
+function model1(d) {
+    var theme = getThemeColors();
+    var sColor = statusColor(d.statut, theme.color);
+    var title = getDocTitle(d);
+    var badge = getBadgeText(d);
+    
+    return `
+<div class="invoice" style="border: 1px solid #e2e8f0; font-family: 'Inter', sans-serif; color: #1e293b; background:#fff;">
+    <div style="padding:28px 32px">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:20px">
+            <div style="display:flex;align-items:flex-start;gap:12px;">
+                ${COMPANY.logo ? `<div style="flex-shrink:0;">${logoHtml(COMPANY.logo, COMPANY.nom, 52)}</div>` : `<div style="width:38px;height:38px;border-radius:9px;background:${theme.color};display:flex;align-items:center;justify-content:center"><i class="fas fa-bolt" style="color:#fff;font-size:17px"></i></div>`}
+                <div>
+                    <div style="font-size:15px;font-weight:700;color:var(--tx)">${COMPANY.nom}</div>
+                    <div style="font-size:11px;color:var(--mu);margin-top:1px">${COMPANY.pdv}</div>
+                    <div style="font-size:10.5px;color:var(--mu);line-height:1.7;margin-top:5px">
+                        ${COMPANY.adresse ? COMPANY.adresse + '<br>' : ''}
+                        ${COMPANY.tel ? 'Tél : ' + COMPANY.tel : ''}${COMPANY.email ? ' · ' + COMPANY.email : ''}<br>
+                        ${fiscalLinesSeller('<br>')}
+                    </div>
+                </div>
             </div>
-            <div class="info-block">
-                <h4>Fournisseur</h4>
-                <strong>{{ $achat->fournisseur->nom }}</strong>
-                <p>{{ $achat->fournisseur->telephone }}<br>{{ $achat->fournisseur->email }}<br>{{ $achat->fournisseur->secteur }}</p>
+            <div style="text-align:right;flex-shrink:0;">
+                <div style="display:inline-block;padding:4px 12px;border-radius:20px;font-size:11px;font-weight:600;background:${theme.bg};color:${theme.tx};margin-bottom:6px">${badge}</div>
+                <div style="font-size:22px;font-weight:800;color:var(--tx)">${title}</div>
+                <div style="font-size:13px;color:var(--mu);margin-top:2px;font-weight:600;">${d.num}</div>
             </div>
         </div>
-        <table>
+        <div style="height:0.5px;background:var(--border);margin-bottom:18px;"></div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:22px">
+            <div style="background:var(--white);border-radius:8px;padding:12px 14px;border:0.5px solid var(--border)">
+                <div style="font-size:10px;font-weight:700;color:${theme.color};text-transform:uppercase;letter-spacing:.07em;margin-bottom:6px">Fournisseur</div>
+                <div style="font-size:13px;font-weight:700;color:var(--tx)">${d.fournisseur.nom}</div>
+                <div style="font-size:11px;color:var(--mu);margin-top:4px;line-height:1.7">${fiscalLinesClient(d.fournisseur, '<br>')}</div>
+            </div>
+            <div style="background:var(--white);border-radius:8px;padding:12px 14px;border:0.5px solid var(--border)">
+                <div style="font-size:10px;font-weight:700;color:${theme.color};text-transform:uppercase;letter-spacing:.07em;margin-bottom:8px">Informations</div>
+                ${[
+                    ["Date d'émission", d.date],
+                    ["Mode de paiement", isReceiptMode ? null : d.mode],
+                    ["Point de vente", COMPANY.pdv]
+                ].map(r => r[1] ? `<div style="display:flex;justify-content:space-between;font-size:11px;padding:4px 0;border-bottom:0.5px solid var(--border)"><span style="color:var(--mu)">${r[0]}</span><span style="font-weight:600;color:var(--tx)">${r[1]}</span></div>` : '').join('')}
+                ${isReceiptMode ? '' : `
+                <div style="display:flex;justify-content:space-between;font-size:11px;padding:5px 0">
+                    <span style="color:var(--mu)">Statut</span>
+                    <span style="font-weight:700;color:${sColor};background:${sColor}18;padding:2px 10px;border-radius:20px">${d.statut}</span>
+                </div>
+                `}
+            </div>
+        </div>
+        
+        <table style="width:100%;border-collapse:collapse;font-size:12px;margin-bottom:16px">
             <thead>
-                <tr>
-                    <th>#</th><th>Désignation</th><th>Référence</th><th>Qté</th><th>Prix unitaire</th><th>Total HT</th>
+                <tr style="background:${theme.color};color:#fff;">
+                    <th style="padding:9px 12px;text-align:left;color:#fff;background:${theme.color};font-weight:600;width:15%">Réf.</th>
+                    <th style="padding:9px 12px;text-align:left;color:#fff;background:${theme.color};font-weight:600">Désignation</th>
+                    <th style="padding:9px 12px;text-align:center;color:#fff;background:${theme.color};font-weight:600;width:12%">Unité</th>
+                    <th style="padding:9px 12px;text-align:right;color:#fff;background:${theme.color};font-weight:600;width:10%">Qté</th>
+                    ${isReceiptMode ? '' : `
+                    <th style="padding:9px 12px;text-align:right;color:#fff;background:${theme.color};font-weight:600;width:18%">P.U. HT</th>
+                    <th style="padding:9px 12px;text-align:right;color:#fff;background:${theme.color};font-weight:600;width:20%">Total HT</th>
+                    `}
                 </tr>
             </thead>
             <tbody>
-                @foreach($achat->details as $i => $detail)
-                <tr>
-                    <td style="color:#94a3b8;">{{ $i+1 }}</td>
-                    <td style="font-weight:600;">{{ $detail->produit->nom }}</td>
-                    <td style="color:#94a3b8;">{{ $detail->produit->reference }}</td>
-                    <td style="text-align:center;">{{ $detail->quantite }}</td>
-                    <td>{{ number_format($detail->prix_unitaire, 0, ',', ' ') }} F</td>
-                    <td>{{ number_format($detail->quantite * $detail->prix_unitaire, 0, ',', ' ') }} F</td>
-                </tr>
-                @endforeach
+                ${d.items.map((r, i) => `<tr style="background:${i % 2 === 0 ? '#fff' : '#F9FAFB'}">
+                    <td style="padding:9px 12px;color:var(--mu);font-weight:500;">${r.ref}</td>
+                    <td style="padding:9px 12px;font-weight:600;color:var(--tx)">${r.nom}</td>
+                    <td style="padding:9px 12px;text-align:center;color:var(--tx)">${r.unite || 'Unité'}</td>
+                    <td style="padding:9px 12px;text-align:right;color:var(--tx)">${r.qty}</td>
+                    ${isReceiptMode ? '' : `
+                    <td style="padding:9px 12px;text-align:right;color:var(--tx)">${fmt(r.pu)}</td>
+                    <td style="padding:9px 12px;text-align:right;font-weight:700;color:var(--tx)">${fmt(r.ht)}</td>
+                    `}
+                </tr>`).join('')}
             </tbody>
         </table>
-        <div class="totaux">
-            <div class="totaux-row"><span>Montant HT</span><span>{{ number_format($achat->montant_ht, 0, ',', ' ') }} FCFA</span></div>
-            <div class="totaux-row"><span>TVA (18%)</span><span>{{ number_format($achat->montant_tva, 0, ',', ' ') }} FCFA</span></div>
-            <div class="totaux-row grand"><span>TOTAL TTC</span><span>{{ number_format($achat->montant_ttc, 0, ',', ' ') }} FCFA</span></div>
+        
+        ${isReceiptMode ? `
+        <div style="border-top:0.5px solid var(--border);padding-top:14px;margin-top:40px;display:flex;justify-content:space-between;align-items:flex-end">
+            <div style="font-size:11px;color:var(--mu);line-height:1.7">Merci pour votre confiance.<br>Document généré par <strong>Selflow</strong></div>
+            <div style="display:flex; gap: 20px;">
+                <div style="text-align:center;font-size:10px;color:var(--mu)">Réceptionné par (Magasinier)<br><div style="width:120px;height:50px;border:0.5px dashed var(--br);border-radius:4px;margin-top:4px"></div></div>
+                <div style="text-align:center;font-size:10px;color:var(--mu)">Livré par (Fournisseur)<br><div style="width:120px;height:50px;border:0.5px dashed var(--br);border-radius:4px;margin-top:4px"></div></div>
+            </div>
         </div>
-        <div style="margin-top:28px; display:flex; justify-content:space-between; align-items:center;">
-            <div>
-                <div style="font-size:11px; color:#94a3b8; text-transform:uppercase; letter-spacing:.5px;">Mode de paiement</div>
-                <div style="font-weight:700; margin-top:4px;">{{ $achat->mode_paiement }}</div>
+        ` : `
+        <div style="display:flex;justify-content:space-between;margin-bottom:20px;align-items:flex-start;">
+            <div style="flex:1;"></div>
+            <div style="width:240px">
+                <div style="display:flex;justify-content:space-between;padding:10px 0 6px;font-size:15px;font-weight:800;color:var(--tx);border-top:1.5px solid ${theme.color};"><span>TOTAL TTC</span><span>${fmtFcfa(d.montant_ttc)}</span></div>
             </div>
-            <div style="text-align:right;">
-                <div style="font-size:11px; color:#94a3b8; margin-bottom:8px;">Signature fournisseur</div>
-                <div style="width:120px; height:60px; border-bottom:1px solid #e2e8f0;"></div>
+        </div>
+        <div style="border-top:0.5px solid var(--border);padding-top:14px;display:flex;justify-content:space-between;align-items:flex-end">
+            <div style="font-size:11px;color:var(--mu);line-height:1.7">Merci pour votre confiance.<br>Document généré par <strong>Selflow</strong></div>
+            <div style="text-align:right;font-size:11px;color:var(--mu)">Signature / Cachet<br><div style="width:100px;height:40px;border:0.5px dashed var(--border);border-radius:4px;margin-top:4px"></div></div>
+        </div>
+        `}
+    </div>
+</div>`;
+}
+
+function model2(d) {
+    var theme = getThemeColors();
+    var sColor = statusColor(d.statut, theme.color);
+    var title = getDocTitle(d);
+    var badge = getBadgeText(d);
+    
+    return `
+<div class="invoice" style="background:#fff;">
+    <div style="display:flex">
+        <div style="width:210px;background:${theme.color};padding:28px 20px;flex-shrink:0;display:flex;flex-direction:column">
+            <div style="margin-bottom:16px;text-align:center">
+                ${COMPANY.logo ? logoHtml(COMPANY.logo, COMPANY.nom, 54) : `<div style="width:36px;height:36px;border-radius:9px;background:rgba(255,255,255,.2);display:inline-flex;align-items:center;justify-content:center"><i class="fas fa-bolt" style="color:#fff;font-size:16px"></i></div>`}
             </div>
+            <div style="font-size:13px;font-weight:700;color:#fff;margin-bottom:4px">${COMPANY.nom}</div>
+            <div style="font-size:10px;color:rgba(255,255,255,.6);margin-bottom:14px">${COMPANY.pdv}</div>
+            <div style="font-size:10.5px;color:rgba(255,255,255,.75);line-height:1.8;font-weight:500;">
+                ${COMPANY.adresse ? COMPANY.adresse + '<br>' : ''}
+                ${COMPANY.tel ? 'Tél : ' + COMPANY.tel + '<br>' : ''}
+                ${COMPANY.email ? COMPANY.email + '<br>' : ''}
+                ${COMPANY.ncc ? '<br>NCC : ' + COMPANY.ncc : ''}
+                ${COMPANY.regime ? '<br>Rég. : ' + COMPANY.regime : ''}
+                ${COMPANY.centre_impots ? '<br>' + COMPANY.centre_impots : ''}
+                ${COMPANY.rccm ? '<br>RCCM : ' + COMPANY.rccm : ''}
+            </div>
+        </div>
+        <div style="flex:1;padding:28px 24px">
+            <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:20px">
+                <div>
+                    <div style="font-size:22px;font-weight:800;color:var(--tx)">${title}</div>
+                    <div style="font-size:12px;color:var(--mu);margin-top:2px;font-weight:600;">${d.num}</div>
+                </div>
+                <div style="padding:5px 14px;border-radius:20px;font-size:11px;font-weight:600;background:${theme.bg};color:${theme.tx}">${badge}</div>
+            </div>
+            <div style="margin-bottom:16px;padding:12px 14px;background:var(--white);border-radius:8px;border:0.5px solid var(--border)">
+                <div style="font-size:10px;color:${theme.color};text-transform:uppercase;letter-spacing:.07em;margin-bottom:6px;font-weight:700;">Fournisseur</div>
+                <div style="font-size:13px;font-weight:700;color:var(--tx)">${d.fournisseur.nom}</div>
+                <div style="font-size:11px;color:var(--mu);margin-top:4px;line-height:1.7;">${fiscalLinesClient(d.fournisseur, '<br>')}</div>
+                <div style="display:flex;gap:14px;margin-top:10px;flex-wrap:wrap;">
+                    <div style="font-size:11px"><span style="color:var(--mu)">Date : </span><span style="color:var(--tx);font-weight:600;">${d.date}</span></div>
+                    ${isReceiptMode ? '' : `
+                    <div style="font-size:11px"><span style="color:var(--mu)">Paiement : </span><span style="color:var(--tx);font-weight:600;">${d.mode}</span></div>
+                    <div style="font-size:11px"><span style="color:var(--mu)">Statut : </span><span style="font-weight:700;color:${sColor}">${d.statut}</span></div>
+                    `}
+                </div>
+            </div>
+            <table style="width:100%;border-collapse:collapse;font-size:12px;margin-bottom:14px">
+                <thead>
+                    <tr style="border-bottom:1.5px solid ${theme.color}">
+                        <th style="padding:7px 0;text-align:left;color:${theme.color};font-weight:700;width:18%">Réf.</th>
+                        <th style="padding:7px 6px;text-align:left;color:${theme.color};font-weight:700">Désignation</th>
+                        <th style="padding:7px 6px;text-align:center;color:${theme.color};font-weight:700;width:12%">Unité</th>
+                        <th style="padding:7px 6px;text-align:right;color:${theme.color};font-weight:700;width:10%">Qté</th>
+                        ${isReceiptMode ? '' : `
+                        <th style="padding:7px 6px;text-align:right;color:${theme.color};font-weight:700;width:18%">P.U. HT</th>
+                        <th style="padding:7px 0;text-align:right;color:${theme.color};font-weight:700;width:20%">Total HT</th>
+                        `}
+                    </tr>
+                </thead>
+                <tbody>
+                    ${d.items.map(r => `<tr style="border-bottom:0.5px solid var(--border)">
+                        <td style="padding:8px 0;color:var(--mu);font-weight:500;">${r.ref}</td>
+                        <td style="padding:8px 6px;color:var(--tx);font-weight:600;">${r.nom}</td>
+                        <td style="padding:8px 6px;text-align:center;color:var(--mu)">${r.unite || 'Unité'}</td>
+                        <td style="padding:8px 6px;text-align:right;color:var(--mu)">${r.qty}</td>
+                        ${isReceiptMode ? '' : `
+                        <td style="padding:8px 6px;text-align:right;color:var(--mu)">${fmt(r.pu)}</td>
+                        <td style="padding:8px 0;text-align:right;font-weight:700;color:var(--tx)">${fmt(r.ht)}</td>
+                        `}
+                    </tr>`).join('')}
+                </tbody>
+            </table>
+            
+            ${isReceiptMode ? `
+            <div style="border-top:0.5px solid var(--border);padding-top:14px;margin-top:40px;display:flex;justify-content:space-between;align-items:flex-end">
+                <div style="font-size:10px;color:var(--mu)">Généré automatiquement par <strong>Selflow</strong></div>
+                <div style="display:flex; gap: 15px;">
+                    <div style="text-align:center;font-size:9px;color:var(--mu)">Réceptionné par (Magasinier)<br><div style="width:100px;height:45px;border:0.5px dashed var(--br);border-radius:4px;margin-top:3px"></div></div>
+                    <div style="text-align:center;font-size:9px;color:var(--mu)">Livré par (Fournisseur)<br><div style="width:100px;height:45px;border:0.5px dashed var(--br);border-radius:4px;margin-top:3px"></div></div>
+                </div>
+            </div>
+            ` : `
+            <div style="display:flex;justify-content:flex-end;margin-bottom:14px">
+                <div style="width:220px;background:var(--white);border-radius:8px;padding:10px 12px;border:0.5px solid var(--border)">
+                    <div style="display:flex;justify-content:space-between;font-size:13px;font-weight:800;padding:6px 0 0;margin-top:4px"><span style="color:var(--tx)">Total TTC</span><span style="color:${theme.color}">${fmtFcfa(d.montant_ttc)}</span></div>
+                </div>
+            </div>
+            <div style="font-size:11px;color:var(--mu)">Généré automatiquement par <strong>Selflow</strong></div>
+            `}
         </div>
     </div>
-    <div class="footer">
-        <span>{{ $achat->pointDeVente->entreprise->email }}</span>
-        <span>Statut : {{ $achat->statut }}</span>
-        <span>Généré le {{ now()->format('d/m/Y à H:i') }}</span>
+</div>`;
+}
+
+function model3(d) {
+    var theme = getThemeColors();
+    var sColor = statusColor(d.statut, theme.color);
+    var title = getDocTitle(d);
+    var badge = getBadgeText(d);
+    
+    return `
+<div class="invoice" style="background:#fff;">
+    <div style="border-top:4px solid ${theme.color};padding:28px 32px">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:20px">
+            <div style="display:flex;align-items:flex-start;gap:12px">
+                ${COMPANY.logo ? `<div style="flex-shrink:0;">${logoHtml(COMPANY.logo, COMPANY.nom, 48)}</div>` : `<div style="width:38px;height:38px;border-radius:10px;background:${theme.color};display:flex;align-items:center;justify-content:center"><i class="fas fa-bolt" style="color:#fff;font-size:18px"></i></div>`}
+                <div>
+                    <div style="font-size:15px;font-weight:700;color:var(--tx)">${COMPANY.nom}</div>
+                    <div style="font-size:11px;color:var(--mu)">${COMPANY.pdv}</div>
+                    <div style="font-size:10.5px;color:var(--mu);line-height:1.7;margin-top:4px">
+                        ${COMPANY.adresse ? COMPANY.adresse + '<br>' : ''}
+                        ${COMPANY.tel ? 'Tél : ' + COMPANY.tel : ''}${COMPANY.email ? ' · ' + COMPANY.email : ''}
+                    </div>
+                </div>
+            </div>
+            <div style="text-align:right">
+                <div style="font-size:24px;font-weight:800;color:var(--tx);letter-spacing:-0.5px;">${title}</div>
+                <div style="font-size:12px;margin-top:2px"><span style="color:var(--mu)">N° </span><span style="font-weight:700;color:${theme.color}">${d.num}</span></div>
+                <div style="display:inline-block;padding:3px 10px;border-radius:4px;font-size:11px;font-weight:600;background:${theme.bg};color:${theme.tx};margin-top:6px">${badge}</div>
+            </div>
+        </div>
+
+        <div style="height:1px;background:var(--border);margin-bottom:18px"></div>
+
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:20px">
+            <div style="padding:12px 14px;background:var(--white);border-radius:8px;border:0.5px solid var(--border)">
+                <div style="font-size:10px;color:${theme.color};font-weight:700;text-transform:uppercase;letter-spacing:.08em;margin-bottom:6px">Fournisseur</div>
+                <div style="font-size:13px;font-weight:700;color:var(--tx)">${d.fournisseur.nom}</div>
+                <div style="font-size:11px;color:var(--mu);margin-top:4px;line-height:1.7">${fiscalLinesClient(d.fournisseur, '<br>')}</div>
+            </div>
+            <div style="padding:12px 14px;background:var(--white);border-radius:8px;border:0.5px solid var(--border)">
+                <div style="font-size:10px;color:${theme.color};font-weight:700;text-transform:uppercase;letter-spacing:.08em;margin-bottom:6px">Détails</div>
+                <div style="font-size:11px;line-height:1.9">
+                    <span style="color:var(--mu)">Date : </span><span style="color:var(--tx);font-weight:600;">${d.date}</span><br>
+                    ${isReceiptMode ? '' : `<span style="color:var(--mu)">Paiement : </span><span style="color:var(--tx);font-weight:600;">${d.mode}</span><br>`}
+                    ${isReceiptMode ? '' : `<span style="color:var(--mu)">Statut : </span><span style="font-weight:700;color:${sColor}">${d.statut}</span>`}
+                </div>
+            </div>
+        </div>
+
+        <div style="margin-bottom:14px;padding:10px 14px;background:var(--white);border-radius:8px;border:0.5px solid var(--border);font-size:10.5px;color:var(--mu)">
+            <div style="display:flex;flex-wrap:wrap;gap:10px 20px;">
+                ${COMPANY.ncc ? `<span>NCC : <strong style="color:var(--tx)">${COMPANY.ncc}</strong></span>` : ''}
+                ${COMPANY.regime ? `<span>Rég. : <strong style="color:var(--tx)">${COMPANY.regime}</strong></span>` : ''}
+                ${COMPANY.centre_impots ? `<span>Centre : <strong style="color:var(--tx)">${COMPANY.centre_impots}</strong></span>` : ''}
+                ${COMPANY.rccm ? `<span>RCCM : <strong style="color:var(--tx)">${COMPANY.rccm}</strong></span>` : ''}
+                ${COMPANY.cc ? `<span>CC : <strong style="color:var(--tx)">${COMPANY.cc}</strong></span>` : ''}
+            </div>
+        </div>
+
+        <table style="width:100%;border-collapse:collapse;font-size:12px;margin-bottom:16px;table-layout:fixed">
+            <thead>
+                <tr>
+                    <th style="padding:9px 10px;text-align:left;border-bottom:2px solid ${theme.color};color:var(--tx);font-weight:700;width:15%">Réf.</th>
+                    <th style="padding:9px 10px;text-align:left;border-bottom:2px solid ${theme.color};color:var(--tx);font-weight:700;width:30%">Désignation</th>
+                    <th style="padding:9px 10px;text-align:center;border-bottom:2px solid ${theme.color};color:var(--tx);font-weight:700;width:12%">Unité</th>
+                    <th style="padding:9px 10px;text-align:right;border-bottom:2px solid ${theme.color};color:var(--tx);font-weight:700;width:10%">Qté</th>
+                    ${isReceiptMode ? '' : `
+                    <th style="padding:9px 10px;text-align:right;border-bottom:2px solid ${theme.color};color:var(--tx);font-weight:700;width:16%">P.U. HT</th>
+                    <th style="padding:9px 10px;text-align:right;border-bottom:2px solid ${theme.color};color:var(--tx);font-weight:700;width:17%">Total HT</th>
+                    `}
+                </tr>
+            </thead>
+            <tbody>
+                ${d.items.map((r, i) => `<tr style="background:${i % 2 === 1 ? '#F9FAFB' : '#fff'}">
+                    <td style="padding:9px 10px;color:var(--mu);font-size:11px;font-weight:500;">${r.ref}</td>
+                    <td style="padding:9px 10px;font-weight:600;color:var(--tx)">${r.nom}</td>
+                    <td style="padding:9px 10px;text-align:center;color:var(--tx)">${r.unite || 'Unité'}</td>
+                    <td style="padding:9px 10px;text-align:right;color:var(--tx)">${r.qty}</td>
+                    ${isReceiptMode ? '' : `
+                    <td style="padding:9px 10px;text-align:right;color:var(--mu)">${fmt(r.pu)}</td>
+                    <td style="padding:9px 10px;text-align:right;font-weight:700;color:var(--tx)">${fmt(r.ht)}</td>
+                    `}
+                </tr>`).join('')}
+            </tbody>
+        </table>
+        
+        ${isReceiptMode ? `
+        <div style="border-top:0.5px solid var(--border);padding-top:12px;margin-top:40px;display:flex;justify-content:space-between;align-items:center">
+            <div style="font-size:11px;color:var(--mu)">Généré par <strong>Selflow</strong> · Document officiel</div>
+            <div style="display:flex;gap:16px">
+                <div style="text-align:center;font-size:10px;color:var(--mu)">Magasinier<br><div style="width:110px;height:45px;border:0.5px dashed var(--br);border-radius:0;margin-top:3px"></div></div>
+                <div style="text-align:center;font-size:10px;color:var(--mu)">Livreur / Société<br><div style="width:110px;height:45px;border:0.5px dashed var(--br);border-radius:0;margin-top:3px"></div></div>
+            </div>
+        </div>
+        ` : `
+        <div style="display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:20px">
+            <div style="font-size:11px;color:var(--mu);max-width:320px;line-height:1.7">
+                <span style="color:var(--tx);font-weight:700">Acheteur :</span><br>
+                ${COMPANY.adresse ? COMPANY.adresse + '<br>' : ''}
+                ${COMPANY.tel ? 'Tél : ' + COMPANY.tel : ''}${COMPANY.email ? ' · ' + COMPANY.email : ''}<br>
+            </div>
+            <div style="width:235px">
+                <div style="display:flex;justify-content:space-between;padding:8px;margin-top:4px;background:${theme.color};border-radius:6px">
+                    <span style="font-size:13px;font-weight:700;color:#fff">Total TTC</span>
+                    <span style="font-size:15px;font-weight:800;color:#fff">${fmtFcfa(d.montant_ttc)}</span>
+                </div>
+            </div>
+        </div>
+        <div style="border-top:0.5px solid var(--border);padding-top:12px;display:flex;justify-content:space-between;align-items:center">
+            <div style="font-size:11px;color:var(--mu)">Généré par <strong>Selflow</strong> · Document officiel</div>
+            <div style="display:flex;gap:16px">
+                <div style="text-align:center;font-size:10px;color:var(--mu)">Signature Fournisseur<br><div style="width:80px;height:36px;border:0.5px dashed var(--border);border-radius:4px;margin-top:3px"></div></div>
+                <div style="text-align:center;font-size:10px;color:var(--mu)">Signature Acheteur<br><div style="width:80px;height:36px;border:0.5px dashed var(--border);border-radius:4px;margin-top:3px"></div></div>
+            </div>
+        </div>
+        `}
+    </div>
+</div>`;
+}
+
+function modelStandard(d) {
+    var title = getDocTitle(d);
+    
+    var rowsHtml = '';
+    if (isReceiptMode) {
+        rowsHtml = d.items.map(r => `
+            <tr style="background:#fff; color:#000;">
+                <td style="padding:8px 10px; border:1px solid #000; font-weight:500;">${r.ref}</td>
+                <td style="padding:8px 10px; border:1px solid #000; font-weight:700;">${r.nom}</td>
+                <td style="padding:8px 10px; border:1px solid #000; text-align:right;">${r.qty}</td>
+                <td style="padding:8px 10px; border:1px solid #000; text-align:center;">${r.unite || 'Unité'}</td>
+            </tr>
+        `).join('');
+    } else {
+        rowsHtml = d.items.map(r => `
+            <tr style="background:#fff; color:#000;">
+                <td style="padding:8px 10px; border:1px solid #000; font-weight:500;">${r.ref}</td>
+                <td style="padding:8px 10px; border:1px solid #000; font-weight:700;">${r.nom}</td>
+                <td style="padding:8px 10px; border:1px solid #000; text-align:right;">${fmt(r.pu)}</td>
+                <td style="padding:8px 10px; border:1px solid #000; text-align:right;">${r.qty}</td>
+                <td style="padding:8px 10px; border:1px solid #000; text-align:center;">${r.unite || 'Unité'}</td>
+                <td style="padding:8px 10px; border:1px solid #000; text-align:right; font-weight:700;">${fmt(r.ht)}</td>
+            </tr>
+        `).join('');
+        
+        rowsHtml += `
+            <tr style="background:#fff; color:#000;">
+                <td colspan="5" style="padding:6px 10px; border:1px solid #000; text-align:right; font-weight:700; text-transform:uppercase;">TOTAL HT</td>
+                <td style="padding:6px 10px; border:1px solid #000; text-align:right; font-weight:700;">${fmt(d.montant_ht)}</td>
+            </tr>
+            <tr style="background:#fff; color:#000;">
+                <td colspan="5" style="padding:6px 10px; border:1px solid #000; text-align:right; font-weight:700; text-transform:uppercase;">TOTAL TTC</td>
+                <td style="padding:6px 10px; border:1px solid #000; text-align:right; font-weight:700;">${fmt(d.montant_ttc)}</td>
+            </tr>
+        `;
+    }
+
+    return `
+<div class="invoice" style="border: 1px solid #000; border-radius: 0; background: #fff; box-shadow: none;">
+    <div style="padding:40px; color:#000; font-family: 'Inter', sans-serif;">
+        <!-- En-tête -->
+        <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:20px;">
+            <div style="flex:1; font-size:11px; line-height:1.6; color:#000; padding-right: 20px;">
+                <div style="border: 1.5px solid #000; border-radius: 8px; padding: 12px; margin-bottom: 12px;">
+                    <div style="font-size:14px; font-weight:800; text-transform:uppercase; margin-bottom:4px;">${COMPANY.nom}</div>
+                    <div>NCC : <strong>${COMPANY.ncc || '—'}</strong></div>
+                    <div>Régime d'imposition : <strong>${COMPANY.regime || '—'}</strong></div>
+                    <div>Centre des impôts : <strong>${COMPANY.centre_impots || '—'}</strong></div>
+                </div>
+                <div style="margin-top:10px;">
+                    RCCM : <strong>${COMPANY.rccm || '—'}</strong><br>
+                    Adresse : ${COMPANY.adresse || '—'}<br>
+                    Nº Tel : ${COMPANY.tel || '—'}<br>
+                    Mail : ${COMPANY.email || '—'}
+                </div>
+            </div>
+            
+            <div style="text-align:right; flex-shrink:0; width:280px; display:flex; flex-direction:column; align-items:flex-end;">
+                <div style="height:60px; margin-bottom:15px; display:flex; align-items:center; justify-content:flex-end;">
+                    ${COMPANY.logo ? `<img src="${COMPANY.logo}" alt="${COMPANY.nom}" style="max-height:100%; object-fit:contain;">` : `<div style="font-size:16px; font-weight:800; text-transform:uppercase; border:1px solid #000; padding:8px 12px;">${COMPANY.nom}</div>`}
+                </div>
+                <div style="font-size:16px; font-weight:800; letter-spacing:0.5px; color:#000; text-transform:uppercase; margin-bottom:4px;">${title}</div>
+                <div style="font-size:12px; font-weight:700; color:#000;">N° ${d.num}</div>
+                ${isReceiptMode ? '' : `<div style="font-size:11px; color:#333; margin-top:2px;">Statut : <span style="font-weight:700; text-transform:uppercase;">${d.statut}</span></div>`}
+            </div>
+        </div>
+        
+        <div style="border-bottom:1.5px solid #000; margin-bottom:20px;"></div>
+        
+        <!-- Section Fournisseur -->
+        <div style="font-size:11px; line-height:1.6; color:#000; margin-bottom:25px; border-top:1.5px solid #000; padding-top:10px;">
+            <div style="font-size:11px; font-weight:800; text-transform:uppercase; color:#000; margin-bottom:5px; letter-spacing:0.5px;">FOURNISSEUR</div>
+            <div>Nom : <strong>${d.fournisseur.nom}</strong></div>
+            <div>Adresse : <strong>${d.fournisseur.adresse || '—'}</strong></div>
+            <div>NCC : <strong>${d.fournisseur.ncc || '—'}</strong></div>
+            <div>Régime d'imposition : <strong>${d.fournisseur.regime || '—'}</strong></div>
+        </div>
+        
+        <!-- Tableau des Articles -->
+        <table class="table-m4">
+            <thead>
+                ${isReceiptMode ? `
+                <tr style="background:#000; color:#fff; text-transform:uppercase;">
+                    <th style="text-align:left; font-weight:700; width:15%;">Réf.</th>
+                    <th style="text-align:left; font-weight:700;">Désignation</th>
+                    <th style="text-align:right; font-weight:700; width:15%;">Qté</th>
+                    <th style="text-align:center; font-weight:700; width:15%;">Unité</th>
+                </tr>
+                ` : `
+                <tr style="background:#000; color:#fff; text-transform:uppercase;">
+                    <th style="text-align:left; font-weight:700; width:15%;">Réf.</th>
+                    <th style="text-align:left; font-weight:700;">Désignation</th>
+                    <th style="text-align:right; font-weight:700; width:15%;">P.U. HT</th>
+                    <th style="text-align:right; font-weight:700; width:10%;">Qté</th>
+                    <th style="text-align:center; font-weight:700; width:15%;">Unité</th>
+                    <th style="text-align:right; font-weight:700; width:20%;">Montant HT</th>
+                </tr>
+                `}
+            </thead>
+            <tbody>
+                ${rowsHtml}
+            </tbody>
+        </table>
+        
+        ${isReceiptMode ? `
+        <div style="border-top:1px solid #000; padding-top:25px; margin-top:50px; display:flex; justify-content:space-between; align-items:flex-end;">
+            <div style="font-size:9px; color:#444; line-height:1.6; font-weight:500; max-width:70%;">
+                Document officiel généré par <strong>Selflow</strong>.
+            </div>
+            <div style="display:flex; gap: 30px;">
+                <div style="text-align:center;">
+                    <div style="font-size:9px; font-weight:700; text-transform:uppercase; color:#333; margin-bottom:5px;">Magasinier</div>
+                    <div style="width:120px; height:50px; border:1px dashed #000; border-radius:0; background:#fff;"></div>
+                </div>
+                <div style="text-align:center;">
+                    <div style="font-size:9px; font-weight:700; text-transform:uppercase; color:#333; margin-bottom:5px;">Livreur</div>
+                    <div style="width:120px; height:50px; border:1px dashed #000; border-radius:0; background:#fff;"></div>
+                </div>
+            </div>
+        </div>
+        ` : `
+        <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-top: 25px;">
+            <div style="flex:1;"></div>
+            <div style="text-align:center; width:200px;">
+                <div style="font-size:9px; font-weight:700; text-transform:uppercase; color:#333; margin-bottom:5px;">Cachet & Signature</div>
+                <div style="width:140px; height:60px; border:1px dashed #000; border-radius:0; background:#fff; display:inline-block;"></div>
+            </div>
+        </div>
+        <div style="border-top:1px solid #000; padding-top:15px; margin-top:20px; font-size:9px; color:#444; line-height:1.6; font-weight:500; text-align:center;">
+            Document généré par <strong>Selflow</strong>.
+        </div>
+        `}
     </div>
 </div>
-</body>
-</html>
+    `;
+}
+
+function render() {
+    var d = DATA['achat'];
+    var theme = getThemeColors();
+    d.badge_color = theme.color;
+    d.badge_bg = theme.bg;
+    d.badge_tx = theme.tx;
+
+    var html = '';
+    if (curModel === 1) html = model1(d);
+    else if (curModel === 2) html = model2(d);
+    else if (curModel === 3) html = model3(d);
+    else html = modelStandard(d);
+    
+    document.getElementById('invoice-wrap').innerHTML = html;
+}
+
+function setModel(n, el) {
+    curModel = n;
+    document.querySelectorAll('.tab').forEach(t => t.classList.remove('act'));
+    el.classList.add('act');
+    render();
+}
+
+// Initial render
+render();
+</script>
+@endsection

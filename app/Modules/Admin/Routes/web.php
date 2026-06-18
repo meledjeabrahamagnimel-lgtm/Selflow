@@ -31,6 +31,8 @@ Route::prefix('admin')
             Route::post('/{vente}/normaliser', [VenteControleur::class, 'normaliser'])->name('normaliser');
             Route::get('/{vente}/modifier',    [VenteControleur::class, 'modifierFormulaire'])->name('modifier');
             Route::put('/{vente}/modifier',    [VenteControleur::class, 'enregistrerModification'])->name('modifier.enregistrer');
+            Route::post('/{vente}/confirmer',  [VenteControleur::class, 'confirmerCommande'])->name('confirmer');
+            Route::post('/{vente}/facturer',   [VenteControleur::class, 'facturer'])->name('facturer');
         });
 
         // ── Achats ──
@@ -40,6 +42,8 @@ Route::prefix('admin')
             Route::get('/factures',        [AchatControleur::class, 'factures'])->name('factures');
             Route::get('/historique',      [AchatControleur::class, 'historique'])->name('historique');
             Route::get('/facture/{achat}', [AchatControleur::class, 'imprimer'])->name('imprimer');
+            Route::post('/{achat}/confirmer', [AchatControleur::class, 'confirmerCommande'])->name('confirmer');
+            Route::post('/{achat}/facturer',  [AchatControleur::class, 'facturer'])->name('facturer');
         });
 
         // ── Stock ──
@@ -56,6 +60,16 @@ Route::prefix('admin')
             Route::get('/codes-journaux', [TresorerieControleur::class, 'codesJournaux'])->name('codes_journaux');
             Route::post('/codes-journaux', [TresorerieControleur::class, 'creerCodeJournal'])->name('creer_code_journal');
             Route::delete('/codes-journaux/{code}', [TresorerieControleur::class, 'supprimerCodeJournal'])->name('supprimer_code_journal');
+        });
+
+        // ── Comptabilité ──
+        Route::prefix('comptabilite')->name('comptabilite.')->group(function () {
+            Route::get('/globale',   [\App\Modules\Admin\Controleurs\ComptabiliteControleur::class, 'globale'])->name('globale');
+            Route::get('/creances',  [\App\Modules\Admin\Controleurs\ComptabiliteControleur::class, 'creances'])->name('creances');
+            Route::get('/tiers/{type}/{id}', [\App\Modules\Admin\Controleurs\ComptabiliteControleur::class, 'releveTiers'])->name('releve_tiers');
+            Route::post('/reglement', [\App\Modules\Admin\Controleurs\ComptabiliteControleur::class, 'enregistrerReglement'])->name('enregistrer_reglement');
+            Route::get('/plan-comptable', [\App\Modules\Admin\Controleurs\ComptabiliteControleur::class, 'planComptable'])->name('plan_comptable');
+            Route::post('/plan-comptable', [\App\Modules\Admin\Controleurs\ComptabiliteControleur::class, 'creerCompteComptable'])->name('creer_compte_comptable');
         });
 
         // ── Points de vente ──

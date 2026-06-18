@@ -72,7 +72,7 @@ class AchatApiControleur
             $montantTtc = $montantHt + $montantTva;
 
             // Générer le numéro de facture d'achat
-            $numero = 'AC-' . now()->year . '-' . str_pad(
+            $numero = 'AC-' . now()->format('d-m-Y') . '-' . str_pad(
                 Achat::whereYear('created_at', now()->year)->count() + 1,
                 4, '0', STR_PAD_LEFT
             );

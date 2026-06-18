@@ -140,6 +140,7 @@
                          data-stock-min="{{ $produit->stock_minimum }}"
                          data-cat="{{ $produit->categorie }}"
                          data-unite="{{ $produit->unite ?? 'Unité' }}"
+                         data-tva="{{ $produit->taux_tva }}"
                          onclick="ajouterAuPanier(this)">
                         <div class="produit-cat">{{ $produit->categorie }}</div>
                         <div class="produit-nom">{{ $produit->nom }}</div>
@@ -187,10 +188,7 @@
                         <input type="number" id="remiseInput" name="remise" class="form-control" value="0" min="0" oninput="calculerTotaux()" style="width: 100px; height: 28px; text-align: right; font-weight: 700; padding: 2px 8px; font-size: 13px; margin: 0;">
                     </div>
                     <div class="total-row" style="align-items:center;">
-                        <label style="display:flex; align-items:center; gap:8px; cursor:pointer; font-weight:inherit; color:inherit; margin:0;">
-                            <input type="checkbox" id="tvaActiveCheckbox" name="tva_active" value="1" checked onchange="calculerTotaux()">
-                            TVA (18%)
-                        </label>
+                        <span>TVA</span>
                         <span id="totalTva">0 F</span>
                     </div>
                     <div class="total-row grand"><span>Total TTC</span><span id="totalTtc">0 F</span></div>
@@ -210,6 +208,7 @@
 
                     {{-- Mode de paiement style buttons --}}
                     <input type="hidden" name="mode_paiement" id="modePaiementInput" value="Caisse">
+                    <input type="hidden" name="etape" id="etapeInput" value="Facture">
                     <div class="form-group">
                         <label class="form-label">Mode de paiement <span style="color:var(--danger)">*</span></label>
                         <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:10px; margin-bottom:12px;">
@@ -226,7 +225,7 @@
                             <select name="banque_id" id="banqueSelect" class="form-control" style="flex:1;">
                                 <option value="">— Choisir un compte banque —</option>
                                 @foreach($banques as $b)
-                                <option value="{{ $b->id }}">{{ $b->nom }} ({{ $b->numero_compte }})</option>
+                                <option value="{{ $b->id }}">{{ $b->intitule }} ({{ $b->code }} - {{ $b->compte }})</option>
                                 @endforeach
                             </select>
                             <button type="button" class="btn btn-primary" onclick="ouvrirModalNouvelleBanque()" style="padding:0 14px;"><i class="fas fa-plus"></i></button>
@@ -235,14 +234,19 @@
 
                     {{-- Montant reçu --}}
                     <div class="form-group">
-                        <label class="form-label">Montant à encaisser / reçu</label>
-                        <input type="number" name="montant_paye" id="montantPayeInput" class="form-control" placeholder="Laisser vide pour la totalité">
+                        <label class="form-label" id="labelMontantPaye">Montant à encaisser / reçu <span style="color:var(--danger)">*</span></label>
+                        <input type="number" name="montant_paye" id="montantPayeInput" class="form-control" placeholder="Saisir le montant reçu / payé" required>
                     </div>
                 </div>
 
-                <button type="submit" class="btn btn-success" id="btnValider" style="width:100%; justify-content:center; margin-top:4px;" disabled>
-                    <i class="fas fa-check-circle"></i> Valider et générer la facture
-                </button>
+                <div style="display:flex; flex-direction:column; gap:8px; margin-top:8px;">
+                    <button type="submit" name="etape" value="Facture" class="btn btn-success" id="btnValider" style="width:100%; justify-content:center;" onclick="document.getElementById('etapeInput').value = 'Facture'" disabled>
+                        <i class="fas fa-check-circle"></i> Valider et facturer
+                    </button>
+                    <button type="submit" name="etape" value="Devis" class="btn btn-outline" id="btnDevis" style="width:100%; justify-content:center; border-color:var(--warning); color:var(--warning);" onclick="document.getElementById('etapeInput').value = 'Devis'" disabled>
+                        <i class="fas fa-file-invoice"></i> Enregistrer comme Devis
+                    </button>
+                </div>
             </div>
         </div>
     </div>
@@ -261,7 +265,7 @@
                 <label class="form-label">Désignation / Service <span style="color:var(--danger)">*</span></label>
                 <input type="text" id="saisieNomInput" class="form-control" placeholder="Ex: Prestation de service, Produit hors stock" required>
             </div>
-            <div style="display:grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px;">
+            <div style="display:grid; grid-template-columns: 1fr 1fr; gap: 16px;">
                 <div class="form-group">
                     <label class="form-label">Prix unitaire (F) <span style="color:var(--danger)">*</span></label>
                     <input type="number" id="saisiePrixInput" class="form-control" min="0" placeholder="Ex: 5000" required>
@@ -270,9 +274,18 @@
                     <label class="form-label">Quantité <span style="color:var(--danger)">*</span></label>
                     <input type="number" id="saisieQteInput" class="form-control" min="1" value="1" required>
                 </div>
+            </div>
+            <div style="display:grid; grid-template-columns: 1fr 1fr; gap: 16px;">
                 <div class="form-group">
                     <label class="form-label">Unité</label>
                     <input type="text" id="saisieUniteInput" class="form-control" value="Unité" placeholder="Ex: Kg, Heure">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">TVA (%)</label>
+                    <select id="saisieTvaInput" class="form-control">
+                        <option value="18">18%</option>
+                        <option value="0">0%</option>
+                    </select>
                 </div>
             </div>
             <div style="display:flex; justify-content:flex-end; gap:12px; margin-top:24px;">
@@ -288,17 +301,21 @@
 <div class="modal-overlay" id="modalNouvelleBanque">
     <div class="modal">
         <div class="modal-header">
-            <h3><i class="fas fa-building-columns"></i> Nouveau compte banque</h3>
+            <h3><i class="fas fa-building-columns"></i> Nouveau code journal banque</h3>
             <button type="button" class="modal-close" onclick="fermerModalNouvelleBanque()">&times;</button>
         </div>
         <form id="formNouvelleBanque" onsubmit="soumettreNouvelleBanque(event)">
             <div class="form-group">
-                <label class="form-label">Nom de la banque <span style="color:var(--danger)">*</span></label>
-                <input type="text" id="banqueNomInput" class="form-control" placeholder="Ex: SGCI, ECOBANK" required>
+                <label class="form-label">Code <span style="color:var(--danger)">*</span></label>
+                <input type="text" id="banqueCodeInput" class="form-control" placeholder="Ex: BQE, SGCI" required>
             </div>
             <div class="form-group">
-                <label class="form-label">Numéro de compte <span style="color:var(--danger)">*</span></label>
-                <input type="text" id="banqueNumeroInput" class="form-control" placeholder="Ex: CI093 01001 1234567890 12" required>
+                <label class="form-label">Intitulé <span style="color:var(--danger)">*</span></label>
+                <input type="text" id="banqueIntituleInput" class="form-control" placeholder="Ex: Journal Société Générale" required>
+            </div>
+            <div class="form-group">
+                <label class="form-label">Compte comptable <span style="color:var(--danger)">*</span></label>
+                <input type="text" id="banqueCompteInput" class="form-control" placeholder="Ex: 521100" required>
             </div>
             <div style="display:flex; justify-content:flex-end; gap:12px; margin-top:24px;">
                 <button type="button" class="btn btn-outline" onclick="fermerModalNouvelleBanque()">Annuler</button>
@@ -332,10 +349,33 @@
 const panier = {};
 const stocks = {};
 
+function savePanier() {
+    localStorage.setItem('selflow_vente_panier', JSON.stringify(panier));
+}
+
+function loadPanier() {
+    const stored = localStorage.getItem('selflow_vente_panier');
+    if (stored) {
+        try {
+            const parsed = JSON.parse(stored);
+            Object.keys(parsed).forEach(k => {
+                panier[k] = parsed[k];
+            });
+            renderPanier();
+        } catch(e) {
+            console.error("Erreur chargement panier local:", e);
+        }
+    }
+}
+
 // Initialisation des stocks
 @foreach($produits as $p)
 stocks[{{ $p->id }}] = {{ $p->stock_actuel }};
 @endforeach
+
+document.addEventListener('DOMContentLoaded', () => {
+    loadPanier();
+});
 
 function formatFcfa(n) {
     return new Intl.NumberFormat('fr-FR').format(Math.round(n)) + ' F';
@@ -350,6 +390,8 @@ function selectionnerModePaiement(btn) {
     
     const banqueContainer = document.getElementById('selectionBanqueContainer');
     const banqueSelect = document.getElementById('banqueSelect');
+    const montantInput = document.getElementById('montantPayeInput');
+    const labelMontant = document.getElementById('labelMontantPaye');
     
     if (mode === 'Banque') {
         banqueContainer.style.display = 'block';
@@ -358,6 +400,17 @@ function selectionnerModePaiement(btn) {
         banqueContainer.style.display = 'none';
         banqueSelect.required = false;
         banqueSelect.value = '';
+    }
+    
+    if (mode === 'Crédit') {
+        montantInput.required = false;
+        montantInput.placeholder = "Laisser vide (Crédit)";
+        montantInput.value = "";
+        labelMontant.innerHTML = 'Montant à encaisser / reçu';
+    } else {
+        montantInput.required = true;
+        montantInput.placeholder = "Saisir le montant reçu / payé";
+        labelMontant.innerHTML = 'Montant à encaisser / reçu <span style="color:var(--danger)">*</span>';
     }
 }
 
@@ -371,6 +424,7 @@ function fermerSaisieLibre() {
     document.getElementById('saisiePrixInput').value = '';
     document.getElementById('saisieQteInput').value = '1';
     document.getElementById('saisieUniteInput').value = 'Unité';
+    document.getElementById('saisieTvaInput').value = '18';
 }
 
 function ajouterSaisieLibre(e, fermer = true) {
@@ -386,14 +440,16 @@ function ajouterSaisieLibre(e, fermer = true) {
     const prixInput = document.getElementById('saisiePrixInput');
     const qteInput = document.getElementById('saisieQteInput');
     const uniteInput = document.getElementById('saisieUniteInput');
+    const tvaInput = document.getElementById('saisieTvaInput');
     
     const nom = nomInput.value.trim();
     const prix = parseFloat(prixInput.value);
     const qte = parseInt(qteInput.value);
     const unite = uniteInput.value.trim() || 'Unité';
+    const tva = parseFloat(tvaInput.value || 18);
     
     const id = 'v_' + Date.now();
-    panier[id] = { nom, prix, qte, stock: 99999, stock_minimum: 0, unite, isVirtual: true };
+    panier[id] = { nom, prix, qte, stock: 99999, stock_minimum: 0, unite, tva, isVirtual: true };
     
     if (fermer) {
         fermerSaisieLibre();
@@ -402,8 +458,10 @@ function ajouterSaisieLibre(e, fermer = true) {
         prixInput.value = '';
         qteInput.value = '1';
         uniteInput.value = 'Unité';
+        tvaInput.value = '18';
         nomInput.focus();
     }
+    savePanier();
     renderPanier();
 }
 
@@ -414,6 +472,7 @@ function ajouterAuPanier(card) {
     const stock     = parseInt(card.dataset.stock);
     const stock_min = parseInt(card.dataset.stockMin || 5);
     const unite     = card.dataset.unite || 'Unité';
+    const tva       = parseFloat(card.dataset.tva || 18);
 
     if (panier[id]) {
         const nouvelleQte = panier[id].qte + 1;
@@ -422,14 +481,16 @@ function ajouterAuPanier(card) {
         } else {
             panier[id].qte++;
             verifierLimiteMinimale(panier[id]);
+            savePanier();
             renderPanier();
         }
     } else {
         if (stock <= 0) {
-            ouvrirModalRuptureVirtual(id, nom, prix, stock, stock_min, unite);
+            ouvrirModalRuptureVirtual(id, nom, prix, stock, stock_min, unite, tva);
         } else {
-            panier[id] = { nom, prix, qte: 1, stock, stock_minimum: stock_min, unite: unite, isVirtual: false };
+            panier[id] = { nom, prix, qte: 1, stock, stock_minimum: stock_min, unite: unite, tva, isVirtual: false };
             verifierLimiteMinimale(panier[id]);
+            savePanier();
             renderPanier();
         }
     }
@@ -444,6 +505,7 @@ function changerQte(id, delta) {
         if (item.qte <= 0) {
             delete panier[id];
         }
+        savePanier();
         renderPanier();
         return;
     }
@@ -452,6 +514,7 @@ function changerQte(id, delta) {
 
     if (nouvelleQte <= 0) {
         delete panier[id];
+        savePanier();
         renderPanier();
         return;
     }
@@ -461,6 +524,7 @@ function changerQte(id, delta) {
     } else {
         item.qte = nouvelleQte;
         verifierLimiteMinimale(item);
+        savePanier();
         renderPanier();
     }
 }
@@ -474,6 +538,7 @@ function saisirQte(id, val) {
 
     if (item.isVirtual) {
         item.qte = q;
+        savePanier();
         renderPanier();
         return;
     }
@@ -483,15 +548,18 @@ function saisirQte(id, val) {
     } else {
         item.qte = q;
         verifierLimiteMinimale(item);
+        savePanier();
         renderPanier();
     }
 }
 
 function supprimerItem(id) {
     delete panier[id];
+    savePanier();
     renderPanier();
 }
 
+// Ouvrir modal rupture standard
 function ouvrirModalRupture(id, qte) {
     const item = panier[id];
     document.getElementById('ruptureNomProduit').textContent = item.nom;
@@ -502,20 +570,23 @@ function ouvrirModalRupture(id, qte) {
         item.qte = qte;
         fermerModalRupture();
         verifierLimiteMinimale(item);
+        savePanier();
         renderPanier();
     };
     
     document.getElementById('modalRuptureStock').classList.add('open');
 }
 
-function ouvrirModalRuptureVirtual(id, nom, prix, stock, stock_min, unite) {
+// Ouvrir modal rupture virtuel
+function ouvrirModalRuptureVirtual(id, nom, prix, stock, stock_min, unite, tva) {
     document.getElementById('ruptureNomProduit').textContent = nom;
     document.getElementById('ruptureQteDemandee').textContent = 1;
     document.getElementById('ruptureStockDispo').textContent = stock;
     
     document.getElementById('btnConfirmerRupture').onclick = function() {
-        panier[id] = { nom, prix, qte: 1, stock, stock_minimum: stock_min, unite: unite, isVirtual: false };
+        panier[id] = { nom, prix, qte: 1, stock, stock_minimum: stock_min, unite: unite, tva, isVirtual: false };
         fermerModalRupture();
+        savePanier();
         renderPanier();
     };
     
@@ -573,6 +644,7 @@ function renderPanier() {
     const vide      = document.getElementById('panierVide');
     const nbArt     = document.getElementById('nbArticles');
     const btnVal    = document.getElementById('btnValider');
+    const btnDevis  = document.getElementById('btnDevis');
 
     const ids = Object.keys(panier);
     if (ids.length === 0) {
@@ -580,6 +652,7 @@ function renderPanier() {
         vide.style.display = 'block';
         nbArt.textContent = '0 article(s)';
         btnVal.disabled = true;
+        if (btnDevis) btnDevis.disabled = true;
         
         document.querySelectorAll('.article-input').forEach(e => e.remove());
         calculerTotaux();
@@ -617,7 +690,7 @@ function renderPanier() {
         container.appendChild(div);
 
         const form = document.getElementById('formVente');
-        ['produit_id', 'quantite', 'libelle_virtuel', 'prix_unitaire', 'unite'].forEach(field => {
+        ['produit_id', 'quantite', 'libelle_virtuel', 'prix_unitaire', 'unite', 'tva'].forEach(field => {
             const input = document.createElement('input');
             input.type = 'hidden';
             input.name = `articles[${idx}][${field}]`;
@@ -632,6 +705,8 @@ function renderPanier() {
                 input.value = item.isVirtual ? item.prix : '';
             } else if (field === 'unite') {
                 input.value = item.unite || 'Unité';
+            } else if (field === 'tva') {
+                input.value = item.tva || 0;
             }
             
             input.className = 'article-input';
@@ -641,18 +716,22 @@ function renderPanier() {
 
     nbArt.textContent = ids.length + ' article(s)';
     btnVal.disabled = false;
+    if (btnDevis) btnDevis.disabled = false;
     calculerTotaux();
 }
 
 function saisirUnite(id, val) {
     if (panier[id]) {
         panier[id].unite = val;
+        savePanier();
         renderPanier();
     }
 }
 
 function calculerTotaux() {
     let totalHt = 0;
+    let totalTva = 0;
+    
     Object.keys(panier).forEach(id => {
         const item = panier[id];
         totalHt += item.prix * item.qte;
@@ -661,12 +740,18 @@ function calculerTotaux() {
     const remise = parseFloat(document.getElementById('remiseInput')?.value || 0);
     const totalHtNet = Math.max(0, totalHt - remise);
     
-    const tvaActive = document.getElementById('tvaActiveCheckbox').checked;
-    const tva = tvaActive ? (totalHtNet * 0.18) : 0;
-    const totalTtc = totalHtNet + tva;
+    const ratio = totalHt > 0 ? totalHtNet / totalHt : 0;
+    
+    Object.keys(panier).forEach(id => {
+        const item = panier[id];
+        const itemHtNet = item.prix * item.qte * ratio;
+        totalTva += itemHtNet * ((item.tva || 0) / 100);
+    });
+    
+    const totalTtc = totalHtNet + totalTva;
     
     document.getElementById('totalHt').textContent  = formatFcfa(totalHt);
-    document.getElementById('totalTva').textContent = formatFcfa(tva);
+    document.getElementById('totalTva').textContent = formatFcfa(totalTva);
     document.getElementById('totalTtc').textContent = formatFcfa(totalTtc);
     
     const inputMontant = document.getElementById('montantPayeInput');
@@ -686,8 +771,9 @@ function fermerModalNouvelleBanque() {
 
 function soumettreNouvelleBanque(e) {
     e.preventDefault();
-    const nom = document.getElementById('banqueNomInput').value;
-    const numero_compte = document.getElementById('banqueNumeroInput').value;
+    const code = document.getElementById('banqueCodeInput').value;
+    const intitule = document.getElementById('banqueIntituleInput').value;
+    const compte = document.getElementById('banqueCompteInput').value;
     
     const routeCreation = "{{ request()->routeIs('caissier.*') ? route('caissier.banques.creer') : route('admin.banques.creer') }}";
     
@@ -697,7 +783,7 @@ function soumettreNouvelleBanque(e) {
             'Content-Type': 'application/json',
             'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
         },
-        body: JSON.stringify({ nom, numero_compte })
+        body: JSON.stringify({ code, intitule, compte })
     })
     .then(res => res.json())
     .then(data => {
@@ -711,7 +797,7 @@ function soumettreNouvelleBanque(e) {
             
             fermerModalNouvelleBanque();
         } else {
-            alert("Erreur lors de la création du compte banque.");
+            alert("Erreur lors de la création du code journal banque.");
         }
     })
     .catch(err => {
@@ -738,6 +824,21 @@ document.getElementById('rechercheInput').addEventListener('input', function() {
     document.querySelectorAll('.produit-card').forEach(card => {
         card.style.display = card.dataset.nom.toLowerCase().includes(q) ? '' : 'none';
     });
+});
+
+// Validation du montant payé avant soumission pour ne pas vider le panier
+document.getElementById('formVente').addEventListener('submit', function(e) {
+    const mode = document.getElementById('modePaiementInput').value;
+    if (mode !== 'Crédit') {
+        const montantInput = document.getElementById('montantPayeInput');
+        const montant = parseFloat(montantInput.value);
+        if (isNaN(montant) || montant <= 0) {
+            e.preventDefault();
+            alert("Le montant payé est obligatoire et doit être strictement supérieur à 0 pour ce mode de paiement (Caisse / Banque).");
+            montantInput.focus();
+            return false;
+        }
+    }
 });
 </script>
 @endsection

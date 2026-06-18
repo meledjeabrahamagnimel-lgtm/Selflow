@@ -24,6 +24,7 @@ class Vente extends Model
         'type_facture',
         'normalise',
         'qr_code_data',
+        'etape',
     ];
 
     protected function casts(): array

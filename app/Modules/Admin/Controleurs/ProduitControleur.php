@@ -18,7 +18,9 @@ class ProduitControleur
             ->orderBy('nom')
             ->paginate(30);
 
-        return view('admin::produits.index', compact('produits'));
+        $comptes = \App\Modules\Admin\Modeles\PlanComptable::orderBy('numero')->get();
+
+        return view('admin::produits.index', compact('produits', 'comptes'));
     }
 
     public function creer(Request $request): RedirectResponse
@@ -28,16 +30,20 @@ class ProduitControleur
         $request->validate([
             'reference'     => ['required', 'string', 'max:50', 'unique:produits,reference'],
             'nom'           => ['required', 'string', 'max:200'],
+            'type'          => ['required', 'string', 'in:stockable,consommable,service'],
             'categorie'     => ['nullable', 'string', 'max:100'],
             'prix_achat'    => ['required', 'numeric', 'min:0'],
             'prix_vente'    => ['required', 'numeric', 'min:0'],
+            'taux_tva'      => ['required', 'numeric', 'min:0'],
+            'compte_vente'  => ['required', 'string', 'max:20'],
+            'compte_achat'  => ['required', 'string', 'max:20'],
             'stock_actuel'  => ['required', 'integer', 'min:0'],
             'stock_minimum' => ['required', 'integer', 'min:0'],
             'unite'         => ['nullable', 'string', 'max:20'],
         ]);
 
         Produit::create(array_merge(
-            $request->only(['reference', 'nom', 'categorie', 'prix_achat', 'prix_vente', 'stock_actuel', 'stock_minimum', 'unite']),
+            $request->only(['reference', 'nom', 'type', 'categorie', 'prix_achat', 'prix_vente', 'taux_tva', 'compte_vente', 'compte_achat', 'stock_actuel', 'stock_minimum', 'unite']),
             ['entreprise_id' => $entreprise->id]
         ));
 
@@ -50,14 +56,19 @@ class ProduitControleur
 
         $request->validate([
             'nom'           => ['required', 'string', 'max:200'],
+            'type'          => ['required', 'string', 'in:stockable,consommable,service'],
             'categorie'     => ['nullable', 'string', 'max:100'],
             'prix_achat'    => ['required', 'numeric', 'min:0'],
             'prix_vente'    => ['required', 'numeric', 'min:0'],
+            'taux_tva'      => ['required', 'numeric', 'min:0'],
+            'compte_vente'  => ['required', 'string', 'max:20'],
+            'compte_achat'  => ['required', 'string', 'max:20'],
+            'stock_actuel'  => ['required', 'integer'],
             'stock_minimum' => ['required', 'integer', 'min:0'],
             'unite'         => ['nullable', 'string', 'max:20'],
         ]);
 
-        $produit->update($request->only(['nom', 'categorie', 'prix_achat', 'prix_vente', 'stock_minimum', 'unite']));
+        $produit->update($request->only(['nom', 'type', 'categorie', 'prix_achat', 'prix_vente', 'taux_tva', 'compte_vente', 'compte_achat', 'stock_actuel', 'stock_minimum', 'unite']));
 
         return back()->with('succes', 'Produit mis à jour avec succès.');
     }

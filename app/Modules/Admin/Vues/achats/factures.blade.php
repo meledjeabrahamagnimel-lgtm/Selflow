@@ -32,6 +32,7 @@
                     <th>TVA</th>
                     <th>TTC</th>
                     <th>Mode</th>
+                    <th>Étape</th>
                     <th>Action</th>
                 </tr>
             </thead>
@@ -47,8 +48,17 @@
                     <td style="font-weight:700; color:var(--danger);">{{ number_format($achat->montant_ttc, 0, ',', ' ') }} F</td>
                     <td>{{ $achat->mode_paiement }}</td>
                     <td>
+                        @if($achat->etape === 'Demande de prix')
+                            <span class="badge" style="background:#fffbeb; color:#d97706; padding:4px 10px; border-radius:20px; font-weight:700;">Demande de prix</span>
+                        @elseif($achat->etape === 'Bon de commande')
+                            <span class="badge" style="background:#eff6ff; color:#2563eb; padding:4px 10px; border-radius:20px; font-weight:700;">Bon de commande</span>
+                        @else
+                            <span class="badge" style="background:#e6fdf5; color:#059669; padding:4px 10px; border-radius:20px; font-weight:700;">Facture</span>
+                        @endif
+                    </td>
+                    <td>
                         <a href="{{ route('admin.achats.imprimer', $achat) }}" class="btn btn-primary btn-sm">
-                            <i class="fas fa-print"></i> Imprimer
+                            <i class="fas fa-eye"></i> Voir
                         </a>
                     </td>
                 </tr>

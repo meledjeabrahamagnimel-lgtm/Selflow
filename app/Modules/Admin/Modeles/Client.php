@@ -9,7 +9,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 class Client extends Model
 {
     protected $table = 'clients';
-    protected $fillable = ['entreprise_id', 'nom', 'telephone', 'email', 'adresse', 'ncc', 'regime_imposition'];
+    protected $fillable = ['entreprise_id', 'nom', 'telephone', 'email', 'adresse', 'ncc', 'regime_imposition', 'rccm', 'compte_comptable', 'numero_tiers'];
 
     public function entreprise(): BelongsTo
     {

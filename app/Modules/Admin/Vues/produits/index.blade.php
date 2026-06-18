@@ -20,6 +20,7 @@
                 <tr>
                     <th>Référence</th>
                     <th>Produit</th>
+                    <th>Type</th>
                     <th>Catégorie</th>
                     <th>Prix achat</th>
                     <th>Prix vente</th>
@@ -35,6 +36,15 @@
                 <tr>
                     <td style="font-family:monospace; font-size:12px; color:var(--text-3);">{{ $p->reference }}</td>
                     <td style="font-weight:600;">{{ $p->nom }}</td>
+                    <td>
+                        @if($p->type === 'service')
+                            <span class="badge" style="background:#eff6ff; color:#1e40af; padding:2px 8px; border-radius:20px; font-weight:600; font-size:11px;">Service</span>
+                        @elseif($p->type === 'consommable')
+                            <span class="badge" style="background:#fef3c7; color:#92400e; padding:2px 8px; border-radius:20px; font-weight:600; font-size:11px;">Consommable</span>
+                        @else
+                            <span class="badge" style="background:#ecfdf5; color:#065f46; padding:2px 8px; border-radius:20px; font-weight:600; font-size:11px;">Stockable</span>
+                        @endif
+                    </td>
                     <td><span class="badge badge-purple">{{ $p->categorie ?? '—' }}</span></td>
                     <td>{{ number_format($p->prix_achat, 0, ',', ' ') }} F</td>
                     <td style="color:var(--success); font-weight:600;">{{ number_format($p->prix_vente, 0, ',', ' ') }} F</td>
@@ -77,12 +87,47 @@
                                     <input type="text" name="nom" class="form-control" value="{{ $p->nom }}" required>
                                 </div>
                                 <div class="form-group">
+                                    <label class="form-label">Type d'article</label>
+                                    <select name="type" class="form-control" required>
+                                        <option value="stockable" {{ $p->type === 'stockable' ? 'selected' : '' }}>Article Stockable</option>
+                                        <option value="consommable" {{ $p->type === 'consommable' ? 'selected' : '' }}>Consommable (sans stock)</option>
+                                        <option value="service" {{ $p->type === 'service' ? 'selected' : '' }}>Service (non physique)</option>
+                                    </select>
+                                </div>
+                                <div class="form-group">
                                     <label class="form-label">Catégorie</label>
                                     <input type="text" name="categorie" class="form-control" value="{{ $p->categorie }}">
                                 </div>
                                 <div class="form-group">
                                     <label class="form-label">Unité</label>
                                     <input type="text" name="unite" class="form-control" value="{{ $p->unite }}">
+                                </div>
+                                <div class="form-group">
+                                    <label class="form-label">Taux TVA par défaut</label>
+                                    <select name="taux_tva" class="form-control" required>
+                                        <option value="18.00" {{ $p->taux_tva == 18.00 ? 'selected' : '' }}>18% (Taux normal)</option>
+                                        <option value="0.00" {{ $p->taux_tva == 0.00 ? 'selected' : '' }}>0% (Exonéré)</option>
+                                    </select>
+                                </div>
+                                <div class="form-group">
+                                    <label class="form-label">Compte de vente</label>
+                                    <select name="compte_vente" class="form-control" required>
+                                        @foreach($comptes as $compte)
+                                            <option value="{{ $compte->numero }}" {{ ($p->compte_vente ?? '701100') == $compte->numero ? 'selected' : '' }}>
+                                                {{ $compte->numero }} - {{ $compte->libelle }}
+                                            </option>
+                                        @endforeach
+                                    </select>
+                                </div>
+                                <div class="form-group">
+                                    <label class="form-label">Compte d'achat</label>
+                                    <select name="compte_achat" class="form-control" required>
+                                        @foreach($comptes as $compte)
+                                            <option value="{{ $compte->numero }}" {{ ($p->compte_achat ?? '601100') == $compte->numero ? 'selected' : '' }}>
+                                                {{ $compte->numero }} - {{ $compte->libelle }}
+                                            </option>
+                                        @endforeach
+                                    </select>
                                 </div>
                                 <div class="form-group">
                                     <label class="form-label">Prix achat</label>
@@ -92,7 +137,11 @@
                                     <label class="form-label">Prix vente</label>
                                     <input type="number" name="prix_vente" class="form-control" value="{{ $p->prix_vente }}" min="0" required>
                                 </div>
-                                <div class="form-group" style="grid-column:1/-1;">
+                                <div class="form-group">
+                                    <label class="form-label">Stock actuel</label>
+                                    <input type="number" name="stock_actuel" class="form-control" value="{{ $p->stock_actuel }}" required>
+                                </div>
+                                <div class="form-group">
                                     <label class="form-label">Stock minimum</label>
                                     <input type="number" name="stock_minimum" class="form-control" value="{{ $p->stock_minimum }}" min="0" required>
                                 </div>
@@ -131,12 +180,47 @@
                     <input type="text" name="nom" class="form-control" placeholder="Huile Dinor 1L" required>
                 </div>
                 <div class="form-group">
+                    <label class="form-label">Type d'article <span style="color:var(--danger)">*</span></label>
+                    <select name="type" class="form-control" required>
+                        <option value="stockable">Article Stockable</option>
+                        <option value="consommable">Consommable (sans stock)</option>
+                        <option value="service">Service (non physique)</option>
+                    </select>
+                </div>
+                <div class="form-group">
                     <label class="form-label">Catégorie</label>
                     <input type="text" name="categorie" class="form-control" placeholder="Épicerie">
                 </div>
                 <div class="form-group">
                     <label class="form-label">Unité</label>
                     <input type="text" name="unite" class="form-control" placeholder="pcs, kg, L…">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Taux TVA par défaut <span style="color:var(--danger)">*</span></label>
+                    <select name="taux_tva" class="form-control" required>
+                        <option value="18.00">18% (Taux normal)</option>
+                        <option value="0.00">0% (Exonéré / TVAD)</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Compte de vente <span style="color:var(--danger)">*</span></label>
+                    <select name="compte_vente" class="form-control" required>
+                        @foreach($comptes as $compte)
+                            <option value="{{ $compte->numero }}" {{ $compte->numero == '701100' ? 'selected' : '' }}>
+                                {{ $compte->numero }} - {{ $compte->libelle }}
+                            </option>
+                        @endforeach
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Compte d'achat <span style="color:var(--danger)">*</span></label>
+                    <select name="compte_achat" class="form-control" required>
+                        @foreach($comptes as $compte)
+                            <option value="{{ $compte->numero }}" {{ $compte->numero == '601100' ? 'selected' : '' }}>
+                                {{ $compte->numero }} - {{ $compte->libelle }}
+                            </option>
+                        @endforeach
+                    </select>
                 </div>
                 <div class="form-group">
                     <label class="form-label">Prix d'achat (FCFA) <span style="color:var(--danger)">*</span></label>

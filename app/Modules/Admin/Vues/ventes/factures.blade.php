@@ -46,6 +46,7 @@
                     <th style="white-space: nowrap;">Client</th>
                     <th style="white-space: nowrap;">TTC</th>
                     <th style="white-space: nowrap;">Mode paiement</th>
+                    <th style="white-space: nowrap;">Étape</th>
                     <th style="white-space: nowrap;">Statut</th>
                     <th style="white-space: nowrap;">Facture Proformat</th>
                     <th style="white-space: nowrap;">Normalisée (DGI)</th>
@@ -65,6 +66,15 @@
                     <td style="white-space: nowrap;">{{ $vente->client?->nom ?? '— Passage —' }}</td>
                     <td style="font-weight:700; color:var(--text); white-space: nowrap;">{{ number_format($vente->montant_ttc, 0, ',', ' ') }} F</td>
                     <td style="white-space: nowrap;">{{ $vente->mode_paiement }}</td>
+                    <td style="white-space: nowrap;">
+                        @if($vente->etape === 'Devis')
+                            <span class="badge" style="background:#fffbeb; color:#d97706; padding:4px 10px; border-radius:20px; font-weight:700;">Devis</span>
+                        @elseif($vente->etape === 'Bon de commande')
+                            <span class="badge" style="background:#eff6ff; color:#2563eb; padding:4px 10px; border-radius:20px; font-weight:700;">Bon de commande</span>
+                        @else
+                            <span class="badge" style="background:#e6fdf5; color:#059669; padding:4px 10px; border-radius:20px; font-weight:700;">Facture</span>
+                        @endif
+                    </td>
                     <td style="white-space: nowrap;">
                         @if($vente->statut === 'Payé')
                             <span class="badge badge-success" style="background:#e6fdf5; color:#0f766e; padding:4px 10px; border-radius:20px; font-weight:700;">Payé</span>

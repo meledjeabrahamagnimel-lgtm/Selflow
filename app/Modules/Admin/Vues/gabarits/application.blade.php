@@ -298,7 +298,7 @@
         .invalid-feedback { font-size: 12px; color: #dc2626; margin-top: 4px; }
 
         /* ── PAGINATION ──────────────────────────── */
-        .pagination { display: flex; gap: 6px; justify-content: center; padding: 20px 0; }
+        .pagination { display: flex; list-style: none; gap: 6px; justify-content: center; padding: 20px 0; margin: 0; }
         .pagination .page-link {
             background: var(--bg3); border: 1px solid var(--border);
             border-radius: 6px; padding: 7px 14px; font-size: 13px; color: var(--text-2);
@@ -307,6 +307,39 @@
         .pagination .page-link:hover,
         .pagination .page-item.active .page-link {
             background: var(--primary); color: #fff; border-color: var(--primary);
+        }
+
+        /* Compatibilité sans framework CSS pour la pagination Laravel (Bootstrap 5) */
+        nav.justify-content-between {
+            display: flex !important;
+            flex-direction: column !important;
+            align-items: center !important;
+            width: 100% !important;
+        }
+        nav.justify-content-between ul.pagination {
+            display: flex !important;
+            list-style: none !important;
+            list-style-type: none !important;
+            padding: 0 !important;
+            margin: 0 !important;
+        }
+        nav.justify-content-between ul.pagination li {
+            list-style: none !important;
+            list-style-type: none !important;
+            display: inline-block !important;
+        }
+        nav.justify-content-between div.d-sm-none {
+            display: none !important;
+        }
+        nav.justify-content-between div.d-none {
+            display: flex !important;
+            flex-direction: column !important;
+            align-items: center !important;
+            gap: 8px !important;
+        }
+        nav.justify-content-between div.d-none > div.small,
+        nav.justify-content-between div.d-none > div.text-muted {
+            display: none !important;
         }
 
         /* ── GRID LAYOUTS ────────────────────────── */
@@ -493,9 +526,9 @@
             @endif
             @endif
 
-            <!-- 5. Trésorerie -->
+            <!-- 5. Comptabilité -->
             @if(auth()->user()->aHabilitation('tresorerie_encaissements') || auth()->user()->aHabilitation('tresorerie_decaissements') || auth()->user()->aHabilitation('tresorerie_journal') || auth()->user()->aHabilitation('tresorerie_codes_journaux'))
-            <div class="nav-section"><span>Trésorerie</span></div>
+            <div class="nav-section"><span>Comptabilité</span></div>
             @if(auth()->user()->aHabilitation('tresorerie_encaissements'))
             <a href="{{ route('admin.tresorerie.encaissements') }}" class="nav-item {{ request()->routeIs('admin.tresorerie.encaissements') ? 'active' : '' }}">
                 <i class="fas fa-arrow-down" style="color:#10b981;"></i> Encaissements
@@ -508,7 +541,7 @@
             @endif
             @if(auth()->user()->aHabilitation('tresorerie_journal'))
             <a href="{{ route('admin.tresorerie.journal') }}" class="nav-item {{ request()->routeIs('admin.tresorerie.journal') ? 'active' : '' }}">
-                <i class="fas fa-wallet"></i> Solde & journal
+                <i class="fas fa-wallet"></i> Solde &amp; journal
             </a>
             @endif
             @if(auth()->user()->aHabilitation('tresorerie_codes_journaux'))
@@ -516,6 +549,15 @@
                 <i class="fas fa-book"></i> Codes Journaux
             </a>
             @endif
+            <a href="{{ route('admin.comptabilite.globale') }}" class="nav-item {{ request()->routeIs('admin.comptabilite.globale') ? 'active' : '' }}">
+                <i class="fas fa-list-check"></i> Opération &amp; écriture globale
+            </a>
+            <a href="{{ route('admin.comptabilite.creances') }}" class="nav-item {{ request()->routeIs('admin.comptabilite.creances') ? 'active' : '' }}">
+                <i class="fas fa-scale-balanced"></i> Créances &amp; règlements
+            </a>
+            <a href="{{ route('admin.comptabilite.plan_comptable') }}" class="nav-item {{ request()->routeIs('admin.comptabilite.plan_comptable') ? 'active' : '' }}">
+                <i class="fas fa-book-open"></i> Plan Comptable
+            </a>
             @endif
 
             <!-- 6. Points de vente -->

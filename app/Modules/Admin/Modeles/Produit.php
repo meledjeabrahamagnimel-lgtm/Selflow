@@ -14,9 +14,13 @@ class Produit extends Model
         'entreprise_id',
         'reference',
         'nom',
+        'type',
         'categorie',
         'prix_achat',
         'prix_vente',
+        'taux_tva',
+        'compte_vente',
+        'compte_achat',
         'stock_actuel',
         'stock_minimum',
     ];
@@ -26,6 +30,7 @@ class Produit extends Model
         return [
             'prix_achat'   => 'decimal:2',
             'prix_vente'   => 'decimal:2',
+            'taux_tva'     => 'decimal:2',
             'stock_actuel' => 'integer',
             'stock_minimum'=> 'integer',
         ];
