@@ -362,9 +362,8 @@ class ComptabiliteControleur
         ]);
 
         $entreprise = Auth::user()->entreprise;
-        $pdvId = session('point_de_vente_actif_id') ?? Auth::user()->point_de_vente_id;
 
-        DB::transaction(function () use ($request, $pdvId, $entreprise) {
+        DB::transaction(function () use ($request, $entreprise) {
             $numFacture = $request->numero_facture;
             $montant = floatval($request->montant);
             $mode = $request->mode_paiement;
@@ -372,6 +371,14 @@ class ComptabiliteControleur
 
             if ($request->type === 'client') {
                 $vente = Vente::where('numero_facture', $numFacture)->firstOrFail();
+                if (!$vente->point_de_vente_id) {
+                    $vente->point_de_vente_id = session('point_de_vente_actif_id')
+                        ?? Auth::user()->point_de_vente_id
+                        ?? PointDeVente::where('entreprise_id', $entreprise->id)->value('id');
+                    $vente->save();
+                    $vente->load('pointDeVente');
+                }
+                $pdvId = $vente->point_de_vente_id;
                 
                 // Calcul du reste à payer
                 $dejaPaye = TresorerieJournal::where('reference_document', $numFacture)->sum('montant_entree');
@@ -409,6 +416,14 @@ class ComptabiliteControleur
                 }
             } else {
                 $achat = Achat::where('numero_facture', $numFacture)->firstOrFail();
+                if (!$achat->point_de_vente_id) {
+                    $achat->point_de_vente_id = session('point_de_vente_actif_id')
+                        ?? Auth::user()->point_de_vente_id
+                        ?? PointDeVente::where('entreprise_id', $entreprise->id)->value('id');
+                    $achat->save();
+                    $achat->load('pointDeVente');
+                }
+                $pdvId = $achat->point_de_vente_id;
                 
                 // Calcul du reste à payer
                 $dejaPaye = TresorerieJournal::where('reference_document', $numFacture)->sum('montant_sortie');
