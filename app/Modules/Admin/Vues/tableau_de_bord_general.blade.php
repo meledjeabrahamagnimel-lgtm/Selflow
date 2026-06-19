@@ -1,15 +1,15 @@
 @extends('admin::gabarits.application')
 
-@section('titre', 'Tableau de bord personnel')
-@section('topbar_titre', 'Tableau de bord — Mon activité')
+@section('titre', 'Tableau de bord général')
+@section('topbar_titre', 'Tableau de bord — Entreprise')
 
 @section('contenu')
 
 {{-- ── EN-TÊTE PAGE ── --}}
 <div class="page-header">
     <div>
-        <h1>Bonjour, {{ auth()->user()->nom }} 👋</h1>
-        <p>{{ now()->isoFormat('dddd D MMMM YYYY') }} — Vue d'ensemble de votre activité personnelle</p>
+        <h1>Tableau de bord général 🏢</h1>
+        <p>{{ now()->isoFormat('dddd D MMMM YYYY') }} — Vue d'ensemble globale de l'entreprise</p>
     </div>
     <a href="{{ route('admin.ventes.nouvelle') }}" class="btn btn-primary">
         <i class="fas fa-plus"></i> Nouvelle vente
@@ -22,14 +22,14 @@
         <div class="stat-icon green"><i class="fas fa-arrow-trend-up"></i></div>
         <div>
             <div class="stat-value">{{ number_format($montantVentesJour, 0, ',', ' ') }} FCFA</div>
-            <div class="stat-label">Mes ventes du jour</div>
+            <div class="stat-label">Ventes globales du jour</div>
         </div>
     </div>
     <div class="stat-card">
         <div class="stat-icon red"><i class="fas fa-arrow-trend-down"></i></div>
         <div>
             <div class="stat-value">{{ number_format($montantAchatsJour, 0, ',', ' ') }} FCFA</div>
-            <div class="stat-label">Mes achats du jour</div>
+            <div class="stat-label">Achats globaux du jour</div>
         </div>
     </div>
     <div class="stat-card">
@@ -38,7 +38,7 @@
             <div class="stat-value" style="color: {{ $solde >= 0 ? '#10b981' : '#ef4444' }}">
                 {{ number_format($solde, 0, ',', ' ') }} FCFA
             </div>
-            <div class="stat-label">Mon solde trésorerie</div>
+            <div class="stat-label">Solde trésorerie global</div>
         </div>
     </div>
     <div class="stat-card">
@@ -55,10 +55,10 @@
 {{-- ── GRILLE PRINCIPALE ── --}}
 <div class="grid-2" style="margin-bottom: 22px;">
 
-    {{-- Dernières ventes personnelles --}}
+    {{-- Dernières ventes --}}
     <div class="card">
         <div class="card-header">
-            <h2><i class="fas fa-receipt" style="color:var(--success)"></i> Mes dernières ventes</h2>
+            <h2><i class="fas fa-receipt" style="color:var(--success)"></i> Dernières ventes globales</h2>
             <a href="{{ route('admin.ventes.historique') }}" class="btn btn-outline btn-sm">Tout voir</a>
         </div>
         <div class="table-wrap">
@@ -151,6 +151,70 @@
             </table>
             @endif
         </div>
+    </div>
+</div>
+
+{{-- ── POINTS DE VENTE ── --}}
+<div class="card">
+    <div class="card-header">
+        <h2><i class="fas fa-store" style="color:var(--primary)"></i> Points de vente — Activité du jour</h2>
+        <a href="{{ route('admin.pdv.index') }}" class="btn btn-outline btn-sm">Gérer</a>
+    </div>
+    <div class="table-wrap">
+        <table>
+            <thead>
+                <tr>
+                    <th>Point de vente</th>
+                    <th>Ville</th>
+                    <th>Responsable</th>
+                    <th>Ventes du jour</th>
+                    <th>CA du jour</th>
+                    <th>Statut</th>
+                    <th>Action</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach($pointsDeVente as $pdv)
+                <tr>
+                    <td>
+                        <div style="font-weight:600; display:flex; align-items:center; gap:8px;">
+                            @if($pointDeVenteId == $pdv->id)
+                                <span style="width:8px;height:8px;border-radius:50%;background:var(--success);display:inline-block;"></span>
+                            @else
+                                <span style="width:8px;height:8px;border-radius:50%;background:var(--text-3);display:inline-block;"></span>
+                            @endif
+                            {{ $pdv->nom }}
+                        </div>
+                    </td>
+                    <td style="color:var(--text-2);">{{ $pdv->commune }}, {{ $pdv->ville }}</td>
+                    <td style="color:var(--text-2);">{{ $pdv->responsable ?? '—' }}</td>
+                    <td style="font-weight:600;">{{ $pdv->ventes_jour ?? 0 }}</td>
+                    <td style="font-weight:700; color:var(--success);">{{ number_format($pdv->montant_ventes_jour ?? 0, 0, ',', ' ') }} F</td>
+                    <td>
+                        @if($pdv->statut === 'Ouvert')
+                            <span class="badge badge-success">Ouvert</span>
+                        @else
+                            <span class="badge badge-gray">Fermé</span>
+                        @endif
+                    </td>
+                    <td>
+                        @if($pdv->nom === 'Siège')
+                            <span style="color:var(--primary); font-size:12px; font-weight:600;"><i class="fas fa-building"></i> Siège</span>
+                        @elseif($pointDeVenteId != $pdv->id)
+                        <form method="POST" action="{{ route('admin.pdv.activer', $pdv) }}">
+                            @csrf
+                            <button type="submit" class="btn btn-outline btn-sm">
+                                <i class="fas fa-toggle-on"></i> Activer
+                            </button>
+                        </form>
+                        @else
+                            <span style="color:var(--success); font-size:12px; font-weight:600;"><i class="fas fa-check"></i> Actif</span>
+                        @endif
+                    </td>
+                </tr>
+                @endforeach
+            </tbody>
+        </table>
     </div>
 </div>
 

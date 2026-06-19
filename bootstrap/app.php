@@ -18,6 +18,7 @@ return Application::configure(basePath: dirname(__DIR__))
             'caissier.acces' => \App\Modules\Authentification\Middleware\VerifierAccesCaissier::class,
             'habilitation' => \App\Modules\Authentification\Middleware\VerifierHabilitationRoute::class,
             'auth.api' => \App\Modules\Authentification\Middleware\AuthentificationApiParJeton::class,
+            'periode' => \App\Modules\Authentification\Middleware\GestionPeriode::class,
         ]);
 
         $middleware->redirectTo(function (Request $request) {

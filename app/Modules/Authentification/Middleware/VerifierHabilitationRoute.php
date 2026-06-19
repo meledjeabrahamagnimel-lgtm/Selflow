@@ -32,7 +32,8 @@ class VerifierHabilitationRoute
 
         // Correspondance entre les routes et les clés d'habilitations
         $correspondances = [
-            'admin.tableau_de_bord'          => 'tableau_de_bord',
+            'admin.tableau_de_bord'          => 'tableau_de_bord_personnel',
+            'admin.tableau_de_bord_general'  => 'tableau_de_bord_general',
             
             'admin.ventes.nouvelle'          => 'nouvelle_vente',
             'admin.ventes.enregistrer'       => 'nouvelle_vente',
@@ -56,6 +57,13 @@ class VerifierHabilitationRoute
             'admin.tresorerie.creer_code_journal' => 'tresorerie_codes_journaux',
             'admin.tresorerie.supprimer_code_journal' => 'tresorerie_codes_journaux',
             'admin.banques.creer'            => 'nouvelle_vente',
+            
+            'admin.comptabilite.globale'     => 'comptabilite_globale',
+            'admin.comptabilite.creances'    => 'comptabilite_creances',
+            'admin.comptabilite.releve_tiers'=> 'comptabilite_creances',
+            'admin.comptabilite.reglement'   => 'comptabilite_creances',
+            'admin.comptabilite.plan_comptable' => 'comptabilite_plan_comptable',
+            'admin.comptabilite.creer_compte_comptable' => 'comptabilite_plan_comptable',
             
             'admin.pdv.index'                => 'gestion_pdv',
             'admin.pdv.creer'                => 'gestion_pdv',

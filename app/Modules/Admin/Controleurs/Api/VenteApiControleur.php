@@ -66,7 +66,9 @@ class VenteApiControleur
 
         if ($request->mode_paiement === 'Banque') {
             $request->validate([
-                'banque_id' => ['required', 'integer', 'exists:banques,id'],
+                'banque_id'          => ['required', 'integer', 'exists:banques,id'],
+                'moyen_bancaire'     => ['required', 'string', 'in:carte,virement,cheque'],
+                'reference_paiement' => ['required', 'string', 'max:255'],
             ]);
         }
 
@@ -159,6 +161,8 @@ class VenteApiControleur
                 'numero_facture'    => $numero,
                 'date_vente'        => now()->toDateString(),
                 'mode_paiement'     => $modePaiementFinal,
+                'moyen_bancaire'    => $request->mode_paiement === 'Banque' ? $request->moyen_bancaire : null,
+                'reference_paiement'=> $request->mode_paiement === 'Banque' ? $request->reference_paiement : null,
                 'montant_ht'        => $montantHt,
                 'montant_tva'       => $montantTva,
                 'remise'            => $remise,
@@ -225,6 +229,8 @@ class VenteApiControleur
                     'type_operation'     => 'Encaissement',
                     'libelle'            => 'Vente — Facture ' . $numero,
                     'mode_paiement'      => $modePaiementFinal,
+                    'moyen_bancaire'     => $request->mode_paiement === 'Banque' ? $request->moyen_bancaire : null,
+                    'reference_paiement' => $request->mode_paiement === 'Banque' ? $request->reference_paiement : null,
                     'montant_entree'     => $montantPaye,
                     'montant_sortie'     => 0,
                     'solde_resultat'     => $soldeActuel + $montantPaye,

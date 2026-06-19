@@ -48,13 +48,23 @@ class AchatApiControleur
             'date_achat'     => ['required', 'date'],
             'mode_paiement'  => ['required', 'string'],
             'articles'       => ['required', 'array', 'min:1'],
-            'articles.*.produit_id'    => ['required', 'integer', 'exists:produits,id'],
+            'articles.*.produit_id'    => ['nullable', 'integer', 'exists:produits,id'],
+            'articles.*.libelle_virtuel' => ['nullable', 'string', 'max:255'],
             'articles.*.quantite'      => ['required', 'integer', 'min:1'],
             'articles.*.prix_unitaire' => ['required', 'numeric', 'min:0'],
+            'articles.*.unite'         => ['nullable', 'string', 'max:50'],
         ], [
             'fournisseur_id.required' => 'Veuillez sélectionner un fournisseur.',
             'articles.required'       => 'Veuillez ajouter au moins un article.',
         ]);
+
+        if ($request->mode_paiement === 'Banque') {
+            $request->validate([
+                'banque_id'          => ['required', 'integer', 'exists:banques,id'],
+                'moyen_bancaire'     => ['required', 'string', 'in:carte,virement,cheque'],
+                'reference_paiement' => ['required', 'string', 'max:255'],
+            ]);
+        }
 
         $achatData = [];
 
@@ -85,12 +95,22 @@ class AchatApiControleur
                 4, '0', STR_PAD_LEFT
             );
 
+            $modePaiementFinal = $request->mode_paiement ?? 'Espèces';
+            if ($request->mode_paiement === 'Banque' && $request->filled('banque_id')) {
+                $banque = Banque::find($request->banque_id);
+                if ($banque) {
+                    $modePaiementFinal = 'Banque : ' . $banque->nom;
+                }
+            }
+
             $achat = Achat::create([
                 'point_de_vente_id' => $pointDeVenteId,
                 'fournisseur_id'    => $request->fournisseur_id,
                 'numero_facture'    => $numero,
                 'date_achat'        => $request->date_achat,
-                'mode_paiement'     => $request->mode_paiement ?? 'Espèces',
+                'mode_paiement'     => $modePaiementFinal,
+                'moyen_bancaire'    => $request->mode_paiement === 'Banque' ? $request->moyen_bancaire : null,
+                'reference_paiement'=> $request->mode_paiement === 'Banque' ? $request->reference_paiement : null,
                 'montant_ht'        => $montantHt,
                 'montant_tva'       => $montantTva,
                 'montant_ttc'       => $montantTtc,
@@ -98,32 +118,36 @@ class AchatApiControleur
             ]);
 
             foreach ($request->articles as $article) {
-                $produit = Produit::lockForUpdate()->find($article['produit_id']);
+                $produit = !empty($article['produit_id']) ? Produit::lockForUpdate()->find($article['produit_id']) : null;
                 $ht      = $article['quantite'] * $article['prix_unitaire'];
                 $tva     = $ht * 0.18;
 
                 AchatDetail::create([
                     'achat_id'       => $achat->id,
-                    'produit_id'     => $produit->id,
+                    'produit_id'     => $produit ? $produit->id : null,
+                    'libelle_virtuel'=> $produit ? null : ($article['libelle_virtuel'] ?? 'Saisie libre'),
                     'quantite'       => $article['quantite'],
+                    'unite'          => $article['unite'] ?? 'Unité',
                     'prix_unitaire'  => $article['prix_unitaire'],
                     'montant_tva'    => $tva,
                     'montant_ttc'    => $ht + $tva,
                 ]);
 
-                // Augmenter le stock + mouvement
-                $stockAvant = $produit->stock_actuel;
-                $produit->increment('stock_actuel', $article['quantite']);
+                // Augmenter le stock + mouvement si produit existe et stockable
+                if ($produit && $produit->type === 'stockable') {
+                    $stockAvant = $produit->stock_actuel;
+                    $produit->increment('stock_actuel', $article['quantite']);
 
-                MouvementStock::create([
-                    'produit_id'         => $produit->id,
-                    'point_de_vente_id'  => $pointDeVenteId,
-                    'type_mouvement'     => 'Entrée',
-                    'quantite'           => $article['quantite'],
-                    'stock_avant'        => $stockAvant,
-                    'stock_apres'        => $stockAvant + $article['quantite'],
-                    'reference_document' => $numero,
-                ]);
+                    MouvementStock::create([
+                        'produit_id'         => $produit->id,
+                        'point_de_vente_id'  => $pointDeVenteId,
+                        'type_mouvement'     => 'Entrée',
+                        'quantite'           => $article['quantite'],
+                        'stock_avant'        => $stockAvant,
+                        'stock_apres'        => $stockAvant + $article['quantite'],
+                        'reference_document' => $numero,
+                    ]);
+                }
             }
 
             // Enregistrement automatique en décaissement (trésorerie)
@@ -136,7 +160,9 @@ class AchatApiControleur
                     'date_operation'     => $request->date_achat,
                     'type_operation'     => 'Décaissement',
                     'libelle'            => 'Achat — Facture ' . $numero,
-                    'mode_paiement'      => $request->mode_paiement ?? 'Espèces',
+                    'mode_paiement'      => $modePaiementFinal,
+                    'moyen_bancaire'     => $request->mode_paiement === 'Banque' ? $request->moyen_bancaire : null,
+                    'reference_paiement' => $request->mode_paiement === 'Banque' ? $request->reference_paiement : null,
                     'montant_entree'     => 0,
                     'montant_sortie'     => $montantPaye,
                     'solde_resultat'     => $soldeActuel - $montantPaye,

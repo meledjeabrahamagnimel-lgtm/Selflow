@@ -88,15 +88,30 @@
 
                 {{-- Sélection de la banque --}}
                 <div id="selectionBanqueContainer" style="display:none; margin-bottom:16px;">
-                    <label class="form-label">Sélectionner la Banque <span style="color:var(--danger)">*</span></label>
-                    <div style="display:flex; gap:8px;">
-                        <select name="banque_id" id="banqueSelect" class="form-control" style="flex:1;">
-                            <option value="">— Choisir un compte banque —</option>
-                            @foreach($banques as $b)
-                            <option value="{{ $b->id }}">{{ $b->intitule }} ({{ $b->code }} - {{ $b->compte }})</option>
-                            @endforeach
+                    <div class="form-group" style="margin-bottom: 12px;">
+                        <label class="form-label">Sélectionner la Banque <span style="color:var(--danger)">*</span></label>
+                        <div style="display:flex; gap:8px;">
+                            <select name="banque_id" id="banqueSelect" class="form-control" style="flex:1;">
+                                <option value="">— Choisir un compte banque —</option>
+                                @foreach($banques as $b)
+                                <option value="{{ $b->id }}">{{ $b->intitule }} ({{ $b->code }} - {{ $b->compte }})</option>
+                                @endforeach
+                            </select>
+                            <button type="button" class="btn btn-primary" onclick="ouvrirModalNouvelleBanque()" style="padding:0 14px;"><i class="fas fa-plus"></i></button>
+                        </div>
+                    </div>
+                    <div class="form-group" style="margin-bottom: 12px;">
+                        <label class="form-label">Moyen de paiement bancaire <span style="color:var(--danger)">*</span></label>
+                        <select name="moyen_bancaire" id="moyenBancaireSelect" class="form-control">
+                            <option value="">— Moyen de paiement —</option>
+                            <option value="carte">Carte bancaire</option>
+                            <option value="virement">Virement</option>
+                            <option value="cheque">Chèque</option>
                         </select>
-                        <button type="button" class="btn btn-primary" onclick="ouvrirModalNouvelleBanque()" style="padding:0 14px;"><i class="fas fa-plus"></i></button>
+                    </div>
+                    <div class="form-group" style="margin-bottom:0;">
+                        <label class="form-label">Référence / Numéro <span style="color:var(--danger)">*</span></label>
+                        <input type="text" name="reference_paiement" id="refPaiementInput" class="form-control" placeholder="Numéro de carte, virement ou chèque">
                     </div>
                 </div>
 
@@ -163,13 +178,19 @@ let idx = 0;
 function savePanier() {
     const panierItems = [];
     document.querySelectorAll('.ligne').forEach(l => {
+        const chk = l.querySelector('.libre-chk');
         const pSel = l.querySelector('.produit-sel');
+        const nameInp = l.querySelector('.name-inp');
+        const unitInp = l.querySelector('.unit-inp');
         const qInp = l.querySelector('.qte-inp');
         const prInp = l.querySelector('.prix-inp');
         
-        if (pSel.value) {
+        const isLibre = chk && chk.checked;
+        if (isLibre || pSel.value) {
             panierItems.push({
-                produit_id: pSel.value,
+                produit_id: isLibre ? '' : pSel.value,
+                libelle_virtuel: isLibre ? nameInp.value : '',
+                unite: isLibre ? unitInp.value : 'Unité',
                 quantite: qInp.value,
                 prix_unitaire: prInp.value
             });
@@ -202,12 +223,28 @@ function ajouterLigne(prefill = null) {
     const opts = produits.map(p => `<option value="${p.id}" data-prix="${p.prix}">${p.nom} (${p.ref})</option>`).join('');
     const div = document.createElement('div');
     div.className = 'ligne'; div.dataset.idx = idx;
+    
+    const isLibre = prefill && (prefill.libelle_virtuel || !prefill.produit_id && prefill.produit_id === '');
+    
     div.innerHTML = `
-        <div class="form-group" style="margin-bottom:0;">
-            <label class="form-label">Produit</label>
-            <select name="articles[${idx}][produit_id]" class="form-control produit-sel" onchange="majPrix(this, ${idx}); savePanier();" required>
-                <option value="">— Choisir —</option>${opts}
-            </select>
+        <div class="form-group" style="margin-bottom:0; min-width: 250px;">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
+                <label class="form-label" style="margin-bottom:0;">Produit</label>
+                <label style="font-size:11px; margin-bottom:0; font-weight:normal; cursor:pointer; color:var(--primary);">
+                    <input type="checkbox" class="libre-chk" onchange="toggleLibre(${idx})" ${isLibre ? 'checked' : ''}> Saisie libre
+                </label>
+            </div>
+            
+            <div class="sel-container" style="${isLibre ? 'display:none;' : 'display:block;'}">
+                <select name="articles[${idx}][produit_id]" class="form-control produit-sel" onchange="majPrix(this, ${idx}); savePanier();" ${isLibre ? '' : 'required'}>
+                    <option value="">— Choisir —</option>${opts}
+                </select>
+            </div>
+            
+            <div class="libre-container" style="${isLibre ? 'display:flex;' : 'display:none;'} gap: 6px;">
+                <input type="text" name="articles[${idx}][libelle_virtuel]" class="form-control name-inp" placeholder="Nom du produit" value="${prefill ? (prefill.libelle_virtuel || '') : ''}" ${isLibre ? 'required' : ''} oninput="savePanier();">
+                <input type="text" name="articles[${idx}][unite]" class="form-control unit-inp" placeholder="Unité" value="${prefill ? (prefill.unite || 'Unité') : 'Unité'}" oninput="savePanier();" style="width: 80px;">
+            </div>
         </div>
         <div class="form-group" style="margin-bottom:0;">
             <label class="form-label">Quantité</label>
@@ -221,12 +258,41 @@ function ajouterLigne(prefill = null) {
     `;
     container.appendChild(div);
     
-    if (prefill && prefill.produit_id) {
-        div.querySelector('.produit-sel').value = prefill.produit_id;
+    if (prefill) {
+        if (prefill.produit_id) {
+            div.querySelector('.produit-sel').value = prefill.produit_id;
+        }
     }
 
     idx++;
     recalculer();
+}
+
+function toggleLibre(i) {
+    const row = document.querySelector(`[data-idx="${i}"]`);
+    const chk = row.querySelector('.libre-chk');
+    const selContainer = row.querySelector('.sel-container');
+    const libreContainer = row.querySelector('.libre-container');
+    const sel = row.querySelector('.produit-sel');
+    const nameInp = row.querySelector('.name-inp');
+    
+    if (chk.checked) {
+        selContainer.style.display = 'none';
+        sel.required = false;
+        sel.value = '';
+        
+        libreContainer.style.display = 'flex';
+        nameInp.required = true;
+    } else {
+        selContainer.style.display = 'block';
+        sel.required = true;
+        
+        libreContainer.style.display = 'none';
+        nameInp.required = false;
+        nameInp.value = '';
+    }
+    recalculer();
+    savePanier();
 }
 
 function majPrix(sel, i) {
@@ -269,14 +335,22 @@ function selectionnerModePaiement(btn) {
     
     const banqueContainer = document.getElementById('selectionBanqueContainer');
     const banqueSelect = document.getElementById('banqueSelect');
+    const moyenBancaireSelect = document.getElementById('moyenBancaireSelect');
+    const refPaiementInput = document.getElementById('refPaiementInput');
     
     if (mode === 'Banque') {
         banqueContainer.style.display = 'block';
         banqueSelect.required = true;
+        moyenBancaireSelect.required = true;
+        refPaiementInput.required = true;
     } else {
         banqueContainer.style.display = 'none';
         banqueSelect.required = false;
         banqueSelect.value = '';
+        moyenBancaireSelect.required = false;
+        moyenBancaireSelect.value = '';
+        refPaiementInput.required = false;
+        refPaiementInput.value = '';
     }
 }
 

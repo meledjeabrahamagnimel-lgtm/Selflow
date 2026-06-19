@@ -137,13 +137,17 @@
                 <tr>
                     <th>Personnel</th>
                     <th>Rôle</th>
-                    <th style="text-align: center;" title="Tableau de bord">TDB</th>
+                    <th style="text-align: center;" title="Tableau de bord personnel">TDB Pers</th>
+                    <th style="text-align: center;" title="Tableau de bord général">TDB Gén</th>
                     <th style="text-align: center;" title="Nouvelle vente">N.Vente</th>
                     <th style="text-align: center;" title="Factures Ventes">F.Vente</th>
                     <th style="text-align: center;" title="Nouvel achat">N.Achat</th>
                     <th style="text-align: center;" title="Factures Achats">F.Achat</th>
                     <th style="text-align: center;" title="Stock">Stock</th>
-                    <th style="text-align: center;" title="Trésorerie">Tréso</th>
+                    <th style="text-align: center;" title="Encaissements">Tréso Enc</th>
+                    <th style="text-align: center;" title="Opérations & écriture globale">Ecriture Glob</th>
+                    <th style="text-align: center;" title="Créances & règlements">Créances</th>
+                    <th style="text-align: center;" title="Plan Comptable">Plan Compta</th>
                     <th style="text-align: center;" title="Points de vente">PDV</th>
                     <th style="text-align: center;" title="Personnel">Pers</th>
                     <th style="text-align: center;" title="Produits">Prod</th>
@@ -167,9 +171,9 @@
                     {{-- Checkboxes indicatifs --}}
                     @php
                         $pagesCheck = [
-                            'tableau_de_bord', 'nouvelle_vente', 'factures_vente',
+                            'tableau_de_bord_personnel', 'tableau_de_bord_general', 'nouvelle_vente', 'factures_vente',
                             'nouvel_achat', 'factures_achat', 'stock_articles',
-                            'tresorerie_encaissements', 'gestion_pdv', 'gestion_personnel',
+                            'tresorerie_encaissements', 'comptabilite_globale', 'comptabilite_creances', 'comptabilite_plan_comptable', 'gestion_pdv', 'gestion_personnel',
                             'catalogue_produits', 'tiers_clients'
                         ];
                     @endphp
@@ -275,7 +279,10 @@
                     <div>
                         <div style="font-weight:600; font-size:11px; text-transform:uppercase; color:var(--text-2); margin-bottom:6px; border-bottom:1px solid var(--border); padding-bottom:3px;">Principal</div>
                         <label style="display:flex; align-items:center; gap:8px; font-size:12px; margin-bottom:5px; cursor:pointer;">
-                            <input type="checkbox" name="habilitations[]" value="tableau_de_bord" checked> Tableau de bord
+                            <input type="checkbox" name="habilitations[]" value="tableau_de_bord_personnel" checked> Tableau de bord personnel
+                        </label>
+                        <label style="display:flex; align-items:center; gap:8px; font-size:12px; margin-bottom:5px; cursor:pointer;">
+                            <input type="checkbox" name="habilitations[]" value="tableau_de_bord_general"> Tableau de bord général
                         </label>
                     </div>
 
@@ -316,7 +323,7 @@
                     </div>
 
                     <div>
-                        <div style="font-weight:600; font-size:11px; text-transform:uppercase; color:var(--text-2); margin-bottom:6px; border-bottom:1px solid var(--border); padding-bottom:3px;">Trésorerie</div>
+                        <div style="font-weight:600; font-size:11px; text-transform:uppercase; color:var(--text-2); margin-bottom:6px; border-bottom:1px solid var(--border); padding-bottom:3px;">Trésorerie & Compta</div>
                         <label style="display:flex; align-items:center; gap:8px; font-size:12px; margin-bottom:5px; cursor:pointer;">
                             <input type="checkbox" name="habilitations[]" value="tresorerie_encaissements"> Encaissements
                         </label>
@@ -328,6 +335,15 @@
                         </label>
                         <label style="display:flex; align-items:center; gap:8px; font-size:12px; margin-bottom:5px; cursor:pointer;">
                             <input type="checkbox" name="habilitations[]" value="tresorerie_codes_journaux"> Codes Journaux
+                        </label>
+                        <label style="display:flex; align-items:center; gap:8px; font-size:12px; margin-bottom:5px; cursor:pointer;">
+                            <input type="checkbox" name="habilitations[]" value="comptabilite_globale"> Opération & écriture globale
+                        </label>
+                        <label style="display:flex; align-items:center; gap:8px; font-size:12px; margin-bottom:5px; cursor:pointer;">
+                            <input type="checkbox" name="habilitations[]" value="comptabilite_creances"> Créances & règlements
+                        </label>
+                        <label style="display:flex; align-items:center; gap:8px; font-size:12px; margin-bottom:5px; cursor:pointer;">
+                            <input type="checkbox" name="habilitations[]" value="comptabilite_plan_comptable"> Plan Comptable
                         </label>
                     </div>
 

@@ -9,10 +9,21 @@ class TresorerieJournal extends Model
 {
     protected $table = 'tresorerie_journal';
     protected $fillable = [
-        'point_de_vente_id', 'date_operation', 'type_operation',
-        'libelle', 'mode_paiement', 'montant_entree', 'montant_sortie',
-        'solde_resultat', 'reference_document',
+        'point_de_vente_id', 'utilisateur_id', 'date_operation', 'type_operation',
+        'libelle', 'mode_paiement', 'moyen_bancaire', 'reference_paiement',
+        'montant_entree', 'montant_sortie', 'solde_resultat', 'reference_document',
     ];
+
+    protected static function booted()
+    {
+        static::addGlobalScope(new \App\Modules\Admin\Scopes\PeriodeScope('date_operation'));
+
+        static::creating(function ($model) {
+            if (auth()->check()) {
+                $model->utilisateur_id = auth()->id();
+            }
+        });
+    }
 
     protected function casts(): array
     {

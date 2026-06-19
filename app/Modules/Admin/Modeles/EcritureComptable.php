@@ -9,6 +9,11 @@ class EcritureComptable extends Model
 {
     protected $table = 'ecritures_comptables';
 
+    protected static function booted()
+    {
+        static::addGlobalScope(new \App\Modules\Admin\Scopes\PeriodeScope('date_ecriture'));
+    }
+
     protected $fillable = [
         'entreprise_id',
         'point_de_vente_id',

@@ -14,12 +14,13 @@ use App\Modules\Admin\Controleurs\EntrepriseControleur;
 use Illuminate\Support\Facades\Route;
 
 Route::prefix('admin')
-    ->middleware(['auth', 'role:admin', 'habilitation', 'apercu.readonly'])
+    ->middleware(['auth', 'role:admin', 'habilitation', 'apercu.readonly', 'periode'])
     ->name('admin.')
     ->group(function () {
 
         // Tableau de bord
         Route::get('/', [AdminControleur::class, 'tableauDeBord'])->name('tableau_de_bord');
+        Route::get('/general', [AdminControleur::class, 'tableauDeBordGeneral'])->name('tableau_de_bord_general');
 
         // ── Ventes ──
         Route::prefix('ventes')->name('ventes.')->group(function () {
@@ -114,13 +115,17 @@ Route::prefix('admin')
         // ── Paramètres entreprise ──
         Route::get('/entreprise/parametres', [EntrepriseControleur::class, 'parametres'])->name('entreprise.parametres');
         Route::put('/entreprise/parametres', [EntrepriseControleur::class, 'enregistrerParametres'])->name('entreprise.parametres.enregistrer');
+
+        // ── Périodes / Exercices ──
+        Route::post('/periods/switch', [EntrepriseControleur::class, 'switchPeriode'])->name('periods.switch');
+        Route::post('/entreprise/periodes', [EntrepriseControleur::class, 'creerPeriode'])->name('entreprise.periodes.creer');
     });
 
 // ───────────────────────────────────────────────────────────────────────
 // Routes pour l'interface Caissier (Point de Vente)
 // ───────────────────────────────────────────────────────────────────────
 Route::prefix('caissier')
-    ->middleware(['auth', 'role:admin,caissier', 'caissier.acces', 'habilitation', 'apercu.readonly'])
+    ->middleware(['auth', 'role:admin,caissier', 'caissier.acces', 'habilitation', 'apercu.readonly', 'periode'])
     ->name('caissier.')
     ->group(function () {
         // Le tableau de bord du caissier est l'écran de caisse/nouvelle vente

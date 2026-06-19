@@ -223,7 +223,7 @@ var isDeliveryMode = false;
 
 @php
     $entreprise = $vente->pointDeVente->entreprise;
-    $logoUrl = $entreprise->logo_path ? Storage::url($entreprise->logo_path) : null;
+    $logoUrl = $entreprise->logo_path ? Storage::disk('public')->url($entreprise->logo_path) : null;
 @endphp
 
 var DATA = {
@@ -234,6 +234,8 @@ var DATA = {
         remise: {{ $vente->remise ?? 0 }},
         normalise: {{ $vente->normalise ? 'true' : 'false' }},
         qr_code_data: {!! json_encode($vente->qr_code_data) !!},
+        moyen_bancaire: {!! json_encode($vente->moyen_bancaire) !!},
+        reference_paiement: {!! json_encode($vente->reference_paiement) !!},
         client: {
             nom: {!! json_encode($vente->client?->nom ?? 'Client de passage') !!},
             adresse: {!! json_encode($vente->client?->adresse ?? '') !!},
@@ -259,6 +261,20 @@ var DATA = {
         deja_paye: {{ $dejaPaye ?? 0 }}
     }
 };
+
+function getFormattedMode(d) {
+    if (d.mode && d.mode.startsWith('Banque')) {
+        if (d.moyen_bancaire) {
+            let label = d.moyen_bancaire;
+            if (d.moyen_bancaire === 'carte') label = 'carte';
+            else if (d.moyen_bancaire === 'cheque') label = 'chèque';
+            else if (d.moyen_bancaire === 'virement') label = 'virement';
+            return 'Banque : ' + label;
+        }
+        return 'Banque';
+    }
+    return d.mode;
+}
 
 var COMPANY = {
     nom: {!! json_encode($entreprise->nom) !!},
@@ -439,7 +455,7 @@ function model1(d) {
                 <div style="font-size:10px;font-weight:700;color:${theme.color};text-transform:uppercase;letter-spacing:.07em;margin-bottom:8px">Informations</div>
                 ${[
                     ["Date d'émission", d.date],
-                    ["Mode de paiement", isDeliveryMode ? null : d.mode],
+                    ["Mode de paiement", isDeliveryMode ? null : getFormattedMode(d)],
                     ["Vendeur", COMPANY.vendeur],
                     ["Point de vente", COMPANY.pdv]
                 ].map(r => r[1] ? `<div style="display:flex;justify-content:space-between;font-size:11px;padding:4px 0;border-bottom:0.5px solid var(--border)"><span style="color:var(--mu)">${r[0]}</span><span style="font-weight:600;color:var(--tx)">${r[1]}</span></div>` : '').join('')}
@@ -568,7 +584,7 @@ function model2(d) {
                 <div style="display:flex;gap:14px;margin-top:10px;flex-wrap:wrap;">
                     <div style="font-size:11px"><span style="color:var(--mu)">Date : </span><span style="color:var(--tx);font-weight:600;">${d.date}</span></div>
                     ${isDeliveryMode ? '' : `
-                    <div style="font-size:11px"><span style="color:var(--mu)">Paiement : </span><span style="color:var(--tx);font-weight:600;">${d.mode}</span></div>
+                    <div style="font-size:11px"><span style="color:var(--mu)">Paiement : </span><span style="color:var(--tx);font-weight:600;">${getFormattedMode(d)}</span></div>
                     <div style="font-size:11px"><span style="color:var(--mu)">Statut : </span><span style="font-weight:700;color:${sColor}">${d.statut}</span></div>
                     `}
                 </div>
@@ -671,7 +687,7 @@ function model3(d) {
                 <div style="font-size:10px;color:${theme.color};font-weight:700;text-transform:uppercase;letter-spacing:.08em;margin-bottom:6px">Détails</div>
                 <div style="font-size:11px;line-height:1.9">
                     <span style="color:var(--mu)">Date : </span><span style="color:var(--tx);font-weight:600;">${d.date}</span><br>
-                    ${isDeliveryMode ? '' : `<span style="color:var(--mu)">Paiement : </span><span style="color:var(--tx);font-weight:600;">${d.mode}</span><br>`}
+                    ${isDeliveryMode ? '' : `<span style="color:var(--mu)">Paiement : </span><span style="color:var(--tx);font-weight:600;">${getFormattedMode(d)}</span><br>`}
                     <span style="color:var(--mu)">Vendeur : </span><span style="color:var(--tx);font-weight:600;">${COMPANY.vendeur || '—'}</span><br>
                     ${isDeliveryMode ? '' : `<span style="color:var(--mu)">Statut : </span><span style="font-weight:700;color:${sColor}">${d.statut}</span>`}
                 </div>
@@ -860,7 +876,7 @@ function modelStandard(d) {
                     Nom du vendeur : <strong>${COMPANY.vendeur || '—'}</strong><br>
                     Nom de PDV : <strong>${COMPANY.pdv}</strong><br>
                     Date et heure : <strong>${d.date}</strong><br>
-                    ${isDeliveryMode ? '' : `Mode de paiement : <strong>${d.mode}</strong>`}
+                    ${isDeliveryMode ? '' : `Mode de paiement : <strong>${getFormattedMode(d)}</strong>`}
                 </div>
             </div>
             

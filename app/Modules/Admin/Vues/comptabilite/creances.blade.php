@@ -224,12 +224,37 @@
 
             <div class="form-group">
                 <label class="form-label">Mode de paiement <span style="color:var(--danger)">*</span></label>
-                <select name="mode_paiement" class="form-control" required>
-                    <option value="Espèces">Espèces</option>
+                <select name="mode_paiement" id="reglementModePaiement" class="form-control" required onchange="toggleReglementBanque(this.value)">
+                    <option value="Caisse">Caisse</option>
                     <option value="Mobile Money">Mobile Money</option>
-                    <option value="Virement">Virement</option>
-                    <option value="Chèque">Chèque</option>
+                    <option value="Banque">Banque</option>
                 </select>
+            </div>
+
+            {{-- Section banque --}}
+            <div id="reglementBanqueSection" style="display:none; border:1px solid var(--border); padding:14px; border-radius:8px; margin-bottom:15px; background:var(--bg3);">
+                <div class="form-group">
+                    <label class="form-label">Sélectionner la Banque <span style="color:var(--danger)">*</span></label>
+                    <select name="banque_id" id="reglementBanqueSelect" class="form-control">
+                        <option value="">— Choisir un compte banque —</option>
+                        @foreach($banques as $b)
+                        <option value="{{ $b->id }}">{{ $b->intitule }} ({{ $b->code }} - {{ $b->compte }})</option>
+                        @endforeach
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Moyen de paiement bancaire <span style="color:var(--danger)">*</span></label>
+                    <select name="moyen_bancaire" id="reglementMoyenBancaire" class="form-control">
+                        <option value="">— Sélectionner le moyen —</option>
+                        <option value="carte">Carte bancaire</option>
+                        <option value="virement">Virement</option>
+                        <option value="cheque">Chèque</option>
+                    </select>
+                </div>
+                <div class="form-group" style="margin-bottom:0;">
+                    <label class="form-label">Référence / Numéro <span style="color:var(--danger)">*</span></label>
+                    <input type="text" name="reference_paiement" id="reglementReferencePaiement" class="form-control" placeholder="Numéro de carte, virement ou chèque">
+                </div>
             </div>
 
             <div class="form-group">
@@ -298,8 +323,32 @@ function changerFactureReglement(select) {
     inp.max = reste;
 }
 
+function toggleReglementBanque(val) {
+    const section = document.getElementById('reglementBanqueSection');
+    const bSel = document.getElementById('reglementBanqueSelect');
+    const mSel = document.getElementById('reglementMoyenBancaire');
+    const rInp = document.getElementById('reglementReferencePaiement');
+    
+    if (val === 'Banque') {
+        section.style.display = 'block';
+        bSel.required = true;
+        mSel.required = true;
+        rInp.required = true;
+    } else {
+        section.style.display = 'none';
+        bSel.required = false;
+        bSel.value = '';
+        mSel.required = false;
+        mSel.value = '';
+        rInp.required = false;
+        rInp.value = '';
+    }
+}
+
 function fermerModalReglement() {
     document.getElementById('modalReglement').classList.remove('open');
+    document.getElementById('reglementModePaiement').value = 'Caisse';
+    toggleReglementBanque('Caisse');
 }
 </script>
 @endsection

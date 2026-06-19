@@ -229,15 +229,30 @@
 
                     {{-- Sélection de la banque --}}
                     <div id="selectionBanqueContainer" style="{{ $modeSimple === 'Banque' ? 'display:block;' : 'display:none;' }} margin-bottom:16px;">
-                        <label class="form-label">Sélectionner la Banque <span style="color:var(--danger)">*</span></label>
-                        <div style="display:flex; gap:8px;">
-                            <select name="banque_id" id="banqueSelect" class="form-control" style="flex:1;" {{ $modeSimple === 'Banque' ? 'required' : '' }}>
-                                <option value="">— Choisir un compte banque —</option>
-                                @foreach($banques as $b)
-                                <option value="{{ $b->id }}" {{ $selectedBanqueId === $b->id ? 'selected' : '' }}>{{ $b->intitule }} ({{ $b->code }} - {{ $b->compte }})</option>
-                                @endforeach
+                        <div class="form-group" style="margin-bottom: 12px;">
+                            <label class="form-label">Sélectionner la Banque <span style="color:var(--danger)">*</span></label>
+                            <div style="display:flex; gap:8px;">
+                                <select name="banque_id" id="banqueSelect" class="form-control" style="flex:1;" {{ $modeSimple === 'Banque' ? 'required' : '' }}>
+                                    <option value="">— Choisir un compte banque —</option>
+                                    @foreach($banques as $b)
+                                    <option value="{{ $b->id }}" {{ $selectedBanqueId === $b->id ? 'selected' : '' }}>{{ $b->intitule }} ({{ $b->code }} - {{ $b->compte }})</option>
+                                    @endforeach
+                                </select>
+                                <button type="button" class="btn btn-primary" onclick="ouvrirModalNouvelleBanque()" style="padding:0 14px;"><i class="fas fa-plus"></i></button>
+                            </div>
+                        </div>
+                        <div class="form-group" style="margin-bottom: 12px;">
+                            <label class="form-label">Moyen de paiement bancaire <span style="color:var(--danger)">*</span></label>
+                            <select name="moyen_bancaire" id="moyenBancaireSelect" class="form-control" {{ $modeSimple === 'Banque' ? 'required' : '' }}>
+                                <option value="">— Moyen de paiement —</option>
+                                <option value="carte" {{ $vente->moyen_bancaire === 'carte' ? 'selected' : '' }}>Carte bancaire</option>
+                                <option value="virement" {{ $vente->moyen_bancaire === 'virement' ? 'selected' : '' }}>Virement</option>
+                                <option value="cheque" {{ $vente->moyen_bancaire === 'cheque' ? 'selected' : '' }}>Chèque</option>
                             </select>
-                            <button type="button" class="btn btn-primary" onclick="ouvrirModalNouvelleBanque()" style="padding:0 14px;"><i class="fas fa-plus"></i></button>
+                        </div>
+                        <div class="form-group" style="margin-bottom:0;">
+                            <label class="form-label">Référence / Numéro <span style="color:var(--danger)">*</span></label>
+                            <input type="text" name="reference_paiement" id="refPaiementInput" class="form-control" placeholder="Numéro de carte, virement ou chèque" value="{{ $vente->reference_paiement }}" {{ $modeSimple === 'Banque' ? 'required' : '' }}>
                         </div>
                     </div>
 
@@ -399,14 +414,22 @@ function selectionnerModePaiement(btn) {
     
     const banqueContainer = document.getElementById('selectionBanqueContainer');
     const banqueSelect = document.getElementById('banqueSelect');
+    const moyenBancaireSelect = document.getElementById('moyenBancaireSelect');
+    const refPaiementInput = document.getElementById('refPaiementInput');
     
     if (mode === 'Banque') {
         banqueContainer.style.display = 'block';
         banqueSelect.required = true;
+        moyenBancaireSelect.required = true;
+        refPaiementInput.required = true;
     } else {
         banqueContainer.style.display = 'none';
         banqueSelect.required = false;
         banqueSelect.value = '';
+        moyenBancaireSelect.required = false;
+        moyenBancaireSelect.value = '';
+        refPaiementInput.required = false;
+        refPaiementInput.value = '';
     }
 }
 

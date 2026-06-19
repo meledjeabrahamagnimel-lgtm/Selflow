@@ -104,7 +104,10 @@
                         <div>
                             <div style="font-weight:600; font-size:11px; text-transform:uppercase; color:var(--text-2); margin-bottom:6px; border-bottom:1px solid var(--border); padding-bottom:3px;">Principal</div>
                             <label style="display:flex; align-items:center; gap:8px; font-size:12px; margin-bottom:5px; cursor:pointer;">
-                                <input type="checkbox" name="habilitations[]" value="tableau_de_bord" @if(in_array('tableau_de_bord', $userHabs)) checked @endif> Tableau de bord
+                                <input type="checkbox" name="habilitations[]" value="tableau_de_bord_personnel" @if(in_array('tableau_de_bord_personnel', $userHabs)) checked @endif> Tableau de bord personnel
+                            </label>
+                            <label style="display:flex; align-items:center; gap:8px; font-size:12px; margin-bottom:5px; cursor:pointer;">
+                                <input type="checkbox" name="habilitations[]" value="tableau_de_bord_general" @if(in_array('tableau_de_bord_general', $userHabs)) checked @endif> Tableau de bord général
                             </label>
                         </div>
 
@@ -145,7 +148,7 @@
                         </div>
 
                         <div>
-                            <div style="font-weight:600; font-size:11px; text-transform:uppercase; color:var(--text-2); margin-bottom:6px; border-bottom:1px solid var(--border); padding-bottom:3px;">Trésorerie</div>
+                            <div style="font-weight:600; font-size:11px; text-transform:uppercase; color:var(--text-2); margin-bottom:6px; border-bottom:1px solid var(--border); padding-bottom:3px;">Trésorerie & Compta</div>
                             <label style="display:flex; align-items:center; gap:8px; font-size:12px; margin-bottom:5px; cursor:pointer;">
                                 <input type="checkbox" name="habilitations[]" value="tresorerie_encaissements" @if(in_array('tresorerie_encaissements', $userHabs)) checked @endif> Encaissements
                             </label>
@@ -157,6 +160,15 @@
                             </label>
                             <label style="display:flex; align-items:center; gap:8px; font-size:12px; margin-bottom:5px; cursor:pointer;">
                                 <input type="checkbox" name="habilitations[]" value="tresorerie_codes_journaux" @if(in_array('tresorerie_codes_journaux', $userHabs)) checked @endif> Codes Journaux
+                            </label>
+                            <label style="display:flex; align-items:center; gap:8px; font-size:12px; margin-bottom:5px; cursor:pointer;">
+                                <input type="checkbox" name="habilitations[]" value="comptabilite_globale" @if(in_array('comptabilite_globale', $userHabs)) checked @endif> Opération & écriture globale
+                            </label>
+                            <label style="display:flex; align-items:center; gap:8px; font-size:12px; margin-bottom:5px; cursor:pointer;">
+                                <input type="checkbox" name="habilitations[]" value="comptabilite_creances" @if(in_array('comptabilite_creances', $userHabs)) checked @endif> Créances & règlements
+                            </label>
+                            <label style="display:flex; align-items:center; gap:8px; font-size:12px; margin-bottom:5px; cursor:pointer;">
+                                <input type="checkbox" name="habilitations[]" value="comptabilite_plan_comptable" @if(in_array('comptabilite_plan_comptable', $userHabs)) checked @endif> Plan Comptable
                             </label>
                         </div>
 

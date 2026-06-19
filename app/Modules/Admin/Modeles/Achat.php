@@ -12,16 +12,30 @@ class Achat extends Model
 
     protected $fillable = [
         'point_de_vente_id',
+        'utilisateur_id',
         'fournisseur_id',
         'numero_facture',
         'date_achat',
         'mode_paiement',
+        'moyen_bancaire',
+        'reference_paiement',
         'montant_ht',
         'montant_tva',
         'montant_ttc',
         'statut',
         'etape',
     ];
+
+    protected static function booted()
+    {
+        static::addGlobalScope(new \App\Modules\Admin\Scopes\PeriodeScope('date_achat'));
+
+        static::creating(function ($model) {
+            if (auth()->check()) {
+                $model->utilisateur_id = auth()->id();
+            }
+        });
+    }
 
     protected function casts(): array
     {

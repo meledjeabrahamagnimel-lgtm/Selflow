@@ -79,7 +79,13 @@ class VenteControleur
 
         if ($request->mode_paiement === 'Banque') {
             $request->validate([
-                'banque_id' => ['required', 'integer', 'exists:codes_journaux,id'],
+                'banque_id'          => ['required', 'integer', 'exists:codes_journaux,id'],
+                'moyen_bancaire'     => ['required', 'string', 'in:carte,virement,cheque'],
+                'reference_paiement' => ['required', 'string', 'max:255'],
+            ], [
+                'banque_id.required'          => 'Veuillez sélectionner la banque.',
+                'moyen_bancaire.required'     => 'Veuillez sélectionner le moyen de paiement bancaire.',
+                'reference_paiement.required' => 'Veuillez saisir le numéro ou référence de paiement.',
             ]);
         }
 
@@ -170,6 +176,8 @@ class VenteControleur
                 'numero_facture'    => $numero,
                 'date_vente'        => now()->toDateString(),
                 'mode_paiement'     => $modePaiementFinal,
+                'moyen_bancaire'    => $request->mode_paiement === 'Banque' ? $request->moyen_bancaire : null,
+                'reference_paiement'=> $request->mode_paiement === 'Banque' ? $request->reference_paiement : null,
                 'montant_ht'        => $montantHt,
                 'montant_tva'       => $montantTva,
                 'remise'            => $remise,
@@ -237,6 +245,8 @@ class VenteControleur
                         'type_operation'     => 'Encaissement',
                         'libelle'            => 'Vente — Facture ' . $numero,
                         'mode_paiement'      => $modePaiementFinal,
+                        'moyen_bancaire'     => $request->mode_paiement === 'Banque' ? $request->moyen_bancaire : null,
+                        'reference_paiement' => $request->mode_paiement === 'Banque' ? $request->reference_paiement : null,
                         'montant_entree'     => $montantPaye,
                         'montant_sortie'     => 0,
                         'solde_resultat'     => $soldeActuel + $montantPaye,
@@ -244,7 +254,14 @@ class VenteControleur
                     ]);
 
                     // Écriture comptable de règlement
-                    \App\Modules\Admin\Services\ComptabiliteService::genererEcritureReglementVente($vente, $montantPaye, $modePaiementFinal);
+                    \App\Modules\Admin\Services\ComptabiliteService::genererEcritureReglementVente(
+                        $vente,
+                        $montantPaye,
+                        $modePaiementFinal,
+                        now()->toDateString(),
+                        $request->mode_paiement === 'Banque' ? $request->moyen_bancaire : null,
+                        $request->mode_paiement === 'Banque' ? $request->reference_paiement : null
+                    );
                 }
             } else {
                 // Étape Devis : Enregistrer le règlement (acompte) dans la trésorerie si présent
@@ -410,7 +427,13 @@ class VenteControleur
 
         if ($request->mode_paiement === 'Banque') {
             $request->validate([
-                'banque_id' => ['required', 'integer', 'exists:codes_journaux,id'],
+                'banque_id'          => ['required', 'integer', 'exists:codes_journaux,id'],
+                'moyen_bancaire'     => ['required', 'string', 'in:carte,virement,cheque'],
+                'reference_paiement' => ['required', 'string', 'max:255'],
+            ], [
+                'banque_id.required'          => 'Veuillez sélectionner la banque.',
+                'moyen_bancaire.required'     => 'Veuillez sélectionner le moyen de paiement bancaire.',
+                'reference_paiement.required' => 'Veuillez saisir le numéro ou référence de paiement.',
             ]);
         }
 
@@ -496,6 +519,8 @@ class VenteControleur
             $vente->update([
                 'client_id'         => $request->client_id ?: null,
                 'mode_paiement'     => $modePaiementFinal,
+                'moyen_bancaire'    => $request->mode_paiement === 'Banque' ? $request->moyen_bancaire : null,
+                'reference_paiement'=> $request->mode_paiement === 'Banque' ? $request->reference_paiement : null,
                 'montant_ht'        => $montantHt,
                 'montant_tva'       => $montantTva,
                 'remise'            => $remise,
@@ -559,6 +584,8 @@ class VenteControleur
                     'type_operation'     => 'Encaissement',
                     'libelle'            => 'Modification Vente — Facture ' . $vente->numero_facture,
                     'mode_paiement'      => $modePaiementFinal,
+                    'moyen_bancaire'     => $request->mode_paiement === 'Banque' ? $request->moyen_bancaire : null,
+                    'reference_paiement' => $request->mode_paiement === 'Banque' ? $request->reference_paiement : null,
                     'montant_entree'     => $montantPaye,
                     'montant_sortie'     => 0,
                     'solde_resultat'     => $soldeActuel + $montantPaye,
@@ -633,6 +660,8 @@ class VenteControleur
                         'type_operation'     => 'Encaissement',
                         'libelle'            => 'Vente — Règlement solde Facture ' . $vente->numero_facture,
                         'mode_paiement'      => $vente->mode_paiement,
+                        'moyen_bancaire'     => $vente->moyen_bancaire,
+                        'reference_paiement' => $vente->reference_paiement,
                         'montant_entree'     => $resteAPayer,
                         'montant_sortie'     => 0,
                         'solde_resultat'     => $soldeActuel + $resteAPayer,
@@ -640,7 +669,14 @@ class VenteControleur
                     ]);
 
                     // Écriture de règlement
-                    \App\Modules\Admin\Services\ComptabiliteService::genererEcritureReglementVente($vente, $resteAPayer, $vente->mode_paiement);
+                    \App\Modules\Admin\Services\ComptabiliteService::genererEcritureReglementVente(
+                        $vente,
+                        $resteAPayer,
+                        $vente->mode_paiement,
+                        now()->toDateString(),
+                        $vente->moyen_bancaire,
+                        $vente->reference_paiement
+                    );
                 }
             }
         });

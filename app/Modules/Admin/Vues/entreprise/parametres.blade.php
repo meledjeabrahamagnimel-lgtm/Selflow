@@ -111,7 +111,7 @@
                     <label class="form-label" style="margin-bottom:10px;display:block;">Logo principal de l'entreprise</label>
                     @if($entreprise->logo_path)
                         <div style="margin-bottom:10px;padding:12px;background:var(--bg3);border-radius:8px;display:flex;align-items:center;gap:12px;">
-                            <img src="{{ Storage::url($entreprise->logo_path) }}" alt="Logo entreprise" style="max-height:60px;max-width:140px;object-fit:contain;border-radius:4px;">
+                            <img src="{{ Storage::disk('public')->url($entreprise->logo_path) }}" alt="Logo entreprise" style="max-height:60px;max-width:140px;object-fit:contain;border-radius:4px;">
                             <span style="font-size:12px;color:var(--text-2);">Logo actuel</span>
                         </div>
                     @else
@@ -129,7 +129,7 @@
                     <label class="form-label" style="margin-bottom:10px;display:block;">Logo secondaire (FNE, certification, etc.)</label>
                     @if($entreprise->logo_fne_path)
                         <div style="margin-bottom:10px;padding:12px;background:var(--bg3);border-radius:8px;display:flex;align-items:center;gap:12px;">
-                            <img src="{{ Storage::url($entreprise->logo_fne_path) }}" alt="Logo FNE" style="max-height:60px;max-width:140px;object-fit:contain;border-radius:4px;">
+                            <img src="{{ Storage::disk('public')->url($entreprise->logo_fne_path) }}" alt="Logo FNE" style="max-height:60px;max-width:140px;object-fit:contain;border-radius:4px;">
                             <span style="font-size:12px;color:var(--text-2);">Logo actuel</span>
                         </div>
                     @else
@@ -185,4 +185,90 @@
         </button>
     </div>
 </form>
+
+<div class="card" style="margin-top:24px; padding:24px;">
+    <div style="font-size:14px;font-weight:700;color:var(--text);text-transform:uppercase;letter-spacing:.5px;margin-bottom:20px;display:flex;align-items:center;gap:8px;border-bottom:1px solid var(--border);padding-bottom:10px;">
+        <i class="far fa-calendar-alt" style="color:var(--primary); font-size:16px;"></i> Gestion des Exercices Comptables (Périodes)
+    </div>
+    
+    <div style="display:grid; grid-template-columns: 1fr 2fr; gap:32px; align-items:start;">
+        {{-- Formulaire de création d'un exercice --}}
+        <div style="background:var(--bg3); border-radius:10px; padding:20px; border:1px solid var(--border);">
+            <h3 style="font-size:13px; font-weight:700; margin-bottom:14px; color:var(--primary);"><i class="fas fa-plus"></i> Nouvel Exercice</h3>
+            
+            <form method="POST" action="{{ route('admin.entreprise.periodes.creer') }}">
+                @csrf
+                <div class="form-group" style="margin-bottom:14px;">
+                    <label class="form-label">Date de début <span style="color:var(--danger)">*</span></label>
+                    <input type="date" name="date_debut" class="form-control" required value="{{ date('Y-01-01') }}">
+                </div>
+                
+                <div class="form-group" style="margin-bottom:14px;">
+                    <label class="form-label">Date de fin <span style="color:var(--danger)">*</span></label>
+                    <input type="date" name="date_fin" class="form-control" required value="{{ date('Y-12-31') }}">
+                </div>
+                
+                <button type="submit" class="btn btn-primary btn-sm" style="width:100%; justify-content:center;">
+                    <i class="fas fa-circle-check"></i> Créer l'exercice
+                </button>
+            </form>
+        </div>
+        
+        {{-- Tableau des exercices existants --}}
+        <div>
+            <h3 style="font-size:13px; font-weight:700; margin-bottom:14px; color:var(--text-2);"><i class="fas fa-list-ul"></i> Exercices enregistrés</h3>
+            <div class="table-wrap" style="border:1px solid var(--border);">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Nom</th>
+                            <th>Période</th>
+                            <th style="text-align: center;">Statut</th>
+                            <th style="text-align: center;">Action</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @forelse($periodes as $p)
+                        <tr>
+                            <td><strong>{{ $p->nom }}</strong></td>
+                            <td>
+                                Du {{ \Carbon\Carbon::parse($p->date_debut)->format('d/m/Y') }} 
+                                au {{ \Carbon\Carbon::parse($p->date_fin)->format('d/m/Y') }}
+                            </td>
+                            <td style="text-align: center;">
+                                @if(session('active_periode_id') == $p->id)
+                                    <span class="badge badge-success"><i class="fas fa-circle-check"></i> Sélectionné</span>
+                                @elseif($p->est_active)
+                                    <span class="badge badge-info">Actif</span>
+                                @else
+                                    <span class="badge badge-gray">Inactif</span>
+                                @endif
+                            </td>
+                            <td style="text-align: center;">
+                                @if(session('active_periode_id') != $p->id)
+                                    <form method="POST" action="{{ route('admin.periods.switch') }}" style="margin:0;">
+                                        @csrf
+                                        <input type="hidden" name="periode_id" value="{{ $p->id }}">
+                                        <button type="submit" class="btn btn-outline btn-sm">
+                                            <i class="fas fa-right-from-bracket"></i> Basculer
+                                        </button>
+                                    </form>
+                                @else
+                                    <span style="font-size:11px; font-weight:600; color:var(--success);">Actif en session</span>
+                                @endif
+                            </td>
+                        </tr>
+                        @empty
+                        <tr>
+                            <td colspan="4" style="text-align: center; color: var(--text-3); padding: 20px 0;">
+                                Aucun exercice enregistré.
+                            </td>
+                        </tr>
+                        @endforelse
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
 @endsection

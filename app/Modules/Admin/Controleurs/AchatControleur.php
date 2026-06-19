@@ -61,9 +61,11 @@ class AchatControleur
             'date_achat'     => ['required', 'date'],
             'mode_paiement'  => ['required', 'string'],
             'articles'       => ['required', 'array', 'min:1'],
-            'articles.*.produit_id'    => ['required', 'integer', 'exists:produits,id'],
+            'articles.*.produit_id'    => ['nullable', 'integer', 'exists:produits,id'],
+            'articles.*.libelle_virtuel' => ['nullable', 'string', 'max:255'],
             'articles.*.quantite'      => ['required', 'integer', 'min:1'],
             'articles.*.prix_unitaire' => ['required', 'numeric', 'min:0'],
+            'articles.*.unite'         => ['nullable', 'string', 'max:50'],
         ], [
             'fournisseur_id.required' => 'Veuillez sélectionner un fournisseur.',
             'articles.required'       => 'Veuillez ajouter au moins un article.',
@@ -71,7 +73,13 @@ class AchatControleur
 
         if ($request->mode_paiement === 'Banque') {
             $request->validate([
-                'banque_id' => ['required', 'integer', 'exists:codes_journaux,id'],
+                'banque_id'          => ['required', 'integer', 'exists:codes_journaux,id'],
+                'moyen_bancaire'     => ['required', 'string', 'in:carte,virement,cheque'],
+                'reference_paiement' => ['required', 'string', 'max:255'],
+            ], [
+                'banque_id.required'          => 'Veuillez sélectionner la banque.',
+                'moyen_bancaire.required'     => 'Veuillez sélectionner le moyen de paiement bancaire.',
+                'reference_paiement.required' => 'Veuillez saisir le numéro ou référence de paiement.',
             ]);
         }
 
@@ -109,6 +117,8 @@ class AchatControleur
                 'numero_facture'    => $numero,
                 'date_achat'        => $request->date_achat,
                 'mode_paiement'     => $modePaiementFinal,
+                'moyen_bancaire'    => $request->mode_paiement === 'Banque' ? $request->moyen_bancaire : null,
+                'reference_paiement'=> $request->mode_paiement === 'Banque' ? $request->reference_paiement : null,
                 'montant_ht'        => $montantHt,
                 'montant_tva'       => 0, // No VAT
                 'montant_ttc'       => $montantTtc,
@@ -117,13 +127,15 @@ class AchatControleur
             ]);
 
             foreach ($request->articles as $article) {
-                $produit = Produit::lockForUpdate()->find($article['produit_id']);
+                $produit = !empty($article['produit_id']) ? Produit::lockForUpdate()->find($article['produit_id']) : null;
                 $ht      = $article['quantite'] * $article['prix_unitaire'];
 
                 AchatDetail::create([
                     'achat_id'       => $achat->id,
-                    'produit_id'     => $produit->id,
+                    'produit_id'     => $produit ? $produit->id : null,
+                    'libelle_virtuel'=> $produit ? null : ($article['libelle_virtuel'] ?? 'Saisie libre'),
                     'quantite'       => $article['quantite'],
+                    'unite'          => $article['unite'] ?? 'Unité',
                     'prix_unitaire'  => $article['prix_unitaire'],
                     'montant_tva'    => 0,
                     'montant_ttc'    => $ht,
@@ -160,6 +172,8 @@ class AchatControleur
                     'type_operation'     => 'Décaissement',
                     'libelle'            => 'Achat — Facture ' . $numero,
                     'mode_paiement'      => $modePaiementFinal,
+                    'moyen_bancaire'     => $request->mode_paiement === 'Banque' ? $request->moyen_bancaire : null,
+                    'reference_paiement' => $request->mode_paiement === 'Banque' ? $request->reference_paiement : null,
                     'montant_entree'     => 0,
                     'montant_sortie'     => $montantTtc,
                     'solde_resultat'     => $soldeActuel - $montantTtc,
@@ -167,7 +181,14 @@ class AchatControleur
                 ]);
 
                 // Écriture comptable de règlement
-                \App\Modules\Admin\Services\ComptabiliteService::genererEcritureReglementAchat($achat, $montantTtc, $modePaiementFinal, $request->date_achat);
+                \App\Modules\Admin\Services\ComptabiliteService::genererEcritureReglementAchat(
+                    $achat,
+                    $montantTtc,
+                    $modePaiementFinal,
+                    $request->date_achat,
+                    $request->mode_paiement === 'Banque' ? $request->moyen_bancaire : null,
+                    $request->mode_paiement === 'Banque' ? $request->reference_paiement : null
+                );
             }
         });
 
@@ -271,6 +292,8 @@ class AchatControleur
                 'type_operation'     => 'Décaissement',
                 'libelle'            => 'Achat — Facture ' . $achat->numero_facture,
                 'mode_paiement'      => $achat->mode_paiement,
+                'moyen_bancaire'     => $achat->moyen_bancaire,
+                'reference_paiement' => $achat->reference_paiement,
                 'montant_entree'     => 0,
                 'montant_sortie'     => $montantPaye,
                 'solde_resultat'     => $soldeActuel - $montantPaye,
@@ -278,7 +301,14 @@ class AchatControleur
             ]);
 
             // Écriture de règlement
-            \App\Modules\Admin\Services\ComptabiliteService::genererEcritureReglementAchat($achat, $montantPaye, $achat->mode_paiement, $achat->date_achat->toDateString());
+            \App\Modules\Admin\Services\ComptabiliteService::genererEcritureReglementAchat(
+                $achat,
+                $montantPaye,
+                $achat->mode_paiement,
+                $achat->date_achat->toDateString(),
+                $achat->moyen_bancaire,
+                $achat->reference_paiement
+            );
         });
 
         return back()->with('succes', 'Facture d\'achat validée, stock mis à jour et écritures générées.');

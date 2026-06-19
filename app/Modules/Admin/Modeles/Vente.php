@@ -12,10 +12,13 @@ class Vente extends Model
 
     protected $fillable = [
         'point_de_vente_id',
+        'utilisateur_id',
         'client_id',
         'numero_facture',
         'date_vente',
         'mode_paiement',
+        'moyen_bancaire',
+        'reference_paiement',
         'montant_ht',
         'montant_tva',
         'montant_ttc',
@@ -26,6 +29,17 @@ class Vente extends Model
         'qr_code_data',
         'etape',
     ];
+
+    protected static function booted()
+    {
+        static::addGlobalScope(new \App\Modules\Admin\Scopes\PeriodeScope('date_vente'));
+
+        static::creating(function ($model) {
+            if (auth()->check()) {
+                $model->utilisateur_id = auth()->id();
+            }
+        });
+    }
 
     protected function casts(): array
     {

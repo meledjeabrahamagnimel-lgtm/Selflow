@@ -126,7 +126,7 @@ class ComptabiliteService
                     'entreprise_id'     => $entrepriseId,
                     'point_de_vente_id'  => $pdvId,
                     'date_ecriture'     => $date,
-                    'libelle'           => $refDoc . '/' . ($detail->produit?->nom ?? 'Marchandises'),
+                    'libelle'           => $refDoc . '/' . ($detail->libelle_virtuel ?? ($detail->produit?->nom ?? 'Marchandises')),
                     'reference_document'=> $refDoc,
                     'code_journal'      => $codeJournal,
                     'compte_debit'      => $detail->produit?->compte_achat ?? '601100',
@@ -158,7 +158,7 @@ class ComptabiliteService
      * Génère l'écriture de règlement client (vente).
      * Débit Caisse/Banque (Montant) vs Crédit Client (Montant)
      */
-    public static function genererEcritureReglementVente(Vente $vente, float $montant, string $modePaiement, ?string $date = null): void
+    public static function genererEcritureReglementVente(Vente $vente, float $montant, string $modePaiement, ?string $date = null, ?string $moyenBancaire = null, ?string $referencePaiement = null): void
     {
         if ($montant <= 0) return;
 
@@ -192,18 +192,26 @@ class ComptabiliteService
         $vente->loadMissing('details.produit');
         $produits = [];
         foreach ($vente->details as $detail) {
-            if ($detail->produit?->nom) {
-                $produits[] = $detail->produit->nom;
+            $nom = $detail->libelle_virtuel ?? $detail->produit?->nom;
+            if ($nom) {
+                $produits[] = $nom;
             }
         }
         $produitsStr = count($produits) > 0 ? implode(', ', array_unique($produits)) : 'Marchandises';
+
+        $refPaiement = $referencePaiement ?? $vente->reference_paiement;
+        $libellePaiement = 'Rglt/' . $refDoc;
+        if ($refPaiement) {
+            $libellePaiement .= '/' . $refPaiement;
+        }
+        $libellePaiement .= '/Vente ' . $produitsStr;
 
         // 1. Débit Banque/Caisse
         EcritureComptable::create([
             'entreprise_id'     => $entrepriseId,
             'point_de_vente_id'  => $pdvId,
             'date_ecriture'     => $date,
-            'libelle'           => 'Rglt/' . $refDoc . '/Vente ' . $produitsStr,
+            'libelle'           => $libellePaiement,
             'reference_document'=> $refDoc,
             'code_journal'      => $codeJournal,
             'compte_debit'      => $compteFinancier,
@@ -217,7 +225,7 @@ class ComptabiliteService
             'entreprise_id'     => $entrepriseId,
             'point_de_vente_id'  => $pdvId,
             'date_ecriture'     => $date,
-            'libelle'           => 'Rglt/' . $refDoc . '/Vente ' . $produitsStr,
+            'libelle'           => $libellePaiement,
             'reference_document'=> $refDoc,
             'code_journal'      => $codeJournal,
             'compte_debit'      => null,
@@ -231,7 +239,7 @@ class ComptabiliteService
      * Génère l'écriture de règlement fournisseur (achat).
      * Débit Fournisseur (Montant) vs Crédit Caisse/Banque (Montant)
      */
-    public static function genererEcritureReglementAchat(Achat $achat, float $montant, string $modePaiement, ?string $date = null): void
+    public static function genererEcritureReglementAchat(Achat $achat, float $montant, string $modePaiement, ?string $date = null, ?string $moyenBancaire = null, ?string $referencePaiement = null): void
     {
         if ($montant <= 0) return;
 
@@ -265,18 +273,26 @@ class ComptabiliteService
         $achat->loadMissing('details.produit');
         $produits = [];
         foreach ($achat->details as $detail) {
-            if ($detail->produit?->nom) {
-                $produits[] = $detail->produit->nom;
+            $nom = $detail->libelle_virtuel ?? $detail->produit?->nom;
+            if ($nom) {
+                $produits[] = $nom;
             }
         }
         $produitsStr = count($produits) > 0 ? implode(', ', array_unique($produits)) : 'Marchandises';
+
+        $refPaiement = $referencePaiement ?? $achat->reference_paiement;
+        $libellePaiement = 'Rglt/' . $refDoc;
+        if ($refPaiement) {
+            $libellePaiement .= '/' . $refPaiement;
+        }
+        $libellePaiement .= '/Achat ' . $produitsStr;
 
         // 1. Débit Fournisseur
         EcritureComptable::create([
             'entreprise_id'     => $entrepriseId,
             'point_de_vente_id'  => $pdvId,
             'date_ecriture'     => $date,
-            'libelle'           => 'Rglt/' . $refDoc . '/Achat ' . $produitsStr,
+            'libelle'           => $libellePaiement,
             'reference_document'=> $refDoc,
             'code_journal'      => $codeJournal,
             'compte_debit'      => $compteFournisseur,
@@ -290,7 +306,7 @@ class ComptabiliteService
             'entreprise_id'     => $entrepriseId,
             'point_de_vente_id'  => $pdvId,
             'date_ecriture'     => $date,
-            'libelle'           => 'Rglt/' . $refDoc . '/Achat ' . $produitsStr,
+            'libelle'           => $libellePaiement,
             'reference_document'=> $refDoc,
             'code_journal'      => $codeJournal,
             'compte_debit'      => null,

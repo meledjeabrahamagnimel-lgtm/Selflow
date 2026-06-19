@@ -212,7 +212,7 @@ var isReceiptMode = false;
 
 @php
     $entreprise = $achat->pointDeVente->entreprise;
-    $logoUrl = $entreprise->logo_path ? Storage::url($entreprise->logo_path) : null;
+    $logoUrl = $entreprise->logo_path ? Storage::disk('public')->url($entreprise->logo_path) : null;
 @endphp
 
 var DATA = {
@@ -221,6 +221,8 @@ var DATA = {
         date: {!! json_encode(\Carbon\Carbon::parse($achat->date_achat)->isoFormat('D MMMM YYYY')) !!},
         etape: {!! json_encode($achat->etape) !!},
         mode: {!! json_encode($achat->mode_paiement) !!},
+        moyen_bancaire: {!! json_encode($achat->moyen_bancaire) !!},
+        reference_paiement: {!! json_encode($achat->reference_paiement) !!},
         statut: {!! json_encode($achat->statut) !!},
         montant_ht: {{ $achat->montant_ht }},
         montant_tva: 0,
@@ -238,8 +240,8 @@ var DATA = {
             @foreach($achat->details as $i => $detail)
             {
                 idx: {{ $i + 1 }},
-                ref: {!! json_encode($detail->produit->reference ?? 'REF-VIR-' . str_pad($detail->id, 3, '0', STR_PAD_LEFT)) !!},
-                nom: {!! json_encode($detail->produit->nom) !!},
+                ref: {!! json_encode($detail->produit?->reference ?? 'REF-VIR-' . str_pad($detail->id, 3, '0', STR_PAD_LEFT)) !!},
+                nom: {!! json_encode($detail->libelle_virtuel ?? ($detail->produit?->nom ?? 'Article')) !!},
                 qty: {{ $detail->quantite }},
                 unite: {!! json_encode($detail->unite ?? 'Unité') !!},
                 pu: {{ $detail->prix_unitaire }},
@@ -271,6 +273,20 @@ function fmt(n) {
 
 function fmtFcfa(n) {
     return Math.round(n).toLocaleString('fr-FR') + ' FCFA';
+}
+
+function getFormattedMode(d) {
+    if (d.mode && d.mode.startsWith('Banque')) {
+        if (d.moyen_bancaire) {
+            let label = d.moyen_bancaire;
+            if (d.moyen_bancaire === 'carte') label = 'carte';
+            else if (d.moyen_bancaire === 'cheque') label = 'chèque';
+            else if (d.moyen_bancaire === 'virement') label = 'virement';
+            return 'Banque : ' + label;
+        }
+        return 'Banque';
+    }
+    return d.mode;
 }
 
 function executerAction(url) {
@@ -410,7 +426,7 @@ function model1(d) {
                 <div style="font-size:10px;font-weight:700;color:${theme.color};text-transform:uppercase;letter-spacing:.07em;margin-bottom:8px">Informations</div>
                 ${[
                     ["Date d'émission", d.date],
-                    ["Mode de paiement", isReceiptMode ? null : d.mode],
+                    ["Mode de paiement", isReceiptMode ? null : getFormattedMode(d)],
                     ["Point de vente", COMPANY.pdv]
                 ].map(r => r[1] ? `<div style="display:flex;justify-content:space-between;font-size:11px;padding:4px 0;border-bottom:0.5px solid var(--border)"><span style="color:var(--mu)">${r[0]}</span><span style="font-weight:600;color:var(--tx)">${r[1]}</span></div>` : '').join('')}
                 ${isReceiptMode ? '' : `
@@ -513,7 +529,7 @@ function model2(d) {
                 <div style="display:flex;gap:14px;margin-top:10px;flex-wrap:wrap;">
                     <div style="font-size:11px"><span style="color:var(--mu)">Date : </span><span style="color:var(--tx);font-weight:600;">${d.date}</span></div>
                     ${isReceiptMode ? '' : `
-                    <div style="font-size:11px"><span style="color:var(--mu)">Paiement : </span><span style="color:var(--tx);font-weight:600;">${d.mode}</span></div>
+                    <div style="font-size:11px"><span style="color:var(--mu)">Paiement : </span><span style="color:var(--tx);font-weight:600;">${getFormattedMode(d)}</span></div>
                     <div style="font-size:11px"><span style="color:var(--mu)">Statut : </span><span style="font-weight:700;color:${sColor}">${d.statut}</span></div>
                     `}
                 </div>
@@ -606,7 +622,7 @@ function model3(d) {
                 <div style="font-size:10px;color:${theme.color};font-weight:700;text-transform:uppercase;letter-spacing:.08em;margin-bottom:6px">Détails</div>
                 <div style="font-size:11px;line-height:1.9">
                     <span style="color:var(--mu)">Date : </span><span style="color:var(--tx);font-weight:600;">${d.date}</span><br>
-                    ${isReceiptMode ? '' : `<span style="color:var(--mu)">Paiement : </span><span style="color:var(--tx);font-weight:600;">${d.mode}</span><br>`}
+                    ${isReceiptMode ? '' : `<span style="color:var(--mu)">Paiement : </span><span style="color:var(--tx);font-weight:600;">${getFormattedMode(d)}</span><br>`}
                     ${isReceiptMode ? '' : `<span style="color:var(--mu)">Statut : </span><span style="font-weight:700;color:${sColor}">${d.statut}</span>`}
                 </div>
             </div>

@@ -236,7 +236,9 @@ class ComptabiliteControleur
 
         $dettesFournisseurs = array_filter($dettesFournisseurs, fn($f) => $f['solde'] > 0);
 
-        return view('admin::comptabilite.creances', compact('creancesClients', 'dettesFournisseurs'));
+        $banques = CodeJournal::where('type', 'Banque')->where('entreprise_id', $entreprise->id)->orderBy('intitule')->get();
+
+        return view('admin::comptabilite.creances', compact('creancesClients', 'dettesFournisseurs', 'banques'));
     }
 
     /**
@@ -361,12 +363,28 @@ class ComptabiliteControleur
             'date_operation'  => ['required', 'date'],
         ]);
 
+        if ($request->mode_paiement === 'Banque') {
+            $request->validate([
+                'banque_id'          => ['required', 'integer', 'exists:codes_journaux,id'],
+                'moyen_bancaire'     => ['required', 'string', 'in:carte,virement,cheque'],
+                'reference_paiement' => ['required', 'string', 'max:255'],
+            ], [
+                'banque_id.required'          => 'Veuillez sélectionner la banque.',
+                'moyen_bancaire.required'     => 'Veuillez sélectionner le moyen de paiement bancaire.',
+                'reference_paiement.required' => 'Veuillez saisir le numéro ou référence de paiement.',
+            ]);
+        }
+
         $entreprise = Auth::user()->entreprise;
 
         DB::transaction(function () use ($request, $entreprise) {
             $numFacture = $request->numero_facture;
             $montant = floatval($request->montant);
             $mode = $request->mode_paiement;
+            if ($request->mode_paiement === 'Banque' && $request->filled('banque_id')) {
+                $codeJournal = CodeJournal::findOrFail($request->banque_id);
+                $mode = 'Banque : ' . $codeJournal->intitule;
+            }
             $date = $request->date_operation;
 
             if ($request->type === 'client') {
@@ -398,6 +416,8 @@ class ComptabiliteControleur
                     'type_operation'     => 'Encaissement',
                     'libelle'            => 'Règlement Client — Facture ' . $numFacture,
                     'mode_paiement'      => $mode,
+                    'moyen_bancaire'     => $request->mode_paiement === 'Banque' ? $request->moyen_bancaire : null,
+                    'reference_paiement' => $request->mode_paiement === 'Banque' ? $request->reference_paiement : null,
                     'montant_entree'     => $montant,
                     'montant_sortie'     => 0,
                     'solde_resultat'     => $soldeActuel + $montant,
@@ -405,7 +425,14 @@ class ComptabiliteControleur
                 ]);
 
                 // 2. Générer l'écriture comptable
-                ComptabiliteService::genererEcritureReglementVente($vente, $montant, $mode, $date);
+                ComptabiliteService::genererEcritureReglementVente(
+                    $vente,
+                    $montant,
+                    $mode,
+                    $date,
+                    $request->mode_paiement === 'Banque' ? $request->moyen_bancaire : null,
+                    $request->mode_paiement === 'Banque' ? $request->reference_paiement : null
+                );
 
                 // 3. Mettre à jour le statut de la facture
                 $nouveauPaye = $dejaPaye + $montant;
@@ -443,6 +470,8 @@ class ComptabiliteControleur
                     'type_operation'     => 'Décaissement',
                     'libelle'            => 'Règlement Fournisseur — Facture ' . $numFacture,
                     'mode_paiement'      => $mode,
+                    'moyen_bancaire'     => $request->mode_paiement === 'Banque' ? $request->moyen_bancaire : null,
+                    'reference_paiement' => $request->mode_paiement === 'Banque' ? $request->reference_paiement : null,
                     'montant_entree'     => 0,
                     'montant_sortie'     => $montant,
                     'solde_resultat'     => $soldeActuel - $montant,
@@ -450,7 +479,14 @@ class ComptabiliteControleur
                 ]);
 
                 // 2. Générer l'écriture comptable
-                ComptabiliteService::genererEcritureReglementAchat($achat, $montant, $mode, $date);
+                ComptabiliteService::genererEcritureReglementAchat(
+                    $achat,
+                    $montant,
+                    $mode,
+                    $date,
+                    $request->mode_paiement === 'Banque' ? $request->moyen_bancaire : null,
+                    $request->mode_paiement === 'Banque' ? $request->reference_paiement : null
+                );
 
                 // 3. Mettre à jour le statut de la facture
                 $nouveauPaye = $dejaPaye + $montant;

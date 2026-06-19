@@ -440,6 +440,51 @@
     </div>
     @endif
 
+    <!-- Sélecteur d'exercice/période -->
+    <div class="sidebar-periode" style="margin: 10px 12px 0; position: relative;">
+        <button onclick="togglePeriodeDropdown(event)" style="width: 100%; display: flex; align-items: center; gap: 10px; background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.15); border-radius: 10px; padding: 10px 14px; color: #ffffff; cursor: pointer; text-align: left; transition: all 0.2s; outline: none;">
+            <i class="far fa-calendar-alt" style="font-size: 16px; color: #FFC107;"></i>
+            <div style="flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+                <div style="font-size: 10px; color: rgba(255,255,255,0.5); text-transform: uppercase; letter-spacing: 0.5px;">Exercice en cours</div>
+                <div style="font-size: 13px; font-weight: 600;">{{ session('active_periode_nom', 'Non défini') }}</div>
+            </div>
+            <i class="fas fa-chevron-down" style="font-size: 10px; color: rgba(255,255,255,0.6);"></i>
+        </button>
+
+        <div id="periodeDropdownMenu" style="display: none; position: absolute; left: 0; right: 0; top: calc(100% + 6px); background: #ffffff; border: 1px solid var(--border); border-radius: 10px; box-shadow: 0 10px 25px rgba(0,0,0,0.25); z-index: 1000; padding: 6px 0;">
+            <div style="padding: 6px 14px 10px; border-bottom: 1px solid var(--border); font-size: 11px; font-weight: 600; color: var(--text-2); text-transform: uppercase; letter-spacing: 0.5px;">
+                Changer d'exercice
+            </div>
+            <div style="max-height: 180px; overflow-y: auto;">
+                @if(isset($global_periodes) && $global_periodes->count() > 0)
+                    @php
+                        $sortedPeriodes = $global_periodes->sortByDesc('date_debut');
+                    @endphp
+                    @foreach($sortedPeriodes as $p)
+                        <form method="POST" action="{{ route('admin.periods.switch') }}" style="margin: 0;">
+                            @csrf
+                            <input type="hidden" name="periode_id" value="{{ $p->id }}">
+                            <button type="submit" style="width: 100%; display: flex; align-items: center; justify-content: space-between; padding: 8px 14px; border: none; background: none; text-align: left; cursor: pointer; color: var(--text); font-family: inherit; font-size: 12.5px; transition: background 0.15s;" onmouseover="this.style.background='#F1F5F9'" onmouseout="this.style.background='none'">
+                                <span>{{ $p->nom }}</span>
+                                @if(session('active_periode_id') == $p->id)
+                                    <span class="badge badge-success" style="padding: 2px 6px; font-size: 9px;">Actif</span>
+                                @endif
+                            </button>
+                        </form>
+                    @endforeach
+                @else
+                    <div style="padding: 10px 14px; font-size: 12px; color: var(--text-3); text-align: center;">Aucun exercice configuré</div>
+                @endif
+            </div>
+            @if(auth()->user()->role === 'admin')
+                <div style="border-top: 1px solid var(--border); margin: 6px 0 4px;"></div>
+                <a href="{{ route('admin.entreprise.parametres') }}" style="display: flex; align-items: center; gap: 8px; padding: 8px 14px; font-size: 12px; color: var(--primary); font-weight: 600; text-decoration: none; transition: background 0.15s;" onmouseover="this.style.background='#F1F5F9'" onmouseout="this.style.background='none'">
+                    <i class="fas fa-sliders" style="font-size: 11px;"></i> Gérer les exercices
+                </a>
+            @endif
+        </div>
+    </div>
+
     <nav class="sidebar-nav">
         @if(request()->routeIs('caissier.*'))
             <!-- ── CAISSIER SIDEBAR ── -->
@@ -463,12 +508,19 @@
         @else
             <!-- ── ADMIN SIDEBAR RESTUCTURÉ ── -->
             
-            <!-- 1. Principal -->
-            @if(auth()->user()->aHabilitation('tableau_de_bord'))
+            <!-- 1. Principal & Tableaux de bord -->
+            @if(auth()->user()->aHabilitation('tableau_de_bord_personnel') || auth()->user()->aHabilitation('tableau_de_bord_general'))
             <div class="nav-section"><span>Principal</span></div>
+            @if(auth()->user()->aHabilitation('tableau_de_bord_personnel'))
             <a href="{{ route('admin.tableau_de_bord') }}" class="nav-item {{ request()->routeIs('admin.tableau_de_bord') ? 'active' : '' }}">
-                <i class="fas fa-chart-pie"></i> Tableau de bord
+                <i class="fas fa-chart-pie"></i> TDB Personnel
             </a>
+            @endif
+            @if(auth()->user()->aHabilitation('tableau_de_bord_general'))
+            <a href="{{ route('admin.tableau_de_bord_general') }}" class="nav-item {{ request()->routeIs('admin.tableau_de_bord_general') ? 'active' : '' }}">
+                <i class="fas fa-chart-line"></i> TDB Général
+            </a>
+            @endif
             @endif
 
             <!-- 2. Ventes -->
@@ -527,7 +579,7 @@
             @endif
 
             <!-- 5. Comptabilité -->
-            @if(auth()->user()->aHabilitation('tresorerie_encaissements') || auth()->user()->aHabilitation('tresorerie_decaissements') || auth()->user()->aHabilitation('tresorerie_journal') || auth()->user()->aHabilitation('tresorerie_codes_journaux'))
+            @if(auth()->user()->aHabilitation('tresorerie_encaissements') || auth()->user()->aHabilitation('tresorerie_decaissements') || auth()->user()->aHabilitation('tresorerie_journal') || auth()->user()->aHabilitation('tresorerie_codes_journaux') || auth()->user()->aHabilitation('comptabilite_globale') || auth()->user()->aHabilitation('comptabilite_creances') || auth()->user()->aHabilitation('comptabilite_plan_comptable'))
             <div class="nav-section"><span>Comptabilité</span></div>
             @if(auth()->user()->aHabilitation('tresorerie_encaissements'))
             <a href="{{ route('admin.tresorerie.encaissements') }}" class="nav-item {{ request()->routeIs('admin.tresorerie.encaissements') ? 'active' : '' }}">
@@ -549,15 +601,21 @@
                 <i class="fas fa-book"></i> Codes Journaux
             </a>
             @endif
+            @if(auth()->user()->aHabilitation('comptabilite_globale'))
             <a href="{{ route('admin.comptabilite.globale') }}" class="nav-item {{ request()->routeIs('admin.comptabilite.globale') ? 'active' : '' }}">
                 <i class="fas fa-list-check"></i> Opération &amp; écriture globale
             </a>
+            @endif
+            @if(auth()->user()->aHabilitation('comptabilite_creances'))
             <a href="{{ route('admin.comptabilite.creances') }}" class="nav-item {{ request()->routeIs('admin.comptabilite.creances') ? 'active' : '' }}">
                 <i class="fas fa-scale-balanced"></i> Créances &amp; règlements
             </a>
+            @endif
+            @if(auth()->user()->aHabilitation('comptabilite_plan_comptable'))
             <a href="{{ route('admin.comptabilite.plan_comptable') }}" class="nav-item {{ request()->routeIs('admin.comptabilite.plan_comptable') ? 'active' : '' }}">
                 <i class="fas fa-book-open"></i> Plan Comptable
             </a>
+            @endif
             @endif
 
             <!-- 6. Points de vente -->
@@ -747,12 +805,30 @@
             menu.style.display = menu.style.display === 'block' ? 'none' : 'block';
         }
     }
+
+    // Menu déroulant Période
+    function togglePeriodeDropdown(e) {
+        e.stopPropagation();
+        const menu = document.getElementById('periodeDropdownMenu');
+        if (menu) {
+            menu.style.display = menu.style.display === 'block' ? 'none' : 'block';
+        }
+    }
+
     // Fermeture automatique au clic extérieur
     document.addEventListener('click', (e) => {
+        // Profil
         const btn = document.querySelector('.user-dropdown-btn');
         const menu = document.getElementById('userDropdownMenu');
         if (btn && menu && !btn.contains(e.target) && !menu.contains(e.target)) {
             menu.style.display = 'none';
+        }
+
+        // Période
+        const pBtn = document.querySelector('.sidebar-periode button');
+        const pMenu = document.getElementById('periodeDropdownMenu');
+        if (pBtn && pMenu && !pBtn.contains(e.target) && !pMenu.contains(e.target)) {
+            pMenu.style.display = 'none';
         }
     });
 
