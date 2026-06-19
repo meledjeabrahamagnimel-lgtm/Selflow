@@ -26,6 +26,7 @@ class Utilisateur extends Authenticatable
         'statut',
         'notes',
         'habilitations',
+        'jeton_api',
     ];
 
     protected $hidden = [

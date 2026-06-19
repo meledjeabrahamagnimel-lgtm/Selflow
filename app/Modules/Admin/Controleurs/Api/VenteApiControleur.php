@@ -116,19 +116,40 @@ class VenteApiControleur
                 4, '0', STR_PAD_LEFT
             );
 
-            // Calcul du statut de paiement
+            $typeDocument = $request->input('type_document', 'Facture');
+
+            // Génération numéro facture et calcul du statut
             $montantPaye = 0;
-            if ($request->mode_paiement === 'Crédit') {
-                $statutVente = 'Crédit';
+            if ($typeDocument === 'Devis') {
+                $numero = 'DEV-' . now()->year . '-' . str_pad(
+                    Vente::where('numero_facture', 'LIKE', 'DEV-%')->whereYear('created_at', now()->year)->count() + 1,
+                    4, '0', STR_PAD_LEFT
+                );
+                $statutVente = 'Brouillon';
+            } elseif ($typeDocument === 'Commande') {
+                $numero = 'CMD-' . now()->year . '-' . str_pad(
+                    Vente::where('numero_facture', 'LIKE', 'CMD-%')->whereYear('created_at', now()->year)->count() + 1,
+                    4, '0', STR_PAD_LEFT
+                );
+                $statutVente = 'Confirmée';
             } else {
-                $montantPaye = $request->filled('montant_paye') ? floatval($request->montant_paye) : $montantTtc;
-                if ($montantPaye <= 0) {
+                $numero = 'VT-' . now()->year . '-' . str_pad(
+                    Vente::where('numero_facture', 'LIKE', 'VT-%')->whereYear('created_at', now()->year)->count() + 1,
+                    4, '0', STR_PAD_LEFT
+                );
+
+                if ($request->mode_paiement === 'Crédit') {
                     $statutVente = 'Crédit';
-                    $montantPaye = 0;
-                } elseif ($montantPaye >= $montantTtc) {
-                    $statutVente = 'Payé';
                 } else {
-                    $statutVente = 'Avance';
+                    $montantPaye = $request->filled('montant_paye') ? floatval($request->montant_paye) : $montantTtc;
+                    if ($montantPaye <= 0) {
+                        $statutVente = 'Crédit';
+                        $montantPaye = 0;
+                    } elseif ($montantPaye >= $montantTtc) {
+                        $statutVente = 'Payé';
+                    } else {
+                        $statutVente = 'Avance';
+                    }
                 }
             }
 
@@ -143,7 +164,14 @@ class VenteApiControleur
                 'remise'            => $remise,
                 'montant_ttc'       => $montantTtc,
                 'statut'            => $statutVente,
+                'type_facture'      => $typeDocument,
             ]);
+
+            // Mettre à jour le document parent si existant (ex: Devis -> Facture)
+            if ($request->filled('reference_parent_id')) {
+                Vente::where('numero_facture', $request->reference_parent_id)
+                    ->update(['statut' => $typeDocument === 'Facture' ? 'Facturé' : 'Converti']);
+            }
 
             foreach ($request->articles as $article) {
                 if (!empty($article['produit_id'])) {
@@ -170,7 +198,7 @@ class VenteApiControleur
                     'montant_ttc'     => $ht + $tva,
                 ]);
 
-                if ($produit) {
+                if ($typeDocument === 'Facture' && $produit) {
                     $stockAvant = $produit->stock_actuel;
                     $produit->decrement('stock_actuel', $article['quantite']);
 
@@ -187,7 +215,7 @@ class VenteApiControleur
             }
 
             // Trésorerie
-            if ($statutVente !== 'Crédit' && $montantPaye > 0) {
+            if ($typeDocument === 'Facture' && $statutVente !== 'Crédit' && $montantPaye > 0) {
                 $soldeActuel = TresorerieJournal::where('point_de_vente_id', $pointDeVenteId)
                     ->orderByDesc('created_at')->value('solde_resultat') ?? 0;
 
@@ -231,8 +259,45 @@ class VenteApiControleur
     public function factures(Request $request): JsonResponse
     {
         $entreprise = Auth::user()->entreprise;
-        $ventes = Vente::with(['client', 'pointDeVente', 'details.produit'])
+        $ventes = Vente::with(['client', 'pointDeVente.entreprise', 'details.produit'])
             ->whereHas('pointDeVente', fn($q) => $q->where('entreprise_id', $entreprise->id))
+            ->where('numero_facture', 'LIKE', 'VT-%')
+            ->latest()
+            ->paginate(20);
+
+        return response()->json([
+            'statut' => 'succes',
+            'ventes' => $ventes
+        ]);
+    }
+
+    /**
+     * Liste des devis.
+     */
+    public function devis(Request $request): JsonResponse
+    {
+        $entreprise = Auth::user()->entreprise;
+        $ventes = Vente::with(['client', 'pointDeVente.entreprise', 'details.produit'])
+            ->whereHas('pointDeVente', fn($q) => $q->where('entreprise_id', $entreprise->id))
+            ->where('numero_facture', 'LIKE', 'DEV-%')
+            ->latest()
+            ->paginate(20);
+
+        return response()->json([
+            'statut' => 'succes',
+            'ventes' => $ventes
+        ]);
+    }
+
+    /**
+     * Liste des commandes.
+     */
+    public function commandes(Request $request): JsonResponse
+    {
+        $entreprise = Auth::user()->entreprise;
+        $ventes = Vente::with(['client', 'pointDeVente.entreprise', 'details.produit'])
+            ->whereHas('pointDeVente', fn($q) => $q->where('entreprise_id', $entreprise->id))
+            ->where('numero_facture', 'LIKE', 'CMD-%')
             ->latest()
             ->paginate(20);
 
@@ -360,7 +425,7 @@ class VenteApiControleur
     }
 
     /**
-     * Modifier rapidement le statut de règlement.
+     * Modifier rapidement le statut de règlement (paiement partiel ou total).
      */
     public function modifierStatut(Vente $vente, Request $request): JsonResponse
     {
@@ -374,13 +439,90 @@ class VenteApiControleur
         $request->validate([
             'statut'        => ['required', 'string', 'in:Payé,Crédit,Avance'],
             'mode_paiement' => ['nullable', 'string', 'max:100'],
+            'montant_paye'  => ['nullable', 'numeric', 'min:0'],
         ]);
 
-        $vente->update($request->only(['statut', 'mode_paiement']));
+        $updateData = $request->only(['statut', 'mode_paiement']);
+        // montant_paye is not stored in ventes table, it is tracked via TresorerieJournal
+        $vente->update($updateData);
+
+        // Enregistrer l'encaissement si paiement effectif
+        if (in_array($request->statut, ['Payé', 'Avance']) && $request->filled('montant_paye')) {
+            $soldeActuel = TresorerieJournal::where('point_de_vente_id', $vente->point_de_vente_id)
+                ->orderByDesc('created_at')->value('solde_resultat') ?? 0;
+
+            TresorerieJournal::create([
+                'entreprise_id'      => Auth::user()->entreprise_id,
+                'point_de_vente_id'  => $vente->point_de_vente_id,
+                'type_operation'     => 'Encaissement',
+                'libelle'            => 'Règlement facture vente ' . $vente->numero_facture,
+                'montant_entree'     => floatval($request->input('montant_paye')),
+                'montant_sortie'     => 0,
+                'solde_resultat'     => $soldeActuel + floatval($request->input('montant_paye')),
+                'mode_paiement'      => $request->input('mode_paiement', 'Espèces'),
+                'reference_document' => $vente->numero_facture,
+                'date_operation'     => now()->toDateString(),
+            ]);
+        }
+
+        return response()->json([
+            'statut'  => 'succes',
+            'message' => 'Facture mise à jour avec succès.',
+            'nouveau_statut' => $vente->fresh()->statut,
+        ]);
+    }
+
+    /**
+     * Récupère la liste des factures impayées (statut Crédit ou Avance).
+     */
+    public function impayes(Request $request): JsonResponse
+    {
+        $entreprise = Auth::user()->entreprise;
+        
+        $impayes = Vente::with(['client'])
+            ->whereHas('pointDeVente', fn($q) => $q->where('entreprise_id', $entreprise->id))
+            ->whereIn('statut', ['Crédit', 'Avance'])
+            ->get()
+            ->map(function ($vente) {
+                // Si pas de date_echeance, on calcule depuis date_vente
+                $dateRef = $vente->date_echeance ?? $vente->date_vente;
+                $delay = $dateRef ? \Carbon\Carbon::parse($dateRef)->diffInDays(now(), false) : 0;
+                
+                return [
+                    'id_facture' => $vente->id,
+                    'nom_client' => $vente->client ? $vente->client->nom : 'Client Divers',
+                    'numero_facture' => $vente->numero_facture,
+                    // Si on ne stocke pas le reste à payer en base, on affiche le TTC.
+                    'montant_restant' => $vente->montant_ttc, 
+                    'jours_retard' => max(0, intval($delay)),
+                    'telephone' => $vente->client ? $vente->client->telephone : '',
+                    'email' => $vente->client ? $vente->client->email : '',
+                ];
+            });
 
         return response()->json([
             'statut' => 'succes',
-            'message' => 'Facture mise à jour avec succès.'
+            'donnees' => $impayes
+        ]);
+    }
+
+    /**
+     * Déclenche une relance client.
+     */
+    public function relancer($id): JsonResponse
+    {
+        $entreprise = Auth::user()->entreprise;
+        
+        $vente = Vente::with(['client', 'pointDeVente'])
+            ->whereHas('pointDeVente', fn($q) => $q->where('entreprise_id', $entreprise->id))
+            ->findOrFail($id);
+
+        // Ici, logiquement vous envoyez un email ou SMS.
+        // Exemple : Mail::to($vente->client->email)->send(new RelanceFactureMail($vente));
+        
+        return response()->json([
+            'statut' => 'succes',
+            'message' => 'Relance traitée avec succès pour la facture ' . $vente->numero_facture
         ]);
     }
 

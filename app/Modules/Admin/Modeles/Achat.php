@@ -43,8 +43,20 @@ class Achat extends Model
         return $this->belongsTo(Fournisseur::class, 'fournisseur_id');
     }
 
+    protected $appends = ['montant_paye'];
     public function details(): HasMany
     {
         return $this->hasMany(AchatDetail::class, 'achat_id');
+    }
+
+    public function paiements(): HasMany
+    {
+        return $this->hasMany(TresorerieJournal::class, 'reference_document', 'numero_facture')
+            ->where('type_operation', 'Décaissement');
+    }
+
+    public function getMontantPayeAttribute()
+    {
+        return $this->paiements()->sum('montant_sortie');
     }
 }

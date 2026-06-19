@@ -49,8 +49,21 @@ class Vente extends Model
         return $this->belongsTo(Client::class, 'client_id');
     }
 
+    protected $appends = ['montant_paye'];
+
     public function details(): HasMany
     {
         return $this->hasMany(VenteDetail::class, 'vente_id');
+    }
+
+    public function paiements(): HasMany
+    {
+        return $this->hasMany(TresorerieJournal::class, 'reference_document', 'numero_facture')
+            ->where('type_operation', 'Encaissement');
+    }
+
+    public function getMontantPayeAttribute()
+    {
+        return $this->paiements()->sum('montant_entree');
     }
 }

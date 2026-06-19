@@ -70,6 +70,14 @@ class AchatApiControleur
             }
 
             $montantTtc = $montantHt + $montantTva;
+            
+            $montantPaye = floatval($request->input('montant_paye', 0));
+            $statutAchat = 'Crédit';
+            if ($montantPaye >= $montantTtc && $montantTtc > 0) {
+                $statutAchat = 'Payé';
+            } elseif ($montantPaye > 0) {
+                $statutAchat = 'Avance';
+            }
 
             // Générer le numéro de facture d'achat
             $numero = 'AC-' . now()->format('d-m-Y') . '-' . str_pad(
@@ -82,11 +90,11 @@ class AchatApiControleur
                 'fournisseur_id'    => $request->fournisseur_id,
                 'numero_facture'    => $numero,
                 'date_achat'        => $request->date_achat,
-                'mode_paiement'     => $request->mode_paiement,
+                'mode_paiement'     => $request->mode_paiement ?? 'Espèces',
                 'montant_ht'        => $montantHt,
                 'montant_tva'       => $montantTva,
                 'montant_ttc'       => $montantTtc,
-                'statut'            => 'Payé',
+                'statut'            => $statutAchat,
             ]);
 
             foreach ($request->articles as $article) {
@@ -119,20 +127,22 @@ class AchatApiControleur
             }
 
             // Enregistrement automatique en décaissement (trésorerie)
-            $soldeActuel = TresorerieJournal::where('point_de_vente_id', $pointDeVenteId)
-                ->orderByDesc('created_at')->value('solde_resultat') ?? 0;
+            if ($statutAchat !== 'Crédit' && $montantPaye > 0) {
+                $soldeActuel = TresorerieJournal::where('point_de_vente_id', $pointDeVenteId)
+                    ->orderByDesc('created_at')->value('solde_resultat') ?? 0;
 
-            TresorerieJournal::create([
-                'point_de_vente_id'  => $pointDeVenteId,
-                'date_operation'     => $request->date_achat,
-                'type_operation'     => 'Décaissement',
-                'libelle'            => 'Achat — Facture ' . $numero,
-                'mode_paiement'      => $request->mode_paiement,
-                'montant_entree'     => 0,
-                'montant_sortie'     => $montantTtc,
-                'solde_resultat'     => $soldeActuel - $montantTtc,
-                'reference_document' => $numero,
-            ]);
+                TresorerieJournal::create([
+                    'point_de_vente_id'  => $pointDeVenteId,
+                    'date_operation'     => $request->date_achat,
+                    'type_operation'     => 'Décaissement',
+                    'libelle'            => 'Achat — Facture ' . $numero,
+                    'mode_paiement'      => $request->mode_paiement ?? 'Espèces',
+                    'montant_entree'     => 0,
+                    'montant_sortie'     => $montantPaye,
+                    'solde_resultat'     => $soldeActuel - $montantPaye,
+                    'reference_document' => $numero,
+                ]);
+            }
 
             $achatData = [
                 'achat_id' => $achat->id,
@@ -206,6 +216,7 @@ class AchatApiControleur
                     'montant_ht' => floatval($achat->montant_ht),
                     'montant_tva' => floatval($achat->montant_tva),
                     'montant_ttc' => floatval($achat->montant_ttc),
+                    'montant_paye' => floatval($achat->montant_paye ?? 0),
                     'statut' => $achat->statut,
                     'fournisseur' => [
                         'nom' => $achat->fournisseur->nom,
@@ -228,6 +239,54 @@ class AchatApiControleur
                     })
                 ]
             ]
+        ]);
+    }
+
+    /**
+     * Modifier rapidement le statut de règlement (paiement partiel ou total) pour un achat.
+     */
+    public function modifierStatut(Achat $achat, Request $request): JsonResponse
+    {
+        if ($achat->pointDeVente->entreprise_id !== Auth::user()->entreprise_id) {
+            return response()->json([
+                'statut' => 'erreur',
+                'message' => 'Accès non autorisé.'
+            ], 403);
+        }
+
+        $request->validate([
+            'statut'        => ['required', 'string', 'in:Payé,Crédit,Avance,en_retard'],
+            'mode_paiement' => ['nullable', 'string', 'max:100'],
+            'montant_paye'  => ['nullable', 'numeric', 'min:0'],
+        ]);
+
+        $updateData = $request->only(['statut', 'mode_paiement']);
+        // montant_paye is not stored in achats table, it is tracked via TresorerieJournal
+        $achat->update($updateData);
+
+        // Enregistrer le décaissement si paiement effectif
+        if (in_array($request->statut, ['Payé', 'Avance']) && $request->filled('montant_paye')) {
+            $soldeActuel = TresorerieJournal::where('point_de_vente_id', $achat->point_de_vente_id)
+                ->orderByDesc('created_at')->value('solde_resultat') ?? 0;
+
+            TresorerieJournal::create([
+                'entreprise_id'      => Auth::user()->entreprise_id,
+                'point_de_vente_id'  => $achat->point_de_vente_id,
+                'type_operation'     => 'Décaissement',
+                'libelle'            => 'Règlement facture achat ' . $achat->numero_facture,
+                'montant_entree'     => 0,
+                'montant_sortie'     => floatval($request->input('montant_paye')),
+                'solde_resultat'     => $soldeActuel - floatval($request->input('montant_paye')),
+                'mode_paiement'      => $request->input('mode_paiement', 'Espèces'),
+                'reference_document' => $achat->numero_facture,
+                'date_operation'     => now()->toDateString(),
+            ]);
+        }
+
+        return response()->json([
+            'statut'  => 'succes',
+            'message' => 'Facture mise à jour avec succès.',
+            'nouveau_statut' => $achat->fresh()->statut,
         ]);
     }
 

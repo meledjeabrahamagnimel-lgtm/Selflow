@@ -84,7 +84,13 @@ class ConnexionApiControleur
                 'id' => $utilisateur->entreprise->id,
                 'nom' => $utilisateur->entreprise->nom,
                 'plan_abonnement' => $utilisateur->entreprise->plan_abonnement,
-                'quota_points_de_vente' => $utilisateur->entreprise->quota_points_de_vente
+                'quota_points_de_vente' => $utilisateur->entreprise->quota_points_de_vente,
+                 'adresse' => $utilisateur->entreprise->adresse,
+                'telephone' => $utilisateur->entreprise->telephone,
+                'email' => $utilisateur->entreprise->email,
+                'ncc' => $utilisateur->entreprise->ncc,
+                'compte_contribuable' => $utilisateur->entreprise->compte_contribuable,
+                'rccm' => $utilisateur->entreprise->rccm
             ] : null
         ]);
     }

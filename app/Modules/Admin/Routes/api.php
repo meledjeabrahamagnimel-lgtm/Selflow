@@ -25,6 +25,8 @@ Route::prefix('admin')
             Route::get('/donnees-formulaire', [VenteApiControleur::class, 'donneesFormulaire']);
             Route::post('/enregistrer',       [VenteApiControleur::class, 'enregistrer']);
             Route::get('/factures',           [VenteApiControleur::class, 'factures']);
+            Route::get('/devis',              [VenteApiControleur::class, 'devis']);
+            Route::get('/commandes',          [VenteApiControleur::class, 'commandes']);
             Route::get('/historique',         [VenteApiControleur::class, 'historique']);
             Route::get('/facture/{vente}',    [VenteApiControleur::class, 'details']);
             Route::post('/{vente}/normaliser', [VenteApiControleur::class, 'normaliser']);
@@ -38,6 +40,7 @@ Route::prefix('admin')
             Route::get('/factures',           [AchatApiControleur::class, 'factures']);
             Route::get('/historique',         [AchatApiControleur::class, 'historique']);
             Route::get('/facture/{achat}',    [AchatApiControleur::class, 'details']);
+            Route::put('/{achat}/modifier',   [AchatApiControleur::class, 'modifierStatut']);
         });
 
         // ── Stock ──

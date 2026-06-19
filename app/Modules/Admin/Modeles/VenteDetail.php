@@ -17,6 +17,6 @@ class VenteDetail extends Model
 
     public function produit(): BelongsTo
     {
-        return $this->belongsTo(Produit::class, 'produit_id')->withDefault();
+        return $this->belongsTo(Produit::class, 'produit_id');
     }
 }
