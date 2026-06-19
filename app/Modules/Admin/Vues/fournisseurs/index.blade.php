@@ -36,10 +36,10 @@
                 @forelse($fournisseurs as $f)
                 <tr>
                     <td style="font-weight:600; color:var(--text);">{{ $f->nom }}</td>
-                    <td style="font-family: monospace; font-weight: 700; color: var(--primary);">{{ $f->numero_tiers ?? '—' }}</td>
                     <td>
                         <span class="badge badge-purple">{{ $f->secteur ?? 'Général' }}</span>
                     </td>
+                    <td style="font-family: monospace; font-weight: 700; color: var(--primary);">{{ $f->numero_tiers ?? '—' }}</td>
                     <td>{{ $f->ncc ?? '—' }}</td>
                     <td>{{ $f->rccm ?? '—' }}</td>
                     <td style="font-family: monospace; font-weight: 700;">{{ $f->compte_comptable ?? '401100' }}</td>
