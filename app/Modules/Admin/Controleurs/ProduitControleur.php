@@ -18,7 +18,10 @@ class ProduitControleur
             ->orderBy('nom')
             ->paginate(30);
 
-        $comptes = \App\Modules\Admin\Modeles\PlanComptable::orderBy('numero')->get();
+        $comptes = \App\Modules\Admin\Modeles\PlanComptable::whereNull('entreprise_id')
+            ->orWhere('entreprise_id', $entreprise->id)
+            ->orderBy('numero')
+            ->get();
 
         return view('admin::produits.index', compact('produits', 'comptes'));
     }
@@ -28,15 +31,34 @@ class ProduitControleur
         $entreprise = Auth::user()->entreprise;
 
         $request->validate([
-            'reference'     => ['required', 'string', 'max:50', 'unique:produits,reference'],
+            'reference'     => [
+                'required',
+                'string',
+                'max:50',
+                \Illuminate\Validation\Rule::unique('produits', 'reference')->where('entreprise_id', $entreprise->id)
+            ],
             'nom'           => ['required', 'string', 'max:200'],
             'type'          => ['required', 'string', 'in:stockable,consommable,service'],
             'categorie'     => ['nullable', 'string', 'max:100'],
             'prix_achat'    => ['required', 'numeric', 'min:0'],
             'prix_vente'    => ['required', 'numeric', 'min:0'],
             'taux_tva'      => ['required', 'numeric', 'min:0'],
-            'compte_vente'  => ['required', 'string', 'max:20'],
-            'compte_achat'  => ['required', 'string', 'max:20'],
+            'compte_vente'  => [
+                'required',
+                'string',
+                'max:20',
+                \Illuminate\Validation\Rule::exists('plan_comptable', 'numero')->where(function ($q) use ($entreprise) {
+                    $q->whereNull('entreprise_id')->orWhere('entreprise_id', $entreprise->id);
+                })
+            ],
+            'compte_achat'  => [
+                'required',
+                'string',
+                'max:20',
+                \Illuminate\Validation\Rule::exists('plan_comptable', 'numero')->where(function ($q) use ($entreprise) {
+                    $q->whereNull('entreprise_id')->orWhere('entreprise_id', $entreprise->id);
+                })
+            ],
             'stock_actuel'  => ['required', 'integer', 'min:0'],
             'stock_minimum' => ['required', 'integer', 'min:0'],
             'unite'         => ['nullable', 'string', 'max:20'],
@@ -53,6 +75,7 @@ class ProduitControleur
     public function modifier(Request $request, Produit $produit): RedirectResponse
     {
         abort_unless($produit->entreprise_id === Auth::user()->entreprise_id, 403);
+        $entreprise = Auth::user()->entreprise;
 
         $request->validate([
             'nom'           => ['required', 'string', 'max:200'],
@@ -61,8 +84,22 @@ class ProduitControleur
             'prix_achat'    => ['required', 'numeric', 'min:0'],
             'prix_vente'    => ['required', 'numeric', 'min:0'],
             'taux_tva'      => ['required', 'numeric', 'min:0'],
-            'compte_vente'  => ['required', 'string', 'max:20'],
-            'compte_achat'  => ['required', 'string', 'max:20'],
+            'compte_vente'  => [
+                'required',
+                'string',
+                'max:20',
+                \Illuminate\Validation\Rule::exists('plan_comptable', 'numero')->where(function ($q) use ($entreprise) {
+                    $q->whereNull('entreprise_id')->orWhere('entreprise_id', $entreprise->id);
+                })
+            ],
+            'compte_achat'  => [
+                'required',
+                'string',
+                'max:20',
+                \Illuminate\Validation\Rule::exists('plan_comptable', 'numero')->where(function ($q) use ($entreprise) {
+                    $q->whereNull('entreprise_id')->orWhere('entreprise_id', $entreprise->id);
+                })
+            ],
             'stock_actuel'  => ['required', 'integer'],
             'stock_minimum' => ['required', 'integer', 'min:0'],
             'unite'         => ['nullable', 'string', 'max:20'],

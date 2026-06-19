@@ -18,7 +18,10 @@ class ClientControleur
             ->orderBy('nom')
             ->paginate(30);
 
-        $comptes = \App\Modules\Admin\Modeles\PlanComptable::orderBy('numero')->get();
+        $comptes = \App\Modules\Admin\Modeles\PlanComptable::whereNull('entreprise_id')
+            ->orWhere('entreprise_id', $entreprise->id)
+            ->orderBy('numero')
+            ->get();
 
         return view('admin::clients.index', compact('clients', 'comptes'));
     }
@@ -35,14 +38,21 @@ class ClientControleur
             'ncc'               => ['nullable', 'string', 'max:50'],
             'rccm'              => ['nullable', 'string', 'max:100'],
             'regime_imposition' => ['nullable', 'string', 'max:100'],
-            'compte_comptable'  => ['required', 'string', 'exists:plan_comptable,numero'],
+            'compte_comptable'  => [
+                'required',
+                'string',
+                \Illuminate\Validation\Rule::exists('plan_comptable', 'numero')->where(function ($q) use ($entreprise) {
+                    $q->whereNull('entreprise_id')->orWhere('entreprise_id', $entreprise->id);
+                })
+            ],
         ]);
 
         $autoNumero = $request->boolean('auto_numero_tiers');
         $numeroTiers = null;
 
         if ($autoNumero) {
-            $max = Client::where('numero_tiers', 'like', '411%')
+            $max = Client::where('entreprise_id', $entreprise->id)
+                ->where('numero_tiers', 'like', '411%')
                 ->orderByRaw('CAST(numero_tiers AS UNSIGNED) DESC')
                 ->value('numero_tiers');
             
@@ -53,7 +63,12 @@ class ClientControleur
             }
         } else {
             $request->validate([
-                'numero_tiers' => ['required', 'string', 'regex:/^411[0-9]*$/', 'unique:clients,numero_tiers'],
+                'numero_tiers' => [
+                    'required',
+                    'string',
+                    'regex:/^411[0-9]*$/',
+                    \Illuminate\Validation\Rule::unique('clients', 'numero_tiers')->where('entreprise_id', $entreprise->id)
+                ],
             ], [
                 'numero_tiers.required' => 'Le numéro de tiers est obligatoire si la numérotation automatique n\'est pas cochée.',
                 'numero_tiers.regex' => 'Le numéro de tiers doit commencer par 411 et ne contenir que des chiffres.',

@@ -21,17 +21,19 @@ class VenteControleur
     public function nouvelle(): View
     {
         $entreprise = Auth::user()->entreprise;
-        $pointDeVenteId = session('point_de_vente_actif_id') 
-            ?? Auth::user()->point_de_vente_id 
-            ?? (\App\Modules\Admin\Modeles\PointDeVente::firstOrCreate([
-                'entreprise_id' => $entreprise->id,
-                'nom'           => 'Siège',
-            ], [
-                'ville'         => 'Abidjan',
-                'commune'       => 'Cocody',
-                'responsable'   => 'Superviseur',
-                'statut'        => 'Ouvert',
-            ]))->id;
+        $pointDeVenteId = Auth::user()->estCaissier()
+            ? Auth::user()->point_de_vente_id
+            : (session('point_de_vente_actif_id') 
+                ?? Auth::user()->point_de_vente_id 
+                ?? (\App\Modules\Admin\Modeles\PointDeVente::firstOrCreate([
+                    'entreprise_id' => $entreprise->id,
+                    'nom'           => 'Siège',
+                ], [
+                    'ville'         => 'Abidjan',
+                    'commune'       => 'Cocody',
+                    'responsable'   => 'Superviseur',
+                    'statut'        => 'Ouvert',
+                ]))->id);
         $clients        = Client::where('entreprise_id', $entreprise->id)->orderBy('nom')->get();
         $produits       = Produit::where('entreprise_id', $entreprise->id)
             ->orderBy('nom')
@@ -46,17 +48,19 @@ class VenteControleur
     public function enregistrer(Request $request): RedirectResponse
     {
         $entreprise = Auth::user()->entreprise;
-        $pointDeVenteId = session('point_de_vente_actif_id') 
-            ?? Auth::user()->point_de_vente_id 
-            ?? (\App\Modules\Admin\Modeles\PointDeVente::firstOrCreate([
-                'entreprise_id' => $entreprise->id,
-                'nom'           => 'Siège',
-            ], [
-                'ville'         => 'Abidjan',
-                'commune'       => 'Cocody',
-                'responsable'   => 'Superviseur',
-                'statut'        => 'Ouvert',
-            ]))->id;
+        $pointDeVenteId = Auth::user()->estCaissier()
+            ? Auth::user()->point_de_vente_id
+            : (session('point_de_vente_actif_id') 
+                ?? Auth::user()->point_de_vente_id 
+                ?? (\App\Modules\Admin\Modeles\PointDeVente::firstOrCreate([
+                    'entreprise_id' => $entreprise->id,
+                    'nom'           => 'Siège',
+                ], [
+                    'ville'         => 'Abidjan',
+                    'commune'       => 'Cocody',
+                    'responsable'   => 'Superviseur',
+                    'statut'        => 'Ouvert',
+                ]))->id);
 
         $request->validate([
             'client_id'      => ['nullable', 'integer', 'exists:clients,id'],
@@ -275,10 +279,19 @@ class VenteControleur
     public function factures(): View
     {
         $entreprise = Auth::user()->entreprise;
-        $ventes = Vente::with(['client', 'pointDeVente', 'details.produit'])
-            ->whereHas('pointDeVente', fn($q) => $q->where('entreprise_id', $entreprise->id))
-            ->latest()
-            ->paginate(20);
+        $pointDeVenteId = Auth::user()->estCaissier()
+            ? Auth::user()->point_de_vente_id
+            : session('point_de_vente_actif_id');
+
+        $query = Vente::with(['client', 'pointDeVente', 'details.produit']);
+        
+        if ($pointDeVenteId) {
+            $query->where('point_de_vente_id', $pointDeVenteId);
+        } else {
+            $query->whereHas('pointDeVente', fn($q) => $q->where('entreprise_id', $entreprise->id));
+        }
+
+        $ventes = $query->latest()->paginate(20);
 
         return view('admin::ventes.factures', compact('ventes'));
     }
@@ -286,10 +299,19 @@ class VenteControleur
     public function historique(): View
     {
         $entreprise = Auth::user()->entreprise;
-        $ventes = Vente::with(['client', 'pointDeVente'])
-            ->whereHas('pointDeVente', fn($q) => $q->where('entreprise_id', $entreprise->id))
-            ->latest()
-            ->paginate(30);
+        $pointDeVenteId = Auth::user()->estCaissier()
+            ? Auth::user()->point_de_vente_id
+            : session('point_de_vente_actif_id');
+
+        $query = Vente::with(['client', 'pointDeVente']);
+        
+        if ($pointDeVenteId) {
+            $query->where('point_de_vente_id', $pointDeVenteId);
+        } else {
+            $query->whereHas('pointDeVente', fn($q) => $q->where('entreprise_id', $entreprise->id));
+        }
+
+        $ventes = $query->latest()->paginate(30);
 
         return view('admin::ventes.historique', compact('ventes'));
     }

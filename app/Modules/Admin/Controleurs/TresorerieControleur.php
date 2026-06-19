@@ -16,11 +16,20 @@ class TresorerieControleur
     public function encaissements(): View
     {
         $entreprise = Auth::user()->entreprise;
-        $operations = TresorerieJournal::with('pointDeVente')
-            ->whereHas('pointDeVente', fn($q) => $q->where('entreprise_id', $entreprise->id))
-            ->where('type_operation', 'Encaissement')
-            ->latest()
-            ->paginate(30);
+        $pointDeVenteId = Auth::user()->estCaissier()
+            ? Auth::user()->point_de_vente_id
+            : session('point_de_vente_actif_id');
+
+        $query = TresorerieJournal::with('pointDeVente')
+            ->where('type_operation', 'Encaissement');
+
+        if ($pointDeVenteId) {
+            $query->where('point_de_vente_id', $pointDeVenteId);
+        } else {
+            $query->whereHas('pointDeVente', fn($q) => $q->where('entreprise_id', $entreprise->id));
+        }
+
+        $operations = $query->latest()->paginate(30);
 
         return view('admin::tresorerie.encaissements', compact('operations'));
     }
@@ -28,11 +37,20 @@ class TresorerieControleur
     public function decaissements(): View
     {
         $entreprise = Auth::user()->entreprise;
-        $operations = TresorerieJournal::with('pointDeVente')
-            ->whereHas('pointDeVente', fn($q) => $q->where('entreprise_id', $entreprise->id))
-            ->where('type_operation', 'Décaissement')
-            ->latest()
-            ->paginate(30);
+        $pointDeVenteId = Auth::user()->estCaissier()
+            ? Auth::user()->point_de_vente_id
+            : session('point_de_vente_actif_id');
+
+        $query = TresorerieJournal::with('pointDeVente')
+            ->where('type_operation', 'Décaissement');
+
+        if ($pointDeVenteId) {
+            $query->where('point_de_vente_id', $pointDeVenteId);
+        } else {
+            $query->whereHas('pointDeVente', fn($q) => $q->where('entreprise_id', $entreprise->id));
+        }
+
+        $operations = $query->latest()->paginate(30);
 
         return view('admin::tresorerie.decaissements', compact('operations'));
     }
@@ -40,10 +58,19 @@ class TresorerieControleur
     public function journal(): View
     {
         $entreprise = Auth::user()->entreprise;
-        $operations = TresorerieJournal::with('pointDeVente')
-            ->whereHas('pointDeVente', fn($q) => $q->where('entreprise_id', $entreprise->id))
-            ->latest()
-            ->paginate(30);
+        $pointDeVenteId = Auth::user()->estCaissier()
+            ? Auth::user()->point_de_vente_id
+            : session('point_de_vente_actif_id');
+
+        $query = TresorerieJournal::with('pointDeVente');
+
+        if ($pointDeVenteId) {
+            $query->where('point_de_vente_id', $pointDeVenteId);
+        } else {
+            $query->whereHas('pointDeVente', fn($q) => $q->where('entreprise_id', $entreprise->id));
+        }
+
+        $operations = $query->latest()->paginate(30);
 
         $totalEntrees  = $operations->sum('montant_entree');
         $totalSorties  = $operations->sum('montant_sortie');

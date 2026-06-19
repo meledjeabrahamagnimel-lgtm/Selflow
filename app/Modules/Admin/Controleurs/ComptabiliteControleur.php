@@ -94,16 +94,30 @@ class ComptabiliteControleur
 
             $operations = $query->orderBy('date_operation', 'desc')->orderBy('id', 'desc')->paginate(30);
 
-            // Charger les informations client/fournisseur pour chaque opération
+            // Charger en lot pour éviter le problème N+1
+            $references = $operations->pluck('reference_document')->filter()->unique();
+            $ventes = collect();
+            $achats = collect();
+
+            $venteRefs = $references->filter(fn($ref) => str_starts_with($ref, 'VT-'));
+            if ($venteRefs->isNotEmpty()) {
+                $ventes = Vente::whereIn('numero_facture', $venteRefs)->with('client')->get()->keyBy('numero_facture');
+            }
+
+            $achatRefs = $references->filter(fn($ref) => str_starts_with($ref, 'AC-'));
+            if ($achatRefs->isNotEmpty()) {
+                $achats = Achat::whereIn('numero_facture', $achatRefs)->with('fournisseur')->get()->keyBy('numero_facture');
+            }
+
             foreach ($operations as $op) {
                 $op->tier_nom = '—';
                 if ($op->reference_document) {
                     if (str_starts_with($op->reference_document, 'VT-')) {
-                        $vente = Vente::where('numero_facture', $op->reference_document)->with('client')->first();
+                        $vente = $ventes->get($op->reference_document);
                         $op->tier_nom = $vente?->client?->nom ?? 'Client de passage';
                         $op->statut = $vente?->statut ?? '—';
                     } elseif (str_starts_with($op->reference_document, 'AC-')) {
-                        $achat = Achat::where('numero_facture', $op->reference_document)->with('fournisseur')->first();
+                        $achat = $achats->get($op->reference_document);
                         $op->tier_nom = $achat?->fournisseur?->nom ?? '—';
                         $op->statut = $achat?->statut ?? '—';
                     }
@@ -131,6 +145,13 @@ class ComptabiliteControleur
             ->whereIn('statut', ['Crédit', 'Avance'])
             ->get();
 
+        // Optimisation N+1 : Charger la somme des règlements de trésorerie en une seule requête
+        $venteRefs = $ventesImpayees->pluck('numero_facture');
+        $reglementsVentes = TresorerieJournal::whereIn('reference_document', $venteRefs)
+            ->groupBy('reference_document')
+            ->select('reference_document', DB::raw('SUM(montant_entree) as total_regle'))
+            ->pluck('total_regle', 'reference_document');
+
         $creancesClients = [];
         foreach ($ventesImpayees as $vente) {
             $clientId = $vente->client_id ?? 0;
@@ -147,8 +168,7 @@ class ComptabiliteControleur
                 ];
             }
 
-            // Calculer le montant déjà réglé via la trésorerie
-            $regle = TresorerieJournal::where('reference_document', $vente->numero_facture)->sum('montant_entree');
+            $regle = floatval($reglementsVentes->get($vente->numero_facture) ?? 0);
 
             $creancesClients[$clientId]['invoices'][] = [
                 'id' => $vente->id,
@@ -164,7 +184,6 @@ class ComptabiliteControleur
             $creancesClients[$clientId]['solde'] += ($vente->montant_ttc - $regle);
         }
 
-        // Filtrer pour ne garder que ceux qui ont un solde débiteur positif
         $creancesClients = array_filter($creancesClients, fn($c) => $c['solde'] > 0);
 
         // 2. Calcul des dettes fournisseurs
@@ -175,6 +194,13 @@ class ComptabiliteControleur
             ->where('etape', 'Facture')
             ->whereIn('statut', ['Crédit', 'Avance'])
             ->get();
+
+        // Optimisation N+1 : Charger la somme des règlements d'achats en une seule requête
+        $achatRefs = $achatsImpayes->pluck('numero_facture');
+        $reglementsAchats = TresorerieJournal::whereIn('reference_document', $achatRefs)
+            ->groupBy('reference_document')
+            ->select('reference_document', DB::raw('SUM(montant_sortie) as total_regle'))
+            ->pluck('total_regle', 'reference_document');
 
         $dettesFournisseurs = [];
         foreach ($achatsImpayes as $achat) {
@@ -192,7 +218,7 @@ class ComptabiliteControleur
                 ];
             }
 
-            $regle = TresorerieJournal::where('reference_document', $achat->numero_facture)->sum('montant_sortie');
+            $regle = floatval($reglementsAchats->get($achat->numero_facture) ?? 0);
 
             $dettesFournisseurs[$fournisseurId]['invoices'][] = [
                 'id' => $achat->id,
@@ -229,6 +255,13 @@ class ComptabiliteControleur
                 ->orderBy('date_vente')
                 ->get();
 
+            // Optimisation N+1 : Charger tous les règlements liés en une seule requête
+            $invoiceRefs = $invoices->pluck('numero_facture');
+            $reglementsGrouped = TresorerieJournal::whereIn('reference_document', $invoiceRefs)
+                ->orderBy('date_operation')
+                ->get()
+                ->groupBy('reference_document');
+
             $operations = [];
             foreach ($invoices as $inv) {
                 // Facturation (Débit du compte tiers)
@@ -241,9 +274,7 @@ class ComptabiliteControleur
                 ];
 
                 // Règlements associés (Crédit du compte tiers)
-                $payments = TresorerieJournal::where('reference_document', $inv->numero_facture)
-                    ->orderBy('date_operation')
-                    ->get();
+                $payments = $reglementsGrouped->get($inv->numero_facture) ?? collect();
 
                 foreach ($payments as $pay) {
                     $operations[] = [
@@ -264,6 +295,13 @@ class ComptabiliteControleur
                 ->orderBy('date_achat')
                 ->get();
 
+            // Optimisation N+1 : Charger tous les règlements liés en une seule requête
+            $invoiceRefs = $invoices->pluck('numero_facture');
+            $reglementsGrouped = TresorerieJournal::whereIn('reference_document', $invoiceRefs)
+                ->orderBy('date_operation')
+                ->get()
+                ->groupBy('reference_document');
+
             $operations = [];
             foreach ($invoices as $inv) {
                 // Facturation d'achat (Crédit du compte tiers)
@@ -276,9 +314,7 @@ class ComptabiliteControleur
                 ];
 
                 // Règlements associés (Débit du compte tiers)
-                $payments = TresorerieJournal::where('reference_document', $inv->numero_facture)
-                    ->orderBy('date_operation')
-                    ->get();
+                $payments = $reglementsGrouped->get($inv->numero_facture) ?? collect();
 
                 foreach ($payments as $pay) {
                     $operations[] = [
@@ -419,7 +455,11 @@ class ComptabiliteControleur
      */
     public function planComptable(Request $request): View
     {
-        $query = \App\Modules\Admin\Modeles\PlanComptable::query();
+        $entreprise = Auth::user()->entreprise;
+        $query = \App\Modules\Admin\Modeles\PlanComptable::where(function ($q) use ($entreprise) {
+            $q->whereNull('entreprise_id')
+              ->orWhere('entreprise_id', $entreprise->id);
+        });
 
         if ($request->filled('numero')) {
             $query->where('numero', 'like', $request->input('numero') . '%');
@@ -443,16 +483,26 @@ class ComptabiliteControleur
      */
     public function creerCompteComptable(Request $request): RedirectResponse
     {
+        $entreprise = Auth::user()->entreprise;
+
         $request->validate([
-            'numero'  => ['required', 'string', 'max:20', 'unique:plan_comptable,numero'],
+            'numero'  => [
+                'required',
+                'string',
+                'max:20',
+                \Illuminate\Validation\Rule::unique('plan_comptable', 'numero')->where('entreprise_id', $entreprise->id)
+            ],
             'libelle' => ['required', 'string', 'max:255'],
         ], [
             'numero.required' => 'Le numéro de compte est obligatoire.',
-            'numero.unique'   => 'Ce numéro de compte existe déjà.',
+            'numero.unique'   => 'Ce numéro de compte existe déjà pour votre entreprise.',
             'libelle.required' => 'Le libellé est obligatoire.',
         ]);
 
-        \App\Modules\Admin\Modeles\PlanComptable::create($request->only(['numero', 'libelle']));
+        \App\Modules\Admin\Modeles\PlanComptable::create(array_merge(
+            $request->only(['numero', 'libelle']),
+            ['entreprise_id' => $entreprise->id]
+        ));
 
         return back()->with('succes', 'Compte comptable créé avec succès.');
     }

@@ -26,10 +26,19 @@ class StockControleur
     public function mouvements(): View
     {
         $entreprise  = Auth::user()->entreprise;
-        $mouvements  = MouvementStock::with(['produit', 'pointDeVente'])
-            ->whereHas('pointDeVente', fn($q) => $q->where('entreprise_id', $entreprise->id))
-            ->latest()
-            ->paginate(30);
+        $pointDeVenteId = Auth::user()->estCaissier()
+            ? Auth::user()->point_de_vente_id
+            : session('point_de_vente_actif_id');
+
+        $query = MouvementStock::with(['produit', 'pointDeVente']);
+
+        if ($pointDeVenteId) {
+            $query->where('point_de_vente_id', $pointDeVenteId);
+        } else {
+            $query->whereHas('pointDeVente', fn($q) => $q->where('entreprise_id', $entreprise->id));
+        }
+
+        $mouvements = $query->latest()->paginate(30);
 
         return view('admin::stock.mouvements', compact('mouvements'));
     }

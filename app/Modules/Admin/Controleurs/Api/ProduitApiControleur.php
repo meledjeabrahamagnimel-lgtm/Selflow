@@ -28,7 +28,12 @@ class ProduitApiControleur
         $entreprise = Auth::user()->entreprise;
 
         $request->validate([
-            'reference'     => ['required', 'string', 'max:50', 'unique:produits,reference'],
+            'reference'     => [
+                'required',
+                'string',
+                'max:50',
+                \Illuminate\Validation\Rule::unique('produits', 'reference')->where('entreprise_id', $entreprise->id)
+            ],
             'nom'           => ['required', 'string', 'max:200'],
             'categorie'     => ['nullable', 'string', 'max:100'],
             'prix_achat'    => ['required', 'numeric', 'min:0'],
