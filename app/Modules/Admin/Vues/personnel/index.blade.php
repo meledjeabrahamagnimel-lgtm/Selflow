@@ -318,12 +318,12 @@
                             <input type="checkbox" name="habilitations[]" value="stock_articles"> Articles & stock
                         </label>
                         <label style="display:flex; align-items:center; gap:8px; font-size:12px; margin-bottom:5px; cursor:pointer;">
-                            <input type="checkbox" name="habilitations[]" value="stock_mouvements"> Mouvements stock
+                            <input type="checkbox" name="habilitations[]" value="stock_mouvements"> Mouvements
                         </label>
                     </div>
 
                     <div>
-                        <div style="font-weight:600; font-size:11px; text-transform:uppercase; color:var(--text-2); margin-bottom:6px; border-bottom:1px solid var(--border); padding-bottom:3px;">Trésorerie & Compta</div>
+                        <div style="font-weight:600; font-size:11px; text-transform:uppercase; color:var(--text-2); margin-bottom:6px; border-bottom:1px solid var(--border); padding-bottom:3px;">Comptabilité</div>
                         <label style="display:flex; align-items:center; gap:8px; font-size:12px; margin-bottom:5px; cursor:pointer;">
                             <input type="checkbox" name="habilitations[]" value="tresorerie_encaissements"> Encaissements
                         </label>
@@ -348,12 +348,12 @@
                     </div>
 
                     <div>
-                        <div style="font-weight:600; font-size:11px; text-transform:uppercase; color:var(--text-2); margin-bottom:6px; border-bottom:1px solid var(--border); padding-bottom:3px;">Configuration</div>
+                        <div style="font-weight:600; font-size:11px; text-transform:uppercase; color:var(--text-2); margin-bottom:6px; border-bottom:1px solid var(--border); padding-bottom:3px;">Points de vente</div>
                         <label style="display:flex; align-items:center; gap:8px; font-size:12px; margin-bottom:5px; cursor:pointer;">
                             <input type="checkbox" name="habilitations[]" value="gestion_pdv"> Points de vente
                         </label>
                         <label style="display:flex; align-items:center; gap:8px; font-size:12px; margin-bottom:5px; cursor:pointer;">
-                            <input type="checkbox" name="habilitations[]" value="gestion_personnel"> Personnel & accès
+                            <input type="checkbox" name="habilitations[]" value="gestion_personnel"> Personnels & accès
                         </label>
                         <label style="display:flex; align-items:center; gap:8px; font-size:12px; margin-bottom:5px; cursor:pointer;">
                             <input type="checkbox" name="habilitations[]" value="gestion_habilitations"> Habilitations
@@ -361,10 +361,14 @@
                     </div>
 
                     <div>
-                        <div style="font-weight:600; font-size:11px; text-transform:uppercase; color:var(--text-2); margin-bottom:6px; border-bottom:1px solid var(--border); padding-bottom:3px;">Catalogue & Tiers</div>
+                        <div style="font-weight:600; font-size:11px; text-transform:uppercase; color:var(--text-2); margin-bottom:6px; border-bottom:1px solid var(--border); padding-bottom:3px;">Produits</div>
                         <label style="display:flex; align-items:center; gap:8px; font-size:12px; margin-bottom:5px; cursor:pointer;">
                             <input type="checkbox" name="habilitations[]" value="catalogue_produits"> Produits
                         </label>
+                        </div>
+
+                    <div>
+                        <div style="font-weight:600; font-size:11px; text-transform:uppercase; color:var(--text-2); margin-bottom:6px; border-bottom:1px solid var(--border); padding-bottom:3px;">Tiers</div>
                         <label style="display:flex; align-items:center; gap:8px; font-size:12px; margin-bottom:5px; cursor:pointer;">
                             <input type="checkbox" name="habilitations[]" value="tiers_clients"> Clients
                         </label>
@@ -374,7 +378,7 @@
                     </div>
 
                     <div>
-                        <div style="font-weight:600; font-size:11px; text-transform:uppercase; color:var(--text-2); margin-bottom:6px; border-bottom:1px solid var(--border); padding-bottom:3px;">Analyses</div>
+                        <div style="font-weight:600; font-size:11px; text-transform:uppercase; color:var(--text-2); margin-bottom:6px; border-bottom:1px solid var(--border); padding-bottom:3px;">Rapports</div>
                         <label style="display:flex; align-items:center; gap:8px; font-size:12px; margin-bottom:5px; cursor:pointer;">
                             <input type="checkbox" name="habilitations[]" value="rapports_analyse"> Analyse d'activité
                         </label>

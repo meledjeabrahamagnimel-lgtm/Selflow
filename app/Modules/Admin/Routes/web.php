@@ -11,6 +11,7 @@ use App\Modules\Admin\Controleurs\ClientControleur;
 use App\Modules\Admin\Controleurs\FournisseurControleur;
 use App\Modules\Admin\Controleurs\PersonnelControleur;
 use App\Modules\Admin\Controleurs\EntrepriseControleur;
+use App\Modules\Admin\Controleurs\RapportControleur;
 use Illuminate\Support\Facades\Route;
 
 Route::prefix('admin')
@@ -119,6 +120,11 @@ Route::prefix('admin')
         // ── Périodes / Exercices ──
         Route::post('/periods/switch', [EntrepriseControleur::class, 'switchPeriode'])->name('periods.switch');
         Route::post('/entreprise/periodes', [EntrepriseControleur::class, 'creerPeriode'])->name('entreprise.periodes.creer');
+
+        // ── Rapports ──
+        Route::prefix('rapports')->name('rapports.')->group(function () {
+            Route::get('/analyse-activite', [RapportControleur::class, 'analyseActivite'])->name('analyse_activite');
+        });
     });
 
 // ───────────────────────────────────────────────────────────────────────

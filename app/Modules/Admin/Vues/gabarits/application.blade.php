@@ -445,7 +445,7 @@
         <button onclick="togglePeriodeDropdown(event)" style="width: 100%; display: flex; align-items: center; gap: 10px; background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.15); border-radius: 10px; padding: 10px 14px; color: #ffffff; cursor: pointer; text-align: left; transition: all 0.2s; outline: none;">
             <i class="far fa-calendar-alt" style="font-size: 16px; color: #FFC107;"></i>
             <div style="flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
-                <div style="font-size: 10px; color: rgba(255,255,255,0.5); text-transform: uppercase; letter-spacing: 0.5px;">Exercice en cours</div>
+                <div style="font-size: 10px; color: rgba(255,255,255,0.5); text-transform: uppercase; letter-spacing: 0.5px;">Période en cours</div>
                 <div style="font-size: 13px; font-weight: 600;">{{ session('active_periode_nom', 'Non défini') }}</div>
             </div>
             <i class="fas fa-chevron-down" style="font-size: 10px; color: rgba(255,255,255,0.6);"></i>
@@ -453,7 +453,7 @@
 
         <div id="periodeDropdownMenu" style="display: none; position: absolute; left: 0; right: 0; top: calc(100% + 6px); background: #ffffff; border: 1px solid var(--border); border-radius: 10px; box-shadow: 0 10px 25px rgba(0,0,0,0.25); z-index: 1000; padding: 6px 0;">
             <div style="padding: 6px 14px 10px; border-bottom: 1px solid var(--border); font-size: 11px; font-weight: 600; color: var(--text-2); text-transform: uppercase; letter-spacing: 0.5px;">
-                Changer d'exercice
+                Changer de période
             </div>
             <div style="max-height: 180px; overflow-y: auto;">
                 @if(isset($global_periodes) && $global_periodes->count() > 0)
@@ -664,8 +664,8 @@
             <!-- 9. Rapports -->
             @if(auth()->user()->aHabilitation('rapports_analyse'))
             <div class="nav-section"><span>Rapports</span></div>
-            <a href="#" class="nav-item" style="opacity: 0.65; cursor: not-allowed;" onclick="event.preventDefault();">
-                <i class="fas fa-chart-line"></i> Analyse d'activité
+            <a href="{{ route('admin.rapports.analyse_activite') }}" class="nav-item {{ request()->routeIs('admin.rapports.analyse_activite') ? 'active' : '' }}">
+                <i class="fas fa-chart-mixed"></i> Analyse d'activité
             </a>
             @endif
 

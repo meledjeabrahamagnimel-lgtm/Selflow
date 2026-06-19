@@ -148,7 +148,7 @@
                         </div>
 
                         <div>
-                            <div style="font-weight:600; font-size:11px; text-transform:uppercase; color:var(--text-2); margin-bottom:6px; border-bottom:1px solid var(--border); padding-bottom:3px;">Trésorerie & Compta</div>
+                        <div style="font-weight:600; font-size:11px; text-transform:uppercase; color:var(--text-2); margin-bottom:6px; border-bottom:1px solid var(--border); padding-bottom:3px;">Comptabilité</div>
                             <label style="display:flex; align-items:center; gap:8px; font-size:12px; margin-bottom:5px; cursor:pointer;">
                                 <input type="checkbox" name="habilitations[]" value="tresorerie_encaissements" @if(in_array('tresorerie_encaissements', $userHabs)) checked @endif> Encaissements
                             </label>
@@ -173,12 +173,12 @@
                         </div>
 
                         <div>
-                            <div style="font-weight:600; font-size:11px; text-transform:uppercase; color:var(--text-2); margin-bottom:6px; border-bottom:1px solid var(--border); padding-bottom:3px;">Configuration</div>
+                        <div style="font-weight:600; font-size:11px; text-transform:uppercase; color:var(--text-2); margin-bottom:6px; border-bottom:1px solid var(--border); padding-bottom:3px;">Points de vente</div>
                             <label style="display:flex; align-items:center; gap:8px; font-size:12px; margin-bottom:5px; cursor:pointer;">
                                 <input type="checkbox" name="habilitations[]" value="gestion_pdv" @if(in_array('gestion_pdv', $userHabs)) checked @endif> Points de vente
                             </label>
                             <label style="display:flex; align-items:center; gap:8px; font-size:12px; margin-bottom:5px; cursor:pointer;">
-                                <input type="checkbox" name="habilitations[]" value="gestion_personnel" @if(in_array('gestion_personnel', $userHabs)) checked @endif> Personnel & accès
+                                <input type="checkbox" name="habilitations[]" value="gestion_personnel" @if(in_array('gestion_personnel', $userHabs)) checked @endif> Personnels & accès
                             </label>
                             <label style="display:flex; align-items:center; gap:8px; font-size:12px; margin-bottom:5px; cursor:pointer;">
                                 <input type="checkbox" name="habilitations[]" value="gestion_habilitations" @if(in_array('gestion_habilitations', $userHabs)) checked @endif> Habilitations
@@ -186,10 +186,14 @@
                         </div>
 
                         <div>
-                            <div style="font-weight:600; font-size:11px; text-transform:uppercase; color:var(--text-2); margin-bottom:6px; border-bottom:1px solid var(--border); padding-bottom:3px;">Catalogue & Tiers</div>
+                            <div style="font-weight:600; font-size:11px; text-transform:uppercase; color:var(--text-2); margin-bottom:6px; border-bottom:1px solid var(--border); padding-bottom:3px;">Produits</div>
                             <label style="display:flex; align-items:center; gap:8px; font-size:12px; margin-bottom:5px; cursor:pointer;">
                                 <input type="checkbox" name="habilitations[]" value="catalogue_produits" @if(in_array('catalogue_produits', $userHabs)) checked @endif> Produits
                             </label>
+                            </div>
+
+                        <div>
+                            <div style="font-weight:600; font-size:11px; text-transform:uppercase; color:var(--text-2); margin-bottom:6px; border-bottom:1px solid var(--border); padding-bottom:3px;">Tiers</div>
                             <label style="display:flex; align-items:center; gap:8px; font-size:12px; margin-bottom:5px; cursor:pointer;">
                                 <input type="checkbox" name="habilitations[]" value="tiers_clients" @if(in_array('tiers_clients', $userHabs)) checked @endif> Clients
                             </label>
@@ -199,7 +203,7 @@
                         </div>
 
                         <div>
-                            <div style="font-weight:600; font-size:11px; text-transform:uppercase; color:var(--text-2); margin-bottom:6px; border-bottom:1px solid var(--border); padding-bottom:3px;">Analyses</div>
+                            <div style="font-weight:600; font-size:11px; text-transform:uppercase; color:var(--text-2); margin-bottom:6px; border-bottom:1px solid var(--border); padding-bottom:3px;">Rapports</div>
                             <label style="display:flex; align-items:center; gap:8px; font-size:12px; margin-bottom:5px; cursor:pointer;">
                                 <input type="checkbox" name="habilitations[]" value="rapports_analyse" @if(in_array('rapports_analyse', $userHabs)) checked @endif> Analyse d'activité
                             </label>

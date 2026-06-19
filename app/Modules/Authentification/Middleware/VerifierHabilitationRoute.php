@@ -87,6 +87,8 @@ class VerifierHabilitationRoute
             
             'admin.fournisseurs.index'       => 'tiers_fournisseurs',
             'admin.fournisseurs.creer'       => 'tiers_fournisseurs',
+
+            'admin.rapports.analyse_activite' => 'rapports_analyse',
         ];
 
         if (isset($correspondances[$routeNormalisee])) {

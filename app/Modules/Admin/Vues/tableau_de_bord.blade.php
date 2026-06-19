@@ -1,70 +1,145 @@
 @extends('admin::gabarits.application')
 
-@section('titre', 'Tableau de bord personnel')
-@section('topbar_titre', 'Tableau de bord — Mon activité')
+@section('titre', 'Mon tableau de bord')
+@section('topbar_titre', 'Mon tableau de bord')
 
 @section('contenu')
 
-{{-- ── EN-TÊTE PAGE ── --}}
-<div class="page-header">
+{{-- ── EN-TÊTE ─────────────────────────────────────────────────────────── --}}
+<div class="page-header" style="margin-bottom:20px;">
     <div>
-        <h1>Bonjour, {{ auth()->user()->nom }} 👋</h1>
-        <p>{{ now()->isoFormat('dddd D MMMM YYYY') }} — Vue d'ensemble de votre activité personnelle</p>
+        <h1 style="font-size:22px; font-weight:800; display:flex; align-items:center; gap:10px;">
+            <span style="width:40px;height:40px;border-radius:12px;background:linear-gradient(135deg,#002B5C,#1e40af);display:inline-flex;align-items:center;justify-content:center;color:#fff;font-size:18px;">
+                <i class="fas fa-chart-pie"></i>
+            </span>
+            Bonjour, {{ auth()->user()->prenom ?? auth()->user()->nom }} 👋
+        </h1>
+        <p style="color:var(--text-2); margin-top:6px; font-size:13px;">
+            <i class="fas fa-calendar-day"></i> {{ now()->locale('fr')->isoFormat('dddd D MMMM YYYY') }}
+            &nbsp;·&nbsp; Période : <strong>{{ session('active_periode_nom', 'Non définie') }}</strong>
+            @if($pointDeVenteId)
+                &nbsp;·&nbsp; <i class="fas fa-store"></i> {{ session('point_de_vente_actif_nom') }}
+            @endif
+        </p>
     </div>
+    @if(auth()->user()->aHabilitation('nouvelle_vente'))
     <a href="{{ route('admin.ventes.nouvelle') }}" class="btn btn-primary">
         <i class="fas fa-plus"></i> Nouvelle vente
     </a>
+    @endif
 </div>
 
-{{-- ── KPI ── --}}
-<div class="stats-grid">
-    <div class="stat-card">
-        <div class="stat-icon green"><i class="fas fa-arrow-trend-up"></i></div>
+{{-- ── KPI LIGNE 1 : AUJOURD'HUI ──────────────────────────────────────── --}}
+<div style="display:grid; grid-template-columns: repeat(4,1fr); gap:14px; margin-bottom:20px;">
+    <div class="tdb-kpi tdb-kpi-blue">
+        <div class="tdb-kpi-icon"><i class="fas fa-arrow-trend-up"></i></div>
         <div>
-            <div class="stat-value">{{ number_format($montantVentesJour, 0, ',', ' ') }} FCFA</div>
-            <div class="stat-label">Mes ventes du jour</div>
+            <div class="tdb-kpi-val">{{ number_format($montantVentesJour, 0, ',', ' ') }} <span>FCFA</span></div>
+            <div class="tdb-kpi-lbl">Mes ventes du jour</div>
+            <div class="tdb-kpi-sub">{{ $nbVentesJour }} vente{{ $nbVentesJour > 1 ? 's' : '' }}</div>
         </div>
     </div>
-    <div class="stat-card">
-        <div class="stat-icon red"><i class="fas fa-arrow-trend-down"></i></div>
+    <div class="tdb-kpi tdb-kpi-red">
+        <div class="tdb-kpi-icon"><i class="fas fa-cart-shopping"></i></div>
         <div>
-            <div class="stat-value">{{ number_format($montantAchatsJour, 0, ',', ' ') }} FCFA</div>
-            <div class="stat-label">Mes achats du jour</div>
+            <div class="tdb-kpi-val">{{ number_format($montantAchatsJour, 0, ',', ' ') }} <span>FCFA</span></div>
+            <div class="tdb-kpi-lbl">Mes achats du jour</div>
         </div>
     </div>
-    <div class="stat-card">
-        <div class="stat-icon blue"><i class="fas fa-wallet"></i></div>
+    <div class="tdb-kpi {{ $solde >= 0 ? 'tdb-kpi-green' : 'tdb-kpi-danger' }}">
+        <div class="tdb-kpi-icon"><i class="fas fa-wallet"></i></div>
         <div>
-            <div class="stat-value" style="color: {{ $solde >= 0 ? '#10b981' : '#ef4444' }}">
-                {{ number_format($solde, 0, ',', ' ') }} FCFA
-            </div>
-            <div class="stat-label">Mon solde trésorerie</div>
+            <div class="tdb-kpi-val">{{ number_format($solde, 0, ',', ' ') }} <span>FCFA</span></div>
+            <div class="tdb-kpi-lbl">Mon solde trésorerie</div>
         </div>
     </div>
-    <div class="stat-card">
-        <div class="stat-icon yellow"><i class="fas fa-triangle-exclamation"></i></div>
+    <div class="tdb-kpi {{ $produitsEnAlerte->count() > 0 ? 'tdb-kpi-warning' : 'tdb-kpi-green' }}">
+        <div class="tdb-kpi-icon"><i class="fas fa-boxes-stacked"></i></div>
         <div>
-            <div class="stat-value" style="color: {{ $produitsEnAlerte->count() > 0 ? '#ef4444' : '#10b981' }}">
-                {{ $produitsEnAlerte->count() }}
-            </div>
-            <div class="stat-label">Alertes stock</div>
+            <div class="tdb-kpi-val">{{ $produitsEnAlerte->count() }}</div>
+            <div class="tdb-kpi-lbl">Alertes stock</div>
+            <div class="tdb-kpi-sub">produit{{ $produitsEnAlerte->count() > 1 ? 's' : '' }} en alerte</div>
         </div>
     </div>
 </div>
 
-{{-- ── GRILLE PRINCIPALE ── --}}
-<div class="grid-2" style="margin-bottom: 22px;">
+{{-- ── KPI LIGNE 2 : PÉRIODE ───────────────────────────────────────────── --}}
+<div style="display:grid; grid-template-columns: repeat(3,1fr); gap:14px; margin-bottom:24px;">
+    <div class="tdb-kpi tdb-kpi-purple" style="grid-column: span 2;">
+        <div class="tdb-kpi-icon" style="width:52px;height:52px;"><i class="fas fa-chart-line"></i></div>
+        <div style="flex:1;">
+            <div class="tdb-kpi-lbl" style="font-size:11px; margin-bottom:4px;">CA de la période · {{ session('active_periode_nom', '—') }}</div>
+            <div class="tdb-kpi-val" style="font-size:24px;">{{ number_format($totalVentesPeriode, 0, ',', ' ') }} <span>FCFA</span></div>
+            <div class="tdb-kpi-sub">{{ $nbVentesPeriode }} ventes facturées</div>
+        </div>
+    </div>
+    @if($meilleurProduit)
+    <div class="tdb-kpi tdb-kpi-gold">
+        <div class="tdb-kpi-icon"><i class="fas fa-trophy"></i></div>
+        <div>
+            <div class="tdb-kpi-lbl">Meilleur produit (période)</div>
+            <div class="tdb-kpi-val" style="font-size:15px; margin-top:4px;">{{ $meilleurProduit->libelle_virtuel ?? '—' }}</div>
+            <div class="tdb-kpi-sub">{{ number_format($meilleurProduit->ca, 0, ',', ' ') }} FCFA · {{ $meilleurProduit->qte }} unités</div>
+        </div>
+    </div>
+    @else
+    <div class="tdb-kpi tdb-kpi-gold">
+        <div class="tdb-kpi-icon"><i class="fas fa-trophy"></i></div>
+        <div>
+            <div class="tdb-kpi-lbl">Meilleur produit</div>
+            <div class="tdb-kpi-val" style="font-size:15px;">—</div>
+            <div class="tdb-kpi-sub">Aucune vente sur la période</div>
+        </div>
+    </div>
+    @endif
+</div>
 
-    {{-- Dernières ventes personnelles --}}
+{{-- ── GRAPHIQUE 7 JOURS + DERNIERES VENTES ──────────────────────────── --}}
+<div style="display:grid; grid-template-columns:1fr 1.6fr; gap:16px; margin-bottom:20px;">
+
+    {{-- Graphique évolution 7j --}}
+    <div class="card">
+        <div class="card-header">
+            <h2><i class="fas fa-chart-area" style="color:#3b82f6"></i> Mes ventes — 7 derniers jours</h2>
+        </div>
+        <div class="card-body" style="padding:16px;">
+            <div style="position:relative; height:200px;">
+                <canvas id="chartEvolution7j"></canvas>
+            </div>
+            <div style="display:flex; justify-content:space-around; margin-top:12px; padding-top:10px; border-top:1px solid var(--border);">
+                @php
+                    $totSemaine = $jours7->sum('total');
+                    $nbSemaine  = $jours7->sum('nb');
+                    $maxJour    = $jours7->max('total');
+                @endphp
+                <div style="text-align:center;">
+                    <div style="font-size:16px; font-weight:800; color:#3b82f6;">{{ number_format($totSemaine, 0, ',', ' ') }}</div>
+                    <div style="font-size:10px; color:var(--text-3); text-transform:uppercase;">CA semaine</div>
+                </div>
+                <div style="text-align:center;">
+                    <div style="font-size:16px; font-weight:800; color:#10b981;">{{ $nbSemaine }}</div>
+                    <div style="font-size:10px; color:var(--text-3); text-transform:uppercase;">Ventes</div>
+                </div>
+                <div style="text-align:center;">
+                    <div style="font-size:16px; font-weight:800; color:#f59e0b;">{{ $nbSemaine > 0 ? number_format($totSemaine/$nbSemaine, 0, ',', ' ') : '—' }}</div>
+                    <div style="font-size:10px; color:var(--text-3); text-transform:uppercase;">Panier moy.</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    {{-- Dernières ventes --}}
     <div class="card">
         <div class="card-header">
             <h2><i class="fas fa-receipt" style="color:var(--success)"></i> Mes dernières ventes</h2>
+            @if(auth()->user()->aHabilitation('historique_ventes'))
             <a href="{{ route('admin.ventes.historique') }}" class="btn btn-outline btn-sm">Tout voir</a>
+            @endif
         </div>
-        <div class="table-wrap">
+        <div class="table-wrap" style="max-height:280px; overflow-y:auto;">
             @if($dernieresVentes->isEmpty())
-            <div style="padding: 32px; text-align: center; color: var(--text-3);">
-                <i class="fas fa-receipt" style="font-size:32px; margin-bottom:8px; opacity:.3; display:block;"></i>
+            <div style="padding:32px; text-align:center; color:var(--text-3);">
+                <i class="fas fa-receipt" style="font-size:28px; margin-bottom:8px; opacity:.3; display:block;"></i>
                 Aucune vente enregistrée
             </div>
             @else
@@ -81,7 +156,7 @@
                     @foreach($dernieresVentes as $vente)
                     <tr>
                         <td>
-                            <a href="{{ route('admin.ventes.imprimer', $vente) }}" style="color: var(--primary); text-decoration:none; font-weight:600;">
+                            <a href="{{ route('admin.ventes.imprimer', $vente) }}" style="color:var(--primary); text-decoration:none; font-weight:600;">
                                 {{ $vente->numero_facture }}
                             </a>
                             <div style="font-size:11px; color:var(--text-3);">{{ $vente->created_at->diffForHumans() }}</div>
@@ -89,61 +164,15 @@
                         <td>{{ $vente->client?->nom ?? 'Client de passage' }}</td>
                         <td style="font-weight:700; color:var(--success);">{{ number_format($vente->montant_ttc, 0, ',', ' ') }} F</td>
                         <td>
-                            @if($vente->statut === 'Payé')
-                                <span class="badge badge-success">{{ $vente->statut }}</span>
-                            @elseif($vente->statut === 'Avance')
-                                <span class="badge badge-warning">{{ $vente->statut }}</span>
-                            @elseif($vente->statut === 'Crédit')
-                                <span class="badge badge-danger">{{ $vente->statut }}</span>
-                            @else
-                                <span class="badge badge-gray">{{ $vente->statut }}</span>
-                            @endif
-                        </td>
-                    </tr>
-                    @endforeach
-                </tbody>
-            </table>
-            @endif
-        </div>
-    </div>
-
-    {{-- Alertes stock --}}
-    <div class="card">
-        <div class="card-header">
-            <h2><i class="fas fa-boxes-stacked" style="color:var(--warning)"></i> Alertes stock</h2>
-            <a href="{{ route('admin.stock.index') }}" class="btn btn-outline btn-sm">Gérer le stock</a>
-        </div>
-        <div class="table-wrap">
-            @if($produitsEnAlerte->isEmpty())
-            <div style="padding: 32px; text-align: center; color: var(--text-3);">
-                <i class="fas fa-check-circle" style="font-size:32px; margin-bottom:8px; color:var(--success); display:block;"></i>
-                Tous les stocks sont suffisants !
-            </div>
-            @else
-            <table>
-                <thead>
-                    <tr>
-                        <th>Produit</th>
-                        <th>Stock actuel</th>
-                        <th>Minimum</th>
-                        <th>Statut</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    @foreach($produitsEnAlerte as $p)
-                    <tr>
-                        <td>
-                            <div style="font-weight:600;">{{ $p->nom }}</div>
-                            <div style="font-size:11px; color:var(--text-3);">{{ $p->reference }}</div>
-                        </td>
-                        <td class="stock-alerte">{{ $p->stock_actuel }}</td>
-                        <td style="color:var(--text-3);">{{ $p->stock_minimum }}</td>
-                        <td>
-                            @if($p->stock_actuel == 0)
-                                <span class="badge badge-danger">Rupture</span>
-                            @else
-                                <span class="badge badge-warning">Faible</span>
-                            @endif
+                            @php
+                                $badgeCls = match($vente->statut) {
+                                    'Facturée','Payé' => 'badge-success',
+                                    'Avance'          => 'badge-warning',
+                                    'Crédit'          => 'badge-danger',
+                                    default           => 'badge-gray',
+                                };
+                            @endphp
+                            <span class="badge {{ $badgeCls }}">{{ $vente->statut }}</span>
                         </td>
                     </tr>
                     @endforeach
@@ -153,5 +182,121 @@
         </div>
     </div>
 </div>
+
+{{-- ── ALERTES STOCK ─────────────────────────────────────────────────── --}}
+@if($produitsEnAlerte->count())
+<div class="card" style="margin-bottom:20px;">
+    <div class="card-header">
+        <h2><i class="fas fa-triangle-exclamation" style="color:var(--warning)"></i> Alertes stock ({{ $produitsEnAlerte->count() }})</h2>
+        @if(auth()->user()->aHabilitation('stock_articles'))
+        <a href="{{ route('admin.stock.index') }}" class="btn btn-outline btn-sm"><i class="fas fa-boxes-stacked"></i> Gérer le stock</a>
+        @endif
+    </div>
+    <div class="table-wrap">
+        <table>
+            <thead>
+                <tr>
+                    <th>Produit</th>
+                    <th>Référence</th>
+                    <th>Stock actuel</th>
+                    <th>Minimum</th>
+                    <th>Statut</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach($produitsEnAlerte as $p)
+                <tr>
+                    <td style="font-weight:600;">{{ $p->nom }}</td>
+                    <td style="color:var(--text-3); font-size:12px;">{{ $p->reference ?? '—' }}</td>
+                    <td class="{{ $p->stock_actuel <= 0 ? 'stock-alerte' : 'stock-warning' }}" style="font-weight:700;">{{ $p->stock_actuel }}</td>
+                    <td style="color:var(--text-3);">{{ $p->stock_minimum }}</td>
+                    <td>
+                        @if($p->stock_actuel <= 0)
+                            <span class="badge badge-danger"><i class="fas fa-xmark"></i> Rupture</span>
+                        @else
+                            <span class="badge badge-warning"><i class="fas fa-triangle-exclamation"></i> Faible</span>
+                        @endif
+                    </td>
+                </tr>
+                @endforeach
+            </tbody>
+        </table>
+    </div>
+</div>
+@endif
+
+{{-- ── STYLES ─────────────────────────────────────────────────────────── --}}
+<style>
+.tdb-kpi {
+    display:flex; align-items:flex-start; gap:14px;
+    padding:18px 20px; border-radius:14px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    box-shadow: var(--shadow);
+    transition:transform .2s, box-shadow .2s;
+}
+.tdb-kpi:hover { transform:translateY(-2px); box-shadow:0 8px 24px rgba(0,0,0,.08); }
+.tdb-kpi-icon {
+    width:46px; height:46px; border-radius:12px; flex-shrink:0;
+    display:flex; align-items:center; justify-content:center; font-size:18px;
+}
+.tdb-kpi-val { font-size:20px; font-weight:800; line-height:1.1; color: var(--text); }
+.tdb-kpi-val span { font-size:12px; font-weight:500; color: var(--text-2); }
+.tdb-kpi-lbl { font-size:11.5px; font-weight:600; color: var(--text-2); text-transform:uppercase; letter-spacing:.5px; margin-bottom:3px; }
+.tdb-kpi-sub { font-size:11px; color: var(--text-3); margin-top:3px; }
+
+/* Icônes colorées sur fond pastel — arrière-plan de la carte toujours blanc */
+.tdb-kpi-blue    .tdb-kpi-icon { background:rgba(59,130,246,.12);  color:#3b82f6; }
+.tdb-kpi-red     .tdb-kpi-icon { background:rgba(239,68,68,.12);   color:#ef4444; }
+.tdb-kpi-green   .tdb-kpi-icon { background:rgba(16,185,129,.12);  color:#10b981; }
+.tdb-kpi-danger  .tdb-kpi-icon { background:rgba(239,68,68,.12);   color:#ef4444; }
+.tdb-kpi-warning .tdb-kpi-icon { background:rgba(245,158,11,.12);  color:#f59e0b; }
+.tdb-kpi-purple  .tdb-kpi-icon { background:rgba(139,92,246,.12);  color:#8b5cf6; }
+.tdb-kpi-gold    .tdb-kpi-icon { background:rgba(245,158,11,.12);  color:#f59e0b; }
+
+/* Valeur colorée seulement pour les montants négatifs */
+.tdb-kpi-danger  .tdb-kpi-val { color: #ef4444; }
+
+@media(max-width:1200px) {
+    [style*="grid-template-columns: repeat(4"] { grid-template-columns: repeat(2,1fr) !important; }
+    [style*="grid-template-columns: repeat(3"] { grid-template-columns: 1fr !important; }
+    [style*="grid-template-columns:1fr 1.6fr"] { grid-template-columns: 1fr !important; }
+}
+</style>
+
+{{-- ── CHART.JS ─────────────────────────────────────────────────────── --}}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<script>
+const jours7 = @json($jours7);
+const labels = jours7.map(j => {
+    const d = new Date(j.jour);
+    return d.toLocaleDateString('fr-FR', {weekday:'short', day:'numeric'});
+});
+const vals = jours7.map(j => parseFloat(j.total) || 0);
+
+new Chart(document.getElementById('chartEvolution7j'), {
+    type: 'line',
+    data: {
+        labels,
+        datasets: [{
+            label: 'Ventes TTC',
+            data: vals,
+            borderColor: '#3b82f6',
+            backgroundColor: 'rgba(59,130,246,0.12)',
+            fill: true, tension: 0.4,
+            pointRadius: 5, pointBackgroundColor: '#3b82f6',
+            borderWidth: 2.5
+        }]
+    },
+    options: {
+        responsive: true, maintainAspectRatio: false,
+        plugins: { legend: { display: false } },
+        scales: {
+            x: { grid: { display: false }, ticks: { font: { size: 10 } } },
+            y: { beginAtZero: true, ticks: { callback: v => v.toLocaleString('fr') } }
+        }
+    }
+});
+</script>
 
 @endsection
