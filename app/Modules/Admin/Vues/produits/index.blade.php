@@ -104,10 +104,17 @@
                                 </div>
                                 <div class="form-group">
                                     <label class="form-label">Taux TVA par défaut</label>
-                                    <select name="taux_tva" class="form-control" required>
+                                    @php
+                                        $isCustomTva = !in_array($p->taux_tva, [0.00, 18.00]);
+                                    @endphp
+                                    <select id="tva_select_{{ $p->id }}" class="form-control" onchange="toggleCustomTva('{{ $p->id }}')" required>
                                         <option value="18.00" {{ $p->taux_tva == 18.00 ? 'selected' : '' }}>18% (Taux normal)</option>
                                         <option value="0.00" {{ $p->taux_tva == 0.00 ? 'selected' : '' }}>0% (Exonéré)</option>
+                                        <option value="custom" {{ $isCustomTva ? 'selected' : '' }}>Autre (Saisie libre)</option>
                                     </select>
+                                    <div id="custom_tva_container_{{ $p->id }}" style="display: {{ $isCustomTva ? 'block' : 'none' }}; margin-top:8px;">
+                                        <input type="number" id="tva_input_{{ $p->id }}" name="taux_tva" class="form-control" placeholder="Entrez le taux (%)" step="0.01" min="0" max="100" value="{{ $p->taux_tva }}">
+                                    </div>
                                 </div>
                                 <div class="form-group">
                                     <label class="form-label">Compte de vente</label>
@@ -197,10 +204,14 @@
                 </div>
                 <div class="form-group">
                     <label class="form-label">Taux TVA par défaut <span style="color:var(--danger)">*</span></label>
-                    <select name="taux_tva" class="form-control" required>
+                    <select id="tva_select_nouveau" class="form-control" onchange="toggleCustomTva('nouveau')" required>
                         <option value="18.00">18% (Taux normal)</option>
                         <option value="0.00">0% (Exonéré / TVAD)</option>
+                        <option value="custom">Autre (Saisie libre)</option>
                     </select>
+                    <div id="custom_tva_container_nouveau" style="display:none; margin-top:8px;">
+                        <input type="number" id="tva_input_nouveau" name="taux_tva" class="form-control" placeholder="Entrez le taux (%)" step="0.01" min="0" max="100" value="18.00">
+                    </div>
                 </div>
                 <div class="form-group">
                     <label class="form-label">Compte de vente <span style="color:var(--danger)">*</span></label>
@@ -246,4 +257,19 @@
         </form>
     </div>
 </div>
+
+<script>
+function toggleCustomTva(id) {
+    var select = document.getElementById('tva_select_' + id);
+    var container = document.getElementById('custom_tva_container_' + id);
+    var input = document.getElementById('tva_input_' + id);
+    
+    if (select.value === 'custom') {
+        container.style.display = 'block';
+    } else {
+        container.style.display = 'none';
+        input.value = select.value;
+    }
+}
+</script>
 @endsection

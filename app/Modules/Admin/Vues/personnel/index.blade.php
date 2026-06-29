@@ -2,6 +2,20 @@
 @section('titre', 'Personnels & Accès')
 @section('topbar_titre', 'Points de vente — Personnels & Accès')
 
+@section('styles')
+<style>
+    .matrix-table thead tr:first-child th {
+        top: 0;
+        z-index: 12;
+        height: 38px;
+    }
+    .matrix-table thead tr:last-child th {
+        top: 38px;
+        z-index: 11;
+    }
+</style>
+@endsection
+
 @section('contenu')
 <div class="page-header">
     <div>
@@ -132,11 +146,21 @@
         <h2>Matrice globale des habilitations (Accès Pages)</h2>
     </div>
     <div class="table-wrap">
-        <table>
+        <table class="matrix-table">
             <thead>
                 <tr>
-                    <th>Personnel</th>
-                    <th>Rôle</th>
+                    <th rowspan="2" style="vertical-align: middle;">Personnel</th>
+                    <th rowspan="2" style="vertical-align: middle;">Rôle</th>
+                    <th colspan="2" style="text-align: center; border-bottom: 2px solid var(--primary); font-weight: bold; background: #f1f5f9;">Principal</th>
+                    <th colspan="2" style="text-align: center; border-bottom: 2px solid var(--primary); font-weight: bold; background: #e2e8f0;">Ventes</th>
+                    <th colspan="2" style="text-align: center; border-bottom: 2px solid var(--primary); font-weight: bold; background: #f1f5f9;">Achats</th>
+                    <th colspan="1" style="text-align: center; border-bottom: 2px solid var(--primary); font-weight: bold; background: #e2e8f0;">Stock</th>
+                    <th colspan="4" style="text-align: center; border-bottom: 2px solid var(--primary); font-weight: bold; background: #f1f5f9;">Comptabilité</th>
+                    <th colspan="2" style="text-align: center; border-bottom: 2px solid var(--primary); font-weight: bold; background: #e2e8f0;">Points de vente</th>
+                    <th colspan="1" style="text-align: center; border-bottom: 2px solid var(--primary); font-weight: bold; background: #f1f5f9;">Produits</th>
+                    <th colspan="1" style="text-align: center; border-bottom: 2px solid var(--primary); font-weight: bold; background: #e2e8f0;">Tiers</th>
+                </tr>
+                <tr>
                     <th style="text-align: center;" title="Tableau de bord personnel">TDB Pers</th>
                     <th style="text-align: center;" title="Tableau de bord général">TDB Gén</th>
                     <th style="text-align: center;" title="Nouvelle vente">N.Vente</th>

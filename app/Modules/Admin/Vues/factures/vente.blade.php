@@ -471,27 +471,27 @@ function model1(d) {
         <table style="width:100%;border-collapse:collapse;font-size:12px;margin-bottom:16px">
             <thead>
                 <tr style="background:${theme.color};color:#fff;">
-                    <th style="padding:9px 12px;text-align:left;color:#fff;background:${theme.color};font-weight:600;width:15%;">Réf.</th>
+                    <th style="padding:9px 12px;text-align:left;color:#fff;background:${theme.color};font-weight:600;width:15%;white-space:nowrap;">Réf.</th>
                     <th style="padding:9px 12px;text-align:left;color:#fff;background:${theme.color};font-weight:600">Description</th>
-                    <th style="padding:9px 12px;text-align:center;color:#fff;background:${theme.color};font-weight:600;width:12%">Unité</th>
-                    <th style="padding:9px 12px;text-align:right;color:#fff;background:${theme.color};font-weight:600;width:8%">Qté</th>
+                    <th style="padding:9px 12px;text-align:center;color:#fff;background:${theme.color};font-weight:600;width:12%;white-space:nowrap;">Unité</th>
+                    <th style="padding:9px 12px;text-align:right;color:#fff;background:${theme.color};font-weight:600;width:8%;white-space:nowrap;">Qté</th>
                     ${isDeliveryMode ? '' : `
-                    <th style="padding:9px 12px;text-align:right;color:#fff;background:${theme.color};font-weight:600;width:16%">P.U. HT</th>
-                    <th style="padding:9px 12px;text-align:right;color:#fff;background:${theme.color};font-weight:600;width:10%">TVA</th>
-                    <th style="padding:9px 12px;text-align:right;color:#fff;background:${theme.color};font-weight:600;width:18%">Total TTC</th>
+                    <th style="padding:9px 12px;text-align:right;color:#fff;background:${theme.color};font-weight:600;width:16%;white-space:nowrap;">P.U. HT</th>
+                    <th style="padding:9px 12px;text-align:right;color:#fff;background:${theme.color};font-weight:600;width:10%;white-space:nowrap;">TVA</th>
+                    <th style="padding:9px 12px;text-align:right;color:#fff;background:${theme.color};font-weight:600;width:18%;white-space:nowrap;">Total TTC</th>
                     `}
                 </tr>
             </thead>
             <tbody>
                 ${c.rows.map((r, i) => `<tr style="background:${i % 2 === 0 ? '#fff' : '#F9FAFB'}">
-                    <td style="padding:9px 12px;color:var(--mu);font-weight:500;">${r.ref}</td>
+                    <td style="padding:9px 12px;color:var(--mu);font-weight:500;white-space:nowrap;">${r.ref}</td>
                     <td style="padding:9px 12px;font-weight:600;color:var(--tx)">${r.desc}</td>
-                    <td style="padding:9px 12px;text-align:center;color:var(--tx)">${r.unite || 'Unité'}</td>
-                    <td style="padding:9px 12px;text-align:right;color:var(--tx)">${r.qty}</td>
+                    <td style="padding:9px 12px;text-align:center;color:var(--tx);white-space:nowrap;">${r.unite || 'Unité'}</td>
+                    <td style="padding:9px 12px;text-align:right;color:var(--tx);white-space:nowrap;">${r.qty}</td>
                     ${isDeliveryMode ? '' : `
-                    <td style="padding:9px 12px;text-align:right;color:var(--tx)">${fmt(r.pu)}</td>
-                    <td style="padding:9px 12px;text-align:right;color:var(--mu)">${r.tva}%</td>
-                    <td style="padding:9px 12px;text-align:right;font-weight:700;color:var(--tx)">${fmt(r.ttc)}</td>
+                    <td style="padding:9px 12px;text-align:right;color:var(--tx);white-space:nowrap;">${fmt(r.pu)}</td>
+                    <td style="padding:9px 12px;text-align:right;color:var(--mu);white-space:nowrap;">${r.tva}%</td>
+                    <td style="padding:9px 12px;text-align:right;font-weight:700;color:var(--tx);white-space:nowrap;">${fmt(r.ttc)}</td>
                     `}
                 </tr>`).join('')}
             </tbody>
@@ -592,27 +592,27 @@ function model2(d) {
             <table style="width:100%;border-collapse:collapse;font-size:12px;margin-bottom:14px">
                 <thead>
                     <tr style="border-bottom:1.5px solid ${theme.color}">
-                        <th style="padding:7px 0;text-align:left;color:${theme.color};font-weight:700;width:18%">Réf.</th>
+                        <th style="padding:7px 0;text-align:left;color:${theme.color};font-weight:700;width:18%;white-space:nowrap;">Réf.</th>
                         <th style="padding:7px 6px;text-align:left;color:${theme.color};font-weight:700">Article</th>
-                        <th style="padding:7px 6px;text-align:center;color:${theme.color};font-weight:700;width:12%">Unité</th>
-                        <th style="padding:7px 6px;text-align:right;color:${theme.color};font-weight:700;width:10%">Qté</th>
+                        <th style="padding:7px 6px;text-align:center;color:${theme.color};font-weight:700;width:12%;white-space:nowrap;">Unité</th>
+                        <th style="padding:7px 6px;text-align:right;color:${theme.color};font-weight:700;width:10%;white-space:nowrap;">Qté</th>
                         ${isDeliveryMode ? '' : `
-                        <th style="padding:7px 6px;text-align:right;color:${theme.color};font-weight:700;width:18%">P.U. HT</th>
-                        <th style="padding:7px 6px;text-align:right;color:${theme.color};font-weight:700;width:10%">TVA</th>
-                        <th style="padding:7px 0;text-align:right;color:${theme.color};font-weight:700;width:20%">TTC</th>
+                        <th style="padding:7px 6px;text-align:right;color:${theme.color};font-weight:700;width:18%;white-space:nowrap;">P.U. HT</th>
+                        <th style="padding:7px 6px;text-align:right;color:${theme.color};font-weight:700;width:10%;white-space:nowrap;">TVA</th>
+                        <th style="padding:7px 0;text-align:right;color:${theme.color};font-weight:700;width:20%;white-space:nowrap;">TTC</th>
                         `}
                     </tr>
                 </thead>
                 <tbody>
                     ${c.rows.map(r => `<tr style="border-bottom:0.5px solid var(--border)">
-                        <td style="padding:8px 0;color:var(--mu);font-weight:500;">${r.ref}</td>
+                        <td style="padding:8px 0;color:var(--mu);font-weight:500;white-space:nowrap;">${r.ref}</td>
                         <td style="padding:8px 6px;color:var(--tx);font-weight:600;">${r.desc}</td>
-                        <td style="padding:8px 6px;text-align:center;color:var(--mu)">${r.unite || 'Unité'}</td>
-                        <td style="padding:8px 6px;text-align:right;color:var(--mu)">${r.qty}</td>
+                        <td style="padding:8px 6px;text-align:center;color:var(--mu);white-space:nowrap;">${r.unite || 'Unité'}</td>
+                        <td style="padding:8px 6px;text-align:right;color:var(--mu);white-space:nowrap;">${r.qty}</td>
                         ${isDeliveryMode ? '' : `
-                        <td style="padding:8px 6px;text-align:right;color:var(--mu)">${fmt(r.pu)}</td>
-                        <td style="padding:8px 6px;text-align:right;color:var(--mu)">${r.tva}%</td>
-                        <td style="padding:8px 0;text-align:right;font-weight:700;color:var(--tx)">${fmt(r.ttc)}</td>
+                        <td style="padding:8px 6px;text-align:right;color:var(--mu);white-space:nowrap;">${fmt(r.pu)}</td>
+                        <td style="padding:8px 6px;text-align:right;color:var(--mu);white-space:nowrap;">${r.tva}%</td>
+                        <td style="padding:8px 0;text-align:right;font-weight:700;color:var(--tx);white-space:nowrap;">${fmt(r.ttc)}</td>
                         `}
                     </tr>`).join('')}
                 </tbody>
@@ -707,27 +707,27 @@ function model3(d) {
         <table style="width:100%;border-collapse:collapse;font-size:12px;margin-bottom:16px;table-layout:fixed">
             <thead>
                 <tr>
-                    <th style="padding:9px 10px;text-align:left;border-bottom:2px solid ${theme.color};color:var(--tx);font-weight:700;width:15%">Réf.</th>
+                    <th style="padding:9px 10px;text-align:left;border-bottom:2px solid ${theme.color};color:var(--tx);font-weight:700;width:15%;white-space:nowrap;">Réf.</th>
                     <th style="padding:9px 10px;text-align:left;border-bottom:2px solid ${theme.color};color:var(--tx);font-weight:700;width:30%">Article</th>
-                    <th style="padding:9px 10px;text-align:center;border-bottom:2px solid ${theme.color};color:var(--tx);font-weight:700;width:12%">Unité</th>
-                    <th style="padding:9px 10px;text-align:right;border-bottom:2px solid ${theme.color};color:var(--tx);font-weight:700;width:10%">Qté</th>
+                    <th style="padding:9px 10px;text-align:center;border-bottom:2px solid ${theme.color};color:var(--tx);font-weight:700;width:12%;white-space:nowrap;">Unité</th>
+                    <th style="padding:9px 10px;text-align:right;border-bottom:2px solid ${theme.color};color:var(--tx);font-weight:700;width:10%;white-space:nowrap;">Qté</th>
                     ${isDeliveryMode ? '' : `
-                    <th style="padding:9px 10px;text-align:right;border-bottom:2px solid ${theme.color};color:var(--tx);font-weight:700;width:16%">P.U. HT</th>
-                    <th style="padding:9px 10px;text-align:right;border-bottom:2px solid ${theme.color};color:var(--tx);font-weight:700;width:10%">TVA</th>
-                    <th style="padding:9px 10px;text-align:right;border-bottom:2px solid ${theme.color};color:var(--tx);font-weight:700;width:17%">TTC</th>
+                    <th style="padding:9px 10px;text-align:right;border-bottom:2px solid ${theme.color};color:var(--tx);font-weight:700;width:16%;white-space:nowrap;">P.U. HT</th>
+                    <th style="padding:9px 10px;text-align:right;border-bottom:2px solid ${theme.color};color:var(--tx);font-weight:700;width:10%;white-space:nowrap;">TVA</th>
+                    <th style="padding:9px 10px;text-align:right;border-bottom:2px solid ${theme.color};color:var(--tx);font-weight:700;width:17%;white-space:nowrap;">TTC</th>
                     `}
                 </tr>
             </thead>
             <tbody>
                 ${c.rows.map((r, i) => `<tr style="background:${i % 2 === 1 ? '#F9FAFB' : '#fff'}">
-                    <td style="padding:9px 10px;color:var(--mu);font-size:11px;font-weight:500;">${r.ref}</td>
+                    <td style="padding:9px 10px;color:var(--mu);font-size:11px;font-weight:500;white-space:nowrap;">${r.ref}</td>
                     <td style="padding:9px 10px;font-weight:600;color:var(--tx)">${r.desc}</td>
-                    <td style="padding:9px 10px;text-align:center;color:var(--tx)">${r.unite || 'Unité'}</td>
-                    <td style="padding:9px 10px;text-align:right;color:var(--tx)">${r.qty}</td>
+                    <td style="padding:9px 10px;text-align:center;color:var(--tx);white-space:nowrap;">${r.unite || 'Unité'}</td>
+                    <td style="padding:9px 10px;text-align:right;color:var(--tx);white-space:nowrap;">${r.qty}</td>
                     ${isDeliveryMode ? '' : `
-                    <td style="padding:9px 10px;text-align:right;color:var(--mu)">${fmt(r.pu)}</td>
-                    <td style="padding:9px 10px;text-align:right;color:var(--mu)">${r.tva}%</td>
-                    <td style="padding:9px 10px;text-align:right;font-weight:700;color:var(--tx)">${fmt(r.ttc)}</td>
+                    <td style="padding:9px 10px;text-align:right;color:var(--mu);white-space:nowrap;">${fmt(r.pu)}</td>
+                    <td style="padding:9px 10px;text-align:right;color:var(--mu);white-space:nowrap;">${r.tva}%</td>
+                    <td style="padding:9px 10px;text-align:right;font-weight:700;color:var(--tx);white-space:nowrap;">${fmt(r.ttc)}</td>
                     `}
                 </tr>`).join('')}
             </tbody>
@@ -786,23 +786,23 @@ function modelStandard(d) {
     if (isDeliveryMode) {
         rowsHtml = c.rows.map(r => `
             <tr style="background:#fff; color:#000;">
-                <td style="padding:8px 10px; border:1px solid #000; font-weight:500;">${r.ref}</td>
+                <td style="padding:8px 10px; border:1px solid #000; font-weight:500; white-space:nowrap;">${r.ref}</td>
                 <td style="padding:8px 10px; border:1px solid #000; font-weight:700;">${r.desc}</td>
-                <td style="padding:8px 10px; border:1px solid #000; text-align:right;">${r.qty}</td>
-                <td style="padding:8px 10px; border:1px solid #000; text-align:center;">${r.unite || 'Unité'}</td>
+                <td style="padding:8px 10px; border:1px solid #000; text-align:right; white-space:nowrap;">${r.qty}</td>
+                <td style="padding:8px 10px; border:1px solid #000; text-align:center; white-space:nowrap;">${r.unite || 'Unité'}</td>
             </tr>
         `).join('');
     } else {
         rowsHtml = c.rows.map(r => `
             <tr style="background:#fff; color:#000;">
-                <td style="padding:8px 10px; border:1px solid #000; font-weight:500;">${r.ref}</td>
+                <td style="padding:8px 10px; border:1px solid #000; font-weight:500; white-space:nowrap;">${r.ref}</td>
                 <td style="padding:8px 10px; border:1px solid #000; font-weight:700;">${r.desc}</td>
-                <td style="padding:8px 10px; border:1px solid #000; text-align:right;">${fmt(r.pu)}</td>
-                <td style="padding:8px 10px; border:1px solid #000; text-align:right;">${r.qty}</td>
-                <td style="padding:8px 10px; border:1px solid #000; text-align:center;">${r.unite || 'Unité'}</td>
-                <td style="padding:8px 10px; border:1px solid #000; text-align:right; color:#000;">${r.tva > 0 ? 'TVA (18%)' : 'TVAD (0)'}</td>
-                <td style="padding:8px 10px; border:1px solid #000; text-align:right; color:#000;">0%</td>
-                <td style="padding:8px 10px; border:1px solid #000; text-align:right; font-weight:700;">${fmt(r.ht)}</td>
+                <td style="padding:8px 10px; border:1px solid #000; text-align:right; white-space:nowrap;">${fmt(r.pu)}</td>
+                <td style="padding:8px 10px; border:1px solid #000; text-align:right; white-space:nowrap;">${r.qty}</td>
+                <td style="padding:8px 10px; border:1px solid #000; text-align:center; white-space:nowrap;">${r.unite || 'Unité'}</td>
+                <td style="padding:8px 10px; border:1px solid #000; text-align:right; color:#000; white-space:nowrap;">${r.tva > 0 ? 'TVA (18%)' : 'TVAD (0)'}</td>
+                <td style="padding:8px 10px; border:1px solid #000; text-align:right; color:#000; white-space:nowrap;">0%</td>
+                <td style="padding:8px 10px; border:1px solid #000; text-align:right; font-weight:700; white-space:nowrap;">${fmt(r.ht)}</td>
             </tr>
         `).join('');
         
@@ -810,41 +810,41 @@ function modelStandard(d) {
         rowsHtml += `
             <tr style="background:#fff; color:#000;">
                 <td colspan="7" style="padding:6px 10px; border:1px solid #000; text-align:right; font-weight:700; text-transform:uppercase;">TOTAL HT</td>
-                <td style="padding:6px 10px; border:1px solid #000; text-align:right; font-weight:700;">${fmt(c.tot_ht)}</td>
+                <td style="padding:6px 10px; border:1px solid #000; text-align:right; font-weight:700; white-space:nowrap;">${fmt(c.tot_ht)}</td>
             </tr>
             ${c.remiseGlobal > 0 ? `
             <tr style="background:#fff; color:#000;">
                 <td colspan="7" style="padding:6px 10px; border:1px solid #000; text-align:right; font-weight:700; text-transform:uppercase; color:#dc2626;">Remise</td>
-                <td style="padding:6px 10px; border:1px solid #000; text-align:right; font-weight:700; color:#dc2626;">-${fmt(c.remiseGlobal)}</td>
+                <td style="padding:6px 10px; border:1px solid #000; text-align:right; font-weight:700; color:#dc2626; white-space:nowrap;">-${fmt(c.remiseGlobal)}</td>
             </tr>
             <tr style="background:#fff; color:#000;">
                 <td colspan="7" style="padding:6px 10px; border:1px solid #000; text-align:right; font-weight:700; text-transform:uppercase;">TOTAL HT NET</td>
-                <td style="padding:6px 10px; border:1px solid #000; text-align:right; font-weight:700;">${fmt(c.tot_ht_net)}</td>
+                <td style="padding:6px 10px; border:1px solid #000; text-align:right; font-weight:700; white-space:nowrap;">${fmt(c.tot_ht_net)}</td>
             </tr>
             ` : ''}
             <tr style="background:#fff; color:#000;">
                 <td colspan="7" style="padding:6px 10px; border:1px solid #000; text-align:right; font-weight:700; text-transform:uppercase;">TVA</td>
-                <td style="padding:6px 10px; border:1px solid #000; text-align:right; font-weight:700;">${fmt(c.tot_tva)}</td>
+                <td style="padding:6px 10px; border:1px solid #000; text-align:right; font-weight:700; white-space:nowrap;">${fmt(c.tot_tva)}</td>
             </tr>
             <tr style="background:#fff; color:#000;">
                 <td colspan="7" style="padding:6px 10px; border:1px solid #000; text-align:right; font-weight:700; text-transform:uppercase;">TOTAL TTC</td>
-                <td style="padding:6px 10px; border:1px solid #000; text-align:right; font-weight:700;">${fmt(c.tot_ttc)}</td>
+                <td style="padding:6px 10px; border:1px solid #000; text-align:right; font-weight:700; white-space:nowrap;">${fmt(c.tot_ttc)}</td>
             </tr>
             <tr style="background:#fff; color:#000;">
                 <td colspan="7" style="padding:6px 10px; border:1px solid #000; text-align:right; font-weight:700; text-transform:uppercase;">AUTRES TAXES</td>
-                <td style="padding:6px 10px; border:1px solid #000; text-align:right; font-weight:700;">0 F</td>
+                <td style="padding:6px 10px; border:1px solid #000; text-align:right; font-weight:700; white-space:nowrap;">0 F</td>
             </tr>
             <tr style="background:#fff; color:#000;">
                 <td colspan="7" style="padding:6px 10px; border:1px solid #000; text-align:right; font-weight:900; text-transform:uppercase;">TOTAL A PAYER</td>
-                <td style="padding:6px 10px; border:1px solid #000; text-align:right; font-weight:900;">${fmt(c.tot_ttc)}</td>
+                <td style="padding:6px 10px; border:1px solid #000; text-align:right; font-weight:900; white-space:nowrap;">${fmt(c.tot_ttc)}</td>
             </tr>
             <tr style="background:#fff; color:#000;">
                 <td colspan="7" style="padding:6px 10px; border:1px solid #000; text-align:right; font-weight:700; text-transform:uppercase;">MONTANT REGLE</td>
-                <td style="padding:6px 10px; border:1px solid #000; text-align:right; font-weight:700;">${fmt(d.deja_paye)}</td>
+                <td style="padding:6px 10px; border:1px solid #000; text-align:right; font-weight:700; white-space:nowrap;">${fmt(d.deja_paye)}</td>
             </tr>
             <tr style="background:#fff; color:#000;">
                 <td colspan="7" style="padding:6px 10px; border:1px solid #000; text-align:right; font-weight:900; text-transform:uppercase; color:${d.deja_paye < c.tot_ttc ? '#dc2626' : '#000'};">RESTE A PAYER</td>
-                <td style="padding:6px 10px; border:1px solid #000; text-align:right; font-weight:900; color:${d.deja_paye < c.tot_ttc ? '#dc2626' : '#000'};">${fmt(Math.max(0, c.tot_ttc - d.deja_paye))}</td>
+                <td style="padding:6px 10px; border:1px solid #000; text-align:right; font-weight:900; color:${d.deja_paye < c.tot_ttc ? '#dc2626' : '#000'}; white-space:nowrap;">${fmt(Math.max(0, c.tot_ttc - d.deja_paye))}</td>
             </tr>
         `;
     }
@@ -919,21 +919,21 @@ function modelStandard(d) {
             <thead>
                 ${isDeliveryMode ? `
                 <tr style="background:#000; color:#fff; text-transform:uppercase;">
-                    <th style="text-align:left; font-weight:700; width:15%;">Réf.</th>
+                    <th style="text-align:left; font-weight:700; width:15%; white-space:nowrap;">Réf.</th>
                     <th style="text-align:left; font-weight:700;">Désignation</th>
-                    <th style="text-align:right; font-weight:700; width:15%;">Qté</th>
-                    <th style="text-align:center; font-weight:700; width:15%;">Unité</th>
+                    <th style="text-align:right; font-weight:700; width:15%; white-space:nowrap;">Qté</th>
+                    <th style="text-align:center; font-weight:700; width:15%; white-space:nowrap;">Unité</th>
                 </tr>
                 ` : `
                 <tr style="background:#000; color:#fff; text-transform:uppercase;">
-                    <th style="text-align:left; font-weight:700; width:12%;">Réf.</th>
+                    <th style="text-align:left; font-weight:700; width:12%; white-space:nowrap;">Réf.</th>
                     <th style="text-align:left; font-weight:700;">Désignation</th>
-                    <th style="text-align:right; font-weight:700; width:12%;">P.U. HT</th>
-                    <th style="text-align:right; font-weight:700; width:8%;">Qté</th>
-                    <th style="text-align:center; font-weight:700; width:10%;">Unité</th>
-                    <th style="text-align:right; font-weight:700; width:15%;">Taxes (%)</th>
-                    <th style="text-align:right; font-weight:700; width:10%;">Rem. (%)</th>
-                    <th style="text-align:right; font-weight:700; width:15%;">Montant HT</th>
+                    <th style="text-align:right; font-weight:700; width:12%; white-space:nowrap;">P.U. HT</th>
+                    <th style="text-align:right; font-weight:700; width:8%; white-space:nowrap;">Qté</th>
+                    <th style="text-align:center; font-weight:700; width:10%; white-space:nowrap;">Unité</th>
+                    <th style="text-align:right; font-weight:700; width:15%; white-space:nowrap;">Taxes (%)</th>
+                    <th style="text-align:right; font-weight:700; width:10%; white-space:nowrap;">Rem. (%)</th>
+                    <th style="text-align:right; font-weight:700; width:15%; white-space:nowrap;">Montant HT</th>
                 </tr>
                 `}
             </thead>

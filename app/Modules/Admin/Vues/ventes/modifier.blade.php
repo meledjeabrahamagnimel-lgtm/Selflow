@@ -301,10 +301,14 @@
                 </div>
                 <div class="form-group">
                     <label class="form-label">TVA (%)</label>
-                    <select id="saisieTvaInput" class="form-control">
+                    <select id="saisieTvaInputSelect" class="form-control" onchange="toggleSaisieTvaCustom()">
                         <option value="18">18%</option>
                         <option value="0">0%</option>
+                        <option value="custom">Autre (Saisie libre)</option>
                     </select>
+                    <div id="saisieTvaCustomContainer" style="display:none; margin-top:8px;">
+                        <input type="number" id="saisieTvaInput" class="form-control" value="18" placeholder="Taux en %" min="0" max="100" step="0.01">
+                    </div>
                 </div>
             </div>
             <div style="display:flex; justify-content:flex-end; gap:12px; margin-top:24px;">
@@ -444,6 +448,11 @@ function fermerSaisieLibre() {
     document.getElementById('saisieQteInput').value = '1';
     document.getElementById('saisieUniteInput').value = 'Unité';
     document.getElementById('saisieTvaInput').value = '18';
+    var select = document.getElementById('saisieTvaInputSelect');
+    if (select) {
+        select.value = '18';
+        toggleSaisieTvaCustom();
+    }
 }
 
 function ajouterSaisieLibre(e, fermer = true) {
@@ -478,6 +487,11 @@ function ajouterSaisieLibre(e, fermer = true) {
         qteInput.value = '1';
         uniteInput.value = 'Unité';
         tvaInput.value = '18';
+        var select = document.getElementById('saisieTvaInputSelect');
+        if (select) {
+            select.value = '18';
+            toggleSaisieTvaCustom();
+        }
         nomInput.focus();
     }
     renderPanier();
@@ -836,5 +850,18 @@ document.getElementById('rechercheInput').addEventListener('input', function() {
 
 // Initial render
 renderPanier();
+
+function toggleSaisieTvaCustom() {
+    var select = document.getElementById('saisieTvaInputSelect');
+    var container = document.getElementById('saisieTvaCustomContainer');
+    var input = document.getElementById('saisieTvaInput');
+    
+    if (select.value === 'custom') {
+        container.style.display = 'block';
+    } else {
+        container.style.display = 'none';
+        input.value = select.value;
+    }
+}
 </script>
 @endsection

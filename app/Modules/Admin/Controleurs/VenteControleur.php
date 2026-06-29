@@ -646,7 +646,7 @@ class VenteControleur
 
             // 3. Trésorerie et Écriture de règlement si payé
             // 3. Trésorerie et Écriture de règlement si payé
-            if ($vente->statut !== 'Crédit') {
+            if ($vente->statut === 'Payé') {
                 $dejaPaye = TresorerieJournal::where('reference_document', $vente->numero_facture)->sum('montant_entree');
                 $resteAPayer = max(0, $vente->montant_ttc - $dejaPaye);
 

@@ -153,7 +153,7 @@
                             <td style="font-weight: 500;">{{ \Carbon\Carbon::parse($op->date_operation)->format('d/m/Y') }}</td>
                             <td style="font-weight: 600;">{{ $op->id }}</td>
                             <td style="font-weight: 700; color: var(--primary);">{{ $op->reference_document ?? '—' }}</td>
-                            <td>{{ $op->libelle }}</td>
+                            <td style="white-space: normal; min-width: 220px;">{{ $op->libelle }}</td>
                             <td>{{ $op->mode_paiement }}</td>
                             <td style="text-align: right; font-weight: 700;">
                                 @if($op->montant_entree > 0)
@@ -238,7 +238,7 @@
                             <td style="font-weight: 600; color: var(--text-2);">
                                 {{ !$isTiers ? $compte : '—' }}
                             </td>
-                            <td>{{ $ecr->libelle }}</td>
+                            <td style="white-space: normal; min-width: 220px;">{{ $ecr->libelle }}</td>
                             <td style="text-align: right; font-weight: 700; color: #1e3a8a;">
                                 {{ $ecr->debit > 0 ? number_format($ecr->debit, 0, ',', ' ') . ' F' : '—' }}
                             </td>

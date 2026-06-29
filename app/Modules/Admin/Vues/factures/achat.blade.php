@@ -441,25 +441,25 @@ function model1(d) {
         <table style="width:100%;border-collapse:collapse;font-size:12px;margin-bottom:16px">
             <thead>
                 <tr style="background:${theme.color};color:#fff;">
-                    <th style="padding:9px 12px;text-align:left;color:#fff;background:${theme.color};font-weight:600;width:15%">Réf.</th>
+                    <th style="padding:9px 12px;text-align:left;color:#fff;background:${theme.color};font-weight:600;width:15%;white-space:nowrap;">Réf.</th>
                     <th style="padding:9px 12px;text-align:left;color:#fff;background:${theme.color};font-weight:600">Désignation</th>
-                    <th style="padding:9px 12px;text-align:center;color:#fff;background:${theme.color};font-weight:600;width:12%">Unité</th>
-                    <th style="padding:9px 12px;text-align:right;color:#fff;background:${theme.color};font-weight:600;width:10%">Qté</th>
+                    <th style="padding:9px 12px;text-align:center;color:#fff;background:${theme.color};font-weight:600;width:12%;white-space:nowrap;">Unité</th>
+                    <th style="padding:9px 12px;text-align:right;color:#fff;background:${theme.color};font-weight:600;width:10%;white-space:nowrap;">Qté</th>
                     ${isReceiptMode ? '' : `
-                    <th style="padding:9px 12px;text-align:right;color:#fff;background:${theme.color};font-weight:600;width:18%">P.U. HT</th>
-                    <th style="padding:9px 12px;text-align:right;color:#fff;background:${theme.color};font-weight:600;width:20%">Total HT</th>
+                    <th style="padding:9px 12px;text-align:right;color:#fff;background:${theme.color};font-weight:600;width:18%;white-space:nowrap;">P.U. HT</th>
+                    <th style="padding:9px 12px;text-align:right;color:#fff;background:${theme.color};font-weight:600;width:20%;white-space:nowrap;">Total HT</th>
                     `}
                 </tr>
             </thead>
             <tbody>
                 ${d.items.map((r, i) => `<tr style="background:${i % 2 === 0 ? '#fff' : '#F9FAFB'}">
-                    <td style="padding:9px 12px;color:var(--mu);font-weight:500;">${r.ref}</td>
+                    <td style="padding:9px 12px;color:var(--mu);font-weight:500;white-space:nowrap;">${r.ref}</td>
                     <td style="padding:9px 12px;font-weight:600;color:var(--tx)">${r.nom}</td>
-                    <td style="padding:9px 12px;text-align:center;color:var(--tx)">${r.unite || 'Unité'}</td>
-                    <td style="padding:9px 12px;text-align:right;color:var(--tx)">${r.qty}</td>
+                    <td style="padding:9px 12px;text-align:center;color:var(--tx);white-space:nowrap;">${r.unite || 'Unité'}</td>
+                    <td style="padding:9px 12px;text-align:right;color:var(--tx);white-space:nowrap;">${r.qty}</td>
                     ${isReceiptMode ? '' : `
-                    <td style="padding:9px 12px;text-align:right;color:var(--tx)">${fmt(r.pu)}</td>
-                    <td style="padding:9px 12px;text-align:right;font-weight:700;color:var(--tx)">${fmt(r.ht)}</td>
+                    <td style="padding:9px 12px;text-align:right;color:var(--tx);white-space:nowrap;">${fmt(r.pu)}</td>
+                    <td style="padding:9px 12px;text-align:right;font-weight:700;color:var(--tx);white-space:nowrap;">${fmt(r.ht)}</td>
                     `}
                 </tr>`).join('')}
             </tbody>
@@ -537,25 +537,25 @@ function model2(d) {
             <table style="width:100%;border-collapse:collapse;font-size:12px;margin-bottom:14px">
                 <thead>
                     <tr style="border-bottom:1.5px solid ${theme.color}">
-                        <th style="padding:7px 0;text-align:left;color:${theme.color};font-weight:700;width:18%">Réf.</th>
+                        <th style="padding:7px 0;text-align:left;color:${theme.color};font-weight:700;width:18%;white-space:nowrap;">Réf.</th>
                         <th style="padding:7px 6px;text-align:left;color:${theme.color};font-weight:700">Désignation</th>
-                        <th style="padding:7px 6px;text-align:center;color:${theme.color};font-weight:700;width:12%">Unité</th>
-                        <th style="padding:7px 6px;text-align:right;color:${theme.color};font-weight:700;width:10%">Qté</th>
+                        <th style="padding:7px 6px;text-align:center;color:${theme.color};font-weight:700;width:12%;white-space:nowrap;">Unité</th>
+                        <th style="padding:7px 6px;text-align:right;color:${theme.color};font-weight:700;width:10%;white-space:nowrap;">Qté</th>
                         ${isReceiptMode ? '' : `
-                        <th style="padding:7px 6px;text-align:right;color:${theme.color};font-weight:700;width:18%">P.U. HT</th>
-                        <th style="padding:7px 0;text-align:right;color:${theme.color};font-weight:700;width:20%">Total HT</th>
+                        <th style="padding:7px 6px;text-align:right;color:${theme.color};font-weight:700;width:18%;white-space:nowrap;">P.U. HT</th>
+                        <th style="padding:7px 0;text-align:right;color:${theme.color};font-weight:700;width:20%;white-space:nowrap;">Total HT</th>
                         `}
                     </tr>
                 </thead>
                 <tbody>
                     ${d.items.map(r => `<tr style="border-bottom:0.5px solid var(--border)">
-                        <td style="padding:8px 0;color:var(--mu);font-weight:500;">${r.ref}</td>
+                        <td style="padding:8px 0;color:var(--mu);font-weight:500;white-space:nowrap;">${r.ref}</td>
                         <td style="padding:8px 6px;color:var(--tx);font-weight:600;">${r.nom}</td>
-                        <td style="padding:8px 6px;text-align:center;color:var(--mu)">${r.unite || 'Unité'}</td>
-                        <td style="padding:8px 6px;text-align:right;color:var(--mu)">${r.qty}</td>
+                        <td style="padding:8px 6px;text-align:center;color:var(--mu);white-space:nowrap;">${r.unite || 'Unité'}</td>
+                        <td style="padding:8px 6px;text-align:right;color:var(--mu);white-space:nowrap;">${r.qty}</td>
                         ${isReceiptMode ? '' : `
-                        <td style="padding:8px 6px;text-align:right;color:var(--mu)">${fmt(r.pu)}</td>
-                        <td style="padding:8px 0;text-align:right;font-weight:700;color:var(--tx)">${fmt(r.ht)}</td>
+                        <td style="padding:8px 6px;text-align:right;color:var(--mu);white-space:nowrap;">${fmt(r.pu)}</td>
+                        <td style="padding:8px 0;text-align:right;font-weight:700;color:var(--tx);white-space:nowrap;">${fmt(r.ht)}</td>
                         `}
                     </tr>`).join('')}
                 </tbody>
@@ -641,25 +641,25 @@ function model3(d) {
         <table style="width:100%;border-collapse:collapse;font-size:12px;margin-bottom:16px;table-layout:fixed">
             <thead>
                 <tr>
-                    <th style="padding:9px 10px;text-align:left;border-bottom:2px solid ${theme.color};color:var(--tx);font-weight:700;width:15%">Réf.</th>
+                    <th style="padding:9px 10px;text-align:left;border-bottom:2px solid ${theme.color};color:var(--tx);font-weight:700;width:15%;white-space:nowrap;">Réf.</th>
                     <th style="padding:9px 10px;text-align:left;border-bottom:2px solid ${theme.color};color:var(--tx);font-weight:700;width:30%">Désignation</th>
-                    <th style="padding:9px 10px;text-align:center;border-bottom:2px solid ${theme.color};color:var(--tx);font-weight:700;width:12%">Unité</th>
-                    <th style="padding:9px 10px;text-align:right;border-bottom:2px solid ${theme.color};color:var(--tx);font-weight:700;width:10%">Qté</th>
+                    <th style="padding:9px 10px;text-align:center;border-bottom:2px solid ${theme.color};color:var(--tx);font-weight:700;width:12%;white-space:nowrap;">Unité</th>
+                    <th style="padding:9px 10px;text-align:right;border-bottom:2px solid ${theme.color};color:var(--tx);font-weight:700;width:10%;white-space:nowrap;">Qté</th>
                     ${isReceiptMode ? '' : `
-                    <th style="padding:9px 10px;text-align:right;border-bottom:2px solid ${theme.color};color:var(--tx);font-weight:700;width:16%">P.U. HT</th>
-                    <th style="padding:9px 10px;text-align:right;border-bottom:2px solid ${theme.color};color:var(--tx);font-weight:700;width:17%">Total HT</th>
+                    <th style="padding:9px 10px;text-align:right;border-bottom:2px solid ${theme.color};color:var(--tx);font-weight:700;width:16%;white-space:nowrap;">P.U. HT</th>
+                    <th style="padding:9px 10px;text-align:right;border-bottom:2px solid ${theme.color};color:var(--tx);font-weight:700;width:17%;white-space:nowrap;">Total HT</th>
                     `}
                 </tr>
             </thead>
             <tbody>
                 ${d.items.map((r, i) => `<tr style="background:${i % 2 === 1 ? '#F9FAFB' : '#fff'}">
-                    <td style="padding:9px 10px;color:var(--mu);font-size:11px;font-weight:500;">${r.ref}</td>
+                    <td style="padding:9px 10px;color:var(--mu);font-size:11px;font-weight:500;white-space:nowrap;">${r.ref}</td>
                     <td style="padding:9px 10px;font-weight:600;color:var(--tx)">${r.nom}</td>
-                    <td style="padding:9px 10px;text-align:center;color:var(--tx)">${r.unite || 'Unité'}</td>
-                    <td style="padding:9px 10px;text-align:right;color:var(--tx)">${r.qty}</td>
+                    <td style="padding:9px 10px;text-align:center;color:var(--tx);white-space:nowrap;">${r.unite || 'Unité'}</td>
+                    <td style="padding:9px 10px;text-align:right;color:var(--tx);white-space:nowrap;">${r.qty}</td>
                     ${isReceiptMode ? '' : `
-                    <td style="padding:9px 10px;text-align:right;color:var(--mu)">${fmt(r.pu)}</td>
-                    <td style="padding:9px 10px;text-align:right;font-weight:700;color:var(--tx)">${fmt(r.ht)}</td>
+                    <td style="padding:9px 10px;text-align:right;color:var(--mu);white-space:nowrap;">${fmt(r.pu)}</td>
+                    <td style="padding:9px 10px;text-align:right;font-weight:700;color:var(--tx);white-space:nowrap;">${fmt(r.ht)}</td>
                     `}
                 </tr>`).join('')}
             </tbody>
@@ -706,32 +706,32 @@ function modelStandard(d) {
     if (isReceiptMode) {
         rowsHtml = d.items.map(r => `
             <tr style="background:#fff; color:#000;">
-                <td style="padding:8px 10px; border:1px solid #000; font-weight:500;">${r.ref}</td>
+                <td style="padding:8px 10px; border:1px solid #000; font-weight:500; white-space:nowrap;">${r.ref}</td>
                 <td style="padding:8px 10px; border:1px solid #000; font-weight:700;">${r.nom}</td>
-                <td style="padding:8px 10px; border:1px solid #000; text-align:right;">${r.qty}</td>
-                <td style="padding:8px 10px; border:1px solid #000; text-align:center;">${r.unite || 'Unité'}</td>
+                <td style="padding:8px 10px; border:1px solid #000; text-align:right; white-space:nowrap;">${r.qty}</td>
+                <td style="padding:8px 10px; border:1px solid #000; text-align:center; white-space:nowrap;">${r.unite || 'Unité'}</td>
             </tr>
         `).join('');
     } else {
         rowsHtml = d.items.map(r => `
             <tr style="background:#fff; color:#000;">
-                <td style="padding:8px 10px; border:1px solid #000; font-weight:500;">${r.ref}</td>
+                <td style="padding:8px 10px; border:1px solid #000; font-weight:500; white-space:nowrap;">${r.ref}</td>
                 <td style="padding:8px 10px; border:1px solid #000; font-weight:700;">${r.nom}</td>
-                <td style="padding:8px 10px; border:1px solid #000; text-align:right;">${fmt(r.pu)}</td>
-                <td style="padding:8px 10px; border:1px solid #000; text-align:right;">${r.qty}</td>
-                <td style="padding:8px 10px; border:1px solid #000; text-align:center;">${r.unite || 'Unité'}</td>
-                <td style="padding:8px 10px; border:1px solid #000; text-align:right; font-weight:700;">${fmt(r.ht)}</td>
+                <td style="padding:8px 10px; border:1px solid #000; text-align:right; white-space:nowrap;">${fmt(r.pu)}</td>
+                <td style="padding:8px 10px; border:1px solid #000; text-align:right; white-space:nowrap;">${r.qty}</td>
+                <td style="padding:8px 10px; border:1px solid #000; text-align:center; white-space:nowrap;">${r.unite || 'Unité'}</td>
+                <td style="padding:8px 10px; border:1px solid #000; text-align:right; font-weight:700; white-space:nowrap;">${fmt(r.ht)}</td>
             </tr>
         `).join('');
         
         rowsHtml += `
             <tr style="background:#fff; color:#000;">
                 <td colspan="5" style="padding:6px 10px; border:1px solid #000; text-align:right; font-weight:700; text-transform:uppercase;">TOTAL HT</td>
-                <td style="padding:6px 10px; border:1px solid #000; text-align:right; font-weight:700;">${fmt(d.montant_ht)}</td>
+                <td style="padding:6px 10px; border:1px solid #000; text-align:right; font-weight:700; white-space:nowrap;">${fmt(d.montant_ht)}</td>
             </tr>
             <tr style="background:#fff; color:#000;">
                 <td colspan="5" style="padding:6px 10px; border:1px solid #000; text-align:right; font-weight:700; text-transform:uppercase;">TOTAL TTC</td>
-                <td style="padding:6px 10px; border:1px solid #000; text-align:right; font-weight:700;">${fmt(d.montant_ttc)}</td>
+                <td style="padding:6px 10px; border:1px solid #000; text-align:right; font-weight:700; white-space:nowrap;">${fmt(d.montant_ttc)}</td>
             </tr>
         `;
     }
@@ -782,19 +782,19 @@ function modelStandard(d) {
             <thead>
                 ${isReceiptMode ? `
                 <tr style="background:#000; color:#fff; text-transform:uppercase;">
-                    <th style="text-align:left; font-weight:700; width:15%;">Réf.</th>
+                    <th style="text-align:left; font-weight:700; width:15%; white-space:nowrap;">Réf.</th>
                     <th style="text-align:left; font-weight:700;">Désignation</th>
-                    <th style="text-align:right; font-weight:700; width:15%;">Qté</th>
-                    <th style="text-align:center; font-weight:700; width:15%;">Unité</th>
+                    <th style="text-align:right; font-weight:700; width:15%; white-space:nowrap;">Qté</th>
+                    <th style="text-align:center; font-weight:700; width:15%; white-space:nowrap;">Unité</th>
                 </tr>
                 ` : `
                 <tr style="background:#000; color:#fff; text-transform:uppercase;">
-                    <th style="text-align:left; font-weight:700; width:15%;">Réf.</th>
+                    <th style="text-align:left; font-weight:700; width:15%; white-space:nowrap;">Réf.</th>
                     <th style="text-align:left; font-weight:700;">Désignation</th>
-                    <th style="text-align:right; font-weight:700; width:15%;">P.U. HT</th>
-                    <th style="text-align:right; font-weight:700; width:10%;">Qté</th>
-                    <th style="text-align:center; font-weight:700; width:15%;">Unité</th>
-                    <th style="text-align:right; font-weight:700; width:20%;">Montant HT</th>
+                    <th style="text-align:right; font-weight:700; width:15%; white-space:nowrap;">P.U. HT</th>
+                    <th style="text-align:right; font-weight:700; width:10%; white-space:nowrap;">Qté</th>
+                    <th style="text-align:center; font-weight:700; width:15%; white-space:nowrap;">Unité</th>
+                    <th style="text-align:right; font-weight:700; width:20%; white-space:nowrap;">Montant HT</th>
                 </tr>
                 `}
             </thead>

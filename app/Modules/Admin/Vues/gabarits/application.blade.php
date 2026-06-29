@@ -238,17 +238,18 @@
         .stat-change.down { color: var(--danger); }
 
         /* ── TABLE ───────────────────────────────── */
-        .table-wrap { overflow-x: auto; border-radius: var(--radius); }
+        .table-wrap { overflow: auto; max-height: 70vh; border-radius: var(--radius); }
         table { width: 100%; border-collapse: collapse; }
         thead th {
             background: #F8FAFC; padding: 12px 16px; text-align: left;
             font-size: 11px; font-weight: 600; text-transform: uppercase;
             letter-spacing: .5px; color: var(--text-2); border-bottom: 1px solid var(--border);
+            position: sticky; top: 0; z-index: 10; white-space: nowrap;
         }
         tbody tr { border-bottom: 1px solid var(--border); transition: background .12s; }
         tbody tr:last-child { border-bottom: none; }
         tbody tr:hover { background: rgba(0,0,0,.02); }
-        tbody td { padding: 13px 16px; font-size: 13px; vertical-align: middle; color: var(--text); }
+        tbody td { padding: 13px 16px; font-size: 13px; vertical-align: middle; color: var(--text); white-space: nowrap; }
 
         /* ── BADGES ──────────────────────────────── */
         .badge {
@@ -367,6 +368,7 @@
             background: var(--surface); border: 1px solid var(--border);
             border-radius: 16px; padding: 28px; width: 100%; max-width: 540px;
             box-shadow: 0 24px 64px rgba(0,0,0,.5); animation: modalIn .2s ease;
+            max-height: 85vh; overflow-y: auto;
         }
         @keyframes modalIn { from { opacity:0; transform: scale(.96) translateY(8px); } to { opacity:1; transform: none; } }
         .modal-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 22px; }
