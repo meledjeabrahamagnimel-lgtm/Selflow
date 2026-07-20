@@ -13,15 +13,27 @@ class ClientControleur
     public function index(Request $request): View
     {
         $entreprise = Auth::user()->entreprise;
-        
-        $clients = Client::where('entreprise_id', $entreprise->id)
+        $search = $request->input('search', '');
+
+        $query = Client::where('entreprise_id', $entreprise->id)
             ->where(function ($q) {
                 $q->where('source', '!=', 'comptaflow')
                   ->orWhereNull('source');
             })
             ->withCount('ventes')
-            ->orderBy('nom')
-            ->paginate(15, ['*'], 'page_local');
+            ->orderBy('nom');
+        
+        if ($search) {
+            $query->where(function($q) use ($search) {
+                $q->where('nom', 'like', "%{$search}%")
+                  ->orWhere('telephone', 'like', "%{$search}%")
+                  ->orWhere('email', 'like', "%{$search}%")
+                  ->orWhere('numero_tiers', 'like', "%{$search}%")
+                  ->orWhere('ncc', 'like', "%{$search}%");
+            });
+        }
+
+        $clients = $query->paginate(15, ['*'], 'page_local')->withQueryString();
 
         $clientsComptaflow = Client::where('entreprise_id', $entreprise->id)
             ->where('source', 'comptaflow')
@@ -31,7 +43,7 @@ class ClientControleur
 
         $comptes = \App\Modules\Admin\Modeles\PlanComptable::obtenirComptesPrioritaires($entreprise->id);
 
-        return view('admin::clients.index', compact('clients', 'clientsComptaflow', 'comptes', 'entreprise'));
+        return view('admin::clients.index', compact('clients', 'clientsComptaflow', 'comptes', 'entreprise', 'search'));
     }
 
     public function creer(Request $request): RedirectResponse
@@ -146,5 +158,18 @@ class ClientControleur
         }
 
         return back()->with('succes', 'Client modifié avec succès.');
+    }
+
+    public function supprimer(Request $request, Client $client): RedirectResponse
+    {
+        $entreprise = Auth::user()->entreprise;
+        abort_unless($client->entreprise_id === $entreprise->id, 403);
+
+        if ($client->ventes_count > 0 || $client->ventes()->exists()) {
+            return back()->with('erreur', 'Impossible de supprimer ce client : il est lié à des ventes enregistrées.');
+        }
+
+        $client->delete();
+        return back()->with('succes', 'Client supprimé avec succès.');
     }
 }

@@ -13,15 +13,28 @@ class FournisseurControleur
     public function index(Request $request): View
     {
         $entreprise   = Auth::user()->entreprise;
-        
-        $fournisseurs = Fournisseur::where('entreprise_id', $entreprise->id)
-             ->where(function ($q) {
-                 $q->where('source', '!=', 'comptaflow')
-                   ->orWhereNull('source');
-             })
-             ->withCount('achats')
-             ->orderBy('nom')
-             ->paginate(15, ['*'], 'page_local');
+        $search = $request->input('search', '');
+
+        $query = Fournisseur::where('entreprise_id', $entreprise->id)
+            ->where(function ($q) {
+                $q->where('source', '!=', 'comptaflow')
+                  ->orWhereNull('source');
+            })
+            ->withCount('achats')
+            ->orderBy('nom');
+
+        if ($search) {
+            $query->where(function($q) use ($search) {
+                $q->where('nom', 'like', "%{$search}%")
+                  ->orWhere('telephone', 'like', "%{$search}%")
+                  ->orWhere('email', 'like', "%{$search}%")
+                  ->orWhere('numero_tiers', 'like', "%{$search}%")
+                  ->orWhere('ncc', 'like', "%{$search}%")
+                  ->orWhere('secteur', 'like', "%{$search}%");
+            });
+        }
+
+        $fournisseurs = $query->paginate(15, ['*'], 'page_local')->withQueryString();
 
         $fournisseursComptaflow = Fournisseur::where('entreprise_id', $entreprise->id)
              ->where('source', 'comptaflow')
@@ -31,7 +44,7 @@ class FournisseurControleur
 
         $comptes = \App\Modules\Admin\Modeles\PlanComptable::obtenirComptesPrioritaires($entreprise->id);
 
-        return view('admin::fournisseurs.index', compact('fournisseurs', 'fournisseursComptaflow', 'comptes', 'entreprise'));
+        return view('admin::fournisseurs.index', compact('fournisseurs', 'fournisseursComptaflow', 'comptes', 'entreprise', 'search'));
     }
 
     public function creer(Request $request): RedirectResponse
@@ -149,5 +162,18 @@ class FournisseurControleur
         }
 
         return back()->with('succes', 'Fournisseur modifié avec succès.');
+    }
+
+    public function supprimer(Request $request, Fournisseur $fournisseur): RedirectResponse
+    {
+        $entreprise = Auth::user()->entreprise;
+        abort_unless($fournisseur->entreprise_id === $entreprise->id, 403);
+
+        if ($fournisseur->achats()->exists()) {
+            return back()->with('erreur', 'Impossible de supprimer ce fournisseur : il est lié à des achats enregistrés.');
+        }
+
+        $fournisseur->delete();
+        return back()->with('succes', 'Fournisseur supprimé avec succès.');
     }
 }

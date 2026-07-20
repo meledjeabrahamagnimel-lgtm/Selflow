@@ -191,15 +191,17 @@ Route::prefix('admin')
         });
 
         Route::prefix('clients')->name('clients.')->group(function () {
-            Route::get('/',       [ClientControleur::class, 'index'])->name('index');
-            Route::post('/',      [ClientControleur::class, 'creer'])->name('creer');
-            Route::put('/{client}', [ClientControleur::class, 'modifier'])->name('modifier');
+            Route::get('/',           [ClientControleur::class, 'index'])->name('index');
+            Route::post('/',          [ClientControleur::class, 'creer'])->name('creer');
+            Route::put('/{client}',   [ClientControleur::class, 'modifier'])->name('modifier');
+            Route::delete('/{client}', [ClientControleur::class, 'supprimer'])->name('supprimer');
         });
 
         Route::prefix('fournisseurs')->name('fournisseurs.')->group(function () {
-            Route::get('/',       [FournisseurControleur::class, 'index'])->name('index');
-            Route::post('/',      [FournisseurControleur::class, 'creer'])->name('creer');
-            Route::put('/{fournisseur}', [FournisseurControleur::class, 'modifier'])->name('modifier');
+            Route::get('/',                [FournisseurControleur::class, 'index'])->name('index');
+            Route::post('/',               [FournisseurControleur::class, 'creer'])->name('creer');
+            Route::put('/{fournisseur}',   [FournisseurControleur::class, 'modifier'])->name('modifier');
+            Route::delete('/{fournisseur}', [FournisseurControleur::class, 'supprimer'])->name('supprimer');
         });
 
         // ── Banques ──

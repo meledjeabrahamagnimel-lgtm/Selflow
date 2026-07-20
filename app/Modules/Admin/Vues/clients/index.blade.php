@@ -26,6 +26,24 @@
     </div>
 </div>
 
+{{-- Alertes flash --}}
+@if(session('erreur'))
+<div style="background:#fff5f5; color:#e53e3e; border:1px solid #fed7d7; padding:12px 16px; border-radius:8px; margin-bottom:16px; font-weight:600;">
+    <i class="fas fa-exclamation-triangle"></i> {{ session('erreur') }}
+</div>
+@endif
+
+{{-- Barre de recherche --}}
+<form method="GET" action="{{ route('admin.clients.index') }}" style="margin-bottom:16px;">
+    <div style="display:flex; gap:10px; align-items:center; max-width:450px;">
+        <input type="text" name="search" value="{{ $search ?? '' }}" placeholder="Rechercher par nom, tél., email, n° tiers..." class="form-control" style="flex:1;">
+        <button type="submit" class="btn btn-primary" style="white-space:nowrap;"><i class="fas fa-search"></i></button>
+        @if(!empty($search))
+            <a href="{{ route('admin.clients.index') }}" class="btn btn-outline" style="white-space:nowrap;"><i class="fas fa-times"></i></a>
+        @endif
+    </div>
+</form>
+
 <div id="section-local">
     <div class="card">
         <div class="table-wrap">
@@ -79,7 +97,7 @@
                             <span class="badge badge-purple">{{ $c->ventes_count }} vente(s)</span>
                         </td>
                         <td style="color:var(--text-3);">{{ $c->created_at->format('d/m/Y') }}</td>
-                        <td>
+                        <td style="display:flex; gap:6px; flex-wrap:wrap;">
                             <button class="btn btn-outline btn-sm btn-modifier-client"
                                 data-id="{{ $c->id }}"
                                 data-nom="{{ $c->nom }}"
@@ -93,8 +111,14 @@
                                 data-numero="{{ $c->numero_tiers }}"
                                 data-source="{{ $c->source }}"
                                 style="padding: 5px 10px;">
-                                <i class="fas fa-edit"></i> Modifier
+                                <i class="fas fa-edit"></i>
                             </button>
+                            @if($c->ventes_count == 0)
+                            <form method="POST" action="{{ route('admin.clients.supprimer', $c) }}" onsubmit="return confirm('Supprimer ce client ?')">
+                                @csrf @method('DELETE')
+                                <button type="submit" class="btn btn-sm" style="padding:5px 10px; background:#fff5f5; color:#e53e3e; border:1px solid #fed7d7;"><i class="fas fa-trash"></i></button>
+                            </form>
+                            @endif
                         </td>
                     </tr>
                     @empty
