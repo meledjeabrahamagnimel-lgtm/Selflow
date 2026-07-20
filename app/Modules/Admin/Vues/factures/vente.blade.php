@@ -412,7 +412,10 @@ var isDeliveryMode = {{ isset($bl) ? 'true' : 'false' }};
 
 @php
     $entreprise = $vente->pointDeVente->entreprise;
-    $logoUrl = $entreprise->logo_path ? Storage::disk('public')->url($entreprise->logo_path) : null;
+    $logoUrl = $entreprise->logo_path;
+    if ($logoUrl && !str_starts_with($logoUrl, 'http://') && !str_starts_with($logoUrl, 'https://')) {
+        $logoUrl = Storage::disk('public')->url($logoUrl);
+    }
 @endphp
 
 var DATA = {

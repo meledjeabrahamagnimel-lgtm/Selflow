@@ -175,7 +175,7 @@
                     <label class="form-label" style="margin-bottom:10px;display:block;">Logo principal de l'entreprise</label>
                     @if($entreprise->logo_path)
                         <div style="margin-bottom:10px;padding:12px;background:var(--bg3);border-radius:8px;display:flex;align-items:center;gap:12px;">
-                            <img src="{{ Storage::disk('public')->url($entreprise->logo_path) }}" alt="Logo entreprise" style="max-height:60px;max-width:140px;object-fit:contain;border-radius:4px;">
+                            <img src="{{ (str_starts_with($entreprise->logo_path, 'http://') || str_starts_with($entreprise->logo_path, 'https://')) ? $entreprise->logo_path : Storage::disk('public')->url($entreprise->logo_path) }}" alt="Logo entreprise" style="max-height:60px;max-width:140px;object-fit:contain;border-radius:4px;">
                             <span style="font-size:12px;color:var(--text-2);">Logo actuel</span>
                         </div>
                     @else
@@ -193,7 +193,7 @@
                     <label class="form-label" style="margin-bottom:10px;display:block;">Logo secondaire (FNE, certification, etc.)</label>
                     @if($entreprise->logo_fne_path)
                         <div style="margin-bottom:10px;padding:12px;background:var(--bg3);border-radius:8px;display:flex;align-items:center;gap:12px;">
-                            <img src="{{ Storage::disk('public')->url($entreprise->logo_fne_path) }}" alt="Logo FNE" style="max-height:60px;max-width:140px;object-fit:contain;border-radius:4px;">
+                            <img src="{{ (str_starts_with($entreprise->logo_fne_path, 'http://') || str_starts_with($entreprise->logo_fne_path, 'https://')) ? $entreprise->logo_fne_path : Storage::disk('public')->url($entreprise->logo_fne_path) }}" alt="Logo FNE" style="max-height:60px;max-width:140px;object-fit:contain;border-radius:4px;">
                             <span style="font-size:12px;color:var(--text-2);">Logo actuel</span>
                         </div>
                     @else
