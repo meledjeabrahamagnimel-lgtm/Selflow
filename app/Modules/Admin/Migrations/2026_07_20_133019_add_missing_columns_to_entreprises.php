@@ -8,6 +8,7 @@ use Illuminate\Support\Facades\Schema;
  * Migration corrective : ajoute toutes les colonnes qui peuvent manquer
  * sur la base de données de production si l'historique des migrations est désynchronisé.
  * Utilise Schema::hasColumn() pour ne jamais casser si la colonne existe déjà.
+ * SANS clause after() pour éviter les dépendances entre colonnes manquantes.
  */
 return new class extends Migration
 {
@@ -15,26 +16,26 @@ return new class extends Migration
     {
         Schema::table('entreprises', function (Blueprint $table) {
 
-            if (!Schema::hasColumn('entreprises', 'modules_actifs')) {
-                $table->json('modules_actifs')->nullable()->after('secteur_activite');
-            }
             if (!Schema::hasColumn('entreprises', 'secteur_activite')) {
-                $table->json('secteur_activite')->nullable()->after('plan_abonnement');
+                $table->json('secteur_activite')->nullable();
+            }
+            if (!Schema::hasColumn('entreprises', 'modules_actifs')) {
+                $table->json('modules_actifs')->nullable();
             }
             if (!Schema::hasColumn('entreprises', 'ncc')) {
-                $table->string('ncc')->nullable()->after('compte_contribuable');
+                $table->string('ncc')->nullable();
             }
             if (!Schema::hasColumn('entreprises', 'forme_juridique')) {
-                $table->string('forme_juridique')->nullable()->after('nom');
+                $table->string('forme_juridique')->nullable();
             }
             if (!Schema::hasColumn('entreprises', 'gerant_nom')) {
-                $table->string('gerant_nom')->nullable()->after('forme_juridique');
+                $table->string('gerant_nom')->nullable();
             }
             if (!Schema::hasColumn('entreprises', 'gerant_prenom')) {
-                $table->string('gerant_prenom')->nullable()->after('gerant_nom');
+                $table->string('gerant_prenom')->nullable();
             }
             if (!Schema::hasColumn('entreprises', 'gerant_fonction')) {
-                $table->string('gerant_fonction')->nullable()->after('gerant_prenom');
+                $table->string('gerant_fonction')->nullable();
             }
             if (!Schema::hasColumn('entreprises', 'regime_imposition')) {
                 $table->string('regime_imposition')->nullable();
