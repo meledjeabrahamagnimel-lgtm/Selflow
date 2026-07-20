@@ -97,6 +97,10 @@ Route::prefix('admin')
             Route::post('/',      [FournisseurApiControleur::class, 'creer']);
         });
 
+
+        // routes/api.php
+        Route::post('ventes/devis/enregistrer', [VenteController::class, 'enregistrerDevis']);
+
         // ── Paramètres entreprise ──
         Route::get('/entreprise/parametres', [EntrepriseApiControleur::class, 'parametres']);
         Route::post('/entreprise/parametres', [EntrepriseApiControleur::class, 'enregistrerParametres']); // POST pour supporter multipart/form-data avec PUT simulé si nécessaire
@@ -114,3 +118,4 @@ Route::prefix('external')->group(function () {
     Route::post('/list-companies', [\App\Modules\Admin\Controleurs\Api\ExternalSyncControleur::class, 'listCompanies'])
         ->name('api.external.list-companies');
 });
+    
