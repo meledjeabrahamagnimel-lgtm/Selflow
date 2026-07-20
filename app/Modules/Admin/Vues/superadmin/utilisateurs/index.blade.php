@@ -180,6 +180,12 @@
                     </div>
                 </div>
 
+                {{-- Nouveau mot de passe --}}
+                <div class="form-group" style="margin-bottom:20px;">
+                    <label class="form-label" style="font-weight:600;">Nouveau mot de passe (laisser vide si inchangé)</label>
+                    <input type="password" name="password" id="modal_password" class="form-control" placeholder="Entrez un nouveau mot de passe pour le mettre à jour" style="border-radius:8px;">
+                </div>
+
                 {{-- Habilitations --}}
                 <div style="font-weight:700; font-size:13px; color:var(--text); text-transform:uppercase; margin-bottom:12px; border-bottom:1px solid var(--border); padding-bottom:6px;">
                     <i class="fas fa-key" style="margin-right:6px;"></i>Écraser les habilitations spécifiques

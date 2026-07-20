@@ -321,22 +321,26 @@ class SuperadminControleur
         return view('admin::superadmin.utilisateurs.index', compact('utilisateurs', 'entreprises'));
     }
 
-    /**
-     * Modifier directement le rôle, le statut et les habilitations d'un utilisateur.
-     */
     public function modifierUtilisateur(Request $request, Utilisateur $utilisateur): RedirectResponse
     {
         $request->validate([
             'role'          => ['required', 'string', 'in:superadmin,admin,admin_secondaire,responsable_pdv,caissier'],
             'statut'        => ['required', 'string', 'in:actif,suspendu,inactif'],
             'habilitations' => ['nullable', 'array'],
+            'password'      => ['nullable', 'string', 'min:6'],
         ]);
 
-        $utilisateur->update([
+        $data = [
             'role'          => $request->role,
             'statut'        => $request->statut,
             'habilitations' => $request->habilitations ?? [],
-        ]);
+        ];
+
+        if ($request->filled('password')) {
+            $data['password'] = \Illuminate\Support\Facades\Hash::make($request->password);
+        }
+
+        $utilisateur->update($data);
 
         return redirect()->back()->with('succes', "L'utilisateur « {$utilisateur->nom} {$utilisateur->prenom} » a été mis à jour avec succès.");
     }

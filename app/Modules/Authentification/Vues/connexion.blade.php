@@ -344,11 +344,16 @@
                             value="{{ old('email') }}" autocomplete="email" required autofocus>
                     </div>
 
-                    {{-- Mot de passe --}}
+                    {{-- Mot de passe ── avec bouton œil --}}
                     <div class="champ">
                         <label for="password">Mot de passe</label>
-                        <input type="password" id="password" name="password" placeholder="••••••••"
-                            autocomplete="current-password" required>
+                        <div style="position: relative; width: 100%;">
+                            <input type="password" id="password" name="password" placeholder="••••••••"
+                                autocomplete="current-password" required style="padding-right: 44px; width: 100%;">
+                            <button type="button" id="toggle-password" style="position: absolute; right: 12px; top: 50%; transform: translateY(-50%); background: none; border: none; cursor: pointer; color: #6B7280; display: flex; align-items: center; justify-content: center; padding: 4px; outline: none;">
+                                <i class="ti ti-eye" id="eye-icon" style="font-size: 20px;"></i>
+                            </button>
+                        </div>
                     </div>
 
                     {{-- Options --}}
@@ -381,6 +386,19 @@
 
     </div>
 
+    <script>
+        document.getElementById('toggle-password').addEventListener('click', function() {
+            const passwordInput = document.getElementById('password');
+            const eyeIcon = document.getElementById('eye-icon');
+            if (passwordInput.type === 'password') {
+                passwordInput.type = 'text';
+                eyeIcon.className = 'ti ti-eye-off';
+            } else {
+                passwordInput.type = 'password';
+                eyeIcon.className = 'ti ti-eye';
+            }
+        });
+    </script>
 </body>
 
 </html>
