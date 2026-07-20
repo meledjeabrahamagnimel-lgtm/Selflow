@@ -10,6 +10,7 @@ use App\Modules\Admin\Modeles\EcritureComptable;
 use App\Modules\Admin\Modeles\TresorerieJournal;
 use App\Modules\Admin\Modeles\PointDeVente;
 use App\Modules\Admin\Modeles\CodeJournal;
+use App\Modules\Admin\Services\CacheService;
 use App\Modules\Admin\Services\ComptabiliteService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -27,8 +28,8 @@ class ComptabiliteControleur
         $entreprise = Auth::user()->entreprise;
         $isAdmin = Auth::user()->role === 'admin';
 
-        // Récupérer les points de vente pour le filtre
-        $pointsDeVente = PointDeVente::where('entreprise_id', $entreprise->id)->get();
+        // Récupérer les points de vente pour le filtre (via cache Section 18.4)
+        $pointsDeVente = CacheService::pointsDeVente($entreprise->id);
 
         // Récupérer le point de vente sélectionné pour le filtre
         $pdvFilter = $request->input('point_de_vente_id');
@@ -126,7 +127,10 @@ class ComptabiliteControleur
             $ecritures = collect();
         }
 
-        return view('admin::comptabilite.globale', compact('pointsDeVente', 'pdvFilter', 'mode', 'operations', 'ecritures', 'isAdmin', 'minIds', 'tresoMap', 'venteMap', 'achatMap'));
+        // Récupérer les codes journaux de l'entreprise avec priorité COMPTAFLOW
+        $codesJournaux = \App\Modules\Admin\Modeles\CodeJournal::obtenirJournauxPrioritaires($entreprise->id);
+
+        return view('admin::comptabilite.globale', compact('pointsDeVente', 'pdvFilter', 'mode', 'operations', 'ecritures', 'isAdmin', 'minIds', 'tresoMap', 'venteMap', 'achatMap', 'codesJournaux'));
     }
 
     /**
@@ -507,26 +511,49 @@ class ComptabiliteControleur
     public function planComptable(Request $request): View
     {
         $entreprise = Auth::user()->entreprise;
-        $query = \App\Modules\Admin\Modeles\PlanComptable::where(function ($q) use ($entreprise) {
+        
+        // 1. Comptes Locaux
+        $queryLocal = \App\Modules\Admin\Modeles\PlanComptable::where(function ($q) use ($entreprise) {
             $q->whereNull('entreprise_id')
               ->orWhere('entreprise_id', $entreprise->id);
+        })->where(function ($q) {
+            $q->where('source', '!=', 'comptaflow')
+              ->orWhereNull('source');
         });
 
         if ($request->filled('numero')) {
-            $query->where('numero', 'like', $request->input('numero') . '%');
+            $queryLocal->where('numero', 'like', $request->input('numero') . '%');
         }
 
         if ($request->filled('classe')) {
-            $query->where('numero', 'like', $request->input('classe') . '%');
+            $queryLocal->where('numero', 'like', $request->input('classe') . '%');
         }
 
         if ($request->filled('libelle')) {
-            $query->where('libelle', 'like', '%' . $request->input('libelle') . '%');
+            $queryLocal->where('libelle', 'like', '%' . $request->input('libelle') . '%');
         }
 
-        $comptes = $query->orderBy('numero')->paginate(10);
+        $comptes = $queryLocal->orderBy('numero')->paginate(15, ['*'], 'page_local');
 
-        return view('admin::comptabilite.plan_comptable', compact('comptes'));
+        // 2. Comptes COMPTAFLOW
+        $queryComptaflow = \App\Modules\Admin\Modeles\PlanComptable::where('entreprise_id', $entreprise->id)
+            ->where('source', 'comptaflow');
+
+        if ($request->filled('numero')) {
+            $queryComptaflow->where('numero', 'like', $request->input('numero') . '%');
+        }
+
+        if ($request->filled('classe')) {
+            $queryComptaflow->where('numero', 'like', $request->input('classe') . '%');
+        }
+
+        if ($request->filled('libelle')) {
+            $queryComptaflow->where('libelle', 'like', '%' . $request->input('libelle') . '%');
+        }
+
+        $comptesComptaflow = $queryComptaflow->orderBy('numero')->paginate(15, ['*'], 'page_comptaflow');
+
+        return view('admin::comptabilite.plan_comptable', compact('comptes', 'comptesComptaflow', 'entreprise'));
     }
 
     /**
@@ -556,5 +583,68 @@ class ComptabiliteControleur
         ));
 
         return back()->with('succes', 'Compte comptable créé avec succès.');
+    }
+
+    /**
+     * Enregistrer une écriture comptable manuelle
+     */
+    public function creerEcritureManuelle(Request $request): RedirectResponse
+    {
+        $entreprise = Auth::user()->entreprise;
+
+        $request->validate([
+            'date_ecriture'     => ['required', 'date'],
+            'libelle'           => ['required', 'string', 'max:255'],
+            'description'       => ['nullable', 'string', 'max:2000'],
+            'code_journal'      => ['required', 'string', 'max:10'],
+            'compte_debit'      => ['required', 'string', 'max:50'],
+            'compte_credit'     => ['required', 'string', 'max:50'],
+            'montant'           => ['required', 'numeric', 'min:1'],
+            'point_de_vente_id' => ['nullable', 'integer', 'exists:points_de_vente,id'],
+        ]);
+
+        $pdvId = $request->point_de_vente_id;
+        if (!$pdvId) {
+            $pdvId = session('point_de_vente_actif_id') 
+                ?? Auth::user()->point_de_vente_id 
+                ?? PointDeVente::where('entreprise_id', $entreprise->id)->value('id');
+        }
+
+        $montant = floatval($request->montant);
+        $numPiece = 'MN-' . now()->format('YmdHis');
+
+        DB::transaction(function () use ($entreprise, $pdvId, $request, $montant, $numPiece) {
+            // Créer le débit
+            EcritureComptable::create([
+                'entreprise_id'      => $entreprise->id,
+                'point_de_vente_id'  => $pdvId,
+                'date_ecriture'      => $request->date_ecriture,
+                'libelle'            => $request->libelle,
+                'description'        => $request->description,
+                'reference_document' => $numPiece,
+                'code_journal'       => $request->code_journal,
+                'compte_debit'       => $request->compte_debit,
+                'compte_credit'      => null,
+                'debit'              => $montant,
+                'credit'             => 0,
+            ]);
+
+            // Créer le crédit
+            EcritureComptable::create([
+                'entreprise_id'      => $entreprise->id,
+                'point_de_vente_id'  => $pdvId,
+                'date_ecriture'      => $request->date_ecriture,
+                'libelle'            => $request->libelle,
+                'description'        => $request->description,
+                'reference_document' => $numPiece,
+                'code_journal'       => $request->code_journal,
+                'compte_debit'       => null,
+                'compte_credit'      => $request->compte_credit,
+                'debit'              => 0,
+                'credit'             => $montant,
+            ]);
+        });
+
+        return back()->with('succes', 'Écriture manuelle enregistrée avec succès.');
     }
 }

@@ -52,7 +52,9 @@
                         <label class="form-label">Rôle <span style="color:var(--danger)">*</span></label>
                         <select name="role" id="role-select" class="form-control" required onchange="verifierRoleChange()">
                             <option value="caissier" @if($personnel->role === 'caissier') selected @endif>Caissier (Restreint)</option>
-                            <option value="admin" @if($personnel->role === 'admin') selected @endif>Administrateur (Tous les droits)</option>
+                            <option value="responsable_pdv" @if($personnel->role === 'responsable_pdv') selected @endif>Responsable Point de Vente (Restreint)</option>
+                            <option value="admin_secondaire" @if($personnel->role === 'admin_secondaire') selected @endif>Administrateur secondaire (Tous les droits)</option>
+                            <option value="admin" @if($personnel->role === 'admin') selected @endif>Administrateur principal (Tous les droits)</option>
                         </select>
                     </div>
                     <div class="form-group">
@@ -102,7 +104,7 @@
                             $userHabs = $personnel->habilitations ?? [];
                         @endphp
                         <div>
-                            <div style="font-weight:600; font-size:11px; text-transform:uppercase; color:var(--text-2); margin-bottom:6px; border-bottom:1px solid var(--border); padding-bottom:3px;">Principal</div>
+                            <div style="font-weight:600; font-size:11px; text-transform:uppercase; color:var(--text-2); margin-bottom:6px; border-bottom:1px solid var(--border); padding-bottom:3px;">Tableau de bord</div>
                             <label style="display:flex; align-items:center; gap:8px; font-size:12px; margin-bottom:5px; cursor:pointer;">
                                 <input type="checkbox" name="habilitations[]" value="tableau_de_bord_personnel" @if(in_array('tableau_de_bord_personnel', $userHabs)) checked @endif> Tableau de bord personnel
                             </label>
@@ -120,7 +122,7 @@
                                 <input type="checkbox" name="habilitations[]" value="factures_vente" @if(in_array('factures_vente', $userHabs)) checked @endif> Factures vente
                             </label>
                             <label style="display:flex; align-items:center; gap:8px; font-size:12px; margin-bottom:5px; cursor:pointer;">
-                                <input type="checkbox" name="habilitations[]" value="historique_ventes" @if(in_array('historique_ventes', $userHabs)) checked @endif> Historique ventes
+                                <input type="checkbox" name="habilitations[]" value="production_recettes" @if(in_array('production_recettes', $userHabs)) checked @endif> Recettes (Fiches techniques)
                             </label>
                         </div>
 
@@ -133,7 +135,7 @@
                                 <input type="checkbox" name="habilitations[]" value="factures_achat" @if(in_array('factures_achat', $userHabs)) checked @endif> Factures achat
                             </label>
                             <label style="display:flex; align-items:center; gap:8px; font-size:12px; margin-bottom:5px; cursor:pointer;">
-                                <input type="checkbox" name="habilitations[]" value="historique_achats" @if(in_array('historique_achats', $userHabs)) checked @endif> Historique achats
+                                <input type="checkbox" name="habilitations[]" value="production_ordres" @if(in_array('production_ordres', $userHabs)) checked @endif> Ordres de production
                             </label>
                         </div>
 
@@ -311,15 +313,18 @@
         const notice = document.getElementById('admin-notice');
         const selectAllLabel = document.querySelector('label[for="check-all-habs"]') || document.getElementById('check-all-habs').closest('label');
 
-        if (role === 'admin') {
+        if (role === 'admin' || role === 'admin_secondaire') {
             grid.style.opacity = '0.4';
             grid.style.pointerEvents = 'none';
-            notice.style.display = 'block';
+            if (notice) {
+                notice.style.display = 'block';
+                notice.textContent = "Les administrateurs possèdent tous les accès d'office. La configuration manuelle est inutile.";
+            }
             if (selectAllLabel) selectAllLabel.style.display = 'none';
         } else {
             grid.style.opacity = '1';
             grid.style.pointerEvents = 'auto';
-            notice.style.display = 'none';
+            if (notice) notice.style.display = 'none';
             if (selectAllLabel) selectAllLabel.style.display = 'flex';
         }
     }

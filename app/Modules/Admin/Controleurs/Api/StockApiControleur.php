@@ -13,9 +13,12 @@ class StockApiControleur
     public function index(): JsonResponse
     {
         $entreprise = Auth::user()->entreprise;
-        $produits   = Produit::where('entreprise_id', $entreprise->id)
-            ->orderBy('categorie')
-            ->orderBy('nom')
+        $produits   = Produit::where('produits.entreprise_id', $entreprise->id)
+            ->with(['stocks'])
+            ->leftJoin('categories', 'produits.categorie_id', '=', 'categories.id')
+            ->select('produits.*')
+            ->orderBy('categories.nom')
+            ->orderBy('produits.nom')
             ->get()
             ->map(function ($p) {
                 return [

@@ -36,6 +36,23 @@
                         <label class="form-label">Nom de l'entreprise <span style="color:var(--danger)">*</span></label>
                         <input type="text" name="nom" class="form-control" value="{{ old('nom', $entreprise->nom) }}" required>
                     </div>
+
+                    {{-- Informations Gérant --}}
+                    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+                        <div class="form-group" style="margin-bottom:0;">
+                            <label class="form-label">Nom du Gérant / Représentant</label>
+                            <input type="text" name="gerant_nom" class="form-control" value="{{ old('gerant_nom', $entreprise->gerant_nom) }}" placeholder="Ex: Dupont">
+                        </div>
+                        <div class="form-group" style="margin-bottom:0;">
+                            <label class="form-label">Prénom du Gérant</label>
+                            <input type="text" name="gerant_prenom" class="form-control" value="{{ old('gerant_prenom', $entreprise->gerant_prenom) }}" placeholder="Ex: Jean">
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Fonction du Gérant</label>
+                        <input type="text" name="gerant_fonction" class="form-control" value="{{ old('gerant_fonction', $entreprise->gerant_fonction) }}" placeholder="Ex: Directeur Général / Gérant">
+                    </div>
+
                     <div class="form-group">
                         <label class="form-label">Adresse physique</label>
                         <input type="text" name="adresse" class="form-control" value="{{ old('adresse', $entreprise->adresse) }}" placeholder="Ex: Cocody, Abidjan, Côte d'Ivoire">
@@ -51,8 +68,9 @@
                         </div>
                     </div>
                     <div class="form-group">
-                        <label class="form-label">RCCM</label>
-                        <input type="text" name="rccm" class="form-control" value="{{ old('rccm', $entreprise->rccm) }}" placeholder="Ex: CI-ABJ-03-2021-B13-05438">
+                        <label class="form-label">RCCM (Lecture seule · Contacter le support pour modifier)</label>
+                        <input type="text" class="form-control" value="{{ $entreprise->rccm }}" placeholder="Ex: CI-ABJ-03-2021-B13-05438" disabled style="background:var(--bg2); cursor:not-allowed;">
+                        <input type="hidden" name="rccm" value="{{ $entreprise->rccm }}">
                     </div>
                 </div>
             </div>
@@ -60,29 +78,25 @@
             {{-- Informations fiscales --}}
             <div class="card" style="padding:24px;">
                 <div style="font-size:12px;font-weight:700;color:var(--text-2);text-transform:uppercase;letter-spacing:.5px;margin-bottom:16px;display:flex;align-items:center;gap:8px;">
-                    <i class="fas fa-file-invoice" style="color:var(--primary);"></i> Informations fiscales
+                    <i class="fas fa-file-invoice" style="color:var(--primary);"></i> Informations fiscales (Lecture seule)
                 </div>
                 <div style="display:flex;flex-direction:column;gap:14px;">
                     <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
                         <div class="form-group" style="margin-bottom:0;">
                             <label class="form-label">NCC (Nº Compte Contribuable)</label>
-                            <input type="text" name="ncc" class="form-control" value="{{ old('ncc', $entreprise->ncc) }}" placeholder="Ex: 2169728N">
+                            <input type="text" class="form-control" value="{{ $entreprise->ncc }}" placeholder="Ex: 2169728N" disabled style="background:var(--bg2); cursor:not-allowed;">
+                            <input type="hidden" name="ncc" value="{{ $entreprise->ncc }}">
                         </div>
                         <div class="form-group" style="margin-bottom:0;">
                             <label class="form-label">Régime d'imposition</label>
-                            <select name="regime_imposition" class="form-control">
-                                <option value="">— Non renseigné —</option>
-                                @foreach(['TEE', 'RS', 'RSI', 'RNI', 'Exonéré'] as $regime)
-                                <option value="{{ $regime }}" {{ old('regime_imposition', $entreprise->regime_imposition) === $regime ? 'selected' : '' }}>
-                                    {{ $regime }}
-                                </option>
-                                @endforeach
-                            </select>
+                            <input type="text" class="form-control" value="{{ $entreprise->regime_imposition ?: 'Non renseigné' }}" disabled style="background:var(--bg2); cursor:not-allowed;">
+                            <input type="hidden" name="regime_imposition" value="{{ $entreprise->regime_imposition }}">
                         </div>
                     </div>
                     <div class="form-group">
                         <label class="form-label">Centre des impôts</label>
-                        <input type="text" name="centre_impots" class="form-control" value="{{ old('centre_impots', $entreprise->centre_impots) }}" placeholder="Ex: 807 Impôts de Cocody">
+                        <input type="text" class="form-control" value="{{ $entreprise->centre_impots }}" placeholder="Ex: 807 Impôts de Cocody" disabled style="background:var(--bg2); cursor:not-allowed;">
+                        <input type="hidden" name="centre_impots" value="{{ $entreprise->centre_impots }}">
                     </div>
                     <div class="form-group">
                         <label class="form-label">Références bancaires</label>
@@ -91,7 +105,57 @@
                     </div>
                     <div class="form-group">
                         <label class="form-label">N° Compte Contribuable (CC)</label>
-                        <input type="text" name="compte_contribuable" class="form-control" value="{{ old('compte_contribuable', $entreprise->compte_contribuable) }}" placeholder="Ex: 1234567890123">
+                        <input type="text" class="form-control" value="{{ $entreprise->compte_contribuable }}" placeholder="Ex: 1234567890123" disabled style="background:var(--bg2); cursor:not-allowed;">
+                        <input type="hidden" name="compte_contribuable" value="{{ $entreprise->compte_contribuable }}">
+                    </div>
+                    {{-- === LIAISON COMPTAFLOW === --}}
+                    <div style="border:2px solid {{ $entreprise->comptaflow_sync_status === 'active' ? '#10b981' : 'var(--border)' }};border-radius:12px;padding:18px;background:{{ $entreprise->comptaflow_sync_status === 'active' ? '#f0fdf4' : 'var(--bg3)' }};margin-top:4px;">
+                        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
+                            <div style="font-size:12px;font-weight:700;color:{{ $entreprise->comptaflow_sync_status === 'active' ? '#065f46' : 'var(--text-2)' }};text-transform:uppercase;letter-spacing:.5px;display:flex;align-items:center;gap:8px;">
+                                <i class="fas fa-link" style="color:{{ $entreprise->comptaflow_sync_status === 'active' ? '#10b981' : 'var(--text-3)' }};"></i>
+                                Liaison COMPTAFLOW
+                            </div>
+                            @if($entreprise->comptaflow_sync_status === 'active')
+                                <span style="background:#dcfce7;color:#166534;padding:3px 10px;border-radius:30px;font-size:11px;font-weight:700;display:flex;align-items:center;gap:5px;">
+                                    <span style="width:7px;height:7px;background:#10b981;border-radius:50%;display:inline-block;animation:pulse 2s infinite;"></span>
+                                    Active
+                                </span>
+                            @else
+                                <span style="background:#fef3c7;color:#92400e;padding:3px 10px;border-radius:30px;font-size:11px;font-weight:700;">
+                                    Non configurée
+                                </span>
+                            @endif
+                        </div>
+
+                        @if($entreprise->comptaflow_sync_status === 'active')
+                        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px;font-size:12px;">
+                            <div style="background:white;border-radius:8px;padding:8px 12px;border:1px solid #d1fae5;">
+                                <div style="color:#6b7280;font-size:10px;text-transform:uppercase;letter-spacing:.5px;">Dernière sync</div>
+                                <div style="font-weight:700;color:#065f46;">{{ $entreprise->comptaflow_last_sync_at ? \Carbon\Carbon::parse($entreprise->comptaflow_last_sync_at)->format('d/m/Y H:i') : '—' }}</div>
+                            </div>
+                            <div style="background:white;border-radius:8px;padding:8px 12px;border:1px solid #d1fae5;">
+                                <div style="color:#6b7280;font-size:10px;text-transform:uppercase;letter-spacing:.5px;">ID COMPTAFLOW</div>
+                                <div style="font-weight:700;color:#065f46;">#{{ $entreprise->comptaflow_company_id ?? '—' }}</div>
+                            </div>
+                        </div>
+                        @endif
+
+                        <div class="form-group" style="margin-bottom:0;">
+                            <label class="form-label" style="font-size:12px;margin-bottom:6px;">
+                                Clé de synchronisation COMPTAFLOW
+                                <span style="font-size:10px;color:var(--text-3);font-weight:400;"> — Obtenir depuis COMPTAFLOW → Configuration → Liaison SELFLOW</span>
+                            </label>
+                            <input type="text" name="comptaflow_sync_key" class="form-control" value="{{ old('comptaflow_sync_key', $entreprise->comptaflow_sync_key) }}" placeholder="Collez ici la clé copiée depuis COMPTAFLOW…" style="font-family:monospace;font-size:12px;">
+                            @if($entreprise->comptaflow_sync_status === 'active')
+                            <small style="color:#10b981;font-size:11px;margin-top:4px;display:block;">
+                                <i class="fas fa-check-circle"></i> Liaison active. Modifier la clé relancera une re-synchronisation complète.
+                            </small>
+                            @else
+                            <small style="color:var(--text-3);font-size:11px;margin-top:4px;display:block;">
+                                <i class="fas fa-info-circle"></i> Copiez la clé depuis COMPTAFLOW pour synchroniser automatiquement vos tiers, plan comptable et écritures.
+                            </small>
+                            @endif
+                        </div>
                     </div>
                 </div>
             </div>
@@ -236,7 +300,9 @@
                                 au {{ \Carbon\Carbon::parse($p->date_fin)->format('d/m/Y') }}
                             </td>
                             <td style="text-align: center;">
-                                @if(session('active_periode_id') == $p->id)
+                                @if($p->estCloture())
+                                    <span class="badge badge-danger" style="background:#fef2f2; color:#991b1b; border:1px solid #fca5a5;"><i class="fas fa-lock"></i> Clôturé</span>
+                                @elseif(session('active_periode_id') == $p->id)
                                     <span class="badge badge-success"><i class="fas fa-circle-check"></i> Sélectionné</span>
                                 @elseif($p->est_active)
                                     <span class="badge badge-info">Actif</span>
@@ -245,16 +311,26 @@
                                 @endif
                             </td>
                             <td style="text-align: center;">
-                                @if(session('active_periode_id') != $p->id)
-                                    <form method="POST" action="{{ route('admin.periods.switch') }}" style="margin:0;">
-                                        @csrf
-                                        <input type="hidden" name="periode_id" value="{{ $p->id }}">
-                                        <button type="submit" class="btn btn-outline btn-sm">
-                                            <i class="fas fa-right-from-bracket"></i> Basculer
-                                        </button>
-                                    </form>
-                                @else
+                                @if($p->estCloture())
+                                    <span style="font-size:11px; font-weight:600; color:var(--text-3);">Aucune action</span>
+                                @elseif(session('active_periode_id') == $p->id)
                                     <span style="font-size:11px; font-weight:600; color:var(--success);">Actif en session</span>
+                                @else
+                                    <div style="display:flex; gap:6px; justify-content:center; align-items:center;">
+                                        <form method="POST" action="{{ route('admin.periods.switch') }}" style="margin:0;">
+                                            @csrf
+                                            <input type="hidden" name="periode_id" value="{{ $p->id }}">
+                                            <button type="submit" class="btn btn-outline btn-sm" style="padding: 4px 8px; font-size:11px;">
+                                                <i class="fas fa-right-from-bracket"></i> Basculer
+                                            </button>
+                                        </form>
+                                        <form method="POST" action="{{ route('admin.entreprise.periodes.cloturer', $p) }}" style="margin:0;" onsubmit="return confirm('Êtes-vous sûr de vouloir clôturer DEFINITIVEMENT cet exercice ? Toutes les écritures de cette période seront verrouillées et non modifiables.')">
+                                            @csrf
+                                            <button type="submit" class="btn btn-outline btn-sm" style="padding: 4px 8px; font-size:11px; color:var(--danger); border-color:var(--danger);">
+                                                <i class="fas fa-lock"></i> Clôturer
+                                            </button>
+                                        </form>
+                                    </div>
                                 @endif
                             </td>
                         </tr>
@@ -271,4 +347,99 @@
         </div>
     </div>
 </div>
+
+{{-- ── INTÉGRATION COMPTAFLOW ─────────────────────────────────────────── --}}
+<div class="card" style="margin-top:24px; padding:24px;">
+    <div style="font-size:14px;font-weight:700;color:var(--text);text-transform:uppercase;letter-spacing:.5px;margin-bottom:20px;display:flex;align-items:center;gap:8px;border-bottom:1px solid var(--border);padding-bottom:10px;">
+        <i class="fas fa-sync" style="color:var(--primary); font-size:16px;"></i> Intégration COMPTAFLOW & Synchronisation bidirectionnelle
+    </div>
+
+    <div style="display:grid; grid-template-columns: 1fr 2fr; gap:32px; align-items:center;">
+        <div>
+            <div style="font-size:13px; color:var(--text-2); margin-bottom:14px; line-height:1.5;">
+                COMPTAFLOW est la solution comptable connectée à Selflow. Activez la liaison pour synchroniser en temps réel vos factures d'achat, de vente, les encaissements, décaissements et générer automatiquement vos écritures de journal.
+            </div>
+            
+            <div style="display:flex; flex-direction:column; gap:10px; font-size:13px;">
+                <div>
+                    Statut de liaison : 
+                    <span id="sync-status-badge" class="badge {{ $entreprise->comptaflow_sync_status === 'Actif' ? 'badge-success' : 'badge-danger' }}">
+                        {{ $entreprise->comptaflow_sync_status }}
+                    </span>
+                </div>
+                <div>
+                    Dernière synchronisation : 
+                    <strong id="sync-last-time">{{ $entreprise->comptaflow_last_sync_at ? \Carbon\Carbon::parse($entreprise->comptaflow_last_sync_at)->format('d/m/Y \à H:i:s') : 'Jamais synchronisé' }}</strong>
+                </div>
+            </div>
+        </div>
+
+        <div style="background:var(--bg3); border-radius:10px; padding:24px; border:1px solid var(--border); text-align:center;">
+            <p style="font-size:13px; font-weight:600; margin-bottom:16px; color:var(--text-1);">Simuler la communication d'API bidirectionnelle</p>
+            
+            <div id="sync-feedback" style="display:none; padding:12px; border-radius:8px; font-size:13px; margin-bottom:16px; text-align:left; font-weight:500;"></div>
+            
+            <button type="button" id="btn-sync-simulation" onclick="lancerSyncSimulation()" class="btn btn-primary" style="margin:0 auto; padding:10px 24px; font-weight:700; gap:8px;">
+                <i class="fas fa-rotate"></i> Lancer la synchronisation test
+            </button>
+            <span id="sync-loader" style="display:none; font-size:13px; color:var(--text-3); font-weight:600;">
+                <i class="fas fa-spinner fa-spin" style="color:var(--primary); margin-right:8px;"></i> Communication avec COMPTAFLOW en cours...
+            </span>
+        </div>
+    </div>
+</div>
+
+<script>
+function lancerSyncSimulation() {
+    const btn = document.getElementById('btn-sync-simulation');
+    const loader = document.getElementById('sync-loader');
+    const feedback = document.getElementById('sync-feedback');
+    const badge = document.getElementById('sync-status-badge');
+    const lastTime = document.getElementById('sync-last-time');
+
+    btn.style.display = 'none';
+    loader.style.display = 'inline-flex';
+    feedback.style.display = 'none';
+
+    fetch("{{ route('admin.entreprise.comptaflow.sync') }}", {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json",
+            "X-CSRF-TOKEN": "{{ csrf_token() }}"
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        btn.style.display = 'inline-flex';
+        loader.style.display = 'none';
+        
+        if (data.success) {
+            feedback.style.display = 'block';
+            feedback.style.background = '#d1fae5';
+            feedback.style.border = '1px solid #6ee7b7';
+            feedback.style.color = '#065f46';
+            feedback.innerHTML = `<i class="fas fa-circle-check"></i> ${data.message}`;
+            
+            badge.className = 'badge badge-success';
+            badge.textContent = 'Actif';
+            lastTime.textContent = data.last_sync;
+        } else {
+            feedback.style.display = 'block';
+            feedback.style.background = '#fee2e2';
+            feedback.style.border = '1px solid #fca5a5';
+            feedback.style.color = '#991b1b';
+            feedback.innerHTML = `<i class="fas fa-circle-exclamation"></i> ${data.message}`;
+        }
+    })
+    .catch(error => {
+        btn.style.display = 'inline-flex';
+        loader.style.display = 'none';
+        feedback.style.display = 'block';
+        feedback.style.background = '#fee2e2';
+        feedback.style.border = '1px solid #fca5a5';
+        feedback.style.color = '#991b1b';
+        feedback.innerHTML = `<i class="fas fa-circle-xmark"></i> Une erreur réseau s'est produite lors de la synchronisation.`;
+    });
+}
+</script>
 @endsection

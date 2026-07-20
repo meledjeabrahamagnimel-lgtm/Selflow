@@ -15,13 +15,20 @@ class Periode extends Model
         'date_debut',
         'date_fin',
         'est_active',
+        'est_cloture',
     ];
 
     protected $casts = [
         'date_debut' => 'date',
         'date_fin'   => 'date',
         'est_active' => 'boolean',
+        'est_cloture' => 'boolean',
     ];
+
+    public function estCloture(): bool
+    {
+        return (bool)$this->est_cloture;
+    }
 
     public function entreprise(): BelongsTo
     {

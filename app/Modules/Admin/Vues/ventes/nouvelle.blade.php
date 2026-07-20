@@ -98,11 +98,11 @@
         <p>Sélectionnez les articles, ajustez les quantités et finalisez la vente</p>
     </div>
     @php
-        $routeHistorique = request()->routeIs('caissier.*') ? route('caissier.ventes.historique') : route('admin.ventes.historique');
+        $routeHistorique = request()->routeIs('caissier.*') ? route('caissier.ventes.factures') : route('admin.ventes.factures');
         $routeEnregistrer = request()->routeIs('caissier.*') ? route('caissier.ventes.enregistrer') : route('admin.ventes.enregistrer');
     @endphp
     <a href="{{ $routeHistorique }}" class="btn btn-outline">
-        <i class="fas fa-history"></i> Historique
+        <i class="fas fa-list"></i> Voir les ventes
     </a>
 </div>
 
@@ -206,62 +206,81 @@
                         </select>
                     </div>
 
-                    {{-- Mode de paiement style buttons --}}
-                    <input type="hidden" name="mode_paiement" id="modePaiementInput" value="Caisse">
+                    {{-- Lot G : Sélecteur du type de document --}}
                     <input type="hidden" name="etape" id="etapeInput" value="Facture">
                     <div class="form-group">
-                        <label class="form-label">Mode de paiement <span style="color:var(--danger)">*</span></label>
-                        <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:10px; margin-bottom:12px;">
-                            <button type="button" class="btn payment-toggle-btn active" data-mode="Caisse" onclick="selectionnerModePaiement(this)" style="justify-content:center;">Caisse</button>
-                            <button type="button" class="btn payment-toggle-btn" data-mode="Banque" onclick="selectionnerModePaiement(this)" style="justify-content:center;">Banque</button>
-                            <button type="button" class="btn payment-toggle-btn" data-mode="Crédit" onclick="selectionnerModePaiement(this)" style="justify-content:center;">Crédit</button>
+                        <label class="form-label">Type de document</label>
+                        <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:8px; margin-bottom:4px;">
+                            <button type="button" class="btn payment-toggle-btn" data-etape-vente="Devis" onclick="selectionnerEtapeVente(this)" style="justify-content:center; font-size:12px; padding:8px 4px;">
+                                <i class="fas fa-file-invoice"></i> Devis
+                            </button>
+                            <button type="button" class="btn payment-toggle-btn" data-etape-vente="Bon de commande" onclick="selectionnerEtapeVente(this)" style="justify-content:center; font-size:12px; padding:8px 4px;">
+                                <i class="fas fa-shopping-basket"></i> Commande
+                            </button>
+                            <button type="button" class="btn payment-toggle-btn active" data-etape-vente="Facture" onclick="selectionnerEtapeVente(this)" style="justify-content:center; font-size:12px; padding:8px 4px;">
+                                <i class="fas fa-check-double"></i> Facture
+                            </button>
                         </div>
+                        <small id="infoEtapeVente" style="color:var(--text-3); font-size:11px;">Mode facturation avec règlement</small>
                     </div>
 
-                    {{-- Sélection de la banque --}}
-                    <div id="selectionBanqueContainer" style="display:none; margin-bottom:16px;">
-                        <div class="form-group" style="margin-bottom: 12px;">
-                            <label class="form-label">Sélectionner la Banque <span style="color:var(--danger)">*</span></label>
-                            <div style="display:flex; gap:8px;">
-                                <select name="banque_id" id="banqueSelect" class="form-control" style="flex:1;">
-                                    <option value="">— Choisir un compte banque —</option>
-                                    @foreach($banques as $b)
-                                    <option value="{{ $b->id }}">{{ $b->intitule }} ({{ $b->code }} - {{ $b->compte }})</option>
-                                    @endforeach
-                                </select>
-                                <button type="button" class="btn btn-primary" onclick="ouvrirModalNouvelleBanque()" style="padding:0 14px;"><i class="fas fa-plus"></i></button>
+                    {{-- Mode de paiement style buttons --}}
+                    <input type="hidden" name="mode_paiement" id="modePaiementInput" value="Caisse">
+
+                    {{-- Bloc Paiement : visible uniquement à l'étape Facture --}}
+                    <div id="blocPaiementVente">
+                        <div class="form-group">
+                            <label class="form-label">Mode de paiement <span style="color:var(--danger)">*</span></label>
+                            <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:10px; margin-bottom:12px;">
+                                <button type="button" class="btn payment-toggle-btn active" data-mode="Caisse" onclick="selectionnerModePaiement(this)" style="justify-content:center;">Caisse</button>
+                                <button type="button" class="btn payment-toggle-btn" data-mode="Banque" onclick="selectionnerModePaiement(this)" style="justify-content:center;">Banque</button>
+                                <button type="button" class="btn payment-toggle-btn" data-mode="Crédit" onclick="selectionnerModePaiement(this)" style="justify-content:center;">Crédit</button>
                             </div>
                         </div>
-                        <div class="form-group" style="margin-bottom: 12px;">
-                            <label class="form-label">Moyen de paiement bancaire <span style="color:var(--danger)">*</span></label>
-                            <select name="moyen_bancaire" id="moyenBancaireSelect" class="form-control">
-                                <option value="">— Moyen de paiement —</option>
-                                <option value="carte">Carte bancaire</option>
-                                <option value="virement">Virement</option>
-                                <option value="cheque">Chèque</option>
-                            </select>
-                        </div>
-                        <div class="form-group" style="margin-bottom:0;">
-                            <label class="form-label">Référence / Numéro <span style="color:var(--danger)">*</span></label>
-                            <input type="text" name="reference_paiement" id="refPaiementInput" class="form-control" placeholder="Numéro de carte, virement ou chèque">
-                        </div>
-                    </div>
 
-                    {{-- Montant reçu --}}
-                    <div class="form-group">
-                        <label class="form-label" id="labelMontantPaye">Montant à encaisser / reçu <span style="color:var(--danger)">*</span></label>
-                        <input type="number" name="montant_paye" id="montantPayeInput" class="form-control" placeholder="Saisir le montant reçu / payé" required>
+                        {{-- Sélection de la banque --}}
+                        <div id="selectionBanqueContainer" style="display:none; margin-bottom:16px;">
+                            <div class="form-group" style="margin-bottom: 12px;">
+                                <label class="form-label">Sélectionner la Banque <span style="color:var(--danger)">*</span></label>
+                                <div style="display:flex; gap:8px;">
+                                    <select name="banque_id" id="banqueSelect" class="form-control" style="flex:1;">
+                                        <option value="">— Choisir un compte banque —</option>
+                                        @foreach($banques as $b)
+                                        <option value="{{ $b->id }}">{{ $b->intitule }} ({{ $b->code }} - {{ $b->compte }})</option>
+                                        @endforeach
+                                    </select>
+                                    <button type="button" class="btn btn-primary" onclick="ouvrirModalNouvelleBanque()" style="padding:0 14px;"><i class="fas fa-plus"></i></button>
+                                </div>
+                            </div>
+                            <div class="form-group" style="margin-bottom: 12px;">
+                                <label class="form-label">Moyen de paiement bancaire <span style="color:var(--danger)">*</span></label>
+                                <select name="moyen_bancaire" id="moyenBancaireSelect" class="form-control">
+                                    <option value="">— Moyen de paiement —</option>
+                                    <option value="carte">Carte bancaire</option>
+                                    <option value="virement">Virement</option>
+                                    <option value="cheque">Chèque</option>
+                                </select>
+                            </div>
+                            <div class="form-group" style="margin-bottom:0;">
+                                <label class="form-label">Référence / Numéro <span style="color:var(--danger)">*</span></label>
+                                <input type="text" name="reference_paiement" id="refPaiementInput" class="form-control" placeholder="Numéro de carte, virement ou chèque">
+                            </div>
+                        </div>
+
+                        {{-- Montant reçu --}}
+                        <div class="form-group">
+                            <label class="form-label" id="labelMontantPaye">Montant à encaisser / reçu <span style="color:var(--danger)">*</span></label>
+                            <input type="number" name="montant_paye" id="montantPayeInput" class="form-control" placeholder="Saisir le montant reçu / payé">
+                        </div>
                     </div>
                 </div>
 
                 <div style="display:flex; flex-direction:column; gap:8px; margin-top:8px;">
-                    <button type="submit" name="etape" value="Facture" class="btn btn-success" id="btnValider" style="width:100%; justify-content:center;" onclick="document.getElementById('etapeInput').value = 'Facture'" disabled>
-                        <i class="fas fa-check-circle"></i> Valider et facturer
-                    </button>
-                    <button type="submit" name="etape" value="Devis" class="btn btn-outline" id="btnDevis" style="width:100%; justify-content:center; border-color:var(--warning); color:var(--warning);" onclick="document.getElementById('etapeInput').value = 'Devis'" disabled>
-                        <i class="fas fa-file-invoice"></i> Enregistrer comme Devis
+                    <button type="submit" class="btn btn-success" id="btnValider" style="width:100%; justify-content:center;" disabled>
+                        <i class="fas fa-check-circle"></i> <span id="labelBtnValiderVente">Valider et facturer</span>
                     </button>
                 </div>
+
             </div>
         </div>
     </div>
@@ -400,10 +419,41 @@ function formatFcfa(n) {
     return new Intl.NumberFormat('fr-FR').format(Math.round(n)) + ' F';
 }
 
-function selectionnerModePaiement(btn) {
-    document.querySelectorAll('.payment-toggle-btn').forEach(b => b.classList.remove('active'));
+// Lot G : Sélection de l'étape du document de vente
+function selectionnerEtapeVente(btn) {
+    document.querySelectorAll('[data-etape-vente]').forEach(b => b.classList.remove('active'));
     btn.classList.add('active');
+    const etape = btn.dataset.etapeVente;
+    document.getElementById('etapeInput').value = etape;
     
+    const blocPaiement = document.getElementById('blocPaiementVente');
+    const infoEtape = document.getElementById('infoEtapeVente');
+    const labelBtn = document.getElementById('labelBtnValiderVente');
+    const montantPayeInput = document.getElementById('montantPayeInput');
+    
+    if (etape === 'Facture') {
+        blocPaiement.style.display = 'block';
+        infoEtape.textContent = 'Mode facturation avec règlement';
+        labelBtn.textContent = 'Valider et facturer';
+        montantPayeInput.removeAttribute('disabled');
+    } else if (etape === 'Devis') {
+        blocPaiement.style.display = 'none';
+        infoEtape.textContent = 'Aucun paiement requis pour un devis';
+        labelBtn.textContent = 'Enregistrer le devis';
+        montantPayeInput.setAttribute('disabled', '');
+    } else {
+        blocPaiement.style.display = 'none';
+        infoEtape.textContent = 'Aucun paiement requis pour un bon de commande';
+        labelBtn.textContent = 'Enregistrer le bon de commande';
+        montantPayeInput.setAttribute('disabled', '');
+    }
+}
+
+function selectionnerModePaiement(btn) {
+    // Cibler uniquement les boutons de mode paiement dans le même parent
+    btn.closest('div').querySelectorAll('.payment-toggle-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+
     const mode = btn.dataset.mode;
     document.getElementById('modePaiementInput').value = mode;
     
@@ -865,15 +915,18 @@ document.getElementById('rechercheInput').addEventListener('input', function() {
 
 // Validation du montant payé avant soumission pour ne pas vider le panier
 document.getElementById('formVente').addEventListener('submit', function(e) {
-    const mode = document.getElementById('modePaiementInput').value;
-    if (mode !== 'Crédit') {
-        const montantInput = document.getElementById('montantPayeInput');
-        const montant = parseFloat(montantInput.value);
-        if (isNaN(montant) || montant <= 0) {
-            e.preventDefault();
-            alert("Le montant payé est obligatoire et doit être strictement supérieur à 0 pour ce mode de paiement (Caisse / Banque).");
-            montantInput.focus();
-            return false;
+    const etape = document.getElementById('etapeInput').value;
+    if (etape === 'Facture') {
+        const mode = document.getElementById('modePaiementInput').value;
+        if (mode !== 'Crédit') {
+            const montantInput = document.getElementById('montantPayeInput');
+            const montant = parseFloat(montantInput.value);
+            if (isNaN(montant) || montant <= 0) {
+                e.preventDefault();
+                alert("Le montant payé est obligatoire et doit être strictement supérieur à 0 pour ce mode de paiement (Caisse / Banque).");
+                montantInput.focus();
+                return false;
+            }
         }
     }
 });

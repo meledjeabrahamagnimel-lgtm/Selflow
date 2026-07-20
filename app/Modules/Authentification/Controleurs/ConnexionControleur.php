@@ -9,9 +9,11 @@ use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
+use App\Modules\Admin\Traits\JournaliseActions;
 
 class ConnexionControleur
 {
+    use JournaliseActions;
     /**
      * Afficher le formulaire de connexion.
      */
@@ -19,6 +21,15 @@ class ConnexionControleur
     {
         return view('authentification::connexion');
     }
+
+    /**
+     * Afficher la page de contact et d'informations DC-KNOWING.
+     */
+    public function contact(): View
+    {
+        return view('authentification::contact');
+    }
+
 
     /**
      * Traiter la tentative de connexion de manière sécurisée.
@@ -48,8 +59,11 @@ class ConnexionControleur
             // Incrémenter le compteur de tentatives
             RateLimiter::hit($this->cléThrottling($request));
 
+            // Journaliser la tentative échouée
+            $this->journaliser('connexion_echec', 'Utilisateur', null, null, ['email' => $request->email]);
+
             throw ValidationException::withMessages([
-                'email' => 'Identifiants incorrects. Veuillez vérifier votre email et mot de passe.',
+                'connexion_erreur' => 'Les informations de connexion saisies sont incorrectes.',
             ]);
         }
 
@@ -57,7 +71,7 @@ class ConnexionControleur
         if (Auth::user()->statut !== 'actif') {
             Auth::logout();
             throw ValidationException::withMessages([
-                'email' => 'Votre compte est désactivé. Contactez votre administrateur.',
+                'connexion_erreur' => 'Votre compte est désactivé. Veuillez contacter le service client.',
             ]);
         }
 
@@ -65,6 +79,9 @@ class ConnexionControleur
         RateLimiter::clear($this->cléThrottling($request));
 
         $request->session()->regenerate();
+
+        // Journaliser la connexion réussie
+        $this->journaliser('connexion', 'Utilisateur', Auth::id());
 
         // Rediriger selon le rôle de l'utilisateur
         $role = Auth::user()->role;
@@ -82,10 +99,14 @@ class ConnexionControleur
      */
     public function deconnecter(Request $request): RedirectResponse
     {
+        // Journaliser la déconnexion
+        $userId = Auth::id();
         Auth::logout();
 
         $request->session()->invalidate();
         $request->session()->regenerateToken();
+
+        $this->journaliser('deconnexion', 'Utilisateur', $userId);
 
         return redirect()->route('connexion');
     }
@@ -106,7 +127,7 @@ class ConnexionControleur
         $secondes = RateLimiter::availableIn($cle);
 
         throw ValidationException::withMessages([
-            'email' => sprintf(
+            'connexion_erreur' => sprintf(
                 'Trop de tentatives de connexion. Veuillez réessayer dans %d secondes.',
                 $secondes
             ),

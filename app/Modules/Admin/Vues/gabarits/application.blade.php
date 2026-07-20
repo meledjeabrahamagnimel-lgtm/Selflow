@@ -426,6 +426,12 @@
     @php
         $nomPdvAffichage = session('apercu_pdv_nom') ?? session('point_de_vente_actif_nom') ?? auth()->user()->pointDeVente?->nom;
         $estApercu = session()->has('apercu_pdv_id');
+        $entreprise = auth()->user()?->entreprise;
+        $modulesActifs = $entreprise?->modules_actifs ?? [];
+        $secteurActivite = $entreprise?->secteur_activite ?? ['Commercial'];
+        if (is_string($secteurActivite)) {
+            $secteurActivite = [$secteurActivite];
+        }
     @endphp
 
     @if($nomPdvAffichage)
@@ -442,6 +448,7 @@
     </div>
     @endif
 
+    @if(!request()->routeIs('superadmin.*') && auth()->user()->role !== 'superadmin')
     <!-- Sélecteur d'exercice/période -->
     <div class="sidebar-periode" style="margin: 10px 12px 0; position: relative;">
         <button onclick="togglePeriodeDropdown(event)" style="width: 100%; display: flex; align-items: center; gap: 10px; background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.15); border-radius: 10px; padding: 10px 14px; color: #ffffff; cursor: pointer; text-align: left; transition: all 0.2s; outline: none;">
@@ -486,9 +493,21 @@
             @endif
         </div>
     </div>
+    @endif
 
     <nav class="sidebar-nav">
-        @if(request()->routeIs('caissier.*'))
+        @if(request()->routeIs('superadmin.*') || auth()->user()->role === 'superadmin')
+            <!-- ── SUPERADMIN SIDEBAR ── -->
+            <div class="nav-section"><span>TABLEAU DE BORD</span></div>
+            <a href="{{ route('superadmin.tableau_de_bord') }}" class="nav-item {{ request()->routeIs('superadmin.tableau_de_bord') ? 'active' : '' }}">
+                <i class="fas fa-chart-pie"></i> Tableau de bord
+            </a>
+            
+            <div class="nav-section"><span>SUPERVISION</span></div>
+            <a href="{{ route('superadmin.entreprises') }}" class="nav-item {{ request()->routeIs('superadmin.entreprises*') ? 'active' : '' }}">
+                <i class="fas fa-building"></i> Entreprises
+            </a>
+        @elseif(request()->routeIs('caissier.*'))
             <!-- ── CAISSIER SIDEBAR ── -->
             <div class="nav-section"><span>Caisse</span></div>
             <a href="{{ route('caissier.ventes.nouvelle') }}" class="nav-item {{ request()->routeIs('caissier.ventes.nouvelle') ? 'active' : '' }}">
@@ -511,8 +530,8 @@
             <!-- ── ADMIN SIDEBAR RESTUCTURÉ ── -->
             
             <!-- 1. Principal & Tableaux de bord -->
-            @if(auth()->user()->aHabilitation('tableau_de_bord_personnel') || auth()->user()->aHabilitation('tableau_de_bord_general'))
-            <div class="nav-section"><span>Principal</span></div>
+            @if(in_array('principal', $modulesActifs) && (auth()->user()->aHabilitation('tableau_de_bord_personnel') || auth()->user()->aHabilitation('tableau_de_bord_general')))
+            <div class="nav-section"><span>Tableau de bord</span></div>
             @if(auth()->user()->aHabilitation('tableau_de_bord_personnel'))
             <a href="{{ route('admin.tableau_de_bord') }}" class="nav-item {{ request()->routeIs('admin.tableau_de_bord') ? 'active' : '' }}">
                 <i class="fas fa-chart-pie"></i> TDB Personnel
@@ -526,7 +545,7 @@
             @endif
 
             <!-- 2. Ventes -->
-            @if(auth()->user()->aHabilitation('nouvelle_vente') || auth()->user()->aHabilitation('factures_vente') || auth()->user()->aHabilitation('historique_ventes'))
+            @if(in_array('ventes', $modulesActifs) && (auth()->user()->aHabilitation('nouvelle_vente') || auth()->user()->aHabilitation('factures_vente') || auth()->user()->aHabilitation('historique_ventes')))
             <div class="nav-section"><span>Ventes</span></div>
             @if(auth()->user()->aHabilitation('nouvelle_vente'))
             <a href="{{ route('admin.ventes.nouvelle') }}" class="nav-item {{ request()->routeIs('admin.ventes.nouvelle') ? 'active' : '' }}">
@@ -534,19 +553,23 @@
             </a>
             @endif
             @if(auth()->user()->aHabilitation('factures_vente'))
-            <a href="{{ route('admin.ventes.factures') }}" class="nav-item {{ request()->routeIs('admin.ventes.factures') ? 'active' : '' }}">
+            <a href="{{ route('admin.ventes.factures') }}" class="nav-item {{ request()->routeIs('admin.ventes.factures') && !request()->has('type') ? 'active' : '' }}">
                 <i class="fas fa-file-invoice"></i> Factures vente
             </a>
+            <a href="{{ route('admin.ventes.factures', ['type' => 'avoir']) }}" class="nav-item {{ request()->routeIs('admin.ventes.factures') && request('type') === 'avoir' ? 'active' : '' }}">
+                <i class="fas fa-file-circle-minus" style="color:#e17055;"></i> Avoirs clients
+            </a>
             @endif
-            @if(auth()->user()->aHabilitation('historique_ventes'))
-            <a href="{{ route('admin.ventes.historique') }}" class="nav-item {{ request()->routeIs('admin.ventes.historique') ? 'active' : '' }}">
-                <i class="fas fa-history"></i> Historique ventes
+
+            @if(auth()->user()->aHabilitation('nouvelle_vente'))
+            <a href="{{ route('admin.b2b.negociations.fournisseur') }}" class="nav-item {{ request()->routeIs('admin.b2b.negociations.fournisseur*') ? 'active' : '' }}">
+                <i class="fas fa-handshake"></i> Demandes B2B reçues
             </a>
             @endif
             @endif
 
             <!-- 3. Achats -->
-            @if(auth()->user()->aHabilitation('nouvel_achat') || auth()->user()->aHabilitation('factures_achat') || auth()->user()->aHabilitation('historique_achats'))
+            @if(in_array('achats', $modulesActifs) && (auth()->user()->aHabilitation('nouvel_achat') || auth()->user()->aHabilitation('factures_achat') || auth()->user()->aHabilitation('historique_achats')))
             <div class="nav-section"><span>Achats</span></div>
             @if(auth()->user()->aHabilitation('nouvel_achat'))
             <a href="{{ route('admin.achats.nouveau') }}" class="nav-item {{ request()->routeIs('admin.achats.nouveau') ? 'active' : '' }}">
@@ -554,19 +577,23 @@
             </a>
             @endif
             @if(auth()->user()->aHabilitation('factures_achat'))
-            <a href="{{ route('admin.achats.factures') }}" class="nav-item {{ request()->routeIs('admin.achats.factures') ? 'active' : '' }}">
+            <a href="{{ route('admin.achats.factures') }}" class="nav-item {{ request()->routeIs('admin.achats.factures') && !request()->has('type') ? 'active' : '' }}">
                 <i class="fas fa-file-invoice-dollar"></i> Factures achat
             </a>
+            <a href="{{ route('admin.achats.factures', ['type' => 'avoir']) }}" class="nav-item {{ request()->routeIs('admin.achats.factures') && request('type') === 'avoir' ? 'active' : '' }}">
+                <i class="fas fa-file-circle-minus" style="color:#e17055;"></i> Avoirs fournisseurs
+            </a>
             @endif
-            @if(auth()->user()->aHabilitation('historique_achats'))
-            <a href="{{ route('admin.achats.historique') }}" class="nav-item {{ request()->routeIs('admin.achats.historique') ? 'active' : '' }}">
-                <i class="fas fa-receipt"></i> Historique achats
+
+            @if(auth()->user()->aHabilitation('nouvel_achat'))
+            <a href="{{ route('admin.b2b.negociations.client') }}" class="nav-item {{ request()->routeIs('admin.b2b.negociations.client*') ? 'active' : '' }}">
+                <i class="fas fa-comments-dollar"></i> Négociations B2B (Achats)
             </a>
             @endif
             @endif
 
             <!-- 4. Stock -->
-            @if(auth()->user()->aHabilitation('stock_articles') || auth()->user()->aHabilitation('stock_mouvements'))
+            @if(in_array('stock', $modulesActifs) && (in_array('Commercial', $secteurActivite) || in_array('Industriel', $secteurActivite)) && (auth()->user()->aHabilitation('stock_articles') || auth()->user()->aHabilitation('stock_mouvements')))
             <div class="nav-section"><span>Stock</span></div>
             @if(auth()->user()->aHabilitation('stock_articles'))
             <a href="{{ route('admin.stock.index') }}" class="nav-item {{ request()->routeIs('admin.stock.index') ? 'active' : '' }}">
@@ -579,9 +606,23 @@
             </a>
             @endif
             @endif
+            <!-- 5. Production -->
+            @if((in_array('production', $modulesActifs) || in_array('Industriel', $secteurActivite)) && (auth()->user()->aHabilitation('catalogue_produits') || auth()->user()->aHabilitation('stock_articles')))
+            <div class="nav-section"><span>Production</span></div>
+            @if(auth()->user()->aHabilitation('catalogue_produits'))
+            <a href="{{ route('admin.production.fiches_techniques.index') }}" class="nav-item {{ request()->routeIs('admin.production.fiches_techniques*') ? 'active' : '' }}">
+                <i class="fas fa-flask"></i> Recettes (FT)
+            </a>
+            @endif
+            @if(auth()->user()->aHabilitation('stock_articles'))
+            <a href="{{ route('admin.production.ordres.index') }}" class="nav-item {{ request()->routeIs('admin.production.ordres*') ? 'active' : '' }}">
+                <i class="fas fa-industry"></i> Ordres de production
+            </a>
+            @endif
+            @endif
 
-            <!-- 5. Comptabilité -->
-            @if(auth()->user()->aHabilitation('tresorerie_encaissements') || auth()->user()->aHabilitation('tresorerie_decaissements') || auth()->user()->aHabilitation('tresorerie_journal') || auth()->user()->aHabilitation('tresorerie_codes_journaux') || auth()->user()->aHabilitation('comptabilite_globale') || auth()->user()->aHabilitation('comptabilite_creances') || auth()->user()->aHabilitation('comptabilite_plan_comptable'))
+            <!-- 6. Comptabilité (Inclus Trésorerie) -->
+            @if(in_array('comptabilite', $modulesActifs) && (auth()->user()->aHabilitation('tresorerie_encaissements') || auth()->user()->aHabilitation('tresorerie_decaissements') || auth()->user()->aHabilitation('tresorerie_journal') || auth()->user()->aHabilitation('tresorerie_codes_journaux') || auth()->user()->aHabilitation('comptabilite_globale') || auth()->user()->aHabilitation('comptabilite_creances') || auth()->user()->aHabilitation('comptabilite_plan_comptable')))
             <div class="nav-section"><span>Comptabilité</span></div>
             @if(auth()->user()->aHabilitation('tresorerie_encaissements'))
             <a href="{{ route('admin.tresorerie.encaissements') }}" class="nav-item {{ request()->routeIs('admin.tresorerie.encaissements') ? 'active' : '' }}">
@@ -620,8 +661,8 @@
             @endif
             @endif
 
-            <!-- 6. Points de vente -->
-            @if(auth()->user()->aHabilitation('gestion_pdv') || auth()->user()->aHabilitation('gestion_personnel') || auth()->user()->aHabilitation('gestion_habilitations'))
+            <!-- 6. Points de vente (Inclus Personnel & Habilitations) -->
+            @if(in_array('points_de_vente', $modulesActifs) && (auth()->user()->aHabilitation('gestion_pdv') || auth()->user()->aHabilitation('gestion_personnel') || auth()->user()->aHabilitation('gestion_habilitations')))
             <div class="nav-section"><span>Points de vente</span></div>
             @if(auth()->user()->aHabilitation('gestion_pdv'))
             <a href="{{ route('admin.pdv.index') }}" class="nav-item {{ request()->routeIs('admin.pdv.index') ? 'active' : '' }}">
@@ -630,7 +671,7 @@
             @endif
             @if(auth()->user()->aHabilitation('gestion_personnel'))
             <a href="{{ route('admin.personnel.index') }}" class="nav-item {{ request()->routeIs('admin.personnel.index') && !request('tab') ? 'active' : '' }}">
-                <i class="fas fa-users-gear"></i> Personnels & accès
+                <i class="fas fa-users-gear"></i> Personnels &amp; accès
             </a>
             @endif
             @if(auth()->user()->aHabilitation('gestion_habilitations'))
@@ -641,7 +682,7 @@
             @endif
 
             <!-- 7. Produits -->
-            @if(auth()->user()->aHabilitation('catalogue_produits'))
+            @if(in_array('produits', $modulesActifs) && auth()->user()->aHabilitation('catalogue_produits'))
             <div class="nav-section"><span>Produits</span></div>
             <a href="{{ route('admin.produits.index') }}" class="nav-item {{ request()->routeIs('admin.produits.index') ? 'active' : '' }}">
                 <i class="fas fa-barcode"></i> Produits
@@ -649,7 +690,7 @@
             @endif
 
             <!-- 8. Tiers -->
-            @if(auth()->user()->aHabilitation('tiers_clients') || auth()->user()->aHabilitation('tiers_fournisseurs'))
+            @if(in_array('tiers', $modulesActifs) && (auth()->user()->aHabilitation('tiers_clients') || auth()->user()->aHabilitation('tiers_fournisseurs')))
             <div class="nav-section"><span>Tiers</span></div>
             @if(auth()->user()->aHabilitation('tiers_clients'))
             <a href="{{ route('admin.clients.index') }}" class="nav-item {{ request()->routeIs('admin.clients.index') ? 'active' : '' }}">
@@ -664,10 +705,10 @@
             @endif
 
             <!-- 9. Rapports -->
-            @if(auth()->user()->aHabilitation('rapports_analyse'))
+            @if(in_array('rapports', $modulesActifs) && auth()->user()->aHabilitation('rapports_analyse'))
             <div class="nav-section"><span>Rapports</span></div>
             <a href="{{ route('admin.rapports.analyse_activite') }}" class="nav-item {{ request()->routeIs('admin.rapports.analyse_activite') ? 'active' : '' }}">
-                <i class="fas fa-chart-mixed"></i> Analyse d'activité
+                <i class="fas fa-chart-line"></i> Analyse d'activité
             </a>
             @endif
 
@@ -715,32 +756,30 @@
         {{-- Bouton Profil et Menu Déroulant (Images 2 et 3) --}}
         <div class="user-dropdown" style="position:relative; display:inline-block;">
             <button class="user-dropdown-btn" onclick="toggleUserDropdown()" style="display:flex; align-items:center; gap:8px; background:#ffffff; border:1px solid var(--border); border-radius:30px; padding:4px 14px 4px 4px; cursor:pointer; font-family:inherit; transition: all 0.15s; outline:none;">
-                <div style="width:30px; height:30px; border-radius:50%; background:#002B5C; color:#ffffff; display:flex; align-items:center; justify-content:center; font-weight:700; font-size:12px;">
-                    {{ strtoupper(substr(auth()->user()->nom, 0, 1)) }}
-                </div>
+                <img src="{{ auth()->user()->avatar_url }}" alt="Avatar" style="width:30px; height:30px; border-radius:50%; object-fit:cover; border:1px solid var(--border);">
                 <span style="font-size:12.5px; font-weight:600; color:var(--primary); max-width:120px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">
-                    {{ auth()->user()->nom }}
+                    {{ auth()->user()->prenom }} {{ auth()->user()->nom }}
                 </span>
                 <i class="fas fa-chevron-down" style="font-size:9px; color:var(--text-3);"></i>
             </button>
             
             <div class="user-dropdown-menu" id="userDropdownMenu" style="display:none; position:absolute; right:0; top:calc(100% + 8px); width:230px; background:#ffffff; border:1px solid var(--border); border-radius:12px; box-shadow:0 10px 25px rgba(0,0,0,0.08); z-index:1000; padding:6px 0;">
                 <div style="padding:10px 14px; border-bottom:1px solid var(--border); display:flex; align-items:center; gap:10px;">
-                    <div style="width:34px; height:34px; border-radius:50%; background:#002B5C; color:#ffffff; display:flex; align-items:center; justify-content:center; font-weight:700; font-size:13px;">
-                        {{ strtoupper(substr(auth()->user()->nom, 0, 1)) }}
-                    </div>
+                    <img src="{{ auth()->user()->avatar_url }}" alt="Avatar" style="width:36px; height:36px; border-radius:50%; object-fit:cover; border:1px solid var(--border);">
                     <div style="overflow:hidden;">
-                        <div style="font-weight:700; font-size:12.5px; color:var(--text); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">{{ auth()->user()->nom }}</div>
-                        <div style="font-size:11px; color:var(--text-3); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">{{ auth()->user()->email }}</div>
+                        <div style="font-weight:700; font-size:12.5px; color:var(--text); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">{{ auth()->user()->prenom }} {{ auth()->user()->nom }}</div>
+                        <div style="font-size:11px; font-weight:600; color:var(--text-2); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; text-transform:capitalize;">
+                            {{ auth()->user()->fonction ?: str_replace('_', ' ', auth()->user()->role) }}
+                        </div>
                     </div>
                 </div>
-                <a href="#" style="display:flex; align-items:center; gap:8px; padding:8px 14px; font-size:12.5px; color:var(--text); text-decoration:none; transition:background 0.15s;" onmouseover="this.style.background='#F1F5F9'" onmouseout="this.style.background='none'">
+                <a href="{{ route('admin.mon_profil') }}" style="display:flex; align-items:center; gap:8px; padding:8px 14px; font-size:12.5px; color:var(--text); text-decoration:none; transition:background 0.15s;" onmouseover="this.style.background='#F1F5F9'" onmouseout="this.style.background='none'">
                     <i class="far fa-user" style="width:14px; color:var(--text-2);"></i> Mon profil
                 </a>
-                <a href="#" style="display:flex; align-items:center; gap:8px; padding:8px 14px; font-size:12.5px; color:var(--text); text-decoration:none; transition:background 0.15s;" onmouseover="this.style.background='#F1F5F9'" onmouseout="this.style.background='none'">
+                <a href="{{ route('admin.entreprise.parametres') }}" style="display:flex; align-items:center; gap:8px; padding:8px 14px; font-size:12.5px; color:var(--text); text-decoration:none; transition:background 0.15s;" onmouseover="this.style.background='#F1F5F9'" onmouseout="this.style.background='none'">
                     <i class="fas fa-gear" style="width:14px; color:var(--text-2);"></i> Paramètres
                 </a>
-                <a href="#" style="display:flex; align-items:center; gap:8px; padding:8px 14px; font-size:12.5px; color:var(--text); text-decoration:none; transition:background 0.15s;" onmouseover="this.style.background='#F1F5F9'" onmouseout="this.style.background='none'">
+                <a href="{{ route('admin.entreprise.parametres') }}" style="display:flex; align-items:center; gap:8px; padding:8px 14px; font-size:12.5px; color:var(--text); text-decoration:none; transition:background 0.15s;" onmouseover="this.style.background='#F1F5F9'" onmouseout="this.style.background='none'">
                     <i class="far fa-credit-card" style="width:14px; color:var(--text-2);"></i> Facturation
                 </a>
                 <div style="border-top:1px solid var(--border); margin:4px 0;"></div>

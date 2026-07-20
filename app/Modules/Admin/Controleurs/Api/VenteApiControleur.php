@@ -2,6 +2,7 @@
 
 namespace App\Modules\Admin\Controleurs\Api;
 
+use App\Jobs\NormaliserFactureFne;
 use App\Modules\Admin\Modeles\Client;
 use App\Modules\Admin\Modeles\MouvementStock;
 use App\Modules\Admin\Modeles\Produit;
@@ -218,6 +219,12 @@ class VenteApiControleur
                 }
             }
 
+            // Normalisation FNE DGI-CI en arrière-plan (Section 18.5)
+            if ($typeDocument === 'Facture') {
+                $estRne = empty($request->client_id) || ($request->client_id == 'divers');
+                NormaliserFactureFne::dispatch($vente, $estRne);
+            }
+
             // Trésorerie
             if ($typeDocument === 'Facture' && $statutVente !== 'Crédit' && $montantPaye > 0) {
                 $soldeActuel = TresorerieJournal::where('point_de_vente_id', $pointDeVenteId)
@@ -389,46 +396,6 @@ class VenteApiControleur
         ]);
     }
 
-    /**
-     * Normaliser la facture (DGI).
-     */
-    public function normaliser(Vente $vente): JsonResponse
-    {
-        if ($vente->pointDeVente->entreprise_id !== Auth::user()->entreprise_id) {
-            return response()->json([
-                'statut' => 'erreur',
-                'message' => 'Accès non autorisé.'
-            ], 403);
-        }
-
-        if ($vente->normalise) {
-            return response()->json([
-                'statut' => 'erreur',
-                'message' => 'Cette facture est déjà normalisée.',
-                'qr_code_data' => $vente->qr_code_data
-            ], 400);
-        }
-
-        // Simulation
-        $qrData = implode('|', [
-            $vente->numero_facture,
-            now()->format('YmdHis'),
-            'DGI-CI',
-            strtoupper(substr(md5($vente->id . $vente->numero_facture . now()->timestamp), 0, 12)),
-        ]);
-
-        $vente->update([
-            'normalise'     => true,
-            'type_facture'  => 'normale',
-            'qr_code_data'  => $qrData,
-        ]);
-
-        return response()->json([
-            'statut' => 'succes',
-            'message' => 'Facture ' . $vente->numero_facture . ' normalisée avec succès.',
-            'qr_code_data' => $qrData
-        ]);
-    }
 
     /**
      * Modifier rapidement le statut de règlement (paiement partiel ou total).

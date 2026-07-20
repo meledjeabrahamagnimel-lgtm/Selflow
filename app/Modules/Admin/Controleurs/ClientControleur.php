@@ -10,20 +10,28 @@ use Illuminate\View\View;
 
 class ClientControleur
 {
-    public function index(): View
+    public function index(Request $request): View
     {
         $entreprise = Auth::user()->entreprise;
-        $clients    = Client::where('entreprise_id', $entreprise->id)
+        
+        $clients = Client::where('entreprise_id', $entreprise->id)
+            ->where(function ($q) {
+                $q->where('source', '!=', 'comptaflow')
+                  ->orWhereNull('source');
+            })
             ->withCount('ventes')
             ->orderBy('nom')
-            ->paginate(30);
+            ->paginate(15, ['*'], 'page_local');
 
-        $comptes = \App\Modules\Admin\Modeles\PlanComptable::whereNull('entreprise_id')
-            ->orWhere('entreprise_id', $entreprise->id)
-            ->orderBy('numero')
-            ->get();
+        $clientsComptaflow = Client::where('entreprise_id', $entreprise->id)
+            ->where('source', 'comptaflow')
+            ->withCount('ventes')
+            ->orderBy('nom')
+            ->paginate(15, ['*'], 'page_comptaflow');
 
-        return view('admin::clients.index', compact('clients', 'comptes'));
+        $comptes = \App\Modules\Admin\Modeles\PlanComptable::obtenirComptesPrioritaires($entreprise->id);
+
+        return view('admin::clients.index', compact('clients', 'clientsComptaflow', 'comptes', 'entreprise'));
     }
 
     public function creer(Request $request): RedirectResponse
@@ -86,5 +94,57 @@ class ClientControleur
         ));
 
         return back()->with('succes', 'Client ajouté avec succès.');
+    }
+
+    public function modifier(Request $request, Client $client): RedirectResponse
+    {
+        $entreprise = Auth::user()->entreprise;
+        abort_unless($client->entreprise_id === $entreprise->id, 403);
+
+        if ($client->source === 'comptaflow') {
+            // Uniquement les champs spécifiques à Selflow
+            $request->validate([
+                'telephone'         => ['nullable', 'string', 'max:30'],
+                'email'             => ['nullable', 'email', 'max:150'],
+                'adresse'           => ['nullable', 'string', 'max:255'],
+                'ncc'               => ['nullable', 'string', 'max:50'],
+                'rccm'              => ['nullable', 'string', 'max:100'],
+                'regime_imposition' => ['nullable', 'string', 'max:100'],
+            ]);
+
+            $client->update($request->only([
+                'telephone', 'email', 'adresse', 'ncc', 'rccm', 'regime_imposition'
+            ]));
+        } else {
+            // Tous les champs
+            $request->validate([
+                'nom'               => ['required', 'string', 'max:150'],
+                'telephone'         => ['nullable', 'string', 'max:30'],
+                'email'             => ['nullable', 'email', 'max:150'],
+                'adresse'           => ['nullable', 'string', 'max:255'],
+                'ncc'               => ['nullable', 'string', 'max:50'],
+                'rccm'              => ['nullable', 'string', 'max:100'],
+                'regime_imposition' => ['nullable', 'string', 'max:100'],
+                'compte_comptable'  => [
+                    'required',
+                    'string',
+                    \Illuminate\Validation\Rule::exists('plan_comptable', 'numero')->where(function ($q) use ($entreprise) {
+                        $q->whereNull('entreprise_id')->orWhere('entreprise_id', $entreprise->id);
+                    })
+                ],
+                'numero_tiers'      => [
+                    'required',
+                    'string',
+                    'regex:/^411[0-9]*$/',
+                    \Illuminate\Validation\Rule::unique('clients', 'numero_tiers')->ignore($client->id)->where('entreprise_id', $entreprise->id)
+                ],
+            ]);
+
+            $client->update($request->only([
+                'nom', 'telephone', 'email', 'adresse', 'ncc', 'rccm', 'regime_imposition', 'compte_comptable', 'numero_tiers'
+            ]));
+        }
+
+        return back()->with('succes', 'Client modifié avec succès.');
     }
 }

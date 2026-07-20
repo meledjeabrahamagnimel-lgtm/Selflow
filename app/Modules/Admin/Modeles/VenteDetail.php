@@ -8,7 +8,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 class VenteDetail extends Model
 {
     protected $table = 'vente_details';
-    protected $fillable = ['vente_id', 'produit_id', 'libelle_virtuel', 'quantite', 'unite', 'prix_unitaire', 'montant_tva', 'montant_ttc'];
+    protected $fillable = ['vente_id', 'produit_id', 'libelle_virtuel', 'quantite', 'quantite_livree', 'unite', 'prix_unitaire', 'montant_tva', 'montant_ttc'];
 
     public function vente(): BelongsTo
     {

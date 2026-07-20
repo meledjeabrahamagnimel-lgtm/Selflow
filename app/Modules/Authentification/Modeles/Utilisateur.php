@@ -18,6 +18,7 @@ class Utilisateur extends Authenticatable
         'nom',
         'prenom',
         'email',
+        'avatar_path',
         'password',
         'role',
         'fonction',
@@ -27,6 +28,7 @@ class Utilisateur extends Authenticatable
         'notes',
         'habilitations',
         'jeton_api',
+        'doit_changer_password',
     ];
 
     protected $hidden = [
@@ -37,9 +39,10 @@ class Utilisateur extends Authenticatable
     protected function casts(): array
     {
         return [
-            'email_verified_at' => 'datetime',
-            'password'          => 'hashed',
-            'habilitations'     => 'array',
+            'email_verified_at'     => 'datetime',
+            'password'              => 'hashed',
+            'habilitations'         => 'array',
+            'doit_changer_password' => 'boolean',
         ];
     }
 
@@ -63,6 +66,16 @@ class Utilisateur extends Authenticatable
         return $this->role === 'admin';
     }
 
+    public function estAdminSecondaire(): bool
+    {
+        return $this->role === 'admin_secondaire';
+    }
+
+    public function estResponsablePdv(): bool
+    {
+        return $this->role === 'responsable_pdv';
+    }
+
     public function estCaissier(): bool
     {
         return $this->role === 'caissier';
@@ -73,10 +86,29 @@ class Utilisateur extends Authenticatable
      */
     public function aHabilitation(string $page): bool
     {
-        if ($this->estSuperAdmin() || $this->estAdmin()) {
+        if ($this->estSuperAdmin() || $this->estAdmin() || $this->estAdminSecondaire()) {
             return true;
         }
 
         return is_array($this->habilitations) && in_array($page, $this->habilitations);
+    }
+
+    public function getAvatarUrlAttribute(): string
+    {
+        if ($this->avatar_path) {
+            return \Illuminate\Support\Facades\Storage::disk('public')->url($this->avatar_path);
+        }
+        return 'data:image/svg+xml;utf8,' . rawurlencode($this->genererAvatarSvg());
+    }
+
+    public function genererAvatarSvg(): string
+    {
+        $prenomInitial = !empty($this->prenom) ? substr($this->prenom, 0, 1) : '';
+        $nomInitial = !empty($this->nom) ? substr($this->nom, 0, 1) : '';
+        $initials = strtoupper($prenomInitial . $nomInitial);
+        if (empty($initials)) {
+            $initials = 'U';
+        }
+        return '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" width="128" height="128"><rect width="128" height="128" fill="#002B5C"/><text x="50%" y="54%" dominant-baseline="middle" text-anchor="middle" font-family="system-ui, -apple-system, BlinkMacSystemFont, \'Segoe UI\', Roboto, Helvetica, Arial, sans-serif" font-size="48" font-weight="800" fill="#FFFFFF">' . $initials . '</text></svg>';
     }
 }

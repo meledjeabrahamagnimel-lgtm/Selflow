@@ -32,9 +32,14 @@ class DonneesInitialesSeeder extends Seeder
         DB::table('ventes')->truncate();
         DB::table('achat_details')->truncate();
         DB::table('achats')->truncate();
+        DB::table('stocks')->truncate();
         DB::table('produits')->truncate();
+        DB::table('categories')->truncate();
         DB::table('clients')->truncate();
         DB::table('fournisseurs')->truncate();
+        DB::table('utilisateurs')->truncate();
+        DB::table('points_de_vente')->truncate();
+        DB::table('entreprises')->truncate();
 
         // Récupérer ou créer l'entreprise de démo
         $entreprise = Entreprise::firstOrCreate(
@@ -47,6 +52,23 @@ class DonneesInitialesSeeder extends Seeder
                 'compte_contribuable'    => 'CI0123456789',
                 'quota_points_de_vente'  => 5,
                 'plan_abonnement'        => 'Pro',
+                'secteur_activite'       => ['Commercial', 'Services'],
+                'modules_actifs'         => ['principal', 'ventes', 'achats', 'stock', 'comptabilite', 'points_de_vente', 'produits', 'tiers', 'rapports', 'b2b', 'fne'],
+            ]
+        );
+
+        $entreprise2 = Entreprise::firstOrCreate(
+            ['email' => 'contact@b2bagro.ci'],
+            [
+                'nom'                    => 'B2B Agro Fournitures',
+                'adresse'                => 'Boulevard des Martyrs, Cocody, Abidjan',
+                'telephone'              => '+225 27 22 99 99',
+                'rccm'                   => 'CI-ABJ-2026-B-99999',
+                'compte_contribuable'    => 'CI9876543210',
+                'quota_points_de_vente'  => 5,
+                'plan_abonnement'        => 'Pro',
+                'secteur_activite'       => ['Commercial'],
+                'modules_actifs'         => ['principal', 'ventes', 'achats', 'stock', 'comptabilite', 'points_de_vente', 'produits', 'tiers', 'rapports', 'b2b', 'fne'],
             ]
         );
 
@@ -73,12 +95,23 @@ class DonneesInitialesSeeder extends Seeder
             ]
         );
 
+        $pdvEntreprise2 = PointDeVente::firstOrCreate(
+            ['nom' => 'Boutique Plateau', 'entreprise_id' => $entreprise2->id],
+            [
+                'ville'         => 'Abidjan',
+                'commune'       => 'Plateau',
+                'responsable'   => 'Koffi Paul',
+                'telephone'     => '+225 27 00 99 99',
+                'statut'        => 'Ouvert',
+            ]
+        );
+
         // Utilisateurs
         Utilisateur::firstOrCreate(
             ['email' => 'superadmin@gmail.com'],
             [
                 'nom'                => 'Super Administrateur',
-                'password'           => Hash::make('12345678'),
+                'password'           => Hash::make('12345678SUPER'),
                 'role'               => 'superadmin',
                 'statut'             => 'actif',
             ]
@@ -89,6 +122,18 @@ class DonneesInitialesSeeder extends Seeder
             [
                 'entreprise_id'      => $entreprise->id,
                 'nom'                => 'Administrateur',
+                'password'           => Hash::make('12345678'),
+                'role'               => 'admin',
+                'statut'             => 'actif',
+            ]
+        );
+
+        Utilisateur::firstOrCreate(
+            ['email' => 'admin3@gmail.com'],
+            [
+                'entreprise_id'      => $entreprise2->id,
+                'point_de_vente_id'  => $pdvEntreprise2->id,
+                'nom'                => 'Admin B2B Agro',
                 'password'           => Hash::make('12345678'),
                 'role'               => 'admin',
                 'statut'             => 'actif',
@@ -133,11 +178,12 @@ class DonneesInitialesSeeder extends Seeder
         ];
 
         foreach ($syscohada as $compte) {
-            \App\Modules\Admin\Modeles\PlanComptable::create($compte);
+            \App\Modules\Admin\Modeles\PlanComptable::create(array_merge($compte, ['entreprise_id' => $entreprise->id]));
+            \App\Modules\Admin\Modeles\PlanComptable::create(array_merge($compte, ['entreprise_id' => $entreprise2->id]));
         }
 
         // -----------------------------------------------------------------------
-        // Seed Produits avec comptes par défaut
+        // Seed Produits avec comptes par défaut pour les deux entreprises
         // -----------------------------------------------------------------------
         $produits = [
             ['reference' => 'ART-001', 'nom' => 'Huile Dinor 1L',       'categorie' => 'Épicerie',  'prix_achat' => 900,  'prix_vente' => 1200, 'stock_actuel' => 42, 'stock_minimum' => 10, 'compte_vente' => '701100', 'compte_achat' => '601100'],
@@ -149,24 +195,90 @@ class DonneesInitialesSeeder extends Seeder
         ];
 
         foreach ($produits as $donnees) {
-            Produit::create(array_merge($donnees, ['entreprise_id' => $entreprise->id, 'type' => 'stockable', 'taux_tva' => 18.00]));
+            $stockActuel  = $donnees['stock_actuel'];
+            $stockMinimum = $donnees['stock_minimum'];
+            $nomCategorie = $donnees['categorie'];
+
+            unset($donnees['stock_actuel']);
+            unset($donnees['stock_minimum']);
+            unset($donnees['categorie']);
+
+            // 1. Pour l'entreprise 1 (Maison Dupont)
+            $cat = \App\Modules\Admin\Modeles\Categorie::firstOrCreate([
+                'entreprise_id' => $entreprise->id,
+                'nom'           => $nomCategorie,
+            ], [
+                'prefixe'       => strtoupper(substr(preg_replace('/[^a-zA-Z]/', '', $nomCategorie), 0, 4)),
+            ]);
+
+            $prod = Produit::create(array_merge($donnees, [
+                'entreprise_id' => $entreprise->id, 
+                'type' => 'marchandise', 
+                'taux_tva' => 18.00,
+                'categorie_id' => $cat->id
+            ]));
+
+            \App\Modules\Admin\Modeles\Stock::create([
+                'produit_id'          => $prod->id,
+                'point_de_vente_id'   => $pdv1->id,
+                'quantite_disponible' => $stockActuel,
+                'stock_minimum'       => $stockMinimum,
+                'stock_maximum'       => 150,
+            ]);
+
+            \App\Modules\Admin\Modeles\Stock::create([
+                'produit_id'          => $prod->id,
+                'point_de_vente_id'   => $pdv2->id,
+                'quantite_disponible' => intval(round($stockActuel / 2)),
+                'stock_minimum'       => $stockMinimum,
+                'stock_maximum'       => 150,
+            ]);
+
+            // 2. Pour l'entreprise 2 (B2B Agro)
+            $cat2 = \App\Modules\Admin\Modeles\Categorie::firstOrCreate([
+                'entreprise_id' => $entreprise2->id,
+                'nom'           => $nomCategorie,
+            ], [
+                'prefixe'       => strtoupper(substr(preg_replace('/[^a-zA-Z]/', '', $nomCategorie), 0, 4)),
+            ]);
+
+            $prod2 = Produit::create(array_merge($donnees, [
+                'entreprise_id' => $entreprise2->id, 
+                'type' => 'marchandise', 
+                'taux_tva' => 18.00,
+                'categorie_id' => $cat2->id
+            ]));
+
+            \App\Modules\Admin\Modeles\Stock::create([
+                'produit_id'          => $prod2->id,
+                'point_de_vente_id'   => $pdvEntreprise2->id,
+                'quantite_disponible' => $stockActuel,
+                'stock_minimum'       => $stockMinimum,
+                'stock_maximum'       => 150,
+            ]);
         }
 
         // -----------------------------------------------------------------------
-        // Seed Clients avec numéros tiers uniques
+        // Seed Clients et Fournisseurs croisés B2B + Clients/Fournisseurs standards
         // -----------------------------------------------------------------------
+        // Entreprise 1 (Maison Dupont)
         Client::create(['entreprise_id' => $entreprise->id, 'nom' => 'Koffi Amos',     'telephone' => '+225 07 11 22 33', 'email' => 'koffi@mail.com',  'adresse' => 'Cocody, Abidjan', 'ncc' => '1982341 X', 'regime_imposition' => 'RNI', 'compte_comptable' => '411100', 'numero_tiers' => '411001']);
         Client::create(['entreprise_id' => $entreprise->id, 'nom' => 'Diallo Mariam',  'telephone' => '+225 07 44 55 66', 'email' => 'diallo@mail.com', 'adresse' => 'Plateau, Abidjan', 'ncc' => '1982342 X', 'regime_imposition' => 'RNI', 'compte_comptable' => '411100', 'numero_tiers' => '411002']);
-        Client::create(['entreprise_id' => $entreprise->id, 'nom' => 'Coulibaly Jean', 'telephone' => '+225 07 77 88 99', 'email' => 'coul@mail.com',   'adresse' => 'Yopougon, Abidjan', 'ncc' => '1982343 X', 'regime_imposition' => 'RNI', 'compte_comptable' => '411100', 'numero_tiers' => '411003']);
-        Client::create(['entreprise_id' => $entreprise->id, 'nom' => 'Koné Fatou',     'telephone' => '+225 07 99 10 11', 'email' => 'kone@mail.com',   'adresse' => 'Adjamé, Abidjan', 'ncc' => '1982344 X', 'regime_imposition' => 'RNI', 'compte_comptable' => '411100', 'numero_tiers' => '411004']);
-        Client::create(['entreprise_id' => $entreprise->id, 'nom' => 'Bamba Seydou',   'telephone' => '+225 07 22 33 44', 'email' => 'bamba@mail.com',  'adresse' => 'Marcory, Abidjan', 'ncc' => '1982345 X', 'regime_imposition' => 'RNI', 'compte_comptable' => '411100', 'numero_tiers' => '411005']);
+        // Client croisé B2B lié à l'Entreprise 2 (NCC B2B Agro = CI9876543210)
+        Client::create(['entreprise_id' => $entreprise->id, 'nom' => 'B2B Agro Fournitures (Client B2B)', 'telephone' => '+225 27 22 99 99', 'email' => 'contact@b2bagro.ci', 'adresse' => 'Abidjan', 'ncc' => 'CI9876543210', 'regime_imposition' => 'RNI', 'compte_comptable' => '411100', 'numero_tiers' => '411003']);
 
-        // -----------------------------------------------------------------------
-        // Seed Fournisseurs avec numéros tiers uniques
-        // -----------------------------------------------------------------------
         Fournisseur::create(['entreprise_id' => $entreprise->id, 'nom' => 'CDCI Distribution', 'telephone' => '+225 27 20 01 01', 'email' => 'contact@cdci.ci',   'adresse' => 'Abidjan, Treichville', 'ncc' => '2019871 Y', 'regime_imposition' => 'RSI', 'secteur' => 'Alimentation', 'compte_comptable' => '401100', 'numero_tiers' => '401001']);
-        Fournisseur::create(['entreprise_id' => $entreprise->id, 'nom' => 'ProFoods CI',        'telephone' => '+225 27 20 02 02', 'email' => 'info@profoods.ci',  'adresse' => 'Abidjan, Zone 3', 'ncc' => '2019872 Y', 'regime_imposition' => 'RSI', 'secteur' => 'Alimentation', 'compte_comptable' => '401100', 'numero_tiers' => '401002']);
-        Fournisseur::create(['entreprise_id' => $entreprise->id, 'nom' => 'ElecTech Abidjan',   'telephone' => '+225 27 20 03 03', 'email' => 'pro@electech.ci',   'adresse' => 'Abidjan, Zone 4', 'ncc' => '2019873 Y', 'regime_imposition' => 'RSI', 'secteur' => 'Électronique', 'compte_comptable' => '401100', 'numero_tiers' => '401003']);
+        // Fournisseur croisé B2B lié à l'Entreprise 2 (NCC B2B Agro = CI9876543210)
+        Fournisseur::create(['entreprise_id' => $entreprise->id, 'nom' => 'B2B Agro Fournitures (Fournisseur B2B)', 'telephone' => '+225 27 22 99 99', 'email' => 'contact@b2bagro.ci', 'adresse' => 'Abidjan', 'ncc' => 'CI9876543210', 'regime_imposition' => 'RSI', 'secteur' => 'Alimentation', 'compte_comptable' => '401100', 'numero_tiers' => '401002']);
+
+        // Entreprise 2 (B2B Agro)
+        Client::create(['entreprise_id' => $entreprise2->id, 'nom' => 'Diallo Awa',     'telephone' => '+225 07 55 66 77', 'email' => 'awa@mail.com',  'adresse' => 'Cocody, Abidjan', 'ncc' => '2982341 X', 'regime_imposition' => 'RNI', 'compte_comptable' => '411100', 'numero_tiers' => '411011']);
+        // Client croisé B2B lié à l'Entreprise 1 (NCC Maison Dupont = CI0123456789)
+        Client::create(['entreprise_id' => $entreprise2->id, 'nom' => 'Maison Dupont SARL (Client B2B)', 'telephone' => '+225 27 22 10 00', 'email' => 'contact@maisondupont.ci', 'adresse' => 'Abidjan', 'ncc' => 'CI0123456789', 'regime_imposition' => 'RNI', 'compte_comptable' => '411100', 'numero_tiers' => '411012']);
+ 
+        Fournisseur::create(['entreprise_id' => $entreprise2->id, 'nom' => 'ProFoods CI',        'telephone' => '+225 27 20 02 02', 'email' => 'info@profoods.ci',  'adresse' => 'Abidjan, Zone 3', 'ncc' => '2019872 Y', 'regime_imposition' => 'RSI', 'secteur' => 'Alimentation', 'compte_comptable' => '401100', 'numero_tiers' => '401011']);
+        // Fournisseur croisé B2B lié à l'Entreprise 1 (NCC Maison Dupont = CI0123456789)
+        Fournisseur::create(['entreprise_id' => $entreprise2->id, 'nom' => 'Maison Dupont SARL (Fournisseur B2B)', 'telephone' => '+225 27 22 10 00', 'email' => 'contact@maisondupont.ci', 'adresse' => 'Abidjan', 'ncc' => 'CI0123456789', 'regime_imposition' => 'RSI', 'secteur' => 'Alimentation', 'compte_comptable' => '401100', 'numero_tiers' => '401012']);
 
         // Réactiver les contraintes de clés étrangères
         Schema::enableForeignKeyConstraints();

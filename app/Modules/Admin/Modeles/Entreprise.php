@@ -11,6 +11,10 @@ class Entreprise extends Model
 
     protected $fillable = [
         'nom',
+        'forme_juridique',
+        'gerant_nom',
+        'gerant_prenom',
+        'gerant_fonction',
         'adresse',
         'telephone',
         'email',
@@ -24,6 +28,17 @@ class Entreprise extends Model
         'logo_fne_path',
         'quota_points_de_vente',
         'plan_abonnement',
+        'secteur_activite',
+        'modules_actifs',
+        'comptaflow_sync_key',
+        'comptaflow_sync_status',
+        'comptaflow_last_sync_at',
+        'comptaflow_company_id',
+    ];
+
+    protected $casts = [
+        'secteur_activite' => 'array',
+        'modules_actifs' => 'array',
     ];
 
     public function pointsDeVente(): HasMany

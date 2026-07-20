@@ -6,63 +6,231 @@
 <div class="page-header">
     <div>
         <h1><i class="fas fa-users"></i> Liste des clients</h1>
-        <p>{{ $clients->total() }} client(s) enregistré(s)</p>
+        <p>{{ $clients->total() + $clientsComptaflow->total() }} client(s) au total</p>
     </div>
-    <button class="btn btn-primary" data-modal-open="modalNouveauClient">
-        <i class="fas fa-plus"></i> Ajouter un client
-    </button>
+    <div style="display:flex; gap:12px; align-items:center;">
+        {{-- Switch bouton --}}
+        <div class="vue-toggle" style="display:flex; background:var(--bg2); border:1px solid var(--border); border-radius:8px; overflow:hidden; padding:2px;">
+            <button type="button" id="btn-vue-local" onclick="switchVue('local')" class="btn btn-sm btn-primary"
+                style="padding:6px 12px; font-size:12px; font-weight:700; border-radius:6px; border:none; cursor:pointer;">
+                <i class="fas fa-database"></i> Local ({{ $clients->total() }})
+            </button>
+            <button type="button" id="btn-vue-comptaflow" onclick="switchVue('comptaflow')" class="btn btn-sm btn-outline"
+                style="padding:6px 12px; font-size:12px; font-weight:700; border-radius:6px; border:none; cursor:pointer; background:transparent; color:var(--text-2);">
+                <i class="fas fa-sync"></i> COMPTAFLOW ({{ $clientsComptaflow->total() }})
+            </button>
+        </div>
+        <button id="btn-nouveau-client" class="btn btn-primary" data-modal-open="modalNouveauClient">
+            <i class="fas fa-plus"></i> Ajouter un client
+        </button>
+    </div>
 </div>
 
-<div class="card">
-    <div class="table-wrap">
-        <table>
-            <thead>
-                <tr>
-                    <th>Nom &amp; Prénom</th>
-                    <th>N° tiers</th>
-                    <th>NCC</th>
-                    <th>RCCM</th>
-                    <th>Compte général</th>
-                    <th>Régime</th>
-                    <th>Téléphone</th>
-                    <th>E-mail</th>
-                    <th>Adresse</th>
-                    <th>Nombre d'achats</th>
-                    <th>Date d'ajout</th>
-                </tr>
-            </thead>
-            <tbody>
-                @forelse($clients as $c)
-                <tr>
-                    <td style="font-weight:600; color:var(--text);">{{ $c->nom }}</td>
-                    <td style="font-family: monospace; font-weight: 700; color: var(--primary);">{{ $c->numero_tiers ?? '—' }}</td>
-                    <td>{{ $c->ncc ?? '—' }}</td>
-                    <td>{{ $c->rccm ?? '—' }}</td>
-                    <td style="font-family: monospace; font-weight: 700;">{{ $c->compte_comptable ?? '411100' }}</td>
-                    <td>{{ $c->regime_imposition ?? '—' }}</td>
-                    <td>{{ $c->telephone ?? '—' }}</td>
-                    <td>{{ $c->email ?? '—' }}</td>
-                    <td>{{ $c->adresse ?? '—' }}</td>
-                    <td>
-                        <span class="badge badge-purple">{{ $c->ventes_count }} achat(s)</span>
-                    </td>
-                    <td style="color:var(--text-3);">{{ $c->created_at->format('d/m/Y') }}</td>
-                </tr>
-                @empty
-                <tr>
-                    <td colspan="11" style="text-align:center; color:var(--text-3); padding:30px;">
-                        Aucun client enregistré pour le moment.
-                    </td>
-                </tr>
-                @endforelse
-            </tbody>
-        </table>
-        @if($clients->hasPages())
-        <div style="padding: 16px;">
-            {{ $clients->links() }}
+<div id="section-local">
+    <div class="card">
+        <div class="table-wrap">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Nom &amp; Prénom</th>
+                        <th>N° tiers</th>
+                        <th>NCC</th>
+                        <th>RCCM</th>
+                        <th>Compte général</th>
+                        <th>Régime</th>
+                        <th>Téléphone</th>
+                        <th>E-mail</th>
+                        <th>Adresse</th>
+                        <th>Ventes</th>
+                        <th>Date d'ajout</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @forelse($clients as $c)
+                    <tr>
+                        <td style="font-weight:600; color:var(--text);">{{ $c->nom }}</td>
+                        <td style="font-family: monospace; font-weight: 700; color: var(--primary);">
+                            {{ $c->numero_tiers ?? '—' }}
+                            @if(!empty($c->numero_original))
+                                <div style="font-size: 10px; color: var(--text-3); font-weight: normal; margin-top: 3px; display: flex; align-items: center; gap: 4px;">
+                                    <i class="fas fa-file-invoice" style="font-size: 9px; opacity: 0.7;"></i> Original: {{ $c->numero_original }}
+                                </div>
+                            @endif
+                        </td>
+                        <td>{{ $c->ncc ?? '—' }}</td>
+                        <td>{{ $c->rccm ?? '—' }}</td>
+                        <td style="font-family: monospace; font-weight: 700;">
+                            {{ $c->compte_comptable ?? '411100' }}
+                            @php
+                                $compteObj = $comptes->firstWhere('numero', $c->compte_comptable ?? '411100');
+                            @endphp
+                            @if($compteObj && !empty($compteObj->numero_original))
+                                <div style="font-size: 10px; color: var(--text-3); font-weight: normal; margin-top: 3px; display: flex; align-items: center; gap: 4px;">
+                                    <i class="fas fa-file-invoice" style="font-size: 9px; opacity: 0.7;"></i> Original: {{ $compteObj->numero_original }}
+                                </div>
+                            @endif
+                        </td>
+                        <td>{{ $c->regime_imposition ?? '—' }}</td>
+                        <td>{{ $c->telephone ?? '—' }}</td>
+                        <td>{{ $c->email ?? '—' }}</td>
+                        <td>{{ $c->adresse ?? '—' }}</td>
+                        <td>
+                            <span class="badge badge-purple">{{ $c->ventes_count }} vente(s)</span>
+                        </td>
+                        <td style="color:var(--text-3);">{{ $c->created_at->format('d/m/Y') }}</td>
+                        <td>
+                            <button class="btn btn-outline btn-sm btn-modifier-client"
+                                data-id="{{ $c->id }}"
+                                data-nom="{{ $c->nom }}"
+                                data-telephone="{{ $c->telephone }}"
+                                data-email="{{ $c->email }}"
+                                data-adresse="{{ $c->adresse }}"
+                                data-ncc="{{ $c->ncc }}"
+                                data-rccm="{{ $c->rccm }}"
+                                data-regime="{{ $c->regime_imposition }}"
+                                data-compte="{{ $c->compte_comptable ?? '411100' }}"
+                                data-numero="{{ $c->numero_tiers }}"
+                                data-source="{{ $c->source }}"
+                                style="padding: 5px 10px;">
+                                <i class="fas fa-edit"></i> Modifier
+                            </button>
+                        </td>
+                    </tr>
+                    @empty
+                    <tr>
+                        <td colspan="12" style="text-align:center; color:var(--text-3); padding:30px;">
+                            Aucun client local enregistré pour le moment.
+                        </td>
+                    </tr>
+                    @endforelse
+                </tbody>
+            </table>
+            @if($clients->hasPages())
+            <div style="padding: 16px;">
+                {{ $clients->links() }}
+            </div>
+            @endif
         </div>
-        @endif
     </div>
+</div>
+
+<div id="section-comptaflow" style="display:none;">
+    @if(empty($entreprise->comptaflow_sync_key))
+        <div class="card" style="padding: 30px; text-align: center;">
+            <i class="fas fa-exclamation-triangle" style="font-size: 48px; color: var(--danger); margin-bottom: 20px; opacity: 0.8;"></i>
+            <h2 style="font-size: 18px; font-weight: 700; margin-bottom: 10px;">Liaison COMPTAFLOW non active</h2>
+            <div style="max-width: 500px; margin: 0 auto; padding: 20px; border-radius: 8px; background: #fff5f5; border: 1px solid #feb2b2; margin-top: 15px;">
+                <p style="font-size: 13px; color: #4a5568; line-height: 1.5;">
+                    Veuillez configurer votre clé de synchronisation COMPTAFLOW dans les paramètres de l'entreprise pour activer la liaison et importer les comptes clients.
+                </p>
+                <a href="{{ route('admin.entreprise.parametres') }}" class="btn btn-primary" style="margin-top: 15px; display: inline-flex;">
+                    <i class="fas fa-cog"></i> Configurer la liaison
+                </a>
+            </div>
+        </div>
+    @else
+        <div style="background: linear-gradient(135deg, #eff6ff, #f0fdf4); border: 1px solid #bfdbfe; border-radius: 12px; padding: 16px; margin-bottom: 20px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px;">
+            <div>
+                <p style="font-weight:700; color:#1e40af; margin-bottom:4px;"><i class="fas fa-link"></i> Clients synchronisés depuis COMPTAFLOW</p>
+                <p style="font-size: 13px; color: #64748b; margin-bottom:0;">
+                    Leurs informations COMPTAFLOW (nom, numéro de tiers, compte collectif) sont protégées en écriture, mais vous pouvez compléter leurs données Selflow manquantes ci-dessous.
+                </p>
+            </div>
+            <button type="button" id="btn-sync-clients" onclick="lancerSyncComptaflow()" class="btn btn-primary" style="font-weight:700; white-space:nowrap;">
+                <i class="fas fa-sync-alt" id="sync-icon-clients"></i> Synchroniser les tiers
+            </button>
+        </div>
+        <div id="sync-feedback-clients" style="display:none; margin-bottom: 16px; padding: 12px; border-radius: 6px; font-weight: 600; font-size: 13px;"></div>
+
+        <div class="card">
+            <div class="table-wrap">
+                @if($clientsComptaflow->isEmpty())
+                <div style="padding:48px; text-align:center; color:var(--text-3);">
+                    <i class="fas fa-users" style="font-size:48px; display:block; margin-bottom:12px; opacity:.2;"></i>
+                    Aucun client COMPTAFLOW synchronisé. Cliquez sur <strong>Synchroniser les tiers</strong>.
+                </div>
+                @else
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Nom &amp; Prénom</th>
+                            <th>N° tiers</th>
+                            <th>NCC</th>
+                            <th>RCCM</th>
+                            <th>Compte général</th>
+                            <th>Régime</th>
+                            <th>Téléphone</th>
+                            <th>E-mail</th>
+                            <th>Adresse</th>
+                            <th>Ventes</th>
+                            <th>Date d'ajout</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach($clientsComptaflow as $c)
+                        <tr>
+                            <td style="font-weight:600; color:var(--text);">{{ $c->nom }}</td>
+                            <td style="font-family: monospace; font-weight: 700; color: var(--primary);">
+                                {{ $c->numero_tiers ?? '—' }}
+                                @if(!empty($c->numero_original))
+                                    <div style="font-size: 10px; color: var(--text-3); font-weight: normal; margin-top: 3px; display: flex; align-items: center; gap: 4px;">
+                                        <i class="fas fa-file-invoice" style="font-size: 9px; opacity: 0.7;"></i> Original: {{ $c->numero_original }}
+                                    </div>
+                                @endif
+                            </td>
+                            <td>{{ $c->ncc ?? '—' }}</td>
+                            <td>{{ $c->rccm ?? '—' }}</td>
+                            <td style="font-family: monospace; font-weight: 700;">
+                             {{ $c->compte_comptable ?? '411100' }}
+                             @php
+                                 $compteObj = $comptes->firstWhere('numero', $c->compte_comptable ?? '411100');
+                             @endphp
+                             @if($compteObj && !empty($compteObj->numero_original))
+                                 <div style="font-size: 10px; color: var(--text-3); font-weight: normal; margin-top: 3px; display: flex; align-items: center; gap: 4px;">
+                                     <i class="fas fa-file-invoice" style="font-size: 9px; opacity: 0.7;"></i> Original: {{ $compteObj->numero_original }}
+                                 </div>
+                             @endif
+                         </td>
+                            <td>{{ $c->regime_imposition ?? '—' }}</td>
+                            <td>{{ $c->telephone ?? '—' }}</td>
+                            <td>{{ $c->email ?? '—' }}</td>
+                            <td>{{ $c->adresse ?? '—' }}</td>
+                            <td>
+                                <span class="badge badge-purple">{{ $c->ventes_count }} vente(s)</span>
+                            </td>
+                            <td style="color:var(--text-3);">{{ $c->created_at->format('d/m/Y') }}</td>
+                            <td>
+                                <button class="btn btn-outline btn-sm btn-modifier-client"
+                                    data-id="{{ $c->id }}"
+                                    data-nom="{{ $c->nom }}"
+                                    data-telephone="{{ $c->telephone }}"
+                                    data-email="{{ $c->email }}"
+                                    data-adresse="{{ $c->adresse }}"
+                                    data-ncc="{{ $c->ncc }}"
+                                    data-rccm="{{ $c->rccm }}"
+                                    data-regime="{{ $c->regime_imposition }}"
+                                    data-compte="{{ $c->compte_comptable ?? '411100' }}"
+                                    data-numero="{{ $c->numero_tiers }}"
+                                    data-source="{{ $c->source }}"
+                                    style="padding: 5px 10px;">
+                                    <i class="fas fa-edit"></i> Modifier
+                                </button>
+                            </td>
+                        </tr>
+                        @endforeach
+                    </tbody>
+                </table>
+                @if($clientsComptaflow->hasPages())
+                <div style="padding: 16px;">
+                    {{ $clientsComptaflow->links() }}
+                </div>
+                @endif
+                @endif
+            </div>
+        </div>
+    @endif
 </div>
 
 {{-- Modal Nouveau Client --}}
@@ -147,6 +315,86 @@
     </div>
 </div>
 
+{{-- Modal Modifier Client --}}
+<div class="modal-overlay" id="modalModifierClient">
+    <div class="modal" style="max-width:580px;">
+        <div class="modal-header">
+            <h3><i class="fas fa-edit"></i> Modifier le client</h3>
+            <button class="modal-close" data-modal-close>✕</button>
+        </div>
+        <form method="POST" id="formModifierClient">
+            @csrf
+            @method('PUT')
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;">
+                <div class="form-group" style="grid-column:1/-1;">
+                    <label class="form-label">Nom &amp; Prénom <span style="color:var(--danger)">*</span></label>
+                    <input type="text" name="nom" id="edit_nom" class="form-control" placeholder="Ex: Koffi Amos" required>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Téléphone</label>
+                    <input type="text" name="telephone" id="edit_telephone" class="form-control" placeholder="Ex: +225 07 00 00 00">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Adresse E-mail</label>
+                    <input type="email" name="email" id="edit_email" class="form-control" placeholder="Ex: koffi@mail.com">
+                </div>
+                <div class="form-group" style="grid-column:1/-1;">
+                    <label class="form-label">Adresse physique</label>
+                    <input type="text" name="adresse" id="edit_adresse" class="form-control" placeholder="Ex: Cocody, Abidjan">
+                </div>
+                {{-- Informations fiscales & Comptables --}}
+                <div style="grid-column:1/-1; padding:12px 14px; background:var(--bg3); border-radius:8px; border:1px solid var(--border); margin-top:4px;">
+                    <div style="font-size:11px;font-weight:700;color:var(--text-2);text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px;">
+                        <i class="fas fa-file-invoice" style="margin-right:6px;"></i>Informations fiscales &amp; comptables
+                    </div>
+                    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+                        <div class="form-group" style="margin-bottom:0;">
+                            <label class="form-label">NCC (Nº Compte Contribuable)</label>
+                            <input type="text" name="ncc" id="edit_ncc" class="form-control" placeholder="Ex: 2302178R">
+                        </div>
+                        <div class="form-group" style="margin-bottom:0;">
+                            <label class="form-label">RCCM (Registre de commerce)</label>
+                            <input type="text" name="rccm" id="edit_rccm" class="form-control" placeholder="Ex: CI-ABJ-03-2021-B13-05438">
+                        </div>
+                        <div class="form-group" style="margin-bottom:0;">
+                            <label class="form-label">Régime d'imposition</label>
+                            <select name="regime_imposition" id="edit_regime_imposition" class="form-control">
+                                <option value="">— Non renseigné —</option>
+                                <option value="TEE">TEE (Taxe sur l'Entreprise Employeuse)</option>
+                                <option value="RS">RS (Régime Simplifié)</option>
+                                <option value="RSI">RSI (Régime Simplifié d'Imposition)</option>
+                                <option value="RNI">RNI (Régime Normal d'Imposition)</option>
+                                <option value="Exonéré">Exonéré</option>
+                            </select>
+                        </div>
+                        <div class="form-group" style="margin-bottom:0;">
+                            <label class="form-label">Compte comptable général collective</label>
+                            <select name="compte_comptable" id="edit_compte_comptable" class="form-control" required>
+                                @foreach($comptes as $compte)
+                                    <option value="{{ $compte->numero }}">
+                                        {{ $compte->numero }} - {{ $compte->libelle }}
+                                    </option>
+                                @endforeach
+                            </select>
+                        </div>
+                        <div class="form-group" style="margin-bottom:0; grid-column: 1/-1;">
+                            <label class="form-label">N° tiers auxiliaire (ex: 411001)</label>
+                            <input type="text" name="numero_tiers" id="edit_numero_tiers" class="form-control" placeholder="Ex: 411001" required>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div style="display:flex; gap:10px; justify-content:flex-end; margin-top:16px;">
+                <button type="button" class="btn btn-outline" data-modal-close>Annuler</button>
+                <button type="submit" class="btn btn-primary"><i class="fas fa-save"></i> Enregistrer les modifications</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+@endsection
+
+@section('scripts')
 <script>
 function toggleClientNumeroTiers() {
     const checkbox = document.getElementById('auto_numero_client');
@@ -160,6 +408,121 @@ function toggleClientNumeroTiers() {
         input.required = true;
         input.focus();
     }
+}
+
+function switchVue(mode) {
+    const btnLocal = document.getElementById('btn-vue-local');
+    const btnComptaflow = document.getElementById('btn-vue-comptaflow');
+    const secLocal = document.getElementById('section-local');
+    const secComptaflow = document.getElementById('section-comptaflow');
+    const btnNouveau = document.getElementById('btn-nouveau-client');
+
+    if (mode === 'local') {
+        btnLocal.className = "btn btn-sm btn-primary";
+        btnLocal.style.color = "#fff";
+        btnLocal.style.background = "";
+        btnComptaflow.className = "btn btn-sm btn-outline";
+        btnComptaflow.style.color = "var(--text-2)";
+        secLocal.style.display = "block";
+        secComptaflow.style.display = "none";
+        if(btnNouveau) btnNouveau.style.display = "inline-flex";
+    } else {
+        btnComptaflow.className = "btn btn-sm btn-primary";
+        btnComptaflow.style.color = "#fff";
+        btnComptaflow.style.background = "";
+        btnLocal.className = "btn btn-sm btn-outline";
+        btnLocal.style.color = "var(--text-2)";
+        secLocal.style.display = "none";
+        secComptaflow.style.display = "block";
+        if(btnNouveau) btnNouveau.style.display = "none";
+    }
+}
+
+// Boutons Modifier via data-* attributes (pas de json_encode dans onclick)
+document.querySelectorAll('.btn-modifier-client').forEach(function(btn) {
+    btn.addEventListener('click', function() {
+        const data = this.dataset;
+        const modal = document.getElementById('modalModifierClient');
+        const form  = document.getElementById('formModifierClient');
+
+        if (!modal || !form) return;
+
+        // URL d'action du formulaire
+        form.action = '/admin/clients/' + data.id;
+
+        // Remplir les champs
+        document.getElementById('edit_nom').value             = data.nom     || '';
+        document.getElementById('edit_telephone').value       = data.telephone || '';
+        document.getElementById('edit_email').value           = data.email   || '';
+        document.getElementById('edit_adresse').value         = data.adresse || '';
+        document.getElementById('edit_ncc').value             = data.ncc     || '';
+        document.getElementById('edit_rccm').value            = data.rccm    || '';
+        document.getElementById('edit_numero_tiers').value    = data.numero  || '';
+
+        const selectRegime = document.getElementById('edit_regime_imposition');
+        if (selectRegime) selectRegime.value = data.regime || '';
+
+        const selectCompte = document.getElementById('edit_compte_comptable');
+        if (selectCompte) selectCompte.value = data.compte || '411100';
+
+        // Champs COMPTAFLOW → lecture seule
+        const lockFields  = ['edit_nom', 'edit_compte_comptable', 'edit_numero_tiers'];
+        const isCompta    = data.source === 'comptaflow';
+        lockFields.forEach(function(id) {
+            const el = document.getElementById(id);
+            if (!el) return;
+            el.readOnly      = isCompta;
+            el.disabled      = isCompta;
+            el.style.background = isCompta ? '#e2e8f0' : '';
+            el.style.cursor     = isCompta ? 'not-allowed' : '';
+            el.title            = isCompta ? 'Ce champ provient de COMPTAFLOW et ne peut pas être modifié.' : '';
+        });
+        // Le select compte n'a pas readOnly → juste disabled
+        if (selectCompte) {
+            selectCompte.disabled     = isCompta;
+            selectCompte.style.background = isCompta ? '#e2e8f0' : '';
+            selectCompte.style.cursor     = isCompta ? 'not-allowed' : '';
+        }
+
+        // Ouvrir le modal via la classe 'open' (système gabarit)
+        modal.classList.add('open');
+    });
+});
+
+function lancerSyncComptaflow() {
+    const btn      = document.getElementById('btn-sync-clients');
+    const icon     = document.getElementById('sync-icon-clients');
+    const feedback = document.getElementById('sync-feedback-clients');
+
+    if (!btn) return;
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fas fa-sync-alt fa-spin"></i> Synchronisation...';
+
+    fetch("{{ route('admin.entreprise.comptaflow.sync_real') }}", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "X-CSRF-TOKEN": "{{ csrf_token() }}" }
+    })
+    .then(res => res.json())
+    .then(data => {
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fas fa-sync-alt"></i> Synchroniser les tiers';
+        feedback.style.display = "block";
+        if (data.success) {
+            feedback.style.cssText = "background:#e6fffa; color:#319795; border:1px solid #b2f5ea; padding:12px; border-radius:6px; font-weight:600; font-size:13px;";
+            feedback.innerText = data.message;
+            setTimeout(() => { window.location.reload(); }, 1200);
+        } else {
+            feedback.style.cssText = "background:#fff5f5; color:#e53e3e; border:1px solid #fed7d7; padding:12px; border-radius:6px; font-weight:600; font-size:13px;";
+            feedback.innerText = "Erreur : " + data.message;
+        }
+    })
+    .catch(() => {
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fas fa-sync-alt"></i> Synchroniser les tiers';
+        feedback.style.display = "block";
+        feedback.style.cssText = "background:#fff5f5; color:#e53e3e; border:1px solid #fed7d7; padding:12px; border-radius:6px; font-weight:600; font-size:13px;";
+        feedback.innerText = "Erreur de connexion.";
+    });
 }
 </script>
 @endsection

@@ -10,20 +10,28 @@ use Illuminate\View\View;
 
 class FournisseurControleur
 {
-    public function index(): View
+    public function index(Request $request): View
     {
         $entreprise   = Auth::user()->entreprise;
+        
         $fournisseurs = Fournisseur::where('entreprise_id', $entreprise->id)
+             ->where(function ($q) {
+                 $q->where('source', '!=', 'comptaflow')
+                   ->orWhereNull('source');
+             })
              ->withCount('achats')
              ->orderBy('nom')
-             ->paginate(30);
+             ->paginate(15, ['*'], 'page_local');
 
-        $comptes = \App\Modules\Admin\Modeles\PlanComptable::whereNull('entreprise_id')
-            ->orWhere('entreprise_id', $entreprise->id)
-            ->orderBy('numero')
-            ->get();
+        $fournisseursComptaflow = Fournisseur::where('entreprise_id', $entreprise->id)
+             ->where('source', 'comptaflow')
+             ->withCount('achats')
+             ->orderBy('nom')
+             ->paginate(15, ['*'], 'page_comptaflow');
 
-        return view('admin::fournisseurs.index', compact('fournisseurs', 'comptes'));
+        $comptes = \App\Modules\Admin\Modeles\PlanComptable::obtenirComptesPrioritaires($entreprise->id);
+
+        return view('admin::fournisseurs.index', compact('fournisseurs', 'fournisseursComptaflow', 'comptes', 'entreprise'));
     }
 
     public function creer(Request $request): RedirectResponse
@@ -87,5 +95,59 @@ class FournisseurControleur
         ));
 
         return back()->with('succes', 'Fournisseur ajouté avec succès.');
+    }
+
+    public function modifier(Request $request, Fournisseur $fournisseur): RedirectResponse
+    {
+        $entreprise = Auth::user()->entreprise;
+        abort_unless($fournisseur->entreprise_id === $entreprise->id, 403);
+
+        if ($fournisseur->source === 'comptaflow') {
+            // Uniquement les champs spécifiques à Selflow
+            $request->validate([
+                'telephone'         => ['nullable', 'string', 'max:30'],
+                'email'             => ['nullable', 'email', 'max:150'],
+                'adresse'           => ['nullable', 'string', 'max:255'],
+                'secteur'           => ['nullable', 'string', 'max:100'],
+                'ncc'               => ['nullable', 'string', 'max:50'],
+                'rccm'              => ['nullable', 'string', 'max:100'],
+                'regime_imposition' => ['nullable', 'string', 'max:100'],
+            ]);
+
+            $fournisseur->update($request->only([
+                'telephone', 'email', 'adresse', 'secteur', 'ncc', 'rccm', 'regime_imposition'
+            ]));
+        } else {
+            // Tous les champs
+            $request->validate([
+                'nom'               => ['required', 'string', 'max:150'],
+                'telephone'         => ['nullable', 'string', 'max:30'],
+                'email'             => ['nullable', 'email', 'max:150'],
+                'adresse'           => ['nullable', 'string', 'max:255'],
+                'secteur'           => ['nullable', 'string', 'max:100'],
+                'ncc'               => ['nullable', 'string', 'max:50'],
+                'rccm'              => ['nullable', 'string', 'max:100'],
+                'regime_imposition' => ['nullable', 'string', 'max:100'],
+                'compte_comptable'  => [
+                    'required',
+                    'string',
+                    \Illuminate\Validation\Rule::exists('plan_comptable', 'numero')->where(function ($q) use ($entreprise) {
+                        $q->whereNull('entreprise_id')->orWhere('entreprise_id', $entreprise->id);
+                    })
+                ],
+                'numero_tiers'      => [
+                    'required',
+                    'string',
+                    'regex:/^401[0-9]*$/',
+                    \Illuminate\Validation\Rule::unique('fournisseurs', 'numero_tiers')->ignore($fournisseur->id)->where('entreprise_id', $entreprise->id)
+                ],
+            ]);
+
+            $fournisseur->update($request->only([
+                'nom', 'telephone', 'email', 'adresse', 'secteur', 'ncc', 'rccm', 'regime_imposition', 'compte_comptable', 'numero_tiers'
+            ]));
+        }
+
+        return back()->with('succes', 'Fournisseur modifié avec succès.');
     }
 }

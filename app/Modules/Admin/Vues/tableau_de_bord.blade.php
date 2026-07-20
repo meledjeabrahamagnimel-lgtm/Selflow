@@ -132,8 +132,8 @@
     <div class="card">
         <div class="card-header">
             <h2><i class="fas fa-receipt" style="color:var(--success)"></i> Mes dernières ventes</h2>
-            @if(auth()->user()->aHabilitation('historique_ventes'))
-            <a href="{{ route('admin.ventes.historique') }}" class="btn btn-outline btn-sm">Tout voir</a>
+            @if(auth()->user()->aHabilitation('factures_vente'))
+            <a href="{{ route('admin.ventes.factures') }}" class="btn btn-outline btn-sm">Tout voir</a>
             @endif
         </div>
         <div class="table-wrap" style="max-height:280px; overflow-y:auto;">

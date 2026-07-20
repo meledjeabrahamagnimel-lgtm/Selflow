@@ -1,6 +1,6 @@
 @extends('admin::gabarits.application')
-@section('titre', 'Bon d\'achat ' . $achat->numero_facture)
-@section('topbar_titre', 'Achats — Détails')
+@section('titre', $achat->type_facture === 'avoir' ? 'Facture d\'avoir fournisseur ' . $achat->numero_facture : 'Bon d\'achat ' . $achat->numero_facture)
+@section('topbar_titre', $achat->type_facture === 'avoir' ? 'Achats — Facture d\'avoir' : 'Achats — Détails')
 
 @section('styles')
 <style>
@@ -154,7 +154,7 @@
 @section('contenu')
 <div class="no-print controls-card">
     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
-        <a href="{{ route('admin.achats.historique') }}" class="print-btn">
+        <a href="{{ route('admin.achats.factures') }}" class="print-btn">
             <i class="fas fa-arrow-left"></i> Retour aux achats
         </a>
         <div style="font-weight: 700; font-size: 14px; text-transform: uppercase; letter-spacing: 0.5px;">Options du document</div>
@@ -172,9 +172,19 @@
             <button class="tab" id="receipt-toggle-btn" onclick="toggleReceiptMode()" style="border-color: var(--primary); color: var(--primary);">
                 <i class="fas fa-truck-ramp-box"></i> Passer en Bon de réception
             </button>
+            @if(empty($achat->fournisseur->ncc))
+                <a href="{{ route('admin.achats.bapa', $achat) }}" class="tab" style="border-color: var(--danger); color: var(--danger); text-decoration:none;">
+                    <i class="fas fa-file-invoice"></i> Imprimer sous format BAPA
+                </a>
+            @endif
         </div>
         
         <div style="display: flex; gap: 8px; align-items: center;">
+            @if($achat->etape === 'Facture' && $achat->type_facture !== 'avoir')
+                <button type="button" class="print-btn" style="border-color:var(--danger); color:var(--danger); font-weight:700;" onclick="ouvrirModalAvoir()">
+                    <i class="fas fa-rotate-left"></i> Générer un avoir
+                </button>
+            @endif
             <button class="print-btn main" onclick="telechargerPdf()">
                 <i class="fas fa-download"></i> Télécharger PDF
             </button>
@@ -202,6 +212,32 @@
 <div class="invoice-container">
     <div id="invoice-wrap"></div>
 </div>
+
+{{-- Modal de confirmation de l'avoir fournisseur --}}
+<div class="modal-overlay" id="modalAvoir" style="display:none; position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(0,0,0,0.5); z-index:9999; align-items:center; justify-content:center;">
+    <div class="modal" style="background:#fff; border-radius:12px; max-width:480px; width:100%; box-shadow:0 10px 30px rgba(0,0,0,0.15); overflow:hidden;">
+        <div class="modal-header" style="padding:16px 20px; border-bottom:1px solid var(--border); display:flex; justify-content:space-between; align-items:center;">
+            <h3 style="font-size:16px; font-weight:700; color:var(--text-1); margin:0;"><i class="fas fa-rotate-left" style="color:var(--danger)"></i> Générer une facture d'avoir fournisseur</h3>
+            <button type="button" class="modal-close" onclick="fermerModalAvoir()" style="background:none; border:none; font-size:24px; cursor:pointer; color:var(--text-3);">&times;</button>
+        </div>
+        <form method="POST" action="{{ route('admin.achats.avoir', $achat) }}" style="margin:0; padding:20px;">
+            @csrf
+            <div style="font-size:13px; color:var(--text-2); margin-bottom:14px; line-height:1.5;">
+                Cette action va enregistrer une facture d'avoir fournisseur pour un montant total de <strong>{{ number_format($achat->montant_ttc, 0, ',', ' ') }} FCFA</strong>. Les stocks des articles stockables associés seront décrémentés (retour fournisseur).
+            </div>
+
+            <div class="form-group" style="margin-bottom:14px;">
+                <label class="form-label">Motif ou Référence de l'avoir fournisseur <span style="color:var(--danger)">*</span></label>
+                <input type="text" name="raison" class="form-control" required placeholder="Ex: Retour d'article défectueux, erreur de prix sur facture..." maxlength="255">
+            </div>
+
+            <div style="border-top:1px solid var(--border); padding-top:14px; margin-top:14px; display:flex; justify-content:flex-end; gap:10px;">
+                <button type="button" class="btn btn-outline" onclick="fermerModalAvoir()">Annuler</button>
+                <button type="submit" class="btn btn-danger"><i class="fas fa-check-circle"></i> Confirmer & Enregistrer l'avoir</button>
+            </div>
+        </form>
+    </div>
+</div>
 @endsection
 
 @section('scripts')
@@ -220,6 +256,10 @@ var DATA = {
         num: {!! json_encode($achat->numero_facture) !!},
         date: {!! json_encode(\Carbon\Carbon::parse($achat->date_achat)->isoFormat('D MMMM YYYY')) !!},
         etape: {!! json_encode($achat->etape) !!},
+        type_facture: {!! json_encode($achat->type_facture) !!},
+        parent_ref: {!! json_encode($achat->parent ? $achat->parent->numero_facture : null) !!},
+        parent_fne: {!! json_encode($achat->parent ? $achat->parent->numero_fne : null) !!},
+        raison_avoir: {!! json_encode($achat->raison_avoir) !!},
         mode: {!! json_encode($achat->mode_paiement) !!},
         moyen_bancaire: {!! json_encode($achat->moyen_bancaire) !!},
         reference_paiement: {!! json_encode($achat->reference_paiement) !!},
@@ -357,8 +397,19 @@ function fiscalLinesClient(c, sep) {
     return lines.join(sep || '<br>');
 }
 
+function getAvoirBlock(d) {
+    if (d.type_facture !== 'avoir') return '';
+    return `
+    <div style="background:#fff7ed; border:1px solid #ffedd5; border-left:4px solid #ea580c; border-radius:8px; padding:10px 14px; margin-bottom:14px; font-size:11px; line-height:1.4; color:#c2410c; text-align:left;">
+        <i class="fas fa-circle-info" style="margin-right:4px;"></i> Facture d'avoir émise en référence à la facture d'origine <strong>${d.parent_ref}</strong>${d.parent_fne ? ` (N° Fiscal DGI: ${d.parent_fne})` : ''}.<br>
+        <strong>Motif :</strong> ${d.raison_avoir}
+    </div>
+    `;
+}
+
 function getDocTitle(d) {
     if (isReceiptMode) return "BON DE RÉCEPTION";
+    if (d.type_facture === 'avoir') return "FACTURE D'AVOIR FOURNISSEUR";
     if (d.etape === 'Demande de prix') return "DEMANDE DE PRIX";
     if (d.etape === 'Bon de commande') return "BON DE COMMANDE FOURNISSEUR";
     return "FACTURE D'ACHAT";
@@ -366,6 +417,7 @@ function getDocTitle(d) {
 
 function getBadgeText(d) {
     if (isReceiptMode) return "RÉCEPTION";
+    if (d.type_facture === 'avoir') return "AVOIR";
     if (d.etape === 'Demande de prix') return "DEMANDE";
     if (d.etape === 'Bon de commande') return "COMMANDE";
     return "ACHAT";
@@ -438,6 +490,7 @@ function model1(d) {
             </div>
         </div>
         
+        ${getAvoirBlock(d)}
         <table style="width:100%;border-collapse:collapse;font-size:12px;margin-bottom:16px">
             <thead>
                 <tr style="background:${theme.color};color:#fff;">
@@ -534,6 +587,7 @@ function model2(d) {
                     `}
                 </div>
             </div>
+            ${getAvoirBlock(d)}
             <table style="width:100%;border-collapse:collapse;font-size:12px;margin-bottom:14px">
                 <thead>
                     <tr style="border-bottom:1.5px solid ${theme.color}">
@@ -638,6 +692,7 @@ function model3(d) {
             </div>
         </div>
 
+        ${getAvoirBlock(d)}
         <table style="width:100%;border-collapse:collapse;font-size:12px;margin-bottom:16px;table-layout:fixed">
             <thead>
                 <tr>
@@ -777,6 +832,7 @@ function modelStandard(d) {
             <div>Régime d'imposition : <strong>${d.fournisseur.regime || '—'}</strong></div>
         </div>
         
+        ${getAvoirBlock(d)}
         <!-- Tableau des Articles -->
         <table class="table-m4">
             <thead>
@@ -861,5 +917,12 @@ function setModel(n, el) {
 
 // Initial render
 render();
+
+function ouvrirModalAvoir() {
+    document.getElementById('modalAvoir').style.display = 'flex';
+}
+function fermerModalAvoir() {
+    document.getElementById('modalAvoir').style.display = 'none';
+}
 </script>
 @endsection

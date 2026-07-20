@@ -327,36 +327,28 @@
                 <p class="form-sous">Connectez-vous pour accéder à votre dashboard</p>
 
                 {{-- Message d'erreur global --}}
-                @if ($errors->any())
-                    <div class="alerte-erreur" role="alert">
+                @if ($errors->has('connexion_erreur') || $errors->any())
+                    <div class="alerte-erreur" role="alert" style="margin-top:10px;">
                         <i class="ti ti-alert-circle" style="font-size:16px;"></i>
-                        {{ $errors->first() }}
+                        {{ $errors->first('connexion_erreur') ?: $errors->first() }}
                     </div>
                 @endif
 
-                <form method="POST" action="{{ route('connexion.traitement') }}" id="form-connexion" novalidate>
+                <form method="POST" action="{{ route('connexion.traitement') }}" id="form-connexion" novalidate style="margin-top:20px;">
                     @csrf
 
                     {{-- Email --}}
                     <div class="champ">
                         <label for="email">Email</label>
                         <input type="email" id="email" name="email" placeholder="vous@entreprise.com"
-                            value="{{ old('email') }}" autocomplete="email"
-                            class="{{ $errors->has('email') ? 'erreur' : '' }}" required autofocus>
-                        @error('email')
-                            <div class="champ-erreur">{{ $message }}</div>
-                        @enderror
+                            value="{{ old('email') }}" autocomplete="email" required autofocus>
                     </div>
 
                     {{-- Mot de passe --}}
                     <div class="champ">
                         <label for="password">Mot de passe</label>
                         <input type="password" id="password" name="password" placeholder="••••••••"
-                            autocomplete="current-password" class="{{ $errors->has('password') ? 'erreur' : '' }}"
-                            required>
-                        @error('password')
-                            <div class="champ-erreur">{{ $message }}</div>
-                        @enderror
+                            autocomplete="current-password" required>
                     </div>
 
                     {{-- Options --}}
@@ -365,7 +357,7 @@
                             <input type="checkbox" name="se_souvenir" id="se_souvenir" value="1" {{ old('se_souvenir') ? 'checked' : '' }}>
                             <span class="checkbox-label">Se souvenir de moi</span>
                         </label>
-                        <a href="#" class="lien-oubli">Mot de passe oublié ?</a>
+                        <a href="{{ route('password.request') }}" class="lien-oubli">Mot de passe oublié ?</a>
                     </div>
 
                     <button type="submit" class="btn-connexion" id="btn-soumettre">
@@ -374,15 +366,14 @@
                 </form>
 
                 <div style="text-align:center; margin-top:22px; font-size:13.5px;">
-                    <span style="color:#6B7280;">Pas encore de compte ?</span>
-                    <a href="#" style="color:#002B5C; text-decoration:none; font-weight:600; margin-left:4px;">Créer un
-                        compte gratuitement</a>
+                    <span style="color:#6B7280;">Intéressé par Selflow ?</span>
+                    <a href="{{ route('contact.info') }}" style="color:#002B5C; text-decoration:none; font-weight:600; margin-left:4px;">Contacter le service client</a>
                 </div>
 
                 <div class="form-pied">
                     En vous connectant, vous acceptez nos
-                    <a href="#">Conditions</a> et notre
-                    <a href="#">Politique de confidentialité</a>
+                    <a href="{{ route('contact.info') }}#conditions">Conditions</a> et notre
+                    <a href="{{ route('contact.info') }}#politique">Politique de confidentialité</a>
                 </div>
 
             </div>

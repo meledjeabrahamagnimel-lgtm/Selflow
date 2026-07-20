@@ -36,8 +36,8 @@
         <h1><i class="fas fa-truck-loading"></i> Nouvel achat fournisseur</h1>
         <p>Enregistrez un bon de commande / réception de marchandises</p>
     </div>
-    <a href="{{ route('admin.achats.historique') }}" class="btn btn-outline">
-        <i class="fas fa-history"></i> Historique
+    <a href="{{ route('admin.achats.factures') }}" class="btn btn-outline">
+        <i class="fas fa-list"></i> Voir les achats
     </a>
 </div>
 
@@ -75,43 +75,74 @@
                     <input type="date" name="date_achat" class="form-control" value="{{ date('Y-m-d') }}" required>
                 </div>
 
-                {{-- Mode de paiement style buttons --}}
-                <input type="hidden" name="mode_paiement" id="modePaiementInput" value="Caisse">
+
+
+                {{-- Étape du document - Lot F --}}
                 <div class="form-group">
-                    <label class="form-label">Mode de paiement <span style="color:var(--danger)">*</span></label>
-                    <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:10px; margin-bottom:12px;">
-                        <button type="button" class="btn payment-toggle-btn active" data-mode="Caisse" onclick="selectionnerModePaiement(this)" style="justify-content:center;">Caisse</button>
-                        <button type="button" class="btn payment-toggle-btn" data-mode="Banque" onclick="selectionnerModePaiement(this)" style="justify-content:center;">Banque</button>
-                        <button type="button" class="btn payment-toggle-btn" data-mode="Crédit" onclick="selectionnerModePaiement(this)" style="justify-content:center;">Crédit</button>
+                    <label class="form-label">Type de document</label>
+                    <input type="hidden" name="etape" id="etapeInput" value="Bon de commande">
+                    <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-bottom:8px;">
+                        <button type="button" class="btn payment-toggle-btn" data-etape="Demande de prix" onclick="selectionnerEtape(this)" style="justify-content:center; font-size:12px; padding:8px 6px;">
+                            <i class="fas fa-file-invoice"></i> Demande de prix
+                        </button>
+                        <button type="button" class="btn payment-toggle-btn active" data-etape="Bon de commande" onclick="selectionnerEtape(this)" style="justify-content:center; font-size:12px; padding:8px 6px;">
+                            <i class="fas fa-shopping-basket"></i> Bon de commande
+                        </button>
                     </div>
                 </div>
 
-                {{-- Sélection de la banque --}}
-                <div id="selectionBanqueContainer" style="display:none; margin-bottom:16px;">
-                    <div class="form-group" style="margin-bottom: 12px;">
-                        <label class="form-label">Sélectionner la Banque <span style="color:var(--danger)">*</span></label>
-                        <div style="display:flex; gap:8px;">
-                            <select name="banque_id" id="banqueSelect" class="form-control" style="flex:1;">
-                                <option value="">— Choisir un compte banque —</option>
-                                @foreach($banques as $b)
-                                <option value="{{ $b->id }}">{{ $b->intitule }} ({{ $b->code }} - {{ $b->compte }})</option>
-                                @endforeach
-                            </select>
-                            <button type="button" class="btn btn-primary" onclick="ouvrirModalNouvelleBanque()" style="padding:0 14px;"><i class="fas fa-plus"></i></button>
+                {{-- Bouton bascule : Facture physique fournisseur --}}
+                <div style="border:1.5px dashed var(--border); border-radius:8px; padding:12px; margin-bottom:14px; background:#fafafa;">
+                    <button type="button" id="btnFacturePhysique" onclick="toggleFacturePhysique()" 
+                            style="width:100%; display:flex; align-items:center; justify-content:center; gap:8px; background:transparent; border:none; color:var(--text-2); font-weight:700; font-size:13px; cursor:pointer;">
+                        <i class="fas fa-file-invoice" id="iconFacturePhysique"></i>
+                        <span id="labelFacturePhysique">Ajouter une facture physique fournisseur</span>
+                    </button>
+                    <div id="blocFacturePhysique" style="display:none; margin-top:14px;">
+                        {{-- Champ etape overridé quand facture physique --}}
+                        <div class="form-group" style="margin-bottom:10px;">
+                            <label class="form-label" style="font-size:12px; color:var(--text-2);">N° Facture fournisseur (papier)</label>
+                            <input type="text" name="numero_facture_fournisseur" id="numeroFactureFournisseur" class="form-control" 
+                                   placeholder="Ex: F2025-00142" style="font-family:monospace;" value="{{ old('numero_facture_fournisseur') }}">
                         </div>
-                    </div>
-                    <div class="form-group" style="margin-bottom: 12px;">
-                        <label class="form-label">Moyen de paiement bancaire <span style="color:var(--danger)">*</span></label>
-                        <select name="moyen_bancaire" id="moyenBancaireSelect" class="form-control">
-                            <option value="">— Moyen de paiement —</option>
-                            <option value="carte">Carte bancaire</option>
-                            <option value="virement">Virement</option>
-                            <option value="cheque">Chèque</option>
-                        </select>
-                    </div>
-                    <div class="form-group" style="margin-bottom:0;">
-                        <label class="form-label">Référence / Numéro <span style="color:var(--danger)">*</span></label>
-                        <input type="text" name="reference_paiement" id="refPaiementInput" class="form-control" placeholder="Numéro de carte, virement ou chèque">
+                        {{-- Mode de paiement --}}
+                        <input type="hidden" name="mode_paiement" id="modePaiementInput" value="Caisse">
+                        <div class="form-group" style="margin-bottom:10px;">
+                            <label class="form-label" style="font-size:12px; color:var(--text-2);">Mode de paiement <span style="color:var(--danger)">*</span></label>
+                            <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:8px;">
+                                <button type="button" class="btn payment-toggle-btn active" data-mode="Caisse" onclick="selectionnerModePaiement(this)" style="justify-content:center; font-size:12px;">Caisse</button>
+                                <button type="button" class="btn payment-toggle-btn" data-mode="Banque" onclick="selectionnerModePaiement(this)" style="justify-content:center; font-size:12px;">Banque</button>
+                                <button type="button" class="btn payment-toggle-btn" data-mode="Crédit" onclick="selectionnerModePaiement(this)" style="justify-content:center; font-size:12px;">Crédit</button>
+                            </div>
+                        </div>
+                        {{-- Sélection banque --}}
+                        <div id="selectionBanqueContainer" style="display:none; margin-bottom:10px;">
+                            <div class="form-group" style="margin-bottom:8px;">
+                                <label class="form-label" style="font-size:12px; color:var(--text-2);">Banque</label>
+                                <div style="display:flex; gap:8px;">
+                                    <select name="banque_id" id="banqueSelect" class="form-control" style="flex:1;">
+                                        <option value="">— Choisir —</option>
+                                        @foreach($banques as $b)
+                                        <option value="{{ $b->id }}">{{ $b->intitule }} ({{ $b->code }})</option>
+                                        @endforeach
+                                    </select>
+                                    <button type="button" class="btn btn-primary" onclick="ouvrirModalNouvelleBanque()" style="padding:0 12px;"><i class="fas fa-plus"></i></button>
+                                </div>
+                            </div>
+                            <div class="form-group" style="margin-bottom:8px;">
+                                <label class="form-label" style="font-size:12px; color:var(--text-2);">Moyen bancaire</label>
+                                <select name="moyen_bancaire" id="moyenBancaireSelect" class="form-control">
+                                    <option value="">— Moyen —</option>
+                                    <option value="carte">Carte bancaire</option>
+                                    <option value="virement">Virement</option>
+                                    <option value="cheque">Chèque</option>
+                                </select>
+                            </div>
+                            <div class="form-group" style="margin-bottom:0;">
+                                <label class="form-label" style="font-size:12px; color:var(--text-2);">Référence / Numéro</label>
+                                <input type="text" name="reference_paiement" id="refPaiementInput" class="form-control" placeholder="Numéro de carte, virement ou chèque">
+                            </div>
+                        </div>
                     </div>
                 </div>
 
@@ -122,11 +153,15 @@
                 </div>
 
                 <div style="display:flex; flex-direction:column; gap:8px; margin-top:12px;">
-                    <button type="submit" name="etape" value="Facture" class="btn btn-primary" id="btnValider" style="width:100%;justify-content:center;" disabled>
-                        <i class="fas fa-check-circle"></i> Valider et facturer
+                    <button type="submit" id="btnValiderAchat" class="btn btn-primary" style="width:100%;justify-content:center;" disabled>
+                        <i class="fas fa-check-circle"></i> <span id="labelBtnValider">Enregistrer le bon de commande</span>
                     </button>
-                    <button type="submit" name="etape" value="Demande de prix" class="btn btn-outline" id="btnDemande" style="width:100%;justify-content:center;border-color:var(--warning);color:var(--warning);" disabled>
-                        <i class="fas fa-file-invoice"></i> Enregistrer comme Demande de prix
+                    <label style="display:flex; align-items:center; gap:8px; font-size:12px; font-weight:600; color:var(--text-2); margin-top:8px; margin-bottom:4px; cursor:pointer;">
+                        <input type="checkbox" name="masquer_prix_conseilles" value="1" id="chkMasquerPrix">
+                        Masquer les prix suggérés (RFQ sans prix)
+                    </label>
+                    <button type="button" onclick="soumettreRfqB2b(event)" class="btn btn-outline" id="btnRfqB2b" style="width:100%;justify-content:center;border-color:var(--primary);color:var(--primary);" disabled>
+                        <i class="fas fa-paper-plane"></i> Envoyer en RFQ B2B (Inter-Entreprise)
                     </button>
                 </div>
             </div>
@@ -134,6 +169,7 @@
     </div>
 </div>
 </form>
+
 
 <!-- Modal Banque -->
 <div class="modal-overlay" id="modalNouvelleBanque">
@@ -322,12 +358,71 @@ function recalculer() {
     const fmt = n => new Intl.NumberFormat('fr-FR').format(Math.round(n)) + ' F';
     document.getElementById('totTtc').textContent = fmt(ht);
     const noItems = document.querySelectorAll('.ligne').length === 0;
-    document.getElementById('btnValider').disabled = noItems;
-    document.getElementById('btnDemande').disabled = noItems;
+    document.getElementById('btnValiderAchat').disabled = noItems;
+    document.getElementById('btnRfqB2b').disabled = noItems;
+}
+
+function soumettreRfqB2b(e) {
+    e.preventDefault();
+    const form = document.getElementById('formAchat');
+    
+    // Validation minimale des champs requis
+    const fournisseurSelect = form.querySelector('select[name="fournisseur_id"]');
+    if (!fournisseurSelect.value) {
+        alert("Veuillez sélectionner un fournisseur.");
+        fournisseurSelect.focus();
+        return;
+    }
+    
+    form.action = "{{ route('admin.b2b.rfq.creer') }}";
+    form.submit();
+}
+
+// Lot F : sélectionner l'étape du document
+function selectionnerEtape(btn) {
+    document.querySelectorAll('[data-etape]').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    const etape = btn.dataset.etape;
+    document.getElementById('etapeInput').value = etape;
+    const labelMap = {
+        'Demande de prix': 'Enregistrer la demande de prix',
+        'Bon de commande': 'Enregistrer le bon de commande',
+    };
+    document.getElementById('labelBtnValider').textContent = labelMap[etape] || 'Enregistrer';
+}
+
+// Lot F : bascule affichage bloc facture physique
+let facturePhysiqueActive = false;
+function toggleFacturePhysique() {
+    facturePhysiqueActive = !facturePhysiqueActive;
+    const bloc = document.getElementById('blocFacturePhysique');
+    const label = document.getElementById('labelFacturePhysique');
+    const icon = document.getElementById('iconFacturePhysique');
+    if (facturePhysiqueActive) {
+        bloc.style.display = 'block';
+        label.textContent = 'Masquer la facture physique fournisseur';
+        icon.className = 'fas fa-chevron-up';
+        document.getElementById('etapeInput').value = 'Facture';
+        document.getElementById('labelBtnValider').textContent = 'Enregistrer la facture';
+    } else {
+        bloc.style.display = 'none';
+        label.textContent = 'Ajouter une facture physique fournisseur';
+        icon.className = 'fas fa-file-invoice';
+        // Restaurer l'etape selon le bouton actif
+        const activeEtapeBtn = document.querySelector('[data-etape].active');
+        if (activeEtapeBtn) {
+            document.getElementById('etapeInput').value = activeEtapeBtn.dataset.etape;
+            document.getElementById('labelBtnValider').textContent = 
+                activeEtapeBtn.dataset.etape === 'Demande de prix' 
+                    ? 'Enregistrer la demande de prix' 
+                    : 'Enregistrer le bon de commande';
+        }
+    }
 }
 
 function selectionnerModePaiement(btn) {
-    document.querySelectorAll('.payment-toggle-btn').forEach(b => b.classList.remove('active'));
+    // Cibler uniquement les boutons de mode paiement
+    btn.closest('div').querySelectorAll('.payment-toggle-btn').forEach(b => b.classList.remove('active'));
     btn.classList.add('active');
     
     const mode = btn.dataset.mode;

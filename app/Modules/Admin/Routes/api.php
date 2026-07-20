@@ -29,7 +29,6 @@ Route::prefix('admin')
             Route::get('/commandes',          [VenteApiControleur::class, 'commandes']);
             Route::get('/historique',         [VenteApiControleur::class, 'historique']);
             Route::get('/facture/{vente}',    [VenteApiControleur::class, 'details']);
-            Route::post('/{vente}/normaliser', [VenteApiControleur::class, 'normaliser']);
             Route::put('/{vente}/modifier',    [VenteApiControleur::class, 'modifierStatut']);
         });
 
@@ -102,3 +101,16 @@ Route::prefix('admin')
         Route::get('/entreprise/parametres', [EntrepriseApiControleur::class, 'parametres']);
         Route::post('/entreprise/parametres', [EntrepriseApiControleur::class, 'enregistrerParametres']); // POST pour supporter multipart/form-data avec PUT simulé si nécessaire
     });
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Routes de synchronisation externe (COMPTAFLOW ↔ Selflow)
+// Protégées par un secret partagé — SANS middleware auth
+// ═══════════════════════════════════════════════════════════════════════════
+Route::prefix('external')->group(function () {
+    Route::post('/register-enterprise', [\App\Modules\Admin\Controleurs\Api\ExternalSyncControleur::class, 'enregistrerEntreprise'])
+        ->name('api.external.register-enterprise');
+    Route::post('/company-info', [\App\Modules\Admin\Controleurs\Api\ExternalSyncControleur::class, 'companyInfo'])
+        ->name('api.external.company-info');
+    Route::post('/list-companies', [\App\Modules\Admin\Controleurs\Api\ExternalSyncControleur::class, 'listCompanies'])
+        ->name('api.external.list-companies');
+});

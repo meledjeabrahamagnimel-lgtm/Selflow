@@ -151,7 +151,7 @@
                 <tr>
                     <th rowspan="2" style="vertical-align: middle;">Personnel</th>
                     <th rowspan="2" style="vertical-align: middle;">Rôle</th>
-                    <th colspan="2" style="text-align: center; border-bottom: 2px solid var(--primary); font-weight: bold; background: #f1f5f9;">Principal</th>
+                    <th colspan="2" style="text-align: center; border-bottom: 2px solid var(--primary); font-weight: bold; background: #f1f5f9;">Tableau de bord</th>
                     <th colspan="2" style="text-align: center; border-bottom: 2px solid var(--primary); font-weight: bold; background: #e2e8f0;">Ventes</th>
                     <th colspan="2" style="text-align: center; border-bottom: 2px solid var(--primary); font-weight: bold; background: #f1f5f9;">Achats</th>
                     <th colspan="1" style="text-align: center; border-bottom: 2px solid var(--primary); font-weight: bold; background: #e2e8f0;">Stock</th>
@@ -159,6 +159,7 @@
                     <th colspan="2" style="text-align: center; border-bottom: 2px solid var(--primary); font-weight: bold; background: #e2e8f0;">Points de vente</th>
                     <th colspan="1" style="text-align: center; border-bottom: 2px solid var(--primary); font-weight: bold; background: #f1f5f9;">Produits</th>
                     <th colspan="1" style="text-align: center; border-bottom: 2px solid var(--primary); font-weight: bold; background: #e2e8f0;">Tiers</th>
+                    <th colspan="2" style="text-align: center; border-bottom: 2px solid var(--primary); font-weight: bold; background: #f1f5f9;">Production</th>
                 </tr>
                 <tr>
                     <th style="text-align: center;" title="Tableau de bord personnel">TDB Pers</th>
@@ -176,6 +177,8 @@
                     <th style="text-align: center;" title="Personnel">Pers</th>
                     <th style="text-align: center;" title="Produits">Prod</th>
                     <th style="text-align: center;" title="Clients & Fournisseurs">Tiers</th>
+                    <th style="text-align: center;" title="Fiches techniques / Recettes">Recettes</th>
+                    <th style="text-align: center;" title="Ordres de production">Ordres</th>
                 </tr>
             </thead>
             <tbody>
@@ -198,7 +201,7 @@
                             'tableau_de_bord_personnel', 'tableau_de_bord_general', 'nouvelle_vente', 'factures_vente',
                             'nouvel_achat', 'factures_achat', 'stock_articles',
                             'tresorerie_encaissements', 'comptabilite_globale', 'comptabilite_creances', 'comptabilite_plan_comptable', 'gestion_pdv', 'gestion_personnel',
-                            'catalogue_produits', 'tiers_clients'
+                            'catalogue_produits', 'tiers_clients', 'production_recettes', 'production_ordres'
                         ];
                     @endphp
                     @foreach($pagesCheck as $pKey)
@@ -254,7 +257,9 @@
                     <label class="form-label">Rôle <span style="color:var(--danger)">*</span></label>
                     <select name="role" id="role-select" class="form-control" required onchange="verifierRoleChange()">
                         <option value="caissier" selected>Caissier (Accès restreint par défaut)</option>
-                        <option value="admin">Administrateur (Tous les droits)</option>
+                        <option value="responsable_pdv">Responsable Point de Vente (Accès restreint par défaut)</option>
+                        <option value="admin_secondaire">Administrateur secondaire (Tous les droits)</option>
+                        <option value="admin">Administrateur principal (Tous les droits)</option>
                     </select>
                 </div>
                 <div class="form-group">
@@ -301,7 +306,7 @@
                 
                 <div style="display:grid; grid-template-columns:repeat(3, 1fr); gap:16px;" id="habs-checkboxes-grid">
                     <div>
-                        <div style="font-weight:600; font-size:11px; text-transform:uppercase; color:var(--text-2); margin-bottom:6px; border-bottom:1px solid var(--border); padding-bottom:3px;">Principal</div>
+                        <div style="font-weight:600; font-size:11px; text-transform:uppercase; color:var(--text-2); margin-bottom:6px; border-bottom:1px solid var(--border); padding-bottom:3px;">Tableau de bord</div>
                         <label style="display:flex; align-items:center; gap:8px; font-size:12px; margin-bottom:5px; cursor:pointer;">
                             <input type="checkbox" name="habilitations[]" value="tableau_de_bord_personnel" checked> Tableau de bord personnel
                         </label>
@@ -319,7 +324,7 @@
                             <input type="checkbox" name="habilitations[]" value="factures_vente"> Factures vente
                         </label>
                         <label style="display:flex; align-items:center; gap:8px; font-size:12px; margin-bottom:5px; cursor:pointer;">
-                            <input type="checkbox" name="habilitations[]" value="historique_ventes"> Historique ventes
+                            <input type="checkbox" name="habilitations[]" value="production_recettes"> Recettes (Fiches techniques)
                         </label>
                     </div>
 
@@ -332,7 +337,7 @@
                             <input type="checkbox" name="habilitations[]" value="factures_achat"> Factures achat
                         </label>
                         <label style="display:flex; align-items:center; gap:8px; font-size:12px; margin-bottom:5px; cursor:pointer;">
-                            <input type="checkbox" name="habilitations[]" value="historique_achats"> Historique achats
+                            <input type="checkbox" name="habilitations[]" value="production_ordres"> Ordres de production
                         </label>
                     </div>
 
@@ -455,15 +460,18 @@
         const notice = document.getElementById('admin-notice');
         const selectAllLabel = document.querySelector('label[for="check-all-habs"]') || document.getElementById('check-all-habs').closest('label');
 
-        if (role === 'admin') {
+        if (role === 'admin' || role === 'admin_secondaire') {
             grid.style.opacity = '0.4';
             grid.style.pointerEvents = 'none';
-            notice.style.display = 'block';
+            if (notice) {
+                notice.style.display = 'block';
+                notice.textContent = "Les administrateurs possèdent tous les accès d'office. La configuration manuelle est inutile.";
+            }
             if (selectAllLabel) selectAllLabel.style.display = 'none';
         } else {
             grid.style.opacity = '1';
             grid.style.pointerEvents = 'auto';
-            notice.style.display = 'none';
+            if (notice) notice.style.display = 'none';
             if (selectAllLabel) selectAllLabel.style.display = 'flex';
         }
     }

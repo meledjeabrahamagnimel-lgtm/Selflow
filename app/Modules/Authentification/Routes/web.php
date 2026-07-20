@@ -12,6 +12,23 @@ Route::middleware('guest')->group(function () {
 
     Route::post('/connexion', [ConnexionControleur::class, 'connecter'])
         ->name('connexion.traitement');
+
+    // Page de contact & documentation d'informations DC-KNOWING
+    Route::get('/contact', [ConnexionControleur::class, 'contact'])
+        ->name('contact.info');
+
+    // Mot de passe oublié
+    Route::get('/mot-de-passe/oublie', [\App\Modules\Authentification\Controleurs\PasswordResetControleur::class, 'afficherDemande'])
+        ->name('password.request');
+
+    Route::post('/mot-de-passe/oublie', [\App\Modules\Authentification\Controleurs\PasswordResetControleur::class, 'envoyerLien'])
+        ->name('password.email');
+
+    Route::get('/mot-de-passe/reinitialiser/{token}', [\App\Modules\Authentification\Controleurs\PasswordResetControleur::class, 'afficherReset'])
+        ->name('password.reset');
+
+    Route::post('/mot-de-passe/reinitialiser', [\App\Modules\Authentification\Controleurs\PasswordResetControleur::class, 'reinitialiser'])
+        ->name('password.update');
 });
 
 // -----------------------------------------------------------------------
@@ -20,6 +37,17 @@ Route::middleware('guest')->group(function () {
 Route::post('/deconnexion', [ConnexionControleur::class, 'deconnecter'])
     ->name('deconnexion')
     ->middleware('auth');
+
+// -----------------------------------------------------------------------
+// Changement de mot de passe obligatoire (accès authentifié uniquement)
+// -----------------------------------------------------------------------
+Route::middleware('auth')->group(function () {
+    Route::get('/changer-mot-de-passe', [\App\Modules\Authentification\Controleurs\ChangementMotDePasseControleur::class, 'afficher'])
+        ->name('password.changer.afficher');
+
+    Route::post('/changer-mot-de-passe', [\App\Modules\Authentification\Controleurs\ChangementMotDePasseControleur::class, 'traiter'])
+        ->name('password.changer.traiter');
+});
 
 // -----------------------------------------------------------------------
 // Redirection de la racine vers connexion ou tableau de bord

@@ -134,9 +134,9 @@ class AchatApiControleur
                 ]);
 
                 // Augmenter le stock + mouvement si produit existe et stockable
-                if ($produit && $produit->type === 'stockable') {
-                    $stockAvant = $produit->stock_actuel;
-                    $produit->increment('stock_actuel', $article['quantite']);
+                if ($produit && $produit->estStockable()) {
+                    $stockAvant = $produit->stockActuel($pointDeVenteId);
+                    $produit->incrementStock($pointDeVenteId, $article['quantite']);
 
                     MouvementStock::create([
                         'produit_id'         => $produit->id,

@@ -3,6 +3,7 @@
 namespace App\Modules\Admin\Controleurs;
 
 use App\Modules\Admin\Modeles\PointDeVente;
+use App\Modules\Admin\Services\CacheService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -40,10 +41,26 @@ class PointDeVenteControleur
             return back()->withErrors(['general' => 'Quota de points de vente atteint pour votre abonnement.']);
         }
 
-        PointDeVente::create(array_merge(
+        $pdv = PointDeVente::create(array_merge(
             $request->only(['nom', 'ville', 'commune', 'responsable', 'telephone']),
             ['entreprise_id' => $entreprise->id, 'statut' => 'Ouvert']
         ));
+
+        // Initialisation automatique des stocks (vides) pour tous les produits existants de l'entreprise
+        $produits = \App\Modules\Admin\Modeles\Produit::where('entreprise_id', $entreprise->id)->get();
+        foreach ($produits as $prod) {
+            \App\Modules\Admin\Modeles\Stock::firstOrCreate([
+                'produit_id'        => $prod->id,
+                'point_de_vente_id' => $pdv->id,
+            ], [
+                'quantite_disponible' => 0,
+                'stock_minimum'       => 5,
+                'stock_maximum'       => 100,
+            ]);
+        }
+
+        // Invalider le cache des PDV pour cette entreprise
+        CacheService::invaliderPointsDeVente($entreprise->id);
 
         return back()->with('succes', 'Point de vente créé avec succès.');
     }

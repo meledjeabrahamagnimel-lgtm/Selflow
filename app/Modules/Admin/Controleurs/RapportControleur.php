@@ -10,6 +10,7 @@ use App\Modules\Admin\Modeles\Produit;
 use App\Modules\Admin\Modeles\TresorerieJournal;
 use App\Modules\Admin\Modeles\Vente;
 use App\Modules\Admin\Modeles\VenteDetail;
+use App\Modules\Admin\Services\CacheService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
@@ -25,8 +26,8 @@ class RapportControleur
         $entreprise  = $utilisateur->entreprise;
         $periodeId   = session('active_periode_id');
 
-        // ─── Liste des points de vente de l'entreprise ───────────────────────
-        $pointsDeVente = PointDeVente::where('entreprise_id', $entreprise->id)->get();
+        // ─── Liste des points de vente de l'entreprise (via cache Section 18.4) ─────────────────────
+        $pointsDeVente = CacheService::pointsDeVente($entreprise->id);
         $pdvIds        = $pointsDeVente->pluck('id');
 
         // ─── VENTES (période active via PeriodeScope) ─────────────────────────

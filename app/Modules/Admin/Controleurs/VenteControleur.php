@@ -2,6 +2,8 @@
 
 namespace App\Modules\Admin\Controleurs;
 
+use App\Jobs\NormaliserFactureFne;
+
 use App\Modules\Admin\Modeles\Client;
 use App\Modules\Admin\Modeles\MouvementStock;
 use App\Modules\Admin\Modeles\Produit;
@@ -10,6 +12,8 @@ use App\Modules\Admin\Modeles\Vente;
 use App\Modules\Admin\Modeles\VenteDetail;
 use App\Modules\Admin\Modeles\Banque;
 use App\Modules\Admin\Modeles\CodeJournal;
+use App\Modules\Admin\Modeles\BonLivraison;
+use App\Modules\Admin\Traits\JournaliseActions;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -18,6 +22,8 @@ use Illuminate\View\View;
 
 class VenteControleur
 {
+    use JournaliseActions;
+
     public function nouvelle(): View
     {
         $entreprise = Auth::user()->entreprise;
@@ -34,7 +40,7 @@ class VenteControleur
                     'responsable'   => 'Superviseur',
                     'statut'        => 'Ouvert',
                 ]))->id);
-        $clients        = Client::where('entreprise_id', $entreprise->id)->orderBy('nom')->get();
+        $clients        = Client::obtenirClientsPrioritaires($entreprise->id);
         $produits       = Produit::where('entreprise_id', $entreprise->id)
             ->orderBy('nom')
             ->get();
@@ -100,7 +106,7 @@ class VenteControleur
 
         $venteId = null;
 
-        DB::transaction(function () use ($request, $pointDeVenteId, &$venteId) {
+        DB::transaction(function () use ($request, $pointDeVenteId, &$venteId, $entreprise) {
             $montantHt  = 0;
             $remise = floatval($request->input('remise', 0));
             $etape = $request->input('etape', 'Facture');
@@ -149,10 +155,7 @@ class VenteControleur
             }
 
             // Génération numéro de facture
-            $numero = 'VT-' . now()->format('d-m-Y') . '-' . str_pad(
-                Vente::whereYear('created_at', now()->year)->count() + 1,
-                4, '0', STR_PAD_LEFT
-            );
+            $numero = \App\Modules\Admin\Services\NumerotationService::genererNumeroVente($entreprise->id, $etape);
 
             // Calcul du montant payé et statut de la vente
             $montantPaye = 0;
@@ -213,9 +216,9 @@ class VenteControleur
                     'montant_ttc'     => $ht + $tva,
                 ]);
 
-                if ($produit && $etape === 'Facture' && $produit->type === 'stockable') {
-                    $stockAvant = $produit->stock_actuel;
-                    $produit->decrement('stock_actuel', $article['quantite']);
+                if ($produit && $etape === 'Facture' && $produit->estStockable()) {
+                    $stockAvant = $produit->stockActuel($pointDeVenteId);
+                    $produit->decrementStock($pointDeVenteId, $article['quantite']);
 
                     MouvementStock::create([
                         'produit_id'         => $produit->id,
@@ -232,6 +235,13 @@ class VenteControleur
             // Trésorerie et Comptabilité (uniquement si validé en étape Facture)
             // Trésorerie et Comptabilité (uniquement si validé en étape Facture)
             if ($etape === 'Facture') {
+                // Appel au service FNE pour la Côte d'Ivoire
+                // Si pas de client enregistré ou client divers -> RNE (Reçu), sinon EV (Facture)
+                $estRne = empty($request->client_id) || ($request->client_id == 'divers');
+
+                // Normalisation FNE en arrière-plan (Section 18.5) — n'attendons pas la réponse HTTP
+                NormaliserFactureFne::dispatch($vente, $estRne);
+
                 // Écriture de facturation
                 \App\Modules\Admin\Services\ComptabiliteService::genererEcritureFactureVente($vente);
 
@@ -286,11 +296,13 @@ class VenteControleur
             $venteId = $vente->id;
         });
 
-        // Déterminer la route de retour correcte selon le préfixe
-        $routeRetour = request()->routeIs('caissier.*') ? 'caissier.ventes.imprimer' : 'admin.ventes.imprimer';
+        // Journaliser la création de la vente
+        $this->journaliser('creation_vente', 'Vente', $venteId ?? null);
 
-        return redirect()->route($routeRetour, $venteId)
-            ->with('succes', 'Vente enregistrée ! La facture est prête.');
+        $routeRetour = request()->routeIs('caissier.*') ? 'caissier.ventes.factures' : 'admin.ventes.factures';
+        $etape = $request->input('etape', 'Facture');
+        return redirect()->route($routeRetour, ['etape' => $etape])
+            ->with('succes', $etape . ' enregistré(e) avec succès.');
     }
 
     public function factures(): View
@@ -300,38 +312,99 @@ class VenteControleur
             ? Auth::user()->point_de_vente_id
             : session('point_de_vente_actif_id');
 
-        $query = Vente::with(['client', 'pointDeVente', 'details.produit']);
-        
+        $etapeActive = request('etape', 'Facture');
+        $type = request('type');
+        $voirArchives = request('archives') === '1';
+
+        // Calcul des totaux par étape (non archivés seulement)
+        $compteQuery = Vente::where(function($q) {
+                $q->whereNull('type_facture')->orWhere('type_facture', '!=', 'avoir');
+            })->where('archived', false);
         if ($pointDeVenteId) {
-            $query->where('point_de_vente_id', $pointDeVenteId);
+            $compteQuery->where('point_de_vente_id', $pointDeVenteId);
         } else {
-            $query->whereHas('pointDeVente', fn($q) => $q->where('entreprise_id', $entreprise->id));
+            $compteQuery->whereHas('pointDeVente', fn($q) => $q->where('entreprise_id', $entreprise->id));
+        }
+        
+        $totaux = $compteQuery->select('etape', \Illuminate\Support\Facades\DB::raw('count(*) as total'))
+            ->groupBy('etape')
+            ->pluck('total', 'etape')
+            ->toArray();
+
+        $nbDV = $totaux['Devis'] ?? 0;
+        $nbBC = $totaux['Bon de commande'] ?? 0;
+        $nbFacture = $totaux['Facture'] ?? 0;
+
+        // Calcul du total des Bons de Livraison actifs
+        $blCompteQuery = BonLivraison::whereNotIn('statut', ['facture']);
+        if ($pointDeVenteId) {
+            $blCompteQuery->where('point_de_vente_id', $pointDeVenteId);
+        } else {
+            $blCompteQuery->whereHas('pointDeVente', fn($q) => $q->where('entreprise_id', $entreprise->id));
+        }
+        $nbBL = $blCompteQuery->count();
+
+        if ($etapeActive === 'Bon de livraison') {
+            $blQuery = BonLivraison::with(['bonDeCommande', 'client', 'pointDeVente', 'facture'])
+                ->whereHas('pointDeVente', fn($q) => $q->where('entreprise_id', $entreprise->id));
+            if ($pointDeVenteId) {
+                $blQuery->where('point_de_vente_id', $pointDeVenteId);
+            }
+            if (request()->filled('statut')) {
+                $blQuery->where('statut', request('statut'));
+            }
+            $ventes = $blQuery->latest()->paginate(20);
+        } else {
+            $baseQuery = Vente::with(['client', 'pointDeVente', 'details.produit']);
+            
+            if ($type === 'avoir') {
+                $baseQuery->where('type_facture', 'avoir');
+                $etapeActive = 'Facture';
+            } else {
+                $baseQuery->where(function($q) {
+                    $q->whereNull('type_facture')->orWhere('type_facture', '!=', 'avoir');
+                });
+                $baseQuery->where('etape', $etapeActive);
+            }
+
+            // Filtrage archives : par défaut on exclut les archivés
+            if ($voirArchives) {
+                $baseQuery->where('archived', true);
+            } else {
+                $baseQuery->where('archived', false);
+            }
+
+            if ($pointDeVenteId) {
+                $baseQuery->where('point_de_vente_id', $pointDeVenteId);
+            } else {
+                $baseQuery->whereHas('pointDeVente', fn($q) => $q->where('entreprise_id', $entreprise->id));
+            }
+
+            $ventes = $baseQuery->latest()->paginate(20);
         }
 
-        $ventes = $query->latest()->paginate(20);
-
-        return view('admin::ventes.factures', compact('ventes'));
-    }
-
-    public function historique(): View
-    {
-        $entreprise = Auth::user()->entreprise;
-        $pointDeVenteId = Auth::user()->estCaissier()
-            ? Auth::user()->point_de_vente_id
-            : session('point_de_vente_actif_id');
-
-        $query = Vente::with(['client', 'pointDeVente']);
-        
-        if ($pointDeVenteId) {
-            $query->where('point_de_vente_id', $pointDeVenteId);
-        } else {
-            $query->whereHas('pointDeVente', fn($q) => $q->where('entreprise_id', $entreprise->id));
+        $facturesDispo = collect();
+        if ($type === 'avoir') {
+            $facturesDispoQuery = Vente::with('client')
+                ->whereHas('pointDeVente', fn($queryPdv) => $queryPdv->where('entreprise_id', $entreprise->id))
+                ->where('etape', 'Facture')
+                ->where('numero_facture', 'LIKE', 'VT-%')
+                ->where(function($queryType) {
+                    $queryType->whereNull('type_facture')->orWhere('type_facture', '!=', 'avoir');
+                })
+                ->where('archived', false);
+            if ($pointDeVenteId) {
+                $facturesDispoQuery->where('point_de_vente_id', $pointDeVenteId);
+            }
+            $facturesDispo = $facturesDispoQuery->latest()->get();
         }
 
-        $ventes = $query->latest()->paginate(30);
+        $banques = \App\Modules\Admin\Modeles\CodeJournal::where('type', 'Banque')->where('entreprise_id', $entreprise->id)->orderBy('intitule')->get();
 
-        return view('admin::ventes.historique', compact('ventes'));
+        return view('admin::ventes.factures', compact('ventes', 'etapeActive', 'nbDV', 'nbBC', 'nbBL', 'nbFacture', 'type', 'voirArchives', 'facturesDispo', 'banques'));
     }
+
+
 
     public function imprimer(Vente $vente): View
     {
@@ -339,44 +412,33 @@ class VenteControleur
             $vente->pointDeVente->entreprise_id === Auth::user()->entreprise_id,
             403
         );
-        $vente->load(['client', 'pointDeVente.entreprise', 'details.produit']);
-        $vendeur = Auth::user();
-        $dejaPaye = \App\Modules\Admin\Modeles\TresorerieJournal::where('reference_document', $vente->numero_facture)->sum('montant_entree');
+
+        $vendeur = $vente->utilisateur;
+        
+        // Calculer ce qui a été effectivement payé
+        $dejaPaye = TresorerieJournal::where('reference_document', $vente->numero_facture)->sum('montant_entree');
+
         return view('admin::factures.vente', compact('vente', 'vendeur', 'dejaPaye'));
     }
 
-    /**
-     * Simuler la normalisation DGI d'une facture.
-     */
-    public function normaliser(Vente $vente): \Illuminate\Http\RedirectResponse
+    public function imprimerTicket(Vente $vente): View
     {
         abort_unless(
             $vente->pointDeVente->entreprise_id === Auth::user()->entreprise_id,
             403
         );
 
-        if ($vente->normalise) {
-            return back()->with('info', 'Cette facture est d\'jà normalisée.');
+        $vendeur = $vente->utilisateur;
+        $dejaPaye = TresorerieJournal::where('reference_document', $vente->numero_facture)->sum('montant_entree');
+
+        $bl = null;
+        if (request()->filled('bl')) {
+            $bl = BonLivraison::with('details.produit')->find(request('bl'));
         }
 
-        // Simulation normalisation DGI — générer un code unique
-        $qrData = implode('|', [
-            $vente->numero_facture,
-            now()->format('YmdHis'),
-            'DGI-CI',
-            strtoupper(substr(md5($vente->id . $vente->numero_facture . now()->timestamp), 0, 12)),
-        ]);
-
-        $vente->update([
-            'normalise'     => true,
-            'type_facture'  => 'normale',
-            'qr_code_data'  => $qrData,
-        ]);
-
-        return redirect()->route(
-            request()->routeIs('caissier.*') ? 'caissier.ventes.factures' : 'admin.ventes.factures'
-        )->with('succes', 'Facture ' . $vente->numero_facture . ' normalisée avec succès.');
+        return view('admin::factures.ticket', compact('vente', 'vendeur', 'dejaPaye', 'bl'));
     }
+
 
     /**
      * Formulaire de modification d'une vente.
@@ -388,8 +450,12 @@ class VenteControleur
             403
         );
 
+        if ($vente->normalise) {
+            abort(403, 'Cette facture a été normalisée et ne peut plus être modifiée.');
+        }
+
         $entreprise = Auth::user()->entreprise;
-        $clients    = Client::where('entreprise_id', $entreprise->id)->orderBy('nom')->get();
+        $clients    = Client::obtenirClientsPrioritaires($entreprise->id);
         $produits   = Produit::where('entreprise_id', $entreprise->id)->orderBy('nom')->get();
         $categories = $produits->pluck('categorie')->unique()->sort()->values();
         $banques    = CodeJournal::where('type', 'Banque')->where('entreprise_id', $entreprise->id)->orderBy('intitule')->get();
@@ -409,6 +475,10 @@ class VenteControleur
             $vente->pointDeVente->entreprise_id === Auth::user()->entreprise_id,
             403
         );
+
+        if ($vente->normalise) {
+            abort(403, 'Cette facture a été normalisée et ne peut plus être modifiée.');
+        }
 
         $request->validate([
             'client_id'      => ['nullable', 'integer', 'exists:clients,id'],
@@ -444,7 +514,7 @@ class VenteControleur
             $oldDetails = VenteDetail::where('vente_id', $vente->id)->with('produit')->get();
             foreach ($oldDetails as $oldDetail) {
                 if ($oldDetail->produit) {
-                    $oldDetail->produit->increment('stock_actuel', $oldDetail->quantite);
+                    $oldDetail->produit->incrementStock($pointDeVenteId, $oldDetail->quantite);
                 }
             }
 
@@ -558,8 +628,8 @@ class VenteControleur
                 ]);
 
                 if ($produit) {
-                    $stockAvant = $produit->stock_actuel;
-                    $produit->decrement('stock_actuel', $article['quantite']);
+                    $stockAvant = $produit->stockActuel($pointDeVenteId);
+                    $produit->decrementStock($pointDeVenteId, $article['quantite']);
 
                     MouvementStock::create([
                         'produit_id'         => $produit->id,
@@ -625,9 +695,9 @@ class VenteControleur
             // 1. Décrémenter le stock uniquement pour les articles stockables
             foreach ($vente->details as $detail) {
                 $produit = $detail->produit;
-                if ($produit && $produit->type === 'stockable') {
-                    $stockAvant = $produit->stock_actuel;
-                    $produit->decrement('stock_actuel', $detail->quantite);
+                if ($produit && $produit->estStockable()) {
+                    $stockAvant = $produit->stockActuel($vente->point_de_vente_id);
+                    $produit->decrementStock($vente->point_de_vente_id, $detail->quantite);
 
                     MouvementStock::create([
                         'produit_id'         => $produit->id,
@@ -641,7 +711,11 @@ class VenteControleur
                 }
             }
 
-            // 2. Générer l'écriture comptable de facturation
+            // 2. Normalisation FNE en arrière-plan (Section 18.5)
+            $estRne = empty($vente->client_id) || ($vente->client_id == 'divers');
+            NormaliserFactureFne::dispatch($vente, $estRne);
+
+            // 3. Générer l'écriture comptable de facturation
             \App\Modules\Admin\Services\ComptabiliteService::genererEcritureFactureVente($vente);
 
             // 3. Trésorerie et Écriture de règlement si payé
@@ -682,5 +756,545 @@ class VenteControleur
         });
 
         return back()->with('succes', 'Facture validée, stock mis à jour et écritures comptables générées.');
+    }
+
+    /**
+     * Générer un avoir sur une facture de vente
+     */
+    public function creerAvoir(Request $request, Vente $vente): RedirectResponse
+    {
+        abort_unless($vente->pointDeVente->entreprise_id === Auth::user()->entreprise_id, 403);
+        abort_if($vente->type_facture === 'avoir', 400, "Impossible de générer un avoir sur une facture d'avoir.");
+
+        $request->validate([
+            'raison' => ['required', 'string', 'max:255'],
+        ]);
+
+        $avoirId = null;
+
+        DB::transaction(function () use ($vente, $request, &$avoirId) {
+            $numAvoir = 'AV-' . $vente->numero_facture;
+
+            // 1. Création de la facture d'avoir
+            $avoir = Vente::create([
+                'point_de_vente_id' => $vente->point_de_vente_id,
+                'client_id'         => $vente->client_id,
+                'utilisateur_id'    => Auth::id(),
+                'numero_facture'    => $numAvoir,
+                'date_vente'        => now()->toDateString(),
+                'mode_paiement'     => $vente->mode_paiement,
+                'moyen_bancaire'    => $vente->moyen_bancaire,
+                'reference_paiement'=> $request->raison, // Raison de l'avoir
+                'montant_ht'        => $vente->montant_ht,
+                'montant_tva'       => $vente->montant_tva,
+                'remise'            => $vente->remise,
+                'montant_ttc'       => $vente->montant_ttc,
+                'statut'            => 'Payé',
+                'type_facture'      => 'avoir',
+                'etape'             => 'Facture',
+            ]);
+
+            // 2. Copie des détails et retour en stock
+            foreach ($vente->details as $detail) {
+                VenteDetail::create([
+                    'vente_id'        => $avoir->id,
+                    'produit_id'      => $detail->produit_id,
+                    'libelle_virtuel' => $detail->libelle_virtuel,
+                    'quantite'        => $detail->quantite,
+                    'unite'           => $detail->unite,
+                    'prix_unitaire'   => $detail->prix_unitaire,
+                    'montant_tva'     => $detail->montant_tva,
+                    'montant_ttc'     => $detail->montant_ttc,
+                ]);
+
+                // Ré-incrémenter le stock si le produit est stockable
+                if ($detail->produit && $detail->produit->estStockable()) {
+                    $stockAvant = $detail->produit->stockActuel($vente->point_de_vente_id);
+                    $detail->produit->incrementStock($vente->point_de_vente_id, $detail->quantite);
+
+                    MouvementStock::create([
+                        'produit_id'         => $detail->produit_id,
+                        'point_de_vente_id'  => $vente->point_de_vente_id,
+                        'type_mouvement'     => 'Entrée', // Retour client
+                        'quantite'           => $detail->quantite,
+                        'stock_avant'        => $stockAvant,
+                        'stock_apres'        => $stockAvant + $detail->quantite,
+                        'reference_document' => $numAvoir,
+                    ]);
+                }
+            }
+
+            // 3. Écritures comptables
+            \App\Modules\Admin\Services\ComptabiliteService::genererEcritureAvoirVente($avoir);
+
+            // 4. Si la facture d'origine était déjà payée en espèces, on simule la sortie de caisse du remboursement
+            if (str_contains(strtolower($vente->mode_paiement), 'espèces') || str_contains(strtolower($vente->mode_paiement), 'caisse')) {
+                $soldeActuel = TresorerieJournal::where('point_de_vente_id', $vente->point_de_vente_id)
+                    ->orderByDesc('created_at')->value('solde_resultat') ?? 0;
+
+                TresorerieJournal::create([
+                    'point_de_vente_id'  => $vente->point_de_vente_id,
+                    'date_operation'     => now()->toDateString(),
+                    'type_operation'     => 'Décaissement', // Remboursement client
+                    'libelle'            => 'Remboursement Avoir client ' . $numAvoir,
+                    'mode_paiement'      => $vente->mode_paiement,
+                    'montant_entree'     => 0,
+                    'montant_sortie'     => $vente->montant_ttc,
+                    'solde_resultat'     => $soldeActuel - $vente->montant_ttc,
+                    'reference_document' => $numAvoir,
+                ]);
+            }
+
+            $avoirId = $avoir->id;
+        });
+
+        $this->journaliser('creation_avoir_vente', 'Vente', $avoirId);
+
+        return redirect()->route(request()->routeIs('caissier.*') ? 'caissier.ventes.imprimer' : 'admin.ventes.imprimer', $avoirId)
+            ->with('succes', "Facture d'avoir générée avec succès ! Les stocks et écritures comptables inverses ont été validés.");
+    }
+
+    /**
+     * Lot H : Normalisation manuelle DGI/FNE.
+     * Dispatch le job de normalisation pour une facture de vente non encore normalisée.
+     */
+    public function normaliser(Vente $vente): RedirectResponse
+    {
+        if ($vente->normalise) {
+            return back()->with('info', 'Cette facture est déjà normalisée.');
+        }
+
+        if ($vente->etape !== 'Facture') {
+            return back()->with('erreur', 'Seules les factures finalisées peuvent être normalisées.');
+        }
+
+        NormaliserFactureFne::dispatch($vente);
+
+        $this->journaliser('normalisation_manuelle_vente', 'Vente', $vente->id);
+
+        return back()->with('succes', 'La normalisation DGI a été lancée avec succès. Elle sera traitée en arrière-plan.');
+    }
+
+    // ──────────────────────────────────────────────────────────────────────────
+    // WORKFLOW DEVIS → COMMANDE → FACTURE
+    // ──────────────────────────────────────────────────────────────────────────
+
+    /**
+     * Passer un devis/commande au statut Envoyé.
+     */
+    public function envoyer(Vente $vente): RedirectResponse
+    {
+        abort_unless($vente->pointDeVente->entreprise_id === Auth::user()->entreprise_id, 403);
+        abort_unless(in_array($vente->etape, ['Devis', 'Bon de commande']), 403);
+
+        $vente->update(['statut' => 'Envoyé']);
+
+        return back()->with('succes', ucfirst(strtolower($vente->etape)) . ' marqué comme envoyé.');
+    }
+
+    /**
+     * Convertir un devis en bon de commande.
+     * L'original est archivé, un clone est créé à l'étape Bon de commande.
+     */
+    public function convertirEnCommande(Vente $vente): RedirectResponse
+    {
+        abort_unless($vente->pointDeVente->entreprise_id === Auth::user()->entreprise_id, 403);
+        if ($vente->etape !== 'Devis') {
+            return back()->with('erreur', 'Ce document n\'est pas un devis.');
+        }
+
+        DB::transaction(function () use ($vente) {
+            // 1. Archiver le devis d'origine
+            $vente->update(['archived' => true]);
+
+            // 2. Cloner en Bon de commande
+            $entrepriseId = $vente->pointDeVente->entreprise_id;
+            $nouveauNumero = \App\Modules\Admin\Services\NumerotationService::genererNumeroVente($entrepriseId, 'Bon de commande');
+
+            $clone = $vente->replicate(['archived', 'normalise', 'numero_fne', 'signature_dgi', 'qr_code_data']);
+            $clone->numero_facture = $nouveauNumero;
+            $clone->etape          = 'Bon de commande';
+            $clone->statut         = 'Brouillon';
+            $clone->archived       = false;
+            $clone->normalise      = false;
+            $clone->numero_fne     = null;
+            $clone->signature_dgi  = null;
+            $clone->qr_code_data   = null;
+            $clone->save();
+
+            // 3. Cloner les lignes de détail
+            foreach ($vente->details as $detail) {
+                $newDetail = $detail->replicate();
+                $newDetail->vente_id = $clone->id;
+                $newDetail->save();
+            }
+        });
+
+        return back()->with('succes', 'Le devis a été converti en bon de commande et archivé.');
+    }
+
+    /**
+     * Convertir un bon de commande en facture à finaliser.
+     * L'original est archivé, un clone Facture est créé et l'utilisateur est
+     * redirigé vers sa fiche de modification pour saisir le paiement.
+     */
+    public function convertirEnFacture(Vente $vente): RedirectResponse
+    {
+        abort_unless($vente->pointDeVente->entreprise_id === Auth::user()->entreprise_id, 403);
+        if ($vente->etape !== 'Bon de commande') {
+            return back()->with('erreur', 'Ce document n\'est pas un bon de commande.');
+        }
+
+        $nouvelleFactureId = null;
+
+        DB::transaction(function () use ($vente, &$nouvelleFactureId) {
+            // 1. Archiver le bon de commande d'origine
+            $vente->update(['archived' => true]);
+
+            // 2. Cloner en Facture (statut Crédit par défaut, en attente de finalisation)
+            $entrepriseId = $vente->pointDeVente->entreprise_id;
+            $nouveauNumero = \App\Modules\Admin\Services\NumerotationService::genererNumeroVente($entrepriseId, 'Facture');
+
+            $clone = $vente->replicate(['archived', 'normalise', 'numero_fne', 'signature_dgi', 'qr_code_data']);
+            $clone->numero_facture = $nouveauNumero;
+            $clone->etape          = 'Facture';
+            $clone->statut         = 'Crédit';
+            $clone->archived       = false;
+            $clone->normalise      = false;
+            $clone->numero_fne     = null;
+            $clone->signature_dgi  = null;
+            $clone->qr_code_data   = null;
+            $clone->save();
+
+            // 3. Cloner les lignes
+            foreach ($vente->details as $detail) {
+                $newDetail = $detail->replicate();
+                $newDetail->vente_id = $clone->id;
+                $newDetail->save();
+            }
+
+            $nouvelleFactureId = $clone->id;
+        });
+
+        // Rediriger vers la modification pour finaliser le paiement
+        $route = request()->routeIs('caissier.*') ? 'caissier.ventes.modifier' : 'admin.ventes.modifier';
+        return redirect()->route($route, $nouvelleFactureId)
+            ->with('succes', 'Bon de commande converti en facture. Veuillez renseigner le mode de paiement et valider.');
+    }
+
+    /**
+     * Supprimer définitivement une vente archivée.
+     */
+    public function supprimer(Vente $vente): RedirectResponse
+    {
+        abort_unless($vente->pointDeVente->entreprise_id === Auth::user()->entreprise_id, 403);
+        abort_if($vente->type_facture === 'avoir', 403, "Impossible de supprimer une facture d'avoir.");
+        abort_unless($vente->archived, 403, 'Seuls les documents archivés peuvent être supprimés.');
+
+        $etape = $vente->etape;
+        $vente->details()->delete();
+        $vente->delete();
+
+        $routeParam = match($etape) {
+            'Devis'           => '?etape=Devis&archives=1',
+            'Bon de commande' => '?etape=Bon+de+commande&archives=1',
+            default           => '?archives=1',
+        };
+
+        $baseRoute = request()->routeIs('caissier.*') ? 'caissier.ventes.factures' : 'admin.ventes.factures';
+        return redirect()->route($baseRoute)->withInput(['etape' => $etape, 'archives' => '1'])
+            ->with('succes', 'Document supprimé définitivement.');
+    }
+
+    public function rechercherFacturesPourAvoir(Request $request): \Illuminate\Http\JsonResponse
+    {
+        $entreprise = Auth::user()->entreprise;
+        $q = $request->query('q');
+
+        $query = Vente::with('client')
+            ->whereHas('pointDeVente', fn($queryPdv) => $queryPdv->where('entreprise_id', $entreprise->id))
+            ->where('etape', 'Facture')
+            ->where('numero_facture', 'LIKE', 'VT-%')
+            ->where(function($queryType) {
+                $queryType->whereNull('type_facture')->orWhere('type_facture', '!=', 'avoir');
+            })
+            ->where('archived', false);
+
+        if ($q) {
+            $query->where(function($querySearch) use ($q) {
+                $querySearch->where('numero_facture', 'like', "%{$q}%")
+                    ->orWhere('numero_fne', 'like', "%{$q}%")
+                    ->orWhereHas('client', fn($queryClient) => $queryClient->where('nom', 'like', "%{$q}%"));
+            });
+        }
+
+        $factures = $query->latest()->limit(10)->get()->map(function($f) {
+            $clientNom = $f->client ? $f->client->nom : 'Client de passage';
+            return [
+                'id' => $f->id,
+                'text' => "{$f->numero_facture} - {$clientNom} (" . number_format($f->montant_ttc, 0, ',', ' ') . " XOF)"
+            ];
+        });
+
+        return response()->json($factures);
+    }
+
+    public function detailsFacturePourAvoir(Vente $vente): \Illuminate\Http\JsonResponse
+    {
+        abort_unless($vente->pointDeVente->entreprise_id === Auth::user()->entreprise_id, 403);
+        $vente->load(['details.produit', 'client']);
+
+        return response()->json([
+            'id' => $vente->id,
+            'numero_facture' => $vente->numero_facture,
+            'client_nom' => $vente->client ? $vente->client->nom : 'Client de passage',
+            'montant_ttc' => $vente->montant_ttc,
+            'details' => $vente->details->map(function($d) {
+                return [
+                    'id' => $d->id,
+                    'produit_id' => $d->produit_id,
+                    'libelle' => $d->produit ? $d->produit->nom : $d->libelle_virtuel,
+                    'quantite' => $d->quantite,
+                    'prix_unitaire' => $d->prix_unitaire,
+                    'montant_tva' => $d->montant_tva,
+                    'montant_ttc' => $d->montant_ttc,
+                    'unite' => $d->unite ?? 'pcs',
+                    'est_stockable' => $d->produit ? $d->produit->estStockable() : false,
+                ];
+            })
+        ]);
+    }
+
+    public function creerAvoirNouveau(Request $request): RedirectResponse
+    {
+        $request->validate([
+            'parent_id' => ['required', 'exists:ventes,id'],
+            'raison'    => ['required', 'string', 'max:255'],
+            'items'     => ['required', 'array'],
+        ]);
+
+        $parent = Vente::findOrFail($request->parent_id);
+        abort_unless($parent->pointDeVente->entreprise_id === Auth::user()->entreprise_id, 403);
+        abort_if($parent->type_facture === 'avoir', 400, "Impossible de générer un avoir sur une facture d'avoir.");
+
+        $avoirId = null;
+
+        DB::transaction(function () use ($parent, $request, &$avoirId) {
+            $numAvoir = 'AV-' . $parent->numero_facture;
+
+            // 1. Création de la facture d'avoir
+            $avoir = Vente::create([
+                'point_de_vente_id' => $parent->point_de_vente_id,
+                'client_id'         => $parent->client_id,
+                'utilisateur_id'    => Auth::id(),
+                'numero_facture'    => $numAvoir,
+                'date_vente'        => now()->toDateString(),
+                'mode_paiement'     => $parent->mode_paiement,
+                'moyen_bancaire'    => $parent->moyen_bancaire,
+                'reference_paiement'=> $request->raison,
+                'statut'            => 'Payé',
+                'type_facture'      => 'avoir',
+                'etape'             => 'Facture',
+                'parent_id'         => $parent->id,
+                'raison_avoir'      => $request->raison,
+                'montant_ht'        => 0,
+                'montant_tva'       => 0,
+                'remise'            => 0,
+                'montant_ttc'       => 0,
+            ]);
+
+            $totalHt = 0;
+            $totalTva = 0;
+            $totalTtc = 0;
+
+            // 2. Traitement des lignes
+            foreach ($request->items as $itemId => $itemData) {
+                $isNouveau = isset($itemData['est_nouveau']) && $itemData['est_nouveau'] == 1;
+                $qteAvoir = floatval($itemData['quantite']);
+                $prixUnit = floatval($itemData['prix_unitaire']);
+
+                if ($qteAvoir <= 0) continue;
+
+                if ($isNouveau) {
+                    $produitId = $itemData['produit_id'] ?? null;
+                    $libelle = $itemData['libelle_virtuel'] ?? 'Article';
+                    
+                    $produit = null;
+                    if ($produitId) {
+                        $produit = \App\Modules\Admin\Modeles\Produit::find($produitId);
+                    }
+
+                    $tvaRate = (floatval($itemData['taux_tva'] ?? 18.0)) / 100;
+                    $unite = $produit ? $produit->unite : 'pcs';
+                    
+                    $itemHt = $qteAvoir * $prixUnit;
+                    $itemTva = $itemHt * $tvaRate;
+                    $itemTtc = $itemHt + $itemTva;
+
+                    VenteDetail::create([
+                        'vente_id'        => $avoir->id,
+                        'produit_id'      => $produitId,
+                        'libelle_virtuel' => $libelle,
+                        'quantite'        => $qteAvoir,
+                        'unite'           => $unite,
+                        'prix_unitaire'   => $prixUnit,
+                        'montant_tva'     => $itemTva,
+                        'montant_ttc'     => $itemTtc,
+                    ]);
+
+                    $totalHt += $itemHt;
+                    $totalTva += $itemTva;
+                    $totalTtc += $itemTtc;
+
+                    // Action sur stock pour produit catalogue stockable
+                    if ($produit && $produit->estStockable()) {
+                        $stockAction = $itemData['stock_action'] ?? 'none';
+                        if ($stockAction === 'reinject') {
+                            $stockAvant = $produit->stockActuel($parent->point_de_vente_id);
+                            $produit->incrementStock($parent->point_de_vente_id, $qteAvoir);
+
+                            MouvementStock::create([
+                                'produit_id'         => $produitId,
+                                'point_de_vente_id'  => $parent->point_de_vente_id,
+                                'type_mouvement'     => 'Entrée',
+                                'quantite'           => $qteAvoir,
+                                'stock_avant'        => $stockAvant,
+                                'stock_apres'        => $stockAvant + $qteAvoir,
+                                'reference_document' => $numAvoir,
+                                'notes'              => 'Retour client - Réinjecté en stock vendable (Ajouté)',
+                            ]);
+                        } elseif ($stockAction === 'scrap') {
+                            MouvementStock::create([
+                                'produit_id'         => $produitId,
+                                'point_de_vente_id'  => $parent->point_de_vente_id,
+                                'type_mouvement'     => 'Entrée',
+                                'quantite'           => $qteAvoir,
+                                'stock_avant'        => 0,
+                                'stock_apres'        => 0,
+                                'reference_document' => $numAvoir,
+                                'notes'              => 'Retour client défectueux - Mis au rebut (Ajouté)',
+                            ]);
+                        }
+                    }
+                } else {
+                    $detail = VenteDetail::where('vente_id', $parent->id)->where('id', $itemId)->first();
+                    if (!$detail) continue;
+
+                    $tvaRate = ($detail->montant_ttc - $detail->montant_ht) > 0 ? 0.18 : 0;
+
+                    $itemHt = $qteAvoir * $prixUnit;
+                    $itemTva = $itemHt * $tvaRate;
+                    $itemTtc = $itemHt + $itemTva;
+
+                    VenteDetail::create([
+                        'vente_id'        => $avoir->id,
+                        'produit_id'      => $detail->produit_id,
+                        'libelle_virtuel' => $detail->libelle_virtuel,
+                        'quantite'        => $qteAvoir,
+                        'unite'           => $detail->unite,
+                        'prix_unitaire'   => $prixUnit,
+                        'montant_tva'     => $itemTva,
+                        'montant_ttc'     => $itemTtc,
+                    ]);
+
+                    $totalHt += $itemHt;
+                    $totalTva += $itemTva;
+                    $totalTtc += $itemTtc;
+
+                    // Action sur stock
+                    if ($detail->produit && $detail->produit->estStockable()) {
+                        $stockAction = $itemData['stock_action'] ?? 'none';
+                        if ($stockAction === 'reinject') {
+                            $stockAvant = $detail->produit->stockActuel($parent->point_de_vente_id);
+                            $detail->produit->incrementStock($parent->point_de_vente_id, $qteAvoir);
+
+                            MouvementStock::create([
+                                'produit_id'         => $detail->produit_id,
+                                'point_de_vente_id'  => $parent->point_de_vente_id,
+                                'type_mouvement'     => 'Entrée',
+                                'quantite'           => $qteAvoir,
+                                'stock_avant'        => $stockAvant,
+                                'stock_apres'        => $stockAvant + $qteAvoir,
+                                'reference_document' => $numAvoir,
+                                'notes'              => 'Retour client - Réinjecté en stock vendable',
+                            ]);
+                        } elseif ($stockAction === 'scrap') {
+                            MouvementStock::create([
+                                'produit_id'         => $detail->produit_id,
+                                'point_de_vente_id'  => $parent->point_de_vente_id,
+                                'type_mouvement'     => 'Entrée',
+                                'quantite'           => $qteAvoir,
+                                'stock_avant'        => 0,
+                                'stock_apres'        => 0,
+                                'reference_document' => $numAvoir,
+                                'notes'              => 'Retour client défectueux - Mis au rebut',
+                            ]);
+                        }
+                    }
+                }
+            }
+
+            $avoir->update([
+                'montant_ht'  => $totalHt,
+                'montant_tva' => $totalTva,
+                'montant_ttc' => $totalTtc,
+            ]);
+
+            // 3. Écritures comptables
+            \App\Modules\Admin\Services\ComptabiliteService::genererEcritureAvoirVente($avoir);
+
+            // 4. Sortie de trésorerie si remboursement caisse
+            if (str_contains(strtolower($parent->mode_paiement), 'espèces') || str_contains(strtolower($parent->mode_paiement), 'caisse')) {
+                $soldeActuel = TresorerieJournal::where('point_de_vente_id', $parent->point_de_vente_id)
+                    ->orderByDesc('created_at')->value('solde_resultat') ?? 0;
+
+                TresorerieJournal::create([
+                    'point_de_vente_id'  => $parent->point_de_vente_id,
+                    'date_operation'     => now()->toDateString(),
+                    'type_operation'     => 'Décaissement',
+                    'libelle'            => 'Remboursement Avoir client ' . $numAvoir,
+                    'mode_paiement'      => $parent->mode_paiement,
+                    'montant_entree'     => 0,
+                    'montant_sortie'     => $totalTtc,
+                    'solde_resultat'     => $soldeActuel - $totalTtc,
+                    'reference_document' => $numAvoir,
+                ]);
+            }
+
+            $avoirId = $avoir->id;
+        });
+
+        $this->journaliser('creation_avoir_vente', 'Vente', $avoirId);
+
+        $route = request()->routeIs('caissier.*') ? 'caissier.ventes.factures' : 'admin.ventes.factures';
+        return redirect()->route($route, ['type' => 'avoir'])
+            ->with('succes', "Facture d'avoir générée avec succès.");
+    }
+
+    public function produitsParCategorie(): \Illuminate\Http\JsonResponse
+    {
+        $user = Auth::user();
+        $entrepriseId = $user->entreprise_id;
+
+        $produits = \App\Modules\Admin\Modeles\Produit::with('category')
+            ->where('entreprise_id', $entrepriseId)
+            ->where('statut', 'actif')
+            ->get();
+
+        $grouped = [];
+        foreach ($produits as $p) {
+            $catNom = $p->category ? $p->category->nom : 'Non Catégorisé';
+            $grouped[$catNom][] = [
+                'id' => $p->id,
+                'nom' => $p->nom,
+                'prix_vente' => floatval($p->prix_vente),
+                'prix_achat' => floatval($p->prix_achat),
+                'unite' => $p->unite ?? 'pcs',
+                'est_stockable' => $p->estStockable(),
+                'taux_tva' => floatval($p->taux_tva ?? 18.0),
+            ];
+        }
+
+        return response()->json($grouped);
     }
 }

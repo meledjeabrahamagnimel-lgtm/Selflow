@@ -53,8 +53,13 @@ class AdminControleur
 
         // ── Alertes stock ─────────────────────────────────────────────────────
         $produitsEnAlerte = Produit::where('entreprise_id', $entreprise->id)
-            ->whereRaw('stock_actuel <= stock_minimum')
-            ->orderByRaw('stock_actuel - stock_minimum ASC')
+            ->whereHas('stocks', function($q) use ($pointDeVenteId) {
+                if ($pointDeVenteId) {
+                    $q->where('point_de_vente_id', $pointDeVenteId);
+                }
+                $q->whereRaw('quantite_disponible <= stock_minimum');
+            })
+            ->with(['stocks'])
             ->limit(8)
             ->get();
 
@@ -149,8 +154,13 @@ class AdminControleur
 
         // ── Alertes stock ─────────────────────────────────────────────────────
         $produitsEnAlerte = Produit::where('entreprise_id', $entreprise->id)
-            ->whereRaw('stock_actuel <= stock_minimum')
-            ->orderByRaw('stock_actuel - stock_minimum ASC')
+            ->whereHas('stocks', function($q) use ($pointDeVenteId) {
+                if ($pointDeVenteId) {
+                    $q->where('point_de_vente_id', $pointDeVenteId);
+                }
+                $q->whereRaw('quantite_disponible <= stock_minimum');
+            })
+            ->with(['stocks'])
             ->limit(8)
             ->get();
 
@@ -224,5 +234,49 @@ class AdminControleur
             'dernieresVentes', 'pointsDeVente', 'pointDeVenteId',
             'jours7', 'topVendeurs', 'caPdvPeriode'
         ));
+    }
+
+    /**
+     * Afficher le profil de l'utilisateur connecté.
+     */
+    public function monProfil(): View
+    {
+        $utilisateur = Auth::user();
+        return view('admin::personnel.profil', compact('utilisateur'));
+    }
+
+    /**
+     * Enregistrer les modifications du profil.
+     */
+    public function enregistrerProfil(Request $request): RedirectResponse
+    {
+        $utilisateur = Auth::user();
+
+        $request->validate([
+            'nom'      => ['required', 'string', 'max:150'],
+            'prenom'   => ['required', 'string', 'max:150'],
+            'password' => ['nullable', 'string', 'min:6', 'confirmed'],
+            'avatar'   => ['nullable', 'image', 'mimes:png,jpg,jpeg,svg,webp', 'max:2048'],
+        ]);
+
+        $data = [
+            'nom'    => $request->nom,
+            'prenom' => $request->prenom,
+        ];
+
+        if ($request->filled('password')) {
+            $data['password'] = \Illuminate\Support\Facades\Hash::make($request->password);
+        }
+
+        if ($request->hasFile('avatar')) {
+            if ($utilisateur->avatar_path && \Illuminate\Support\Facades\Storage::disk('public')->exists($utilisateur->avatar_path)) {
+                \Illuminate\Support\Facades\Storage::disk('public')->delete($utilisateur->avatar_path);
+            }
+            $data['avatar_path'] = $request->file('avatar')->store('avatars', 'public');
+        }
+
+        $utilisateur->update($data);
+
+        return back()->with('succes', 'Votre profil a été mis à jour avec succès.');
     }
 }

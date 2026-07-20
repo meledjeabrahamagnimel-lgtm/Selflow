@@ -15,6 +15,7 @@ class Achat extends Model
         'utilisateur_id',
         'fournisseur_id',
         'numero_facture',
+        'numero_facture_fournisseur', // N° facture du fournisseur externe (saisie manuelle ou FNE DGI)
         'date_achat',
         'mode_paiement',
         'moyen_bancaire',
@@ -24,7 +25,17 @@ class Achat extends Model
         'montant_ttc',
         'statut',
         'etape',
+        'normalise',
+        'numero_fne',
+        'signature_dgi',
+        'qr_code_data',
+        'type_facture',
+        'archived',
+        'parent_id',
+        'raison_avoir',
     ];
+
+
 
     protected static function booted()
     {
@@ -44,6 +55,7 @@ class Achat extends Model
             'montant_ht'  => 'decimal:2',
             'montant_tva' => 'decimal:2',
             'montant_ttc' => 'decimal:2',
+            'archived'    => 'boolean',
         ];
     }
 
@@ -72,5 +84,15 @@ class Achat extends Model
     public function getMontantPayeAttribute()
     {
         return $this->paiements()->sum('montant_sortie');
+    }
+
+    public function parent(): BelongsTo
+    {
+        return $this->belongsTo(Achat::class, 'parent_id');
+    }
+
+    public function avoirs(): HasMany
+    {
+        return $this->hasMany(Achat::class, 'parent_id');
     }
 }

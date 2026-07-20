@@ -43,6 +43,53 @@
     </div>
 </div>
 
+<div class="card" style="margin-bottom:20px; padding:16px 20px; background:var(--bg2);">
+    <form method="GET" action="{{ route('admin.tresorerie.journal') }}" style="display:grid; grid-template-columns:repeat(auto-fit, minmax(200px, 1fr)) 120px 100px; gap:12px; align-items:end; margin:0;">
+        {{-- Point de Vente --}}
+        <div class="form-group" style="margin-bottom:0;">
+            <label class="form-label" style="font-size:11px; font-weight:600; text-transform:uppercase; letter-spacing:.5px; color:var(--text-3); margin-bottom:6px;"><i class="fas fa-store"></i> Point de vente</label>
+            <select name="point_de_vente_id" class="form-control" style="padding:8px 12px; font-size:13px;" @if(Auth::user()->estCaissier()) disabled @endif>
+                <option value="tous" {{ $pointDeVenteId === 'tous' ? 'selected' : '' }}>— Tous les sites —</option>
+                @foreach($pointsDeVente as $pdv)
+                    <option value="{{ $pdv->id }}" {{ $pointDeVenteId == $pdv->id ? 'selected' : '' }}>{{ $pdv->nom }}</option>
+                @endforeach
+            </select>
+            @if(Auth::user()->estCaissier())
+                <input type="hidden" name="point_de_vente_id" value="{{ $pointDeVenteId }}">
+            @endif
+        </div>
+
+        {{-- Mode de Paiement --}}
+        <div class="form-group" style="margin-bottom:0;">
+            <label class="form-label" style="font-size:11px; font-weight:600; text-transform:uppercase; letter-spacing:.5px; color:var(--text-3); margin-bottom:6px;"><i class="fas fa-credit-card"></i> Moyen de Paiement</label>
+            <select name="mode_paiement" class="form-control" style="padding:8px 12px; font-size:13px;">
+                <option value="">— Tous —</option>
+                @foreach($modesDisponibles as $m)
+                    <option value="{{ $m }}" {{ request('mode_paiement') === $m ? 'selected' : '' }}>{{ $m }}</option>
+                @endforeach
+            </select>
+        </div>
+
+        {{-- Moyen Bancaire / Banque --}}
+        <div class="form-group" style="margin-bottom:0;">
+            <label class="form-label" style="font-size:11px; font-weight:600; text-transform:uppercase; letter-spacing:.5px; color:var(--text-3); margin-bottom:6px;"><i class="fas fa-bank"></i> Banque / Moyen bancaire</label>
+            <select name="moyen_bancaire" class="form-control" style="padding:8px 12px; font-size:13px;">
+                <option value="">— Toutes —</option>
+                @foreach($moyensBancairesDisponibles as $mb)
+                    <option value="{{ $mb }}" {{ request('moyen_bancaire') === $mb ? 'selected' : '' }}>{{ $mb }}</option>
+                @endforeach
+            </select>
+        </div>
+
+        <button type="submit" class="btn btn-primary" style="padding: 10px; font-weight: 600; justify-content: center; border-radius: 8px;">
+            <i class="fas fa-filter"></i> Filtrer
+        </button>
+        <a href="{{ route('admin.tresorerie.journal') }}" class="btn btn-outline" style="padding: 10px; font-weight: 600; justify-content: center; border-radius: 8px;">
+            Réinitialiser
+        </a>
+    </form>
+</div>
+
 <div class="card">
     <div class="table-wrap">
         @if($operations->isEmpty())

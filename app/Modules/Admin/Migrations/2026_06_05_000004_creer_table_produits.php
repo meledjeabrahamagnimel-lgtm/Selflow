@@ -25,6 +25,8 @@ return new class extends Migration
             $table->decimal('prix_vente', 15, 2);
             $table->integer('stock_actuel')->default(0);
             $table->integer('stock_minimum')->default(5);
+            $table->integer('quantite_commandee')->default(0);
+            $table->integer('quantite_a_receptionner')->default(0);
             $table->timestamps();
         });
     }

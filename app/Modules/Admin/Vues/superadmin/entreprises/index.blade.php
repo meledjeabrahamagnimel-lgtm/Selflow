@@ -1,0 +1,336 @@
+@extends('admin::gabarits.application')
+
+@section('titre', 'Supervision - Entreprises')
+@section('topbar_titre', 'Supervision — Entreprises')
+
+@section('contenu')
+<div class="page-header" style="margin-bottom: 20px;">
+    <div>
+        <h1><i class="fas fa-building"></i> Liste des Entreprises</h1>
+        <p>Gérez les comptes clients de la plateforme, les quotas et les modules autorisés</p>
+    </div>
+    <a href="{{ route('superadmin.entreprises.creer') }}" class="btn btn-primary">
+        <i class="fas fa-plus"></i> Nouvelle Entreprise
+    </a>
+</div>
+
+@if(session('succes'))
+<div class="alert alert-success" style="display:flex;align-items:center;gap:10px;padding:14px 18px;background:#d1fae5;border:1px solid #6ee7b7;border-radius:10px;margin-bottom:20px;color:#065f46;font-weight:500;">
+    <i class="fas fa-check-circle" style="font-size:16px;color:#10b981;"></i>
+    {{ session('succes') }}
+</div>
+@endif
+
+<div class="card">
+    <div class="table-wrap">
+        <table>
+            <thead>
+                <tr>
+                    <th>Nom de l'entreprise</th>
+                    <th>Contact</th>
+                    <th>Secteur d'activité</th>
+                    <th> NCC / RCCM </th>
+                    <th>Abonnement &amp; Quotas</th>
+                    <th>Modules activés</th>
+                    <th style="text-align: center;">Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                @forelse($entreprises as $ent)
+                <tr>
+                    <td>
+                        <div style="font-weight: 700; color: var(--text); font-size: 14px;">{{ $ent->nom }}</div>
+                    </td>
+                    <td>
+                        <div style="font-size: 12px; color: var(--text-2); display: flex; flex-direction: column; gap: 4px;">
+                            <span><i class="fas fa-envelope" style="color: var(--primary); width: 14px;"></i> {{ $ent->email ?? '—' }}</span>
+                            @if($ent->telephone)
+                                <span><i class="fas fa-phone" style="color: var(--primary); width: 14px;"></i> {{ $ent->telephone }}</span>
+                            @endif
+                        </div>
+                    </td>
+                    <td>
+                        @php
+                            $secteurs = $ent->secteur_activite ?? [];
+                            if (is_string($secteurs)) {
+                                $secteurs = [$secteurs];
+                            }
+                        @endphp
+                        @foreach($secteurs as $secteur)
+                            @if($secteur === 'Commercial')
+                                <span class="badge badge-info" style="margin-bottom: 2px; display: inline-block;"><i class="fas fa-tags"></i> Commercial</span>
+                            @elseif($secteur === 'Industriel')
+                                <span class="badge badge-purple" style="margin-bottom: 2px; display: inline-block;"><i class="fas fa-industry"></i> Industriel</span>
+                            @else
+                                <span class="badge badge-success" style="margin-bottom: 2px; display: inline-block;"><i class="fas fa-person-digging"></i> Services</span>
+                            @endif
+                        @endforeach
+                    </td>
+                    <td>
+                        <span style="font-size: 11.5px; color: var(--text-2);">
+                            NCC: <strong>{{ $ent->ncc ?? '—' }}</strong><br>
+                            RCCM: {{ $ent->rccm ?? '—' }}
+                        </span>
+                    </td>
+                    <td>
+                        <span class="badge badge-purple" style="margin-bottom: 4px; display: inline-block;">{{ $ent->plan_abonnement }}</span>
+                        <div style="font-size: 11px; color: var(--text-3);">
+                            Points de vente max : <strong>{{ $ent->quota_points_de_vente }}</strong>
+                        </div>
+                    </td>
+                    <td>
+                        @php
+                            $count = $ent->modules_actifs ? count($ent->modules_actifs) : 0;
+                        @endphp
+                        @if($count > 0)
+                            <button type="button" class="btn btn-outline btn-sm" onclick="toggleModulesList(event, 'modules-{{ $ent->id }}')" style="font-size: 11px; padding: 4px 8px; font-weight:600; display: inline-flex; align-items: center; gap: 4px; border-color: var(--border);">
+                                <i class="fas fa-cubes"></i> <span>{{ $count }} modules</span> <i class="fas fa-chevron-down" style="font-size: 8px; transition: transform 0.2s;"></i>
+                            </button>
+                            <div id="modules-{{ $ent->id }}" style="display: none; margin-top: 6px; flex-wrap: wrap; gap: 4px; max-width: 280px; animation: fadeIn 0.2s ease;">
+                                @foreach($ent->modules_actifs as $mod)
+                                    <span style="font-size: 9.5px; background: rgba(0,43,92,0.06); border: 1px solid rgba(0,43,92,0.12); color: var(--primary); padding: 2px 6px; border-radius: 4px; font-weight: 600; text-transform: uppercase;">
+                                        {{ $mod }}
+                                    </span>
+                                @endforeach
+                            </div>
+                        @else
+                            <span style="font-size: 11px; color: var(--text-3);">Aucun module actif</span>
+                        @endif
+                    </td>
+                    <td style="text-align: center;">
+                        <div style="display: flex; gap: 6px; justify-content: center; align-items: center;">
+                            <button type="button" class="btn btn-outline btn-sm" onclick="ouvrirModalDetails({{ json_encode($ent) }}, {{ $ent->pointsDeVente()->count() }}, {{ $ent->utilisateurs()->count() }}, {{ $ent->produits()->count() }})">
+                                <i class="fas fa-eye"></i> Détails
+                            </button>
+                            <a href="{{ route('superadmin.entreprises.modifier', $ent) }}" class="btn btn-primary btn-sm">
+                                <i class="fas fa-pen-to-square"></i> Configurer
+                            </a>
+                        </div>
+                    </td>
+                </tr>
+                @empty
+                <tr>
+                    <td colspan="7" style="text-align: center; color: var(--text-3); padding: 30px 0;">
+                        Aucune entreprise n'est enregistrée pour le moment.
+                    </td>
+                </tr>
+                @endforelse
+            </tbody>
+        </table>
+        @if($entreprises->hasPages())
+        <div style="padding: 16px;">
+            {{ $entreprises->links() }}
+        </div>
+        @endif
+    </div>
+</div>
+
+<!-- Modal de Détails -->
+<div id="modalDetailsEntreprise" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 10000; align-items: center; justify-content: center; backdrop-filter: blur(4px); animation: fadeIn 0.2s ease;">
+    <div style="background: var(--bg); border: 1px solid var(--border); width: 100%; max-width: 600px; border-radius: 16px; box-shadow: 0 20px 40px rgba(0,0,0,0.3); overflow: hidden; animation: slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1);">
+        <!-- Header -->
+        <div style="padding: 20px 24px; background: var(--bg2); border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between;">
+            <div style="display: flex; align-items: center; gap: 10px;">
+                <i class="fas fa-building" style="color: var(--primary); font-size: 20px;"></i>
+                <span style="font-weight: 800; font-size: 16px; color: var(--text);" id="modalNom">Nom de l'entreprise</span>
+            </div>
+            <button type="button" onclick="fermerModalDetails()" style="background: none; border: none; font-size: 20px; color: var(--text-3); cursor: pointer; display: flex; align-items: center; justify-content: center; outline: none; transition: color 0.15s;" onmouseover="this.style.color='var(--danger)'" onmouseout="this.style.color='var(--text-3)'">
+                <i class="fas fa-xmark"></i>
+            </button>
+        </div>
+        
+        <!-- Body -->
+        <div style="padding: 24px; max-height: 480px; overflow-y: auto; display: flex; flex-direction: column; gap: 20px; font-size: 13px;">
+            <!-- Secteurs -->
+            <div>
+                <div style="font-weight: 700; color: var(--text-2); text-transform: uppercase; font-size: 11px; letter-spacing: 0.5px; margin-bottom: 8px;">Secteurs d'activité</div>
+                <div id="modalSecteurs" style="display: flex; gap: 6px;"></div>
+            </div>
+
+            <!-- Contacts -->
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+                <div>
+                    <div style="font-weight: 700; color: var(--text-2); text-transform: uppercase; font-size: 11px; letter-spacing: 0.5px; margin-bottom: 4px;">Email</div>
+                    <span id="modalEmail" style="color: var(--text); font-weight: 600;">—</span>
+                </div>
+                <div>
+                    <div style="font-weight: 700; color: var(--text-2); text-transform: uppercase; font-size: 11px; letter-spacing: 0.5px; margin-bottom: 4px;">Téléphone</div>
+                    <span id="modalTelephone" style="color: var(--text); font-weight: 600;">—</span>
+                </div>
+            </div>
+
+            <!-- Fiscal -->
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+                <div>
+                    <div style="font-weight: 700; color: var(--text-2); text-transform: uppercase; font-size: 11px; letter-spacing: 0.5px; margin-bottom: 4px;">NCC</div>
+                    <span id="modalNCC" style="color: var(--text); font-weight: 600;">—</span>
+                </div>
+                <div>
+                    <div style="font-weight: 700; color: var(--text-2); text-transform: uppercase; font-size: 11px; letter-spacing: 0.5px; margin-bottom: 4px;">RCCM</div>
+                    <span id="modalRCCM" style="color: var(--text); font-weight: 600;">—</span>
+                </div>
+            </div>
+
+            <!-- Abonnement -->
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+                <div>
+                    <div style="font-weight: 700; color: var(--text-2); text-transform: uppercase; font-size: 11px; letter-spacing: 0.5px; margin-bottom: 4px;">Plan d'abonnement</div>
+                    <span class="badge badge-purple" id="modalPlan" style="font-size: 11.5px; padding: 4px 8px;">Starter</span>
+                </div>
+                <div>
+                    <div style="font-weight: 700; color: var(--text-2); text-transform: uppercase; font-size: 11px; letter-spacing: 0.5px; margin-bottom: 4px;">Quota Points de vente</div>
+                    <span id="modalQuota" style="color: var(--text); font-weight: 600;">5 max</span>
+                </div>
+            </div>
+
+            <!-- Statistiques / Compteurs -->
+            <div>
+                <div style="font-weight: 700; color: var(--text-2); text-transform: uppercase; font-size: 11px; letter-spacing: 0.5px; margin-bottom: 8px;">Métriques actuelles</div>
+                <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px;">
+                    <div style="padding: 10px; background: var(--bg2); border: 1px solid var(--border); border-radius: 8px; text-align: center;">
+                        <div style="font-size: 18px; font-weight: 800; color: var(--primary);" id="modalCountPdv">0</div>
+                        <div style="font-size: 10px; color: var(--text-3); text-transform: uppercase; font-weight:600; margin-top:4px;">Points de Vente</div>
+                    </div>
+                    <div style="padding: 10px; background: var(--bg2); border: 1px solid var(--border); border-radius: 8px; text-align: center;">
+                        <div style="font-size: 18px; font-weight: 800; color: var(--primary);" id="modalCountUsers">0</div>
+                        <div style="font-size: 10px; color: var(--text-3); text-transform: uppercase; font-weight:600; margin-top:4px;">Utilisateurs</div>
+                    </div>
+                    <div style="padding: 10px; background: var(--bg2); border: 1px solid var(--border); border-radius: 8px; text-align: center;">
+                        <div style="font-size: 18px; font-weight: 800; color: var(--primary);" id="modalCountProducts">0</div>
+                        <div style="font-size: 10px; color: var(--text-3); text-transform: uppercase; font-weight:600; margin-top:4px;">Catalogue</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Modules activés -->
+            <div>
+                <div style="font-weight: 700; color: var(--text-2); text-transform: uppercase; font-size: 11px; letter-spacing: 0.5px; margin-bottom: 8px;">Modules Actifs</div>
+                <div id="modalModules" style="display: flex; flex-wrap: wrap; gap: 6px;"></div>
+            </div>
+            
+            <!-- Future / Other details dynamic placeholder -->
+            <div id="modalDetailsFuturs" style="padding: 12px; background: rgba(16,185,129,0.06); border: 1px dashed rgba(16,185,129,0.3); border-radius: 8px; color: #10b981; display: none; align-items: center; gap: 8px; font-size: 11.5px;">
+                <i class="fas fa-circle-info"></i>
+                <span id="modalTxtFuturs">Champs futurs et extensions</span>
+            </div>
+        </div>
+        
+        <!-- Footer -->
+        <div style="padding: 16px 24px; background: var(--bg2); border-top: 1px solid var(--border); display: flex; justify-content: flex-end;">
+            <button type="button" class="btn btn-outline" onclick="fermerModalDetails()" style="padding: 10px 20px; border-radius: 8px;">Fermer</button>
+        </div>
+    </div>
+</div>
+
+<script>
+function toggleModulesList(event, id) {
+    event.stopPropagation();
+    const list = document.getElementById(id);
+    const btn = event.currentTarget;
+    const isHidden = list.style.display === 'none';
+    
+    // Fermer toutes les autres listes d'abord pour garder propre
+    document.querySelectorAll('[id^="modules-"]').forEach(el => {
+        if(el.id !== id) {
+            el.style.display = 'none';
+            const otherBtn = document.querySelector(`[onclick*="${el.id}"]`);
+            if(otherBtn) {
+                const chev = otherBtn.querySelector('.fa-chevron-down');
+                if(chev) chev.style.transform = 'rotate(0deg)';
+            }
+        }
+    });
+    
+    if (isHidden) {
+        list.style.display = 'flex';
+        btn.querySelector('.fa-chevron-down').style.transform = 'rotate(180deg)';
+    } else {
+        list.style.display = 'none';
+        btn.querySelector('.fa-chevron-down').style.transform = 'rotate(0deg)';
+    }
+}
+
+function ouvrirModalDetails(ent, countPdv, countUsers, countProducts) {
+    document.getElementById('modalNom').textContent = ent.nom;
+    document.getElementById('modalEmail').textContent = ent.email || '— Non renseigné —';
+    document.getElementById('modalTelephone').textContent = ent.telephone || '— Non renseigné —';
+    document.getElementById('modalNCC').textContent = ent.ncc || '— Non renseigné —';
+    document.getElementById('modalRCCM').textContent = ent.rccm || '— Non renseigné —';
+    document.getElementById('modalPlan').textContent = ent.plan_abonnement;
+    document.getElementById('modalQuota').textContent = ent.quota_points_de_vente + ' max';
+    
+    document.getElementById('modalCountPdv').textContent = countPdv;
+    document.getElementById('modalCountUsers').textContent = countUsers;
+    document.getElementById('modalCountProducts').textContent = countProducts;
+    
+    // Secteurs
+    const sectorsDiv = document.getElementById('modalSecteurs');
+    sectorsDiv.innerHTML = '';
+    const secteurs = Array.isArray(ent.secteur_activite) ? ent.secteur_activite : [ent.secteur_activite || 'Commercial'];
+    secteurs.forEach(s => {
+        const badge = document.createElement('span');
+        badge.className = s === 'Commercial' ? 'badge badge-info' : (s === 'Industriel' ? 'badge badge-purple' : 'badge badge-success');
+        badge.style.display = 'inline-block';
+        badge.style.marginBottom = '0';
+        badge.innerHTML = `<i class="fas ${s === 'Commercial' ? 'fa-tags' : (s === 'Industriel' ? 'fa-industry' : 'fa-person-digging')}"></i> ${s}`;
+        sectorsDiv.appendChild(badge);
+    });
+
+    // Modules
+    const modulesDiv = document.getElementById('modalModules');
+    modulesDiv.innerHTML = '';
+    const modules = ent.modules_actifs || [];
+    if(modules.length > 0) {
+        modules.forEach(m => {
+            const badge = document.createElement('span');
+            badge.style.cssText = "font-size: 10px; background: rgba(0,43,92,0.06); border: 1px solid rgba(0,43,92,0.12); color: var(--primary); padding: 4px 8px; border-radius: 4px; font-weight: 600; text-transform: uppercase;";
+            badge.textContent = m;
+            modulesDiv.appendChild(badge);
+        });
+    } else {
+        modulesDiv.innerHTML = '<span style="color: var(--text-3);">Aucun module activé</span>';
+    }
+    
+    // Dynamic placeholder for any future/unmapped variables
+    const futureDiv = document.getElementById('modalDetailsFuturs');
+    const extraFields = [];
+    Object.keys(ent).forEach(key => {
+        const standardKeys = ['id', 'nom', 'email', 'telephone', 'ncc', 'rccm', 'compte_contribuable', 'quota_points_de_vente', 'plan_abonnement', 'secteur_activite', 'modules_actifs', 'created_at', 'updated_at'];
+        if (!standardKeys.includes(key) && ent[key] !== null && ent[key] !== undefined) {
+            extraFields.push(`<strong>${key}</strong>: ${JSON.stringify(ent[key])}`);
+        }
+    });
+    if (extraFields.length > 0) {
+        futureDiv.style.display = 'flex';
+        document.getElementById('modalTxtFuturs').innerHTML = `<i class="fas fa-circle-info"></i> Informations additionnelles : ${extraFields.join(', ')}`;
+    } else {
+        futureDiv.style.display = 'none';
+    }
+
+    document.getElementById('modalDetailsEntreprise').style.display = 'flex';
+}
+
+function fermerModalDetails() {
+    document.getElementById('modalDetailsEntreprise').style.display = 'none';
+}
+
+// Close modal when clicking outside
+window.addEventListener('click', function(e) {
+    const modal = document.getElementById('modalDetailsEntreprise');
+    if (e.target === modal) {
+        fermerModalDetails();
+    }
+});
+</script>
+
+<style>
+@keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+@keyframes slideUp {
+    from { transform: translateY(20px); opacity: 0; }
+    to { transform: translateY(0); opacity: 1; }
+}
+</style>
+@endsection

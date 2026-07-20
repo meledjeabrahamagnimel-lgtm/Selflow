@@ -5,6 +5,7 @@ namespace App\Modules\Admin\Modeles;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 
 class Vente extends Model
 {
@@ -15,6 +16,7 @@ class Vente extends Model
         'utilisateur_id',
         'client_id',
         'numero_facture',
+        'numero_fne',
         'date_vente',
         'mode_paiement',
         'moyen_bancaire',
@@ -27,7 +29,12 @@ class Vente extends Model
         'type_facture',
         'normalise',
         'qr_code_data',
+        'signature_dgi',
         'etape',
+        'archived',
+        'bon_livraison_id',
+        'parent_id',
+        'raison_avoir',
     ];
 
     protected static function booted()
@@ -50,6 +57,7 @@ class Vente extends Model
             'montant_ttc'   => 'decimal:2',
             'remise'        => 'decimal:2',
             'normalise'     => 'boolean',
+            'archived'      => 'boolean',
         ];
     }
 
@@ -61,6 +69,11 @@ class Vente extends Model
     public function client(): BelongsTo
     {
         return $this->belongsTo(Client::class, 'client_id');
+    }
+
+    public function utilisateur(): BelongsTo
+    {
+        return $this->belongsTo(\App\Modules\Authentification\Modeles\Utilisateur::class, 'utilisateur_id');
     }
 
     protected $appends = ['montant_paye'];
@@ -79,5 +92,31 @@ class Vente extends Model
     public function getMontantPayeAttribute()
     {
         return $this->paiements()->sum('montant_entree');
+    }
+
+    /**
+     * Si ce BC a généré un Bon de Livraison
+     */
+    public function bonLivraison(): HasOne
+    {
+        return $this->hasOne(BonLivraison::class, 'vente_id');
+    }
+
+    /**
+     * Le BL dont cette Facture est issue (via bon_livraison_id)
+     */
+    public function bonLivraisonSource(): BelongsTo
+    {
+        return $this->belongsTo(BonLivraison::class, 'bon_livraison_id');
+    }
+
+    public function parent(): BelongsTo
+    {
+        return $this->belongsTo(Vente::class, 'parent_id');
+    }
+
+    public function avoirs(): HasMany
+    {
+        return $this->hasMany(Vente::class, 'parent_id');
     }
 }

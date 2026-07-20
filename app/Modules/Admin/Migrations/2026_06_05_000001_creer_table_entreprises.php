@@ -21,6 +21,8 @@ return new class extends Migration
             $table->string('compte_contribuable')->nullable();
             $table->integer('quota_points_de_vente')->default(5)->index();
             $table->string('plan_abonnement')->default('Starter')->index();
+            $table->json('secteur_activite')->nullable();
+            $table->json('modules_actifs')->nullable();
             $table->timestamps();
         });
     }

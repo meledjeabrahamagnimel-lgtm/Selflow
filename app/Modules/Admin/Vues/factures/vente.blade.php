@@ -1,6 +1,6 @@
 @extends('admin::gabarits.application')
-@section('titre', 'Facture ' . $vente->numero_facture)
-@section('topbar_titre', 'Vente — Facture')
+@section('titre', isset($bl) ? 'Bon de Livraison ' . $bl->numero_bl : ($vente->type_facture === 'avoir' ? 'Facture d\'avoir ' . $vente->numero_facture : 'Facture ' . $vente->numero_facture))
+@section('topbar_titre', isset($bl) ? 'Ventes — Bons de Livraison' : ($vente->type_facture === 'avoir' ? 'Vente — Facture d\'avoir' : 'Vente — Facture'))
 
 @section('styles')
 <style>
@@ -160,10 +160,12 @@
 <div class="no-print controls-card">
     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
         @php
-            $routeRetour = request()->routeIs('caissier.*') ? route('caissier.ventes.factures') : route('admin.ventes.factures');
+            $routeRetour = isset($bl)
+                ? (request()->routeIs('caissier.*') ? route('caissier.ventes.factures', ['etape' => 'Bon de livraison']) : route('admin.ventes.factures', ['etape' => 'Bon de livraison']))
+                : (request()->routeIs('caissier.*') ? route('caissier.ventes.factures') : route('admin.ventes.factures'));
         @endphp
         <a href="{{ $routeRetour }}" class="print-btn">
-            <i class="fas fa-arrow-left"></i> Retour aux factures
+            <i class="fas fa-arrow-left"></i> {{ isset($bl) ? 'Retour aux bons de livraison' : 'Retour aux factures' }}
         </a>
         <div style="font-weight: 700; font-size: 14px; text-transform: uppercase; letter-spacing: 0.5px;">Options du document</div>
     </div>
@@ -177,27 +179,47 @@
 
     <div style="display: flex; justify-content: space-between; align-items: center; border-top: 0.5px solid var(--border); padding-top: 15px; flex-wrap: wrap; gap: 10px;">
         <div style="display: flex; gap: 8px; align-items: center;">
+            @if($vente->etape === 'Bon de commande' && !isset($bl))
             <button class="tab" id="delivery-toggle-btn" onclick="toggleDeliveryMode()" style="border-color: var(--primary); color: var(--primary);">
                 <i class="fas fa-truck-delivery"></i> Passer en Bon de livraison
             </button>
+            @endif
         </div>
         
         <div style="display: flex; gap: 8px; align-items: center;">
+            @if(isset($bl))
+                @if(!in_array($bl->statut, ['livre', 'facture']))
+                <button type="button" class="print-btn" style="background:#0369a1; color:#fff; border-color:#0369a1; font-weight:700;" onclick="executerAction('{{ request()->routeIs('caissier.*') ? route('caissier.ventes.livraison.livrer', $bl->id) : route('admin.ventes.livraison.livrer', $bl->id) }}', true)">
+                    <i class="fas fa-check"></i> Marquer Livré
+                </button>
+                @endif
+                @if($bl->statut !== 'facture')
+                <button type="button" class="print-btn" style="background:#047857; color:#fff; border-color:#047857; font-weight:700;" onclick="document.getElementById('modal-facturer').style.display='flex'">
+                    <i class="fas fa-file-invoice-dollar"></i> → Facturer
+                </button>
+                @endif
+            @endif
+
+
+            @if($vente->etape === 'Facture' && !isset($bl))
+                <button type="button" class="print-btn" style="border-color:#cbd5e1; color:#94a3b8; background:#f1f5f9; cursor:not-allowed;" onclick="alert('En attente de la FNE')">
+                    <i class="fas fa-print"></i> Imprimer Ticket RNE
+                </button>
+            @endif
             <button class="print-btn main" onclick="telechargerPdf()">
                 <i class="fas fa-download"></i> Télécharger PDF
             </button>
-            <button class="print-btn" onclick="window.print()">
-                <i class="fas fa-print"></i> Imprimer
-            </button>
             
-            @if($vente->etape === 'Devis')
-                <button class="print-btn" style="background:var(--warning); color:#fff; border-color:var(--warning);" onclick="executerAction('{{ route('admin.ventes.confirmer', $vente->id) }}')">
-                    <i class="fas fa-check-circle"></i> Confirmer la commande
-                </button>
-            @elseif($vente->etape === 'Bon de commande')
-                <button class="print-btn" style="background:#10b981; color:#fff; border-color:#10b981;" onclick="executerAction('{{ route('admin.ventes.facturer', $vente->id) }}')">
-                    <i class="fas fa-file-invoice-dollar"></i> Valider & Facturer
-                </button>
+            @if(!isset($bl))
+                @if($vente->etape === 'Devis')
+                    <button class="print-btn" style="background:var(--warning); color:#fff; border-color:var(--warning);" onclick="executerAction('{{ route('admin.ventes.confirmer', $vente->id) }}')">
+                        <i class="fas fa-check-circle"></i> Confirmer la commande
+                    </button>
+                @elseif($vente->etape === 'Bon de commande')
+                    <button class="print-btn" style="background:#10b981; color:#fff; border-color:#10b981;" onclick="executerAction('{{ route('admin.ventes.facturer', $vente->id) }}')">
+                        <i class="fas fa-file-invoice-dollar"></i> Valider & Facturer
+                    </button>
+                @endif
             @endif
         </div>
     </div>
@@ -210,6 +232,173 @@
 <div class="invoice-container">
     <div id="invoice-wrap"></div>
 </div>
+
+{{-- Modal de confirmation de l'avoir --}}
+<div class="modal-overlay" id="modalAvoir" style="display:none; position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(0,0,0,0.5); z-index:9999; align-items:center; justify-content:center;">
+    <div class="modal" style="background:#fff; border-radius:12px; max-width:480px; width:100%; box-shadow:0 10px 30px rgba(0,0,0,0.15); overflow:hidden;">
+        <div class="modal-header" style="padding:16px 20px; border-bottom:1px solid var(--border); display:flex; justify-content:space-between; align-items:center;">
+            <h3 style="font-size:16px; font-weight:700; color:var(--text-1); margin:0;"><i class="fas fa-rotate-left" style="color:var(--danger)"></i> Générer une facture d'avoir</h3>
+            <button type="button" class="modal-close" onclick="fermerModalAvoir()" style="background:none; border:none; font-size:24px; cursor:pointer; color:var(--text-3);">&times;</button>
+        </div>
+        <form method="POST" action="{{ route(request()->routeIs('caissier.*') ? 'caissier.ventes.avoir' : 'admin.ventes.avoir', $vente) }}" style="margin:0; padding:20px;">
+            @csrf
+            <div style="font-size:13px; color:var(--text-2); margin-bottom:14px; line-height:1.5;">
+                Cette action va générer une facture d'avoir pour un montant total de <strong>{{ number_format($vente->montant_ttc, 0, ',', ' ') }} FCFA</strong>. Les stocks des articles stockables associés seront ré-incrémentés en stock.
+            </div>
+
+            <div class="form-group" style="margin-bottom:14px;">
+                <label class="form-label">Motif ou Raison de l'avoir <span style="color:var(--danger)">*</span></label>
+                <input type="text" name="raison" class="form-control" required placeholder="Ex: Retour d'article défectueux, erreur de facturation..." maxlength="255">
+            </div>
+
+            <div style="border-top:1px solid var(--border); padding-top:14px; margin-top:14px; display:flex; justify-content:flex-end; gap:10px;">
+                <button type="button" class="btn btn-outline" onclick="fermerModalAvoir()">Annuler</button>
+                <button type="submit" class="btn btn-danger"><i class="fas fa-check-circle"></i> Confirmer & Créer l'avoir</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+@if(isset($bl))
+    {{-- Modal choix facturation & règlement --}}
+    <div id="modal-facturer"
+        style="display:none; position:fixed; inset:0; background:rgba(0,0,0,.5); z-index:9999; align-items:center; justify-content:center; overflow-y:auto; padding:20px;">
+        <div
+            style="background:#fff; border-radius:14px; max-width:480px; width:100%; padding:28px; box-shadow:0 20px 60px rgba(0,0,0,.2); margin:auto;">
+            <h3 style="font-size:18px; font-weight:800; margin-bottom:12px; display:flex; align-items:center; gap:8px;">
+                <i class="fas fa-file-invoice-dollar" style="color:#047857;"></i> Valider & Facturer
+            </h3>
+            <p style="font-size:13px; color:#6b7280; margin-bottom:20px;">Veuillez configurer les options de facturation
+                et de règlement :</p>
+
+            <form method="POST"
+                action="{{ request()->routeIs('caissier.*') ? route('caissier.ventes.livraison.facturer', $bl) : route('admin.ventes.livraison.facturer', $bl) }}"
+                id="form-convert-bl-facture" style="margin:0;">
+                @csrf
+
+                {{-- 1. Base de facturation --}}
+                <div style="margin-bottom:18px;">
+                    <label
+                        style="font-weight:700; font-size:12px; text-transform:uppercase; color:#475569; display:block; margin-bottom:6px;">Base
+                        de facturation</label>
+                    <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px;">
+                        <label
+                            style="border:1px solid #e2e5ec; border-radius:8px; padding:10px; cursor:pointer; display:flex; gap:8px; align-items:center;"
+                            id="label-livree">
+                            <input type="radio" name="base_facturation" id="r-livree" value="livree" checked
+                                onchange="majBaseFacturation()">
+                            <span style="font-size:12.5px; font-weight:600;">Qtés livrées (BL)</span>
+                        </label>
+                        <label
+                            style="border:1px solid #e2e5ec; border-radius:8px; padding:10px; cursor:pointer; display:flex; gap:8px; align-items:center;"
+                            id="label-commandee">
+                            <input type="radio" name="base_facturation" id="r-commandee" value="commandee"
+                                onchange="majBaseFacturation()">
+                            <span style="font-size:12.5px; font-weight:600;">Qtés BC d'origine</span>
+                        </label>
+                    </div>
+                </div>
+
+                {{-- 2. Mode de paiement --}}
+                <div style="margin-bottom:18px;">
+                    <label
+                        style="font-weight:700; font-size:12px; text-transform:uppercase; color:#475569; display:block; margin-bottom:6px;">Mode
+                        de paiement <span style="color:#dc2626">*</span></label>
+                    <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:8px;">
+                        <label
+                            style="border:1px solid #047857; background:#f0fdf4; border-radius:8px; padding:10px; cursor:pointer; text-align:center;"
+                            id="label-mode-caisse">
+                            <input type="radio" name="mode_paiement" value="Caisse" checked style="display:none;"
+                                onchange="selectionnerMode('Caisse')">
+                            <span style="font-size:12.5px; font-weight:700; color:#166534;">Caisse</span>
+                        </label>
+                        <label
+                            style="border:1px solid #e2e5ec; border-radius:8px; padding:10px; cursor:pointer; text-align:center;"
+                            id="label-mode-banque">
+                            <input type="radio" name="mode_paiement" value="Banque" style="display:none;"
+                                onchange="selectionnerMode('Banque')">
+                            <span style="font-size:12.5px; font-weight:700; color:#475569;">Banque</span>
+                        </label>
+                        <label
+                            style="border:1px solid #e2e5ec; border-radius:8px; padding:10px; cursor:pointer; text-align:center;"
+                            id="label-mode-credit">
+                            <input type="radio" name="mode_paiement" value="Crédit" style="display:none;"
+                                onchange="selectionnerMode('Crédit')">
+                            <span style="font-size:12.5px; font-weight:700; color:#475569;">Crédit</span>
+                        </label>
+                    </div>
+                </div>
+
+                {{-- Bloc Banque (caché par défaut) --}}
+                <div id="selection-banque-bl"
+                    style="display:none; background:#f8fafc; border:1px solid #e2e5ec; border-radius:10px; padding:16px; margin-bottom:18px;">
+                    <div style="margin-bottom:12px;">
+                        <label style="font-weight:600; font-size:12px; display:block; margin-bottom:4px;">Sélectionner
+                            la banque *</label>
+                        <select name="banque_id" id="bl-banque-select"
+                            style="width:100%; padding:8px; border:1px solid #cbd5e1; border-radius:6px; background:#fff;">
+                            <option value="">— Choisir la banque —</option>
+                            @foreach($banques as $b)
+                                <option value="{{ $b->id }}">{{ $b->intitule }} ({{ $b->code }})</option>
+                            @endforeach
+                        </select>
+                    </div>
+                    <div style="margin-bottom:12px;">
+                        <label style="font-weight:600; font-size:12px; display:block; margin-bottom:4px;">Moyen de
+                            paiement bancaire *</label>
+                        <select name="moyen_bancaire" id="bl-moyen-select"
+                            style="width:100%; padding:8px; border:1px solid #cbd5e1; border-radius:6px; background:#fff;">
+                            <option value="">— Choisir le moyen —</option>
+                            <option value="carte">Carte bancaire</option>
+                            <option value="virement">Virement</option>
+                            <option value="cheque">Chèque</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label style="font-weight:600; font-size:12px; display:block; margin-bottom:4px;">Référence
+                            *</label>
+                        <input type="text" name="reference_paiement" id="bl-ref-input" placeholder="Numéro..."
+                            style="width:100%; padding:8px; border:1px solid #cbd5e1; border-radius:6px;">
+                    </div>
+                </div>
+
+                {{-- 3. Montant payé --}}
+                <div style="margin-bottom:18px;" id="bloc-montant-paye">
+                    <label
+                        style="font-weight:700; font-size:12px; text-transform:uppercase; color:#475569; display:block; margin-bottom:6px;"
+                        id="label-montant-paye">Montant reçu / réglé *</label>
+                    <input type="number" name="montant_paye" id="bl-montant-input"
+                        value="{{ round($bl->bonDeCommande->montant_ttc) }}"
+                        style="width:100%; padding:10px 14px; border:1px solid #cbd5e1; border-radius:8px; font-size:14px; font-weight:700;">
+                </div>
+
+                {{-- 4. Case à cocher Livraison Immédiate --}}
+                @if($bl->statut !== 'livre')
+                    <div
+                        style="margin-bottom:20px; background:#f0fdf4; border:1px solid #bbf7d0; border-radius:10px; padding:12px 14px;">
+                        <label
+                            style="display:flex; align-items:center; gap:8px; cursor:pointer; font-weight:600; font-size:13px; color:#166534;">
+                            <input type="checkbox" name="livraison_immediate" value="1" checked
+                                style="width:16px; height:16px; cursor:pointer;">
+                            Marquer la livraison comme immédiate et finale ?
+                        </label>
+                    </div>
+                @endif
+
+                <div style="display:flex; gap:10px; justify-content:flex-end;">
+                    <button type="button" onclick="document.getElementById('modal-facturer').style.display='none'"
+                        style="padding:9px 18px; border-radius:8px; border:1px solid #cbd5e1; background:#fff; font-weight:600; cursor:pointer;">
+                        Annuler
+                    </button>
+                    <button type="submit"
+                        style="padding:9px 18px; border-radius:8px; background:#047857; color:#fff; border:none; font-weight:700; cursor:pointer;">
+                        <i class="fas fa-check"></i> Créer la Facture
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+@endif
 @endsection
 
 @section('scripts')
@@ -219,7 +408,7 @@
 
 <script>
 var curModel = 1;
-var isDeliveryMode = false;
+var isDeliveryMode = {{ isset($bl) ? 'true' : 'false' }};
 
 @php
     $entreprise = $vente->pointDeVente->entreprise;
@@ -233,7 +422,13 @@ var DATA = {
         etape: {!! json_encode($vente->etape) !!},
         remise: {{ $vente->remise ?? 0 }},
         normalise: {{ $vente->normalise ? 'true' : 'false' }},
+        type_facture: {!! json_encode($vente->type_facture) !!},
+        parent_ref: {!! json_encode($vente->parent ? $vente->parent->numero_facture : null) !!},
+        parent_fne: {!! json_encode($vente->parent ? $vente->parent->numero_fne : null) !!},
+        raison_avoir: {!! json_encode($vente->raison_avoir) !!},
         qr_code_data: {!! json_encode($vente->qr_code_data) !!},
+        numero_fne: {!! json_encode($vente->numero_fne) !!},
+        signature_dgi: {!! json_encode($vente->signature_dgi) !!},
         moyen_bancaire: {!! json_encode($vente->moyen_bancaire) !!},
         reference_paiement: {!! json_encode($vente->reference_paiement) !!},
         client: {
@@ -249,7 +444,7 @@ var DATA = {
             {
                 ref: {!! json_encode($detail->produit?->reference ?? 'REF-VIR-' . str_pad($detail->id, 3, '0', STR_PAD_LEFT)) !!},
                 desc: {!! json_encode($detail->libelle_virtuel ?? ($detail->produit?->nom ?? 'Article')) !!},
-                qty: {{ $detail->quantite }},
+                qty: {{ isset($bl) ? ($bl->details->firstWhere('produit_id', $detail->produit_id)?->qte_livree ?? 0) : $detail->quantite }},
                 unite: {!! json_encode($detail->unite ?? 'Unité') !!},
                 pu: {{ $detail->prix_unitaire }},
                 tva: {{ $detail->produit ? $detail->produit->taux_tva : ($detail->montant_tva > 0 ? 18 : 0) }}
@@ -258,7 +453,9 @@ var DATA = {
         ],
         mode: {!! json_encode($vente->mode_paiement) !!},
         statut: {!! json_encode($vente->statut) !!},
-        deja_paye: {{ $dejaPaye ?? 0 }}
+        deja_paye: {{ $vente->type_facture === 'avoir' ? $vente->montant_ttc : ($dejaPaye ?? 0) }},
+        ref_bl: {!! json_encode(isset($bl) ? $bl->numero_bl : ($vente->etape === 'Bon de commande' ? ($vente->bonLivraison?->numero_bl ?? '') : ($vente->bonLivraisonSource?->numero_bl ?? ''))) !!},
+        ref_bc: {!! json_encode(isset($bl) ? $bl->bonDeCommande->numero_facture : ($vente->etape === 'Bon de commande' ? $vente->numero_facture : (optional($vente->bonLivraisonSource?->bonDeCommande)->numero_facture ?? ''))) !!}
     }
 };
 
@@ -315,8 +512,8 @@ function calcItems(items, remiseGlobal) {
     return { rows, tot_ht, tot_ht_net, tot_tva, tot_ttc, remiseGlobal };
 }
 
-function executerAction(url) {
-    if (confirm("Confirmer cette action ?")) {
+function executerAction(url, sansConfirmation = false) {
+    if (sansConfirmation || confirm("Confirmer cette action ?")) {
         var form = document.getElementById('action-form');
         form.action = url;
         form.submit();
@@ -384,8 +581,19 @@ function fiscalLinesClient(c, sep) {
     return lines.join(sep || '<br>');
 }
 
+function getAvoirBlock(d) {
+    if (d.type_facture !== 'avoir') return '';
+    return `
+    <div style="background:#fff7ed; border:1px solid #ffedd5; border-left:4px solid #ea580c; border-radius:8px; padding:10px 14px; margin-bottom:14px; font-size:11px; line-height:1.4; color:#c2410c; text-align:left;">
+        <i class="fas fa-circle-info" style="margin-right:4px;"></i> Facture d'avoir émise en référence à la facture d'origine <strong>${d.parent_ref}</strong>${d.parent_fne ? ` (N° Fiscal DGI: ${d.parent_fne})` : ''}.<br>
+        <strong>Motif :</strong> ${d.raison_avoir}
+    </div>
+    `;
+}
+
 function getDocTitle(d) {
     if (isDeliveryMode) return "BON DE LIVRAISON";
+    if (d.type_facture === 'avoir') return "FACTURE D'AVOIR";
     if (d.etape === 'Devis') return "DEVIS ESTIMATIF";
     if (d.etape === 'Bon de commande') return "BON DE COMMANDE";
     return d.normalise ? "FACTURE NORMALISÉE" : "FACTURE";
@@ -393,6 +601,7 @@ function getDocTitle(d) {
 
 function getBadgeText(d) {
     if (isDeliveryMode) return "LIVRAISON";
+    if (d.type_facture === 'avoir') return "AVOIR";
     if (d.etape === 'Devis') return "DEVIS";
     if (d.etape === 'Bon de commande') return "COMMANDE";
     return "VENTE";
@@ -441,7 +650,7 @@ function model1(d) {
             <div style="text-align:right;flex-shrink:0;">
                 <div style="display:inline-block;padding:4px 12px;border-radius:20px;font-size:11px;font-weight:600;background:${theme.bg};color:${theme.tx};margin-bottom:6px">${badge}</div>
                 <div style="font-size:22px;font-weight:800;color:var(--tx)">${title}</div>
-                <div style="font-size:13px;color:var(--mu);margin-top:2px;font-weight:600;">${d.num}</div>
+                <div style="font-size:13px;color:var(--mu);margin-top:2px;font-weight:600;">N° ${isDeliveryMode ? (d.ref_bl || 'BL-EN-COURS') : d.num}</div>
             </div>
         </div>
         <div style="height:0.5px;background:var(--border);margin-bottom:18px;"></div>
@@ -455,6 +664,7 @@ function model1(d) {
                 <div style="font-size:10px;font-weight:700;color:${theme.color};text-transform:uppercase;letter-spacing:.07em;margin-bottom:8px">Informations</div>
                 ${[
                     ["Date d'émission", d.date],
+                    ["N° Bon de commande", isDeliveryMode ? d.ref_bc : null],
                     ["Mode de paiement", isDeliveryMode ? null : getFormattedMode(d)],
                     ["Vendeur", COMPANY.vendeur],
                     ["Point de vente", COMPANY.pdv]
@@ -468,6 +678,7 @@ function model1(d) {
             </div>
         </div>
         
+        ${getAvoirBlock(d)}
         <table style="width:100%;border-collapse:collapse;font-size:12px;margin-bottom:16px">
             <thead>
                 <tr style="background:${theme.color};color:#fff;">
@@ -509,8 +720,15 @@ function model1(d) {
         <div style="display:flex;justify-content:space-between;margin-bottom:20px;align-items:flex-start;">
             <div style="flex:1;">
                 ${d.normalise && d.qr_code_data ? `
-                <div style="display:inline-block;padding:5px;border:1px solid #e2e5ec;background:#fff;margin-top:10px;">
-                    <div id="qrcode"></div>
+                <div style="display:flex;gap:12px;align-items:center;margin-top:10px;">
+                    <div style="display:inline-block;padding:5px;border:1px solid #e2e5ec;background:#fff;">
+                        <div id="qrcode"></div>
+                    </div>
+                    <div style="font-size:9.5px;color:var(--mu);line-height:1.4;">
+                        <strong>FNE N° :</strong> ${d.numero_fne || '—'}<br>
+                        <strong>Signature DGI :</strong><br>
+                        <span style="font-family:monospace;word-break:break-all;">${(d.signature_dgi || '').substring(0, 16)}...</span>
+                    </div>
                 </div>` : ''}
             </div>
             <div style="width:240px">
@@ -519,8 +737,10 @@ function model1(d) {
                 <div style="display:flex;justify-content:space-between;padding:6px 0;font-size:12px;border-bottom:0.5px solid var(--border)"><span style="color:var(--mu)">Total Net HT</span><span>${fmtFcfa(c.tot_ht_net)}</span></div>
                 <div style="display:flex;justify-content:space-between;padding:6px 0;font-size:12px;border-bottom:0.5px solid var(--border)"><span style="color:var(--mu)">TVA (18%)</span><span>${fmtFcfa(c.tot_tva)}</span></div>
                 <div style="display:flex;justify-content:space-between;padding:10px 0 6px;font-size:15px;font-weight:800;color:var(--tx);border-top:1.5px solid ${theme.color};"><span>TOTAL TTC</span><span>${fmtFcfa(c.tot_ttc)}</span></div>
+                ${d.etape === 'Facture' ? `
                 <div style="display:flex;justify-content:space-between;padding:6px 0;font-size:12px;border-bottom:0.5px solid var(--border)"><span style="color:var(--mu)">Montant Réglé</span><span>${fmtFcfa(d.deja_paye)}</span></div>
                 <div style="display:flex;justify-content:space-between;padding:6px 0;font-size:12px;color:${d.deja_paye < c.tot_ttc ? '#dc2626' : '#059669'};font-weight:700;"><span style="text-transform:uppercase;">Reste à payer</span><span>${fmtFcfa(Math.max(0, c.tot_ttc - d.deja_paye))}</span></div>
+                ` : ''}
             </div>
         </div>
         ${COMPANY.ref_bancaire ? `<div style="margin-bottom:14px;padding:10px 14px;background:var(--white);border-radius:7px;border:0.5px solid var(--border);font-size:11px;color:var(--mu);line-height:1.7;"><span style="font-weight:600;color:var(--tx)">Références bancaires : </span>${COMPANY.ref_bancaire}</div>` : ''}
@@ -560,8 +780,13 @@ function model2(d) {
             </div>
             ${!isDeliveryMode && d.normalise && d.qr_code_data ? `
             <div style="margin-top:16px;padding-top:12px;border-top:1px solid rgba(255,255,255,.2);text-align:center;">
-                <div style="display:inline-block;padding:5px;background:#fff;border-radius:4px;">
+                <div style="display:inline-block;padding:5px;background:#fff;border-radius:4px;margin-bottom:8px;">
                     <div id="qrcode"></div>
+                </div>
+                <div style="font-size:9px;color:rgba(255,255,255,.75);line-height:1.3;text-align:left;">
+                    <strong>FNE N° :</strong><br>${d.numero_fne || '—'}<br>
+                    <strong>Signature DGI :</strong><br>
+                    <span style="font-family:monospace;word-break:break-all;">${(d.signature_dgi || '').substring(0, 12)}...</span>
                 </div>
             </div>` : ''}
             <div style="margin-top:auto;padding-top:16px;border-top:1px solid rgba(255,255,255,.15)">
@@ -573,7 +798,7 @@ function model2(d) {
             <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:20px">
                 <div>
                     <div style="font-size:22px;font-weight:800;color:var(--tx)">${title}</div>
-                    <div style="font-size:12px;color:var(--mu);margin-top:2px;font-weight:600;">${d.num}</div>
+                    <div style="font-size:12px;color:var(--mu);margin-top:2px;font-weight:600;">N° ${isDeliveryMode ? (d.ref_bl || 'BL-EN-COURS') : d.num}</div>
                 </div>
                 <div style="padding:5px 14px;border-radius:20px;font-size:11px;font-weight:600;background:${theme.bg};color:${theme.tx}">${badge}</div>
             </div>
@@ -588,7 +813,14 @@ function model2(d) {
                     <div style="font-size:11px"><span style="color:var(--mu)">Statut : </span><span style="font-weight:700;color:${sColor}">${d.statut}</span></div>
                     `}
                 </div>
+                ${d.ref_bl || d.ref_bc ? `
+                <div style="margin-top:8px;padding-top:8px;border-top:0.5px solid var(--border);font-size:10.5px;color:var(--mu);line-height:1.8;">
+                    ${d.ref_bc ? `<span style="font-weight:600;">Réf. commande : </span>${d.ref_bc}` : ''}
+                    ${d.ref_bc && d.ref_bl ? ' &nbsp;·&nbsp; ' : ''}
+                    ${d.ref_bl ? `<span style="font-weight:600;">Livré selon BL : </span>${d.ref_bl}` : ''}
+                </div>` : ''}
             </div>
+            ${getAvoirBlock(d)}
             <table style="width:100%;border-collapse:collapse;font-size:12px;margin-bottom:14px">
                 <thead>
                     <tr style="border-bottom:1.5px solid ${theme.color}">
@@ -634,8 +866,10 @@ function model2(d) {
                     <div style="display:flex;justify-content:space-between;font-size:11px;padding:4px 0"><span style="color:var(--mu)">Net HT</span><span>${fmtFcfa(c.tot_ht_net)}</span></div>
                     <div style="display:flex;justify-content:space-between;font-size:11px;padding:4px 0"><span style="color:var(--mu)">TVA 18%</span><span>${fmtFcfa(c.tot_tva)}</span></div>
                     <div style="display:flex;justify-content:space-between;font-size:13px;font-weight:800;padding:6px 0 0;border-top:0.5px solid var(--border);margin-top:4px"><span style="color:var(--tx)">Total TTC</span><span style="color:${theme.color}">${fmtFcfa(c.tot_ttc)}</span></div>
+                    ${d.etape === 'Facture' ? `
                     <div style="display:flex;justify-content:space-between;font-size:11px;padding:4px 0;border-top:0.5px solid var(--border);margin-top:4px"><span style="color:var(--mu)">Montant Réglé</span><span>${fmtFcfa(d.deja_paye)}</span></div>
                     <div style="display:flex;justify-content:space-between;font-size:11px;padding:4px 0;font-weight:700;color:${d.deja_paye < c.tot_ttc ? '#dc2626' : '#059669'}"><span>Reste à payer</span><span>${fmtFcfa(Math.max(0, c.tot_ttc - d.deja_paye))}</span></div>
+                    ` : ''}
                 </div>
             </div>
             ${COMPANY.ref_bancaire ? `<div style="font-size:10.5px;color:var(--mu);line-height:1.7;margin-bottom:10px;"><strong>Réf. bancaires : </strong>${COMPANY.ref_bancaire}</div>` : ''}
@@ -670,7 +904,7 @@ function model3(d) {
             </div>
             <div style="text-align:right">
                 <div style="font-size:24px;font-weight:800;color:var(--tx);letter-spacing:-0.5px;">${title}</div>
-                <div style="font-size:12px;margin-top:2px"><span style="color:var(--mu)">N° </span><span style="font-weight:700;color:${theme.color}">${d.num}</span></div>
+                <div style="font-size:12px;margin-top:2px"><span style="color:var(--mu)">N° </span><span style="font-weight:700;color:${theme.color}">${isDeliveryMode ? (d.ref_bl || 'BL-EN-COURS') : d.num}</span></div>
                 <div style="display:inline-block;padding:3px 10px;border-radius:4px;font-size:11px;font-weight:600;background:${theme.bg};color:${theme.tx};margin-top:6px">${badge}</div>
             </div>
         </div>
@@ -690,6 +924,8 @@ function model3(d) {
                     ${isDeliveryMode ? '' : `<span style="color:var(--mu)">Paiement : </span><span style="color:var(--tx);font-weight:600;">${getFormattedMode(d)}</span><br>`}
                     <span style="color:var(--mu)">Vendeur : </span><span style="color:var(--tx);font-weight:600;">${COMPANY.vendeur || '—'}</span><br>
                     ${isDeliveryMode ? '' : `<span style="color:var(--mu)">Statut : </span><span style="font-weight:700;color:${sColor}">${d.statut}</span>`}
+                    ${d.ref_bc ? `<br><span style="color:var(--mu)">Réf. commande : </span><span style="color:var(--tx);font-weight:600;">${d.ref_bc}</span>` : ''}
+                    ${d.ref_bl ? `<br><span style="color:var(--mu)">Livré selon BL : </span><span style="color:var(--tx);font-weight:600;">${d.ref_bl}</span>` : ''}
                 </div>
             </div>
         </div>
@@ -704,6 +940,7 @@ function model3(d) {
             </div>
         </div>
 
+        ${getAvoirBlock(d)}
         <table style="width:100%;border-collapse:collapse;font-size:12px;margin-bottom:16px;table-layout:fixed">
             <thead>
                 <tr>
@@ -748,7 +985,17 @@ function model3(d) {
                 ${COMPANY.adresse ? COMPANY.adresse + '<br>' : ''}
                 ${COMPANY.tel ? 'Tél : ' + COMPANY.tel : ''}${COMPANY.email ? ' · ' + COMPANY.email : ''}<br>
                 ${COMPANY.ref_bancaire ? '<strong>Réf. bancaires : </strong>' + COMPANY.ref_bancaire : ''}
-                ${d.normalise && d.qr_code_data ? `<div style="margin-top:10px;"><div id="qrcode"></div></div>` : ''}
+                ${d.normalise && d.qr_code_data ? `
+                <div style="display:flex;gap:12px;align-items:center;margin-top:10px;">
+                    <div style="display:inline-block;padding:5px;border:1px solid #e2e5ec;background:#fff;">
+                        <div id="qrcode"></div>
+                    </div>
+                    <div style="font-size:9.5px;color:var(--mu);line-height:1.4;">
+                        <strong>FNE N° :</strong> ${d.numero_fne || '—'}<br>
+                        <strong>Signature DGI :</strong><br>
+                        <span style="font-family:monospace;word-break:break-all;">${(d.signature_dgi || '').substring(0, 16)}...</span>
+                    </div>
+                </div>` : ''}
             </div>
             <div style="width:235px">
                 <div style="display:flex;justify-content:space-between;padding:4px 0;font-size:12px;border-bottom:0.5px solid var(--border)"><span style="color:var(--mu)">Sous-total Brut HT</span><span>${fmtFcfa(c.tot_ht)}</span></div>
@@ -759,8 +1006,10 @@ function model3(d) {
                     <span style="font-size:13px;font-weight:700;color:#fff">Total TTC</span>
                     <span style="font-size:15px;font-weight:800;color:#fff">${fmtFcfa(c.tot_ttc)}</span>
                 </div>
+                ${d.etape === 'Facture' ? `
                 <div style="display:flex;justify-content:space-between;padding:6px 8px;font-size:12px;border-bottom:0.5px solid var(--border)"><span style="color:var(--mu)">Montant Réglé</span><span style="font-weight:600;">${fmtFcfa(d.deja_paye)}</span></div>
                 <div style="display:flex;justify-content:space-between;padding:6px 8px;font-size:12px;color:${d.deja_paye < c.tot_ttc ? '#dc2626' : '#059669'};font-weight:700;"><span>Reste à payer</span><span>${fmtFcfa(Math.max(0, c.tot_ttc - d.deja_paye))}</span></div>
+                ` : ''}
             </div>
         </div>
         <div style="border-top:0.5px solid var(--border);padding-top:12px;display:flex;justify-content:space-between;align-items:center">
@@ -834,6 +1083,7 @@ function modelStandard(d) {
                 <td colspan="7" style="padding:6px 10px; border:1px solid #000; text-align:right; font-weight:700; text-transform:uppercase;">AUTRES TAXES</td>
                 <td style="padding:6px 10px; border:1px solid #000; text-align:right; font-weight:700; white-space:nowrap;">0 F</td>
             </tr>
+            ${d.etape === 'Facture' ? `
             <tr style="background:#fff; color:#000;">
                 <td colspan="7" style="padding:6px 10px; border:1px solid #000; text-align:right; font-weight:900; text-transform:uppercase;">TOTAL A PAYER</td>
                 <td style="padding:6px 10px; border:1px solid #000; text-align:right; font-weight:900; white-space:nowrap;">${fmt(c.tot_ttc)}</td>
@@ -846,6 +1096,7 @@ function modelStandard(d) {
                 <td colspan="7" style="padding:6px 10px; border:1px solid #000; text-align:right; font-weight:900; text-transform:uppercase; color:${d.deja_paye < c.tot_ttc ? '#dc2626' : '#000'};">RESTE A PAYER</td>
                 <td style="padding:6px 10px; border:1px solid #000; text-align:right; font-weight:900; color:${d.deja_paye < c.tot_ttc ? '#dc2626' : '#000'}; white-space:nowrap;">${fmt(Math.max(0, c.tot_ttc - d.deja_paye))}</td>
             </tr>
+            ` : ''}
         `;
     }
 
@@ -876,7 +1127,7 @@ function modelStandard(d) {
                     Nom du vendeur : <strong>${COMPANY.vendeur || '—'}</strong><br>
                     Nom de PDV : <strong>${COMPANY.pdv}</strong><br>
                     Date et heure : <strong>${d.date}</strong><br>
-                    ${isDeliveryMode ? '' : `Mode de paiement : <strong>${getFormattedMode(d)}</strong>`}
+                    ${isDeliveryMode ? `N° Commande : <strong>${d.ref_bc}</strong>` : `Mode de paiement : <strong>${getFormattedMode(d)}</strong>`}
                 </div>
             </div>
             
@@ -888,7 +1139,7 @@ function modelStandard(d) {
                 </div>
                 
                 <div style="font-size:16px; font-weight:800; letter-spacing:0.5px; color:#000; text-transform:uppercase; margin-bottom:4px;">${title}</div>
-                <div style="font-size:12px; font-weight:700; color:#000;">N° ${d.num}</div>
+                <div style="font-size:12px; font-weight:700; color:#000;">N° ${isDeliveryMode ? (d.ref_bl || 'BL-EN-COURS') : d.num}</div>
                 ${isDeliveryMode ? '' : `<div style="font-size:11px; color:#333; margin-top:2px;">Statut : <span style="font-weight:700; text-transform:uppercase;">${d.statut}</span></div>`}
                 
                 ${!isDeliveryMode && isNorm && d.qr_code_data ? `
@@ -899,6 +1150,10 @@ function modelStandard(d) {
                     <div style="width:80px; height:80px; display:flex; align-items:center; justify-content:center;">
                         <img src="/dgi-stamp.png" style="max-height:100%; max-width:100%; object-fit:contain;">
                     </div>
+                </div>
+                <div style="font-size:9px; color:#000; text-align:right; margin-top:8px; font-family:monospace; line-height:1.4;">
+                    FNE N° : <strong>${d.numero_fne || '—'}</strong><br>
+                    Signature DGI : <strong>${(d.signature_dgi || '').substring(0, 16)}...</strong>
                 </div>` : ''}
             </div>
         </div>
@@ -914,6 +1169,7 @@ function modelStandard(d) {
             <div>Régime d'imposition : <strong>${d.client.regime || '—'}</strong></div>
         </div>
         
+        ${getAvoirBlock(d)}
         <!-- Tableau des Articles -->
         <table class="table-m4">
             <thead>
@@ -1052,5 +1308,73 @@ if (urlParams.get('download') === '1') {
         telechargerPdf();
     }, 800);
 }
+if (urlParams.get('facturer') === '1' && document.getElementById('modal-facturer')) {
+    document.getElementById('modal-facturer').style.display = 'flex';
+}
+
+function ouvrirModalAvoir() {
+    document.getElementById('modalAvoir').style.display = 'flex';
+}
+function fermerModalAvoir() {
+    document.getElementById('modalAvoir').style.display = 'none';
+}
+
+function selectionnerMode(mode) {
+    ['Caisse', 'Banque', 'Crédit'].forEach(m => {
+        const label = document.getElementById('label-mode-' + m.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, ""));
+        if (label) {
+            label.style.border = '1px solid #e2e5ec';
+            label.style.background = '#fff';
+            label.querySelector('span').style.color = '#475569';
+        }
+    });
+
+    const actLabel = document.getElementById('label-mode-' + mode.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, ""));
+    if (actLabel) {
+        const input = actLabel.querySelector('input');
+        input.checked = true;
+
+        if (mode === 'Caisse') {
+            actLabel.style.border = '1px solid #047857';
+            actLabel.style.background = '#f0fdf4';
+            actLabel.querySelector('span').style.color = '#166534';
+            document.getElementById('selection-banque-bl').style.display = 'none';
+            document.getElementById('bloc-montant-paye').style.display = 'block';
+            document.getElementById('bl-montant-input').disabled = false;
+        } else if (mode === 'Banque') {
+            actLabel.style.border = '1px solid #1e3a8a';
+            actLabel.style.background = '#eff6ff';
+            actLabel.querySelector('span').style.color = '#1e40af';
+            document.getElementById('selection-banque-bl').style.display = 'block';
+            document.getElementById('bloc-montant-paye').style.display = 'block';
+            document.getElementById('bl-montant-input').disabled = false;
+        } else if (mode === 'Crédit') {
+            actLabel.style.border = '1px solid #dc2626';
+            actLabel.style.background = '#fef2f2';
+            actLabel.querySelector('span').style.color = '#991b1b';
+            document.getElementById('selection-banque-bl').style.display = 'none';
+            document.getElementById('bloc-montant-paye').style.display = 'none';
+            document.getElementById('bl-montant-input').disabled = true;
+        }
+    }
+}
+
+function majBaseFacturation() {
+    const rLivree = document.getElementById('r-livree');
+    if (rLivree) {
+        const isLivree = rLivree.checked;
+        document.getElementById('label-livree').style.borderColor = isLivree ? '#047857' : '#e2e5ec';
+        document.getElementById('label-livree').style.background = isLivree ? '#f0fdf4' : '#fff';
+        document.getElementById('label-commandee').style.borderColor = !isLivree ? '#047857' : '#e2e5ec';
+        document.getElementById('label-commandee').style.background = !isLivree ? '#f0fdf4' : '#fff';
+    }
+}
+
+@if(isset($bl))
+document.addEventListener('DOMContentLoaded', function() {
+    majBaseFacturation();
+    selectionnerMode('Caisse');
+});
+@endif
 </script>
 @endsection

@@ -83,15 +83,23 @@
         <p>Consultez le journal des opérations de trésorerie ou le Grand Livre des écritures comptables.</p>
     </div>
     
-    <div class="mode-selector">
-        <a href="{{ route('admin.comptabilite.globale', ['mode' => 'operations', 'point_de_vente_id' => $pdvFilter]) }}" 
-           class="mode-btn {{ $mode === 'operations' ? 'active' : '' }}">
-            <i class="fas fa-wallet"></i> Afficher les opérations
-        </a>
-        <a href="{{ route('admin.comptabilite.globale', ['mode' => 'ecritures', 'point_de_vente_id' => $pdvFilter]) }}" 
-           class="mode-btn {{ $mode === 'ecritures' ? 'active' : '' }}">
-            <i class="fas fa-file-invoice-dollar"></i> Afficher les écritures
-        </a>
+    <div style="display:flex; gap:12px; align-items:center; flex-wrap:wrap;">
+        @if($mode === 'ecritures')
+        <button type="button" onclick="ouvrirModalEcriture()" class="btn btn-primary btn-sm" style="font-weight:700;">
+            <i class="fas fa-plus"></i> Saisir une écriture manuelle
+        </button>
+        @endif
+
+        <div class="mode-selector">
+            <a href="{{ route('admin.comptabilite.globale', ['mode' => 'operations', 'point_de_vente_id' => $pdvFilter]) }}" 
+               class="mode-btn {{ $mode === 'operations' ? 'active' : '' }}">
+                <i class="fas fa-wallet"></i> Afficher les opérations
+            </a>
+            <a href="{{ route('admin.comptabilite.globale', ['mode' => 'ecritures', 'point_de_vente_id' => $pdvFilter]) }}" 
+               class="mode-btn {{ $mode === 'ecritures' ? 'active' : '' }}">
+                <i class="fas fa-file-invoice-dollar"></i> Afficher les écritures
+            </a>
+        </div>
     </div>
 </div>
 
@@ -201,7 +209,8 @@
                             <th>Code journal</th>
                             <th>Numéro facture</th>
                             <th>N° compte général</th>
-                            <th>Libellé écriture</th>
+                            <th>Titre / Libellé</th>
+                            <th>Description</th>
                             <th style="text-align: right;">Montant débit</th>
                             <th style="text-align: right;">Montant crédit</th>
                             <th>N° compte tiers</th>
@@ -238,7 +247,8 @@
                             <td style="font-weight: 600; color: var(--text-2);">
                                 {{ !$isTiers ? $compte : '—' }}
                             </td>
-                            <td style="white-space: normal; min-width: 220px;">{{ $ecr->libelle }}</td>
+                            <td style="white-space: normal; min-width: 180px; font-weight:500;">{{ $ecr->libelle }}</td>
+                            <td style="white-space: normal; min-width: 200px; font-size:12px; color:var(--text-3);">{{ $ecr->description ?? '—' }}</td>
                             <td style="text-align: right; font-weight: 700; color: #1e3a8a;">
                                 {{ $ecr->debit > 0 ? number_format($ecr->debit, 0, ',', ' ') . ' F' : '—' }}
                             </td>
@@ -260,4 +270,93 @@
         @endif
     </div>
 </div>
+
+{{-- MODAL DE CRÉATION D'ÉCRITURE MANUELLE --}}
+<div class="modal-overlay" id="modalEcritureManuelle" style="display:none; position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(0,0,0,0.5); z-index:9999; align-items:center; justify-content:center;">
+    <div class="modal" style="background:#fff; border-radius:12px; max-width:600px; width:100%; box-shadow:0 10px 30px rgba(0,0,0,0.15); overflow:hidden;">
+        <div class="modal-header" style="padding:16px 20px; border-bottom:1px solid var(--border); display:flex; justify-content:space-between; align-items:center;">
+            <h3 style="font-size:16px; font-weight:700; color:var(--text-1); margin:0;"><i class="fas fa-plus" style="color:var(--primary)"></i> Nouvelle écriture manuelle</h3>
+            <button type="button" class="modal-close" onclick="fermerModalEcriture()" style="background:none; border:none; font-size:24px; cursor:pointer; color:var(--text-3);">&times;</button>
+        </div>
+        <form method="POST" action="{{ route('admin.comptabilite.ecriture_manuelle') }}" style="margin:0; padding:20px;">
+            @csrf
+            
+            <div style="display:grid; grid-template-columns:1fr 1fr; gap:14px; margin-bottom:14px;">
+                <div class="form-group">
+                    <label class="form-label">Date d'écriture <span style="color:var(--danger)">*</span></label>
+                    <input type="date" name="date_ecriture" class="form-control" required value="{{ date('Y-m-d') }}">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Code Journal <span style="color:var(--danger)">*</span></label>
+                    <select name="code_journal" class="form-control" required>
+                        @forelse($codesJournaux as $j)
+                            <option value="{{ $j->code }}">{{ $j->code }} - {{ $j->intitule }} ({{ $j->type }})</option>
+                        @empty
+                            <option value="OD">OD - Opérations Diverses</option>
+                            <option value="CA">CA - Caisse principale</option>
+                            <option value="BQ">BQ - Banque</option>
+                            <option value="VT">VT - Journal de Ventes</option>
+                            <option value="AC">AC - Journal d'Achats</option>
+                        @endforelse
+                    </select>
+                </div>
+            </div>
+
+            <div class="form-group" style="margin-bottom:14px;">
+                <label class="form-label">Titre / Libellé court <span style="color:var(--danger)">*</span></label>
+                <input type="text" name="libelle" class="form-control" required placeholder="Ex: Constatation provision, Vente exceptionnelle..." maxlength="255">
+            </div>
+
+            <div class="form-group" style="margin-bottom:14px;">
+                <label class="form-label">Description libre / Détail</label>
+                <textarea name="description" class="form-control" rows="2" placeholder="Saisissez des précisions sur cette écriture..." maxlength="2000"></textarea>
+            </div>
+
+            <div style="display:grid; grid-template-columns:1fr 1fr; gap:14px; margin-bottom:14px;">
+                <div class="form-group">
+                    <label class="form-label">Compte Débit <span style="color:var(--danger)">*</span></label>
+                    <input type="text" name="compte_debit" class="form-control" required placeholder="Ex: 601100" pattern="[0-9]+" title="Veuillez entrer un numéro de compte comptable valide.">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Compte Crédit <span style="color:var(--danger)">*</span></label>
+                    <input type="text" name="compte_credit" class="form-control" required placeholder="Ex: 571000" pattern="[0-9]+" title="Veuillez entrer un numéro de compte comptable valide.">
+                </div>
+            </div>
+
+            <div style="display:grid; grid-template-columns:1fr 1fr; gap:14px; margin-bottom:14px;">
+                <div class="form-group">
+                    <label class="form-label">Montant (FCFA) <span style="color:var(--danger)">*</span></label>
+                    <input type="number" name="montant" class="form-control" required placeholder="Ex: 50000" min="1">
+                </div>
+                @if($isAdmin)
+                <div class="form-group">
+                    <label class="form-label">Affectation Point de Vente</label>
+                    <select name="point_de_vente_id" class="form-control">
+                        <option value="">Sélectionner un site...</option>
+                        @foreach($pointsDeVente as $pdv)
+                            <option value="{{ $pdv->id }}">{{ $pdv->nom }}</option>
+                        @endforeach
+                    </select>
+                </div>
+                @endif
+            </div>
+
+            <div style="border-top:1px solid var(--border); padding-top:14px; margin-top:14px; display:flex; justify-content:flex-end; gap:10px;">
+                <button type="button" class="btn btn-outline" onclick="fermerModalEcriture()">Annuler</button>
+                <button type="submit" class="btn btn-primary"><i class="fas fa-save"></i> Enregistrer l'écriture</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+function ouvrirModalEcriture() {
+    const modal = document.getElementById('modalEcritureManuelle');
+    modal.style.display = 'flex';
+}
+function fermerModalEcriture() {
+    const modal = document.getElementById('modalEcritureManuelle');
+    modal.style.display = 'none';
+}
+</script>
 @endsection

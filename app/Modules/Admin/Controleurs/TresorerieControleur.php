@@ -55,35 +55,89 @@ class TresorerieControleur
         return view('admin::tresorerie.decaissements', compact('operations'));
     }
 
-    public function journal(): View
+    public function journal(Request $request): View
     {
         $entreprise = Auth::user()->entreprise;
-        $pointDeVenteId = Auth::user()->estCaissier()
-            ? Auth::user()->point_de_vente_id
-            : session('point_de_vente_actif_id');
+        $role = Auth::user()->role;
+        $pointsDeVente = $entreprise->pointsDeVente()->orderBy('nom')->get();
+
+        // Récupérer le point de vente à filtrer
+        $pointDeVenteId = $request->input('point_de_vente_id');
+        if ($pointDeVenteId === null) {
+            $pointDeVenteId = Auth::user()->estCaissier()
+                ? Auth::user()->point_de_vente_id
+                : session('point_de_vente_actif_id') ?? 'tous';
+        }
 
         $query = TresorerieJournal::with('pointDeVente');
 
-        if ($pointDeVenteId) {
+        // Filtrage Point de Vente
+        if ($pointDeVenteId !== 'tous' && !empty($pointDeVenteId)) {
             $query->where('point_de_vente_id', $pointDeVenteId);
         } else {
             $query->whereHas('pointDeVente', fn($q) => $q->where('entreprise_id', $entreprise->id));
         }
 
-        $operations = $query->latest()->paginate(30);
+        // Filtrage Mode de paiement
+        if ($request->filled('mode_paiement')) {
+            $query->where('mode_paiement', $request->mode_paiement);
+        }
 
-        $totalEntrees  = $operations->sum('montant_entree');
-        $totalSorties  = $operations->sum('montant_sortie');
-        $soldeFinal    = $totalEntrees - $totalSorties;
+        // Filtrage Banque (Moyen Bancaire)
+        if ($request->filled('moyen_bancaire')) {
+            $query->where('moyen_bancaire', $request->moyen_bancaire);
+        }
 
-        return view('admin::tresorerie.journal', compact('operations', 'totalEntrees', 'totalSorties', 'soldeFinal'));
+        // Récupérer la liste des modes de paiement et moyens bancaires uniques existants en base pour cette entreprise
+        $pdvIds = $pointsDeVente->pluck('id');
+        $modesDisponibles = TresorerieJournal::whereIn('point_de_vente_id', $pdvIds)
+            ->whereNotNull('mode_paiement')
+            ->distinct()
+            ->pluck('mode_paiement');
+
+        $moyensBancairesDisponibles = TresorerieJournal::whereIn('point_de_vente_id', $pdvIds)
+            ->whereNotNull('moyen_bancaire')
+            ->where('moyen_bancaire', '!=', '')
+            ->distinct()
+            ->pluck('moyen_bancaire');
+
+        // Calculer les totaux de trésorerie sur l'ensemble filtré (avant pagination)
+        $totalEntrees = (clone $query)->sum('montant_entree');
+        $totalSorties = (clone $query)->sum('montant_sortie');
+        $soldeFinal   = $totalEntrees - $totalSorties;
+
+        $operations = $query->latest()->paginate(30)->withQueryString();
+
+        return view('admin::tresorerie.journal', compact(
+            'operations',
+            'totalEntrees',
+            'totalSorties',
+            'soldeFinal',
+            'pointsDeVente',
+            'pointDeVenteId',
+            'modesDisponibles',
+            'moyensBancairesDisponibles'
+        ));
     }
 
     public function codesJournaux(): View
     {
         $entreprise = Auth::user()->entreprise;
-        $codes = CodeJournal::where('entreprise_id', $entreprise->id)->latest()->get();
-        return view('admin::tresorerie.codes_journaux', compact('codes'));
+        
+        $codes = CodeJournal::where('entreprise_id', $entreprise->id)
+            ->where(function ($q) {
+                $q->where('source', '!=', 'comptaflow')
+                  ->orWhereNull('source');
+            })
+            ->latest()
+            ->get();
+
+        $codesComptaflow = CodeJournal::where('entreprise_id', $entreprise->id)
+            ->where('source', 'comptaflow')
+            ->latest()
+            ->get();
+
+        return view('admin::tresorerie.codes_journaux', compact('codes', 'codesComptaflow', 'entreprise'));
     }
 
     public function creerCodeJournal(Request $request): RedirectResponse

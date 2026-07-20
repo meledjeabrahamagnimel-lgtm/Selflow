@@ -6,11 +6,30 @@
 <div class="page-header">
     <div>
         <h1><i class="fas fa-arrows-up-down"></i> Mouvements de stock</h1>
-        <p>Historique de toutes les entrées et sorties</p>
+        <p>Historique de toutes les entrées, sorties, transferts et rebuts.</p>
     </div>
     <a href="{{ route('admin.stock.index') }}" class="btn btn-outline">
-        <i class="fas fa-boxes-stacked"></i> Inventaire
+        <i class="fas fa-boxes-stacked"></i> Retour à l'inventaire
     </a>
+</div>
+
+{{-- Onglets / Sections (Style Odoo) --}}
+<div style="display:flex; border-bottom:2px solid var(--border); margin-bottom:20px; gap:8px;">
+    @php
+        $sections = [
+            'tous'        => ['label' => 'Tous les mouvements', 'icon' => 'fa-list'],
+            'achats'      => ['label' => 'Réceptions (Achats)', 'icon' => 'fa-truck-loading'],
+            'ventes'      => ['label' => 'Livraisons (Ventes)', 'icon' => 'fa-dolly'],
+            'transferts'  => ['label' => 'Transferts Internes',  'icon' => 'fa-exchange-alt'],
+            'rebuts'      => ['label' => 'Rebuts & Pertes',     'icon' => 'fa-trash-can'],
+        ];
+    @endphp
+    @foreach($sections as $key => $sec)
+        <a href="{{ route('admin.stock.mouvements', ['section' => $key]) }}"
+           style="text-decoration:none; display:flex; align-items:center; gap:8px; padding:12px 20px; font-size:13px; font-weight:700; border-bottom:3px solid {{ $section === $key ? 'var(--primary)' : 'transparent' }}; color:{{ $section === $key ? 'var(--primary)' : 'var(--text-3)' }}; transition:all .2s;">
+            <i class="fas {{ $sec['icon'] }}"></i> {{ $sec['label'] }}
+        </a>
+    @endforeach
 </div>
 
 <div class="card">
@@ -18,7 +37,7 @@
         @if($mouvements->isEmpty())
         <div style="padding:48px; text-align:center; color:var(--text-3);">
             <i class="fas fa-arrows-up-down" style="font-size:48px; display:block; margin-bottom:12px; opacity:.2;"></i>
-            Aucun mouvement de stock enregistré.
+            Aucun mouvement enregistré pour cette section.
         </div>
         @else
         <table>
@@ -26,12 +45,13 @@
                 <tr>
                     <th>Date</th>
                     <th>Produit</th>
-                    <th>Point de vente</th>
-                    <th>Type</th>
+                    <th>Mouvement</th>
                     <th>Quantité</th>
-                    <th>Stock avant</th>
-                    <th>Stock après</th>
-                    <th>Référence doc.</th>
+                    <th>Stock (Avant/Après)</th>
+                    <th>Qui (Opérateur)</th>
+                    <th>Provenance / Destination</th>
+                    <th>Point de vente</th>
+                    <th>Doc. Réf</th>
                 </tr>
             </thead>
             <tbody>
@@ -40,27 +60,72 @@
                     <td style="color:var(--text-3); font-size:12px;">{{ $m->created_at->format('d/m/Y H:i') }}</td>
                     <td>
                         <div style="font-weight:600;">{{ $m->produit->nom }}</div>
-                        <div style="font-size:11px; color:var(--text-3);">{{ $m->produit->reference }}</div>
+                        <div style="font-size:11px; color:var(--text-3); font-family:monospace;">{{ $m->produit->reference }}</div>
                     </td>
-                    <td><span class="badge badge-purple">{{ $m->pointDeVente->nom }}</span></td>
                     <td>
-                        @if($m->type_mouvement === 'Entrée')
-                            <span class="badge badge-success"><i class="fas fa-arrow-down"></i> Entrée</span>
-                        @else
-                            <span class="badge badge-danger"><i class="fas fa-arrow-up"></i> Sortie</span>
-                        @endif
+                        @php
+                            $subColors = [
+                                'reception'  => ['bg' => '#ecfdf5', 'color' => '#047857', 'label' => 'Réception'],
+                                'livraison'  => ['bg' => '#eff6ff', 'color' => '#1d4ed8', 'label' => 'Livraison'],
+                                'transfert'  => ['bg' => '#fff7ed', 'color' => '#b45309', 'label' => 'Transfert'],
+                                'rebut'      => ['bg' => '#fef2f2', 'color' => '#b91c1c', 'label' => 'Rebut'],
+                                'ajustement' => ['bg' => '#f3f4f6', 'color' => '#374151', 'label' => 'Ajustement'],
+                                'production' => ['bg' => '#f5f3ff', 'color' => '#6d28d9', 'label' => 'Production'],
+                            ];
+                            $sc = $subColors[strtolower($m->sous_type)] ?? ['bg' => '#f3f4f6', 'color' => '#374151', 'label' => $m->type_mouvement];
+                        @endphp
+                        <span class="badge" style="background:{{ $sc['bg'] }}; color:{{ $sc['color'] }}; padding:4px 10px; border-radius:20px; font-weight:700; font-size:11px;">
+                            {{ $sc['label'] }}
+                        </span>
                     </td>
                     <td style="font-weight:700; {{ $m->type_mouvement === 'Entrée' ? 'color:var(--success)' : 'color:var(--danger)' }}">
                         {{ $m->type_mouvement === 'Entrée' ? '+' : '-' }}{{ $m->quantite }}
+                        <span style="font-size:11px; font-weight:400; color:var(--text-3);">{{ $m->produit->unite }}</span>
                     </td>
-                    <td style="color:var(--text-3);">{{ $m->stock_avant }}</td>
-                    <td style="font-weight:600;">{{ $m->stock_apres }}</td>
-                    <td style="font-family:monospace; font-size:12px; color:var(--primary);">{{ $m->reference_document ?? '—' }}</td>
+                    <td>
+                        <div style="font-size:13px; font-weight:600; color:var(--text-1);">
+                            {{ $m->stock_apres }}
+                            <span style="font-weight:400; font-size:11px; color:var(--text-3);"> (avant: {{ $m->stock_avant }})</span>
+                        </div>
+                    </td>
+                    <td>
+                        @if($m->utilisateur)
+                            <div style="font-weight:600; font-size:13px;">{{ $m->utilisateur->nom }}</div>
+                            <div style="font-size:11px; color:var(--text-3);">{{ ucfirst($m->utilisateur->role) }}</div>
+                        @else
+                            <span style="color:var(--text-3); font-style:italic;">Système</span>
+                        @endif
+                    </td>
+                    <td style="font-size:13px; color:var(--text-2);">
+                        @if(strtolower($m->sous_type) === 'reception' && $m->fournisseur)
+                            <i class="fas fa-building" style="font-size:11px; color:var(--text-3);"></i> {{ $m->fournisseur->nom }}
+                        @elseif(strtolower($m->sous_type) === 'livraison' && $m->client)
+                            <i class="fas fa-user" style="font-size:11px; color:var(--text-3);"></i> {{ $m->client->nom }}
+                        @elseif(strtolower($m->sous_type) === 'transfert')
+                            @if($m->type_mouvement === 'Sortie')
+                                <i class="fas fa-arrow-right-from-bracket" style="color:var(--danger); font-size:11px;"></i> Vers: <strong>{{ $m->pointDeVente->nom }}</strong>
+                            @else
+                                <i class="fas fa-arrow-left-to-bracket" style="color:var(--success); font-size:11px;"></i> Depuis: <strong>{{ $m->pointDeVenteSource->nom ?? 'Autre site' }}</strong>
+                            @endif
+                        @elseif(strtolower($m->sous_type) === 'rebut')
+                            <span style="color:var(--danger); font-style:italic;"><i class="fas fa-trash-can"></i> Mis au rebut</span>
+                        @else
+                            —
+                        @endif
+                    </td>
+                    <td>
+                        <span class="badge badge-purple" style="font-size:11px; font-weight:600;"><i class="fas fa-store"></i> {{ $m->pointDeVente->nom }}</span>
+                    </td>
+                    <td style="font-family:monospace; font-size:12px; color:var(--primary); font-weight:600;">
+                        {{ $m->reference_document ?? '—' }}
+                    </td>
                 </tr>
                 @endforeach
             </tbody>
         </table>
-        <div style="padding: 0 16px;">{{ $mouvements->links() }}</div>
+        <div style="padding:16px 20px; border-top:1px solid var(--border);">
+            {{ $mouvements->appends(['section' => $section])->links() }}
+        </div>
         @endif
     </div>
 </div>
