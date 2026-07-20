@@ -8,30 +8,20 @@ use Illuminate\Http\Request;
 return Application::configure(basePath: dirname(__DIR__))
     ->withRouting(
         web: __DIR__.'/../routes/web.php',
-        api: __DIR__.'/../routes/api.php',
         commands: __DIR__.'/../routes/console.php',
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware): void {
         $middleware->alias([
-
-            'role'              => \App\Modules\Authentification\Middleware\VerifierRole::class,
-            'apercu.readonly'   => \App\Modules\Authentification\Middleware\ApercuLectureSeule::class,
-            'caissier.acces'   => \App\Modules\Authentification\Middleware\VerifierAccesCaissier::class,
-            'habilitation'      => \App\Modules\Authentification\Middleware\VerifierHabilitationRoute::class,
-            'auth.api'          => \App\Modules\Authentification\Middleware\AuthentificationApiParJeton::class,
-            'periode'           => \App\Modules\Authentification\Middleware\GestionPeriode::class,
-            'modules'           => \App\Modules\Authentification\Middleware\VerifierModulesActifs::class,
-            'forcer.mdp'        => \App\Modules\Authentification\Middleware\ForcerChangementMotDePasse::class,
-
-            'role' => \App\Modules\Authentification\Middleware\VerifierRole::class,
+            'role'            => \App\Modules\Authentification\Middleware\VerifierRole::class,
             'apercu.readonly' => \App\Modules\Authentification\Middleware\ApercuLectureSeule::class,
-            'caissier.acces' => \App\Modules\Authentification\Middleware\VerifierAccesCaissier::class,
-            'habilitation' => \App\Modules\Authentification\Middleware\VerifierHabilitationRoute::class,
-            'auth.api' => \App\Modules\Authentification\Middleware\AuthentificationApiParJeton::class,
-            'periode' => \App\Modules\Authentification\Middleware\GestionPeriode::class,
-            'hub.token' => \App\Modules\Authentification\Middleware\VerifierJetonHub::class,
-
+            'caissier.acces'  => \App\Modules\Authentification\Middleware\VerifierAccesCaissier::class,
+            'habilitation'    => \App\Modules\Authentification\Middleware\VerifierHabilitationRoute::class,
+            'auth.api'        => \App\Modules\Authentification\Middleware\AuthentificationApiParJeton::class,
+            'periode'         => \App\Modules\Authentification\Middleware\GestionPeriode::class,
+            'modules'         => \App\Modules\Authentification\Middleware\VerifierModulesActifs::class,
+            'forcer.mdp'      => \App\Modules\Authentification\Middleware\ForcerChangementMotDePasse::class,
+            'hub.token'       => \App\Modules\Authentification\Middleware\VerifierJetonHub::class,
         ]);
 
         // En-têtes de sécurité HTTP sur toutes les réponses web (Section 17.11)
@@ -43,7 +33,7 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->redirectTo(function (Request $request) {
             if ($request->is('api/*')) {
                 abort(response()->json([
-                    'statut' => 'erreur',
+                    'statut'  => 'erreur',
                     'message' => 'Non authentifié.'
                 ], 401));
             }
@@ -61,7 +51,7 @@ return Application::configure(basePath: dirname(__DIR__))
                 // Tenter d'envoyer l'alerte email aux super-admins
                 try {
                     $url = $request->fullUrl();
-                    $msg = "Alerte Production : Panne détectée sur Selflow\n\n";
+                    $msg  = "Alerte Production : Panne détectée sur Selflow\n\n";
                     $msg .= "URL de la page : " . $url . "\n";
                     $msg .= "Erreur : " . $e->getMessage() . "\n";
                     $msg .= "Fichier : " . $e->getFile() . "\n";
