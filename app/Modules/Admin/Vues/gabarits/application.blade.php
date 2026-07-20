@@ -427,7 +427,10 @@
         $nomPdvAffichage = session('apercu_pdv_nom') ?? session('point_de_vente_actif_nom') ?? auth()->user()->pointDeVente?->nom;
         $estApercu = session()->has('apercu_pdv_id');
         $entreprise = auth()->user()?->entreprise;
-        $modulesActifs = $entreprise?->modules_actifs ?? [];
+        $modulesActifs = $entreprise?->modules_actifs;
+        if (empty($modulesActifs)) {
+            $modulesActifs = ['principal', 'ventes', 'achats', 'stock', 'production', 'comptabilite', 'points_de_vente', 'produits', 'tiers', 'rapports', 'b2b', 'fne'];
+        }
         $secteurActivite = $entreprise?->secteur_activite ?? ['Commercial'];
         if (is_string($secteurActivite)) {
             $secteurActivite = [$secteurActivite];
@@ -506,6 +509,9 @@
             <div class="nav-section"><span>SUPERVISION</span></div>
             <a href="{{ route('superadmin.entreprises') }}" class="nav-item {{ request()->routeIs('superadmin.entreprises*') ? 'active' : '' }}">
                 <i class="fas fa-building"></i> Entreprises
+            </a>
+            <a href="{{ route('superadmin.utilisateurs') }}" class="nav-item {{ request()->routeIs('superadmin.utilisateurs*') ? 'active' : '' }}">
+                <i class="fas fa-users-gear"></i> Habilitations &amp; Accès
             </a>
         @elseif(request()->routeIs('caissier.*'))
             <!-- ── CAISSIER SIDEBAR ── -->

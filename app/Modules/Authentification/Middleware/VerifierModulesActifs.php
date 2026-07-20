@@ -33,7 +33,10 @@ class VerifierModulesActifs
             abort(403, 'Accès refusé. Vous n\'êtes rattaché à aucune entreprise.');
         }
 
-        $modulesActifs = $entreprise->modules_actifs ?? [];
+        $modulesActifs = $entreprise->modules_actifs;
+        if (empty($modulesActifs)) {
+            $modulesActifs = ['principal', 'ventes', 'achats', 'stock', 'production', 'comptabilite', 'points_de_vente', 'produits', 'tiers', 'rapports', 'b2b', 'fne'];
+        }
 
         if (! in_array(strtolower($module), $modulesActifs, true)) {
             abort(403, "Accès refusé. Le module « " . ucfirst($module) . " » n'est pas activé pour votre entreprise.");

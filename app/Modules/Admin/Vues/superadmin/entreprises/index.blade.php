@@ -39,7 +39,12 @@
                 @forelse($entreprises as $ent)
                 <tr>
                     <td>
-                        <div style="font-weight: 700; color: var(--text); font-size: 14px;">{{ $ent->nom }}</div>
+                        <div style="font-weight: 700; color: var(--text); font-size: 14px; display: flex; align-items: center; gap: 8px;">
+                            {{ $ent->nom }}
+                            @if($ent->statut === 'bloque')
+                                <span class="badge" style="font-size: 10px; padding: 2px 6px; background: #fee2e2; color: #991b1b; border: 1px solid #fca5a5; font-weight: 700; border-radius: 4px; display: inline-flex; align-items: center; gap: 4px;"><i class="fas fa-lock"></i> Suspendue</span>
+                            @endif
+                        </div>
                     </td>
                     <td>
                         <div style="font-size: 12px; color: var(--text-2); display: flex; flex-direction: column; gap: 4px;">
@@ -58,11 +63,11 @@
                         @endphp
                         @foreach($secteurs as $secteur)
                             @if($secteur === 'Commercial')
-                                <span class="badge badge-info" style="margin-bottom: 2px; display: inline-block;"><i class="fas fa-tags"></i> Commercial</span>
+                                <span class="badge badge-blue" style="margin-bottom: 2px; display: inline-block;"><i class="fas fa-tag"></i> Commercial</span>
                             @elseif($secteur === 'Industriel')
-                                <span class="badge badge-purple" style="margin-bottom: 2px; display: inline-block;"><i class="fas fa-industry"></i> Industriel</span>
+                                <span class="badge badge-dark" style="margin-bottom: 2px; display: inline-block;"><i class="fas fa-industry"></i> Industriel</span>
                             @else
-                                <span class="badge badge-success" style="margin-bottom: 2px; display: inline-block;"><i class="fas fa-person-digging"></i> Services</span>
+                                <span class="badge badge-success" style="margin-bottom: 2px; display: inline-block;"><i class="fas fa-hand-holding-hand"></i> Services</span>
                             @endif
                         @endforeach
                     </td>
@@ -98,13 +103,30 @@
                         @endif
                     </td>
                     <td style="text-align: center;">
-                        <div style="display: flex; gap: 6px; justify-content: center; align-items: center;">
-                            <button type="button" class="btn btn-outline btn-sm" onclick="ouvrirModalDetails({{ json_encode($ent) }}, {{ $ent->pointsDeVente()->count() }}, {{ $ent->utilisateurs()->count() }}, {{ $ent->produits()->count() }})">
+                        <div style="display: flex; gap: 4px; justify-content: center; align-items: center; flex-wrap: wrap;">
+                            <button type="button" class="btn btn-outline btn-sm" onclick="ouvrirModalDetails({{ json_encode($ent) }}, {{ $ent->pointsDeVente()->count() }}, {{ $ent->utilisateurs()->count() }}, {{ $ent->produits()->count() }})" style="padding: 4px 8px; font-size: 12px;">
                                 <i class="fas fa-eye"></i> Détails
                             </button>
-                            <a href="{{ route('superadmin.entreprises.modifier', $ent) }}" class="btn btn-primary btn-sm">
+                            <a href="{{ route('superadmin.entreprises.modifier', $ent) }}" class="btn btn-primary btn-sm" style="padding: 4px 8px; font-size: 12px;">
                                 <i class="fas fa-pen-to-square"></i> Configurer
                             </a>
+                            <form method="POST" action="{{ route('superadmin.entreprises.toggle_status', $ent) }}" style="margin: 0; display: inline;">
+                                @csrf
+                                <button type="submit" class="btn btn-sm" style="padding: 4px 8px; font-size: 12px; font-weight: 600; display: inline-flex; align-items: center; gap: 4px; background: {{ $ent->statut === 'bloque' ? '#d1fae5' : '#fef3c7' }}; color: {{ $ent->statut === 'bloque' ? '#065f46' : '#92400e' }}; border: 1px solid {{ $ent->statut === 'bloque' ? '#34d399' : '#fbbf24' }}; border-radius: 6px; cursor: pointer;">
+                                    @if($ent->statut === 'bloque')
+                                        <i class="fas fa-unlock"></i> Activer
+                                    @else
+                                        <i class="fas fa-lock"></i> Bloquer
+                                    @endif
+                                </button>
+                            </form>
+                            <form method="POST" action="{{ route('superadmin.entreprises.supprimer', $ent) }}" onsubmit="return confirm('Êtes-vous sûr de vouloir supprimer définitivement l\'entreprise « {{ $ent->nom }} » et toutes ses données associées (utilisateurs, pdvs) ?')" style="margin: 0; display: inline;">
+                                @csrf
+                                @method('DELETE')
+                                <button type="submit" class="btn btn-sm" style="padding: 4px 8px; font-size: 12px; font-weight: 600; display: inline-flex; align-items: center; gap: 4px; background: #fee2e2; color: #991b1b; border: 1px solid #fca5a5; border-radius: 6px; cursor: pointer;">
+                                    <i class="fas fa-trash"></i> Supprimer
+                                </button>
+                            </form>
                         </div>
                     </td>
                 </tr>

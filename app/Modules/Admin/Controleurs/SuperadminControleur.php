@@ -259,4 +259,85 @@ class SuperadminControleur
 
         return redirect()->route('superadmin.entreprises')->with('succes', 'Entreprise mise à jour avec succès.');
     }
+
+    /**
+     * Activer ou Bloquer une entreprise.
+     */
+    public function toggleStatus(Entreprise $entreprise): RedirectResponse
+    {
+        $nouveauStatut = $entreprise->statut === 'bloque' ? 'actif' : 'bloque';
+        $entreprise->update(['statut' => $nouveauStatut]);
+        
+        $message = $nouveauStatut === 'bloque' 
+            ? "L'entreprise « {$entreprise->nom} » et tous ses utilisateurs ont été bloqués avec succès."
+            : "L'entreprise « {$entreprise->nom} » a été réactivée.";
+
+        return redirect()->route('superadmin.entreprises')->with('succes', $message);
+    }
+
+    /**
+     * Supprimer une entreprise.
+     */
+    public function supprimer(Entreprise $entreprise): RedirectResponse
+    {
+        $nom = $entreprise->nom;
+        
+        // Supprimer les entités enfants associées
+        $entreprise->utilisateurs()->delete();
+        $entreprise->pointsDeVente()->delete();
+        $entreprise->delete();
+
+        return redirect()->route('superadmin.entreprises')->with('succes', "L'entreprise « {$nom} » a été supprimée avec succès.");
+    }
+
+    /**
+     * Liste complète des utilisateurs de toutes les entreprises.
+     */
+    public function utilisateurs(Request $request): View
+    {
+        $query = Utilisateur::with('entreprise');
+
+        // Filtrer par nom/email d'utilisateur
+        if ($request->filled('recherche_utilisateur')) {
+            $search = $request->recherche_utilisateur;
+            $query->where(function($q) use ($search) {
+                $q->where('nom', 'like', "%{$search}%")
+                  ->orWhere('prenom', 'like', "%{$search}%")
+                  ->orWhere('email', 'like', "%{$search}%");
+            });
+        }
+
+        // Filtrer par nom d'entreprise
+        if ($request->filled('recherche_entreprise')) {
+            $search = $request->recherche_entreprise;
+            $query->whereHas('entreprise', function($q) use ($search) {
+                $q->where('nom', 'like', "%{$search}%");
+            });
+        }
+
+        $utilisateurs = $query->orderBy('created_at', 'desc')->paginate(15);
+        $entreprises = Entreprise::orderBy('nom')->get();
+
+        return view('admin::superadmin.utilisateurs.index', compact('utilisateurs', 'entreprises'));
+    }
+
+    /**
+     * Modifier directement le rôle, le statut et les habilitations d'un utilisateur.
+     */
+    public function modifierUtilisateur(Request $request, Utilisateur $utilisateur): RedirectResponse
+    {
+        $request->validate([
+            'role'          => ['required', 'string', 'in:superadmin,admin,admin_secondaire,responsable_pdv,caissier'],
+            'statut'        => ['required', 'string', 'in:actif,suspendu,inactif'],
+            'habilitations' => ['nullable', 'array'],
+        ]);
+
+        $utilisateur->update([
+            'role'          => $request->role,
+            'statut'        => $request->statut,
+            'habilitations' => $request->habilitations ?? [],
+        ]);
+
+        return redirect()->back()->with('succes', "L'utilisateur « {$utilisateur->nom} {$utilisateur->prenom} » a été mis à jour avec succès.");
+    }
 }

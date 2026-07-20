@@ -240,6 +240,10 @@ Route::prefix('superadmin')
         Route::post('/entreprises/creer', [\App\Modules\Admin\Controleurs\SuperadminControleur::class, 'creer'])->name('entreprises.creer.enregistrer');
         Route::get('/entreprises/{entreprise}/modifier', [\App\Modules\Admin\Controleurs\SuperadminControleur::class, 'modifierFormulaire'])->name('entreprises.modifier');
         Route::put('/entreprises/{entreprise}/modifier', [\App\Modules\Admin\Controleurs\SuperadminControleur::class, 'modifier'])->name('entreprises.modifier.enregistrer');
+        Route::post('/entreprises/{entreprise}/toggle-status', [\App\Modules\Admin\Controleurs\SuperadminControleur::class, 'toggleStatus'])->name('entreprises.toggle_status');
+        Route::delete('/entreprises/{entreprise}', [\App\Modules\Admin\Controleurs\SuperadminControleur::class, 'supprimer'])->name('entreprises.supprimer');
+        Route::get('/utilisateurs', [\App\Modules\Admin\Controleurs\SuperadminControleur::class, 'utilisateurs'])->name('utilisateurs');
+        Route::put('/utilisateurs/{utilisateur}', [\App\Modules\Admin\Controleurs\SuperadminControleur::class, 'modifierUtilisateur'])->name('utilisateurs.modifier');
     });
 
 // ───────────────────────────────────────────────────────────────────────

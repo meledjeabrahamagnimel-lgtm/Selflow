@@ -247,7 +247,12 @@
                 @forelse($entreprisesRecentes as $ent)
                 <tr>
                     <td>
-                        <div style="font-weight: 700; color: var(--text-1);">{{ $ent->nom }}</div>
+                        <div style="font-weight: 700; color: var(--text-1); display: flex; align-items: center; gap: 6px;">
+                            {{ $ent->nom }}
+                            @if($ent->statut === 'bloque')
+                                <span class="badge" style="font-size: 8px; padding: 1px 4px; background: #fee2e2; color: #991b1b; border: 1px solid #fca5a5; font-weight: 700; border-radius: 3px;"><i class="fas fa-lock"></i> Suspendue</span>
+                            @endif
+                        </div>
                         <div style="font-size: 11px; color: var(--text-3);">{{ $ent->email ?? '—' }}</div>
                     </td>
                     <td>

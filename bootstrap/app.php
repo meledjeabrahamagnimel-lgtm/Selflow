@@ -27,6 +27,9 @@ return Application::configure(basePath: dirname(__DIR__))
         // En-têtes de sécurité HTTP sur toutes les réponses web (Section 17.11)
         $middleware->appendToGroup('web', \App\Http\Middleware\AjouterEntetesSecurite::class);
 
+        // Vérifier si l'entreprise rattachée est active ou bloquée
+        $middleware->appendToGroup('web', \App\Http\Middleware\VerifierEntrepriseActive::class);
+
         // Forcer le changement de mot de passe à la 1ère connexion (Section 13)
         $middleware->appendToGroup('web', \App\Modules\Authentification\Middleware\ForcerChangementMotDePasse::class);
 
