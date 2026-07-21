@@ -137,8 +137,13 @@ class Produit extends Model
 
     public function getPhotoUrlAttribute(): string
     {
-        if ($this->photo && \Illuminate\Support\Facades\Storage::disk('public')->exists($this->photo)) {
-            return asset('storage/' . $this->photo);
+        if ($this->photo) {
+            if (str_starts_with($this->photo, 'http://') || str_starts_with($this->photo, 'https://')) {
+                return $this->photo;
+            }
+            if (\Illuminate\Support\Facades\Storage::disk('public')->exists($this->photo)) {
+                return asset('storage/' . $this->photo);
+            }
         }
         return asset('images/placeholder-produit.png');
     }

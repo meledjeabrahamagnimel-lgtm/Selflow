@@ -145,46 +145,81 @@
                     <thead>
                         <tr>
                             <th>Date</th>
-                            <th>N° pièce</th>
+                            <th>N° Saisie</th>
                             <th>Référence</th>
                             <th>Libellé</th>
+                            <th>Type</th>
                             <th>Mode paiement</th>
-                            <th style="text-align: right;">Montant</th>
-                            <th>Client</th>
-                            <th>Statut</th>
-                            <th>Point de Vente</th>
+                            <th style="text-align: right; color:var(--success);">Entrée</th>
+                            <th style="text-align: right; color:var(--danger);">Sortie</th>
+                            <th style="text-align: right;">Solde</th>
+                            <th>Tiers</th>
+                            <th>PDV</th>
                         </tr>
                     </thead>
                     <tbody>
                         @foreach($operations as $op)
                         <tr>
-                            <td style="font-weight: 500;">{{ \Carbon\Carbon::parse($op->date_operation)->format('d/m/Y') }}</td>
-                            <td style="font-weight: 600;">{{ $op->id }}</td>
-                            <td style="font-weight: 700; color: var(--primary);">{{ $op->reference_document ?? '—' }}</td>
-                            <td style="white-space: normal; min-width: 220px;">{{ $op->libelle }}</td>
-                            <td>{{ $op->mode_paiement }}</td>
+                            <td style="font-weight: 500; white-space:nowrap;">{{ \Carbon\Carbon::parse($op->date_operation)->format('d/m/Y') }}</td>
+                            <td style="font-weight: 700; color: var(--primary);">
+                                @if(isset($op->no_saisie))
+                                    <a href="{{ route('admin.comptabilite.globale', ['mode' => 'ecritures', 'ref' => $op->reference_document]) }}"
+                                       style="color:var(--primary); text-decoration:none;"
+                                       title="Voir les écritures liées">
+                                        #{{ $op->no_saisie }}
+                                    </a>
+                                @else
+                                    #{{ $op->id }}
+                                @endif
+                            </td>
+                            <td style="font-weight: 600; color:var(--text-2);">{{ $op->reference_document ?? '—' }}</td>
+                            <td style="white-space: normal; min-width: 200px;">{{ $op->libelle }}</td>
+                            <td>
+                                @if($op->type_operation === 'recette')
+                                    <span style="background:#ecfdf5; color:#065f46; padding:2px 8px; border-radius:20px; font-size:11px; font-weight:700;">
+                                        <i class="fas fa-arrow-down"></i> Recette
+                                    </span>
+                                @else
+                                    <span style="background:#fef2f2; color:#991b1b; padding:2px 8px; border-radius:20px; font-size:11px; font-weight:700;">
+                                        <i class="fas fa-arrow-up"></i> Dépense
+                                    </span>
+                                @endif
+                            </td>
+                            <td>
+                                <span style="font-size:12px;">
+                                    @php
+                                        $modeIcons = ['Espèces'=>'fa-money-bill-wave','Virement'=>'fa-university','Chèque'=>'fa-file-alt','Carte bancaire'=>'fa-credit-card','Mobile Money'=>'fa-mobile-alt'];
+                                        $icon = $modeIcons[$op->mode_paiement] ?? 'fa-wallet';
+                                    @endphp
+                                    <i class="fas {{ $icon }}" style="margin-right:4px;"></i>
+                                    {{ $op->mode_paiement }}
+                                    @if($op->moyen_bancaire)
+                                        <br><small style="color:var(--text-3);">{{ $op->moyen_bancaire }}</small>
+                                    @endif
+                                </span>
+                            </td>
                             <td style="text-align: right; font-weight: 700;">
                                 @if($op->montant_entree > 0)
                                     <span style="color: var(--success);">+{{ number_format($op->montant_entree, 0, ',', ' ') }} F</span>
-                                @elseif($op->montant_sortie > 0)
+                                @else
+                                    <span style="color:var(--text-3);">—</span>
+                                @endif
+                            </td>
+                            <td style="text-align: right; font-weight: 700;">
+                                @if($op->montant_sortie > 0)
                                     <span style="color: var(--danger);">-{{ number_format($op->montant_sortie, 0, ',', ' ') }} F</span>
                                 @else
-                                    <span>0 F</span>
+                                    <span style="color:var(--text-3);">—</span>
                                 @endif
                             </td>
-                            <td style="font-weight: 600;">{{ $op->tier_nom }}</td>
-                            <td>
-                                @if($op->statut === 'Payé')
-                                    <span class="badge badge-success" style="background:#e6fdf5; color:#0f766e; padding:3px 8px; border-radius:20px;">Payé</span>
-                                @elseif($op->statut === 'Crédit')
-                                    <span class="badge badge-danger" style="background:#fef2f2; color:#991b1b; padding:3px 8px; border-radius:20px;">Crédit</span>
-                                @elseif($op->statut === 'Avance')
-                                    <span class="badge badge-warning" style="background:#fffbeb; color:#92400e; padding:3px 8px; border-radius:20px;">Avance</span>
-                                @else
-                                    <span class="badge badge-gray" style="background:#f1f5f9; color:#475569; padding:3px 8px; border-radius:20px;">—</span>
-                                @endif
+                            <td style="text-align: right; font-weight: 700; white-space:nowrap;">
+                                @php $s = floatval($op->solde_resultat); @endphp
+                                <span style="color: {{ $s >= 0 ? 'var(--success)' : 'var(--danger)' }}">
+                                    {{ number_format($s, 0, ',', ' ') }} F
+                                </span>
                             </td>
-                            <td><span class="badge badge-purple" style="background:var(--bg3); color:var(--primary); padding:3px 8px; border-radius:6px; font-weight:600;">{{ $op->pointDeVente->nom }}</span></td>
+                            <td style="font-weight: 500;">{{ $op->tier_nom }}</td>
+                            <td><span style="background:var(--bg3); color:var(--primary); padding:3px 8px; border-radius:6px; font-weight:600; font-size:12px;">{{ $op->pointDeVente->nom }}</span></td>
                         </tr>
                         @endforeach
                     </tbody>
@@ -204,51 +239,39 @@
                 <table>
                     <thead>
                         <tr>
-                            <th>Date de pièce (JJMMAA)</th>
-                            <th>N° pièce</th>
+                            <th>Date de pièce</th>
+                            <th>N° Saisie / Pièce</th>
                             <th>Code journal</th>
-                            <th>Numéro facture</th>
-                            <th>N° compte général</th>
+                            <th>Référence pièce</th>
+                            <th>N° Compte Général</th>
                             <th>Titre / Libellé</th>
-                            <th>Description</th>
-                            <th style="text-align: right;">Montant débit</th>
-                            <th style="text-align: right;">Montant crédit</th>
-                            <th>N° compte tiers</th>
-                            <th>Point de vente</th>
+                            <th style="text-align: right; color:#1e3a8a;">Montant Débit</th>
+                            <th style="text-align: right; color:#7f1d1d;">Montant Crédit</th>
+                            <th>N° Compte Tiers</th>
+                            <th>Point de Vente</th>
                         </tr>
                     </thead>
                     <tbody>
                         @foreach($ecritures as $ecr)
                         @php
+                            // Compte mouvementé (débit ou crédit)
                             $compte = $ecr->compte_debit ?? $ecr->compte_credit;
                             $isTiers = str_starts_with($compte, '411') || str_starts_with($compte, '401');
-                            $saisieKey = $ecr->code_journal . '_' . $ecr->reference_document;
-                            
-                            $saisieNum = null;
-                            if ($ecr->reference_document) {
-                                if (isset($tresoMap[$ecr->reference_document])) {
-                                    $saisieNum = $tresoMap[$ecr->reference_document];
-                                } elseif (isset($venteMap[$ecr->reference_document])) {
-                                    $saisieNum = $venteMap[$ecr->reference_document];
-                                } elseif (isset($achatMap[$ecr->reference_document])) {
-                                    $saisieNum = $achatMap[$ecr->reference_document];
-                                }
-                            }
-                            
-                            if (is_null($saisieNum)) {
-                                $saisieNum = $minIds[$saisieKey] ?? $ecr->id;
-                            }
+
+                            // N° Saisie unifié du groupe de pièce (MIN(id) des écritures du document)
+                            $saisieKey = $ecr->reference_document;
+                            $saisieNum = $minIds[$saisieKey] ?? $minIds[$ecr->code_journal . '_' . $ecr->reference_document] ?? $ecr->id;
                         @endphp
                         <tr>
-                            <td>{{ \Carbon\Carbon::parse($ecr->date_ecriture)->format('dmy') }}</td>
-                            <td style="font-weight: 600;">{{ $saisieNum }}</td>
+                            <td style="font-weight: 500; white-space:nowrap;">{{ \Carbon\Carbon::parse($ecr->date_ecriture)->format('d/m/Y') }}</td>
+                            <td style="font-weight: 700; color: var(--primary);">#{{ $saisieNum }}</td>
                             <td><span class="badge" style="background: var(--bg3); color: var(--primary); font-weight:700;">{{ $ecr->code_journal }}</span></td>
-                            <td style="font-weight: 700; color: var(--primary);">{{ $ecr->reference_document }}</td>
-                            <td style="font-weight: 600; color: var(--text-2);">
-                                {{ !$isTiers ? $compte : '—' }}
+                            <td style="font-weight: 700; color: var(--primary);">{{ $ecr->reference_document ?? '—' }}</td>
+                            <td style="font-weight: 700; color: var(--text-1);">
+                                {{-- En SYSCOHADA, le Compte Général est TOUJOURS affiché (y compris 401100 / 411100) --}}
+                                {{ $compte }}
                             </td>
-                            <td style="white-space: normal; min-width: 180px; font-weight:500;">{{ $ecr->libelle }}</td>
-                            <td style="white-space: normal; min-width: 200px; font-size:12px; color:var(--text-3);">{{ $ecr->description ?? '—' }}</td>
+                            <td style="white-space: normal; min-width: 240px; font-weight:500;">{{ $ecr->libelle }}</td>
                             <td style="text-align: right; font-weight: 700; color: #1e3a8a;">
                                 {{ $ecr->debit > 0 ? number_format($ecr->debit, 0, ',', ' ') . ' F' : '—' }}
                             </td>
@@ -258,7 +281,7 @@
                             <td style="font-weight: 600; color: var(--text-2);">
                                 {{ $isTiers ? $compte : '—' }}
                             </td>
-                            <td>{{ $ecr->pointDeVente->nom }}</td>
+                            <td><span style="background:var(--bg3); color:var(--primary); padding:3px 8px; border-radius:6px; font-weight:600; font-size:12px;">{{ $ecr->pointDeVente->nom }}</span></td>
                         </tr>
                         @endforeach
                     </tbody>

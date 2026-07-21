@@ -32,7 +32,7 @@ class RapportControleur
 
         // ─── VENTES (période active via PeriodeScope) ─────────────────────────
         $ventesBase = Vente::whereIn('point_de_vente_id', $pdvIds)
-            ->where('statut', 'Facturée');
+            ->where('etape', 'Facture');
 
         $totalVentes    = (clone $ventesBase)->sum('montant_ttc');
         $nbVentes       = (clone $ventesBase)->count();
@@ -40,7 +40,7 @@ class RapportControleur
 
         // ─── ACHATS (période active via PeriodeScope) ─────────────────────────
         $achatsBase = Achat::whereIn('point_de_vente_id', $pdvIds)
-            ->where('statut', 'Facturée');
+            ->where('etape', 'Facture');
 
         $totalAchats = (clone $achatsBase)->sum('montant_ttc');
         $nbAchats    = (clone $achatsBase)->count();
@@ -63,7 +63,7 @@ class RapportControleur
             )
             ->whereHas('vente', function ($q) use ($pdvIds) {
                 $q->whereIn('point_de_vente_id', $pdvIds)
-                  ->where('statut', 'Facturée');
+                  ->where('etape', 'Facture');
             })
             ->groupBy('produit_id', 'libelle_virtuel')
             ->orderByDesc('ca_ttc')
@@ -90,7 +90,7 @@ class RapportControleur
             )
             ->whereHas('vente', function ($q) use ($pdvIds) {
                 $q->whereIn('point_de_vente_id', $pdvIds)
-                  ->where('statut', 'Facturée');
+                  ->where('etape', 'Facture');
             })
             ->groupBy('produit_id', 'libelle_virtuel')
             ->having('qte_vendue', '>', 0)
@@ -112,7 +112,7 @@ class RapportControleur
             )
             ->whereHas('achat', function ($q) use ($pdvIds) {
                 $q->whereIn('point_de_vente_id', $pdvIds)
-                  ->where('statut', 'Facturée');
+                  ->where('etape', 'Facture');
             })
             ->groupBy('libelle_virtuel')
             ->orderByDesc('total_depense')
@@ -122,9 +122,9 @@ class RapportControleur
         // ─── Comparaison Points de Vente ─────────────────────────────────────
         $performancesPdv = $pointsDeVente->map(function ($pdv) use ($pdvIds) {
             $ventesPdv  = Vente::where('point_de_vente_id', $pdv->id)
-                ->where('statut', 'Facturée');
+                ->where('etape', 'Facture');
             $achatsPdv  = Achat::where('point_de_vente_id', $pdv->id)
-                ->where('statut', 'Facturée');
+                ->where('etape', 'Facture');
             $tresPdv    = TresorerieJournal::where('point_de_vente_id', $pdv->id);
 
             $ca_ttc     = (clone $ventesPdv)->sum('montant_ttc');
@@ -161,7 +161,7 @@ class RapportControleur
                 DB::raw('AVG(montant_ttc) as panier_moyen')
             )
             ->whereIn('point_de_vente_id', $pdvIds)
-            ->where('statut', 'Facturée')
+            ->where('etape', 'Facture')
             ->whereNotNull('utilisateur_id')
             ->groupBy('utilisateur_id')
             ->orderByDesc('total_ventes')
@@ -181,7 +181,7 @@ class RapportControleur
                 DB::raw('COUNT(*) as nb')
             )
             ->whereIn('point_de_vente_id', $pdvIds)
-            ->where('statut', 'Facturée')
+            ->where('etape', 'Facture')
             ->where('date_vente', '>=', now()->subMonths(11)->startOfMonth())
             ->groupBy('mois')
             ->orderBy('mois')
@@ -193,7 +193,7 @@ class RapportControleur
                 DB::raw('SUM(montant_ttc) as depenses')
             )
             ->whereIn('point_de_vente_id', $pdvIds)
-            ->where('statut', 'Facturée')
+            ->where('etape', 'Facture')
             ->where('date_achat', '>=', now()->subMonths(11)->startOfMonth())
             ->groupBy('mois')
             ->orderBy('mois')
@@ -202,7 +202,7 @@ class RapportControleur
         // ─── Répartition modes de paiement ───────────────────────────────────
         $repartitionPaiements = Vente::select('mode_paiement', DB::raw('COUNT(*) as nb'), DB::raw('SUM(montant_ttc) as total'))
             ->whereIn('point_de_vente_id', $pdvIds)
-            ->where('statut', 'Facturée')
+            ->where('etape', 'Facture')
             ->groupBy('mode_paiement')
             ->get();
 

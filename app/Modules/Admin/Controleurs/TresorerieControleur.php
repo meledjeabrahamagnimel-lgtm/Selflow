@@ -21,7 +21,10 @@ class TresorerieControleur
             : session('point_de_vente_actif_id');
 
         $query = TresorerieJournal::with('pointDeVente')
-            ->where('type_operation', 'Encaissement');
+            ->where(function($q) {
+                $q->whereIn('type_operation', ['recette', 'Encaissement', 'encaissement'])
+                  ->orWhere('montant_entree', '>', 0);
+            });
 
         if ($pointDeVenteId) {
             $query->where('point_de_vente_id', $pointDeVenteId);
@@ -29,7 +32,7 @@ class TresorerieControleur
             $query->whereHas('pointDeVente', fn($q) => $q->where('entreprise_id', $entreprise->id));
         }
 
-        $operations = $query->latest()->paginate(30);
+        $operations = $query->latest('date_operation')->latest('id')->paginate(30);
 
         return view('admin::tresorerie.encaissements', compact('operations'));
     }
@@ -42,7 +45,10 @@ class TresorerieControleur
             : session('point_de_vente_actif_id');
 
         $query = TresorerieJournal::with('pointDeVente')
-            ->where('type_operation', 'Décaissement');
+            ->where(function($q) {
+                $q->whereIn('type_operation', ['depense', 'Décaissement', 'dépense', 'decaissement'])
+                  ->orWhere('montant_sortie', '>', 0);
+            });
 
         if ($pointDeVenteId) {
             $query->where('point_de_vente_id', $pointDeVenteId);
@@ -50,7 +56,7 @@ class TresorerieControleur
             $query->whereHas('pointDeVente', fn($q) => $q->where('entreprise_id', $entreprise->id));
         }
 
-        $operations = $query->latest()->paginate(30);
+        $operations = $query->latest('date_operation')->latest('id')->paginate(30);
 
         return view('admin::tresorerie.decaissements', compact('operations'));
     }

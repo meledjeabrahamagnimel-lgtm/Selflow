@@ -59,28 +59,16 @@ class ComptabiliteControleur
             // afin de l'utiliser comme "N° saisie" commun en fallback
             $references = $ecritures->pluck('reference_document')->filter()->unique();
             if ($references->isNotEmpty()) {
-                $minIds = DB::table('ecritures_comptables')
+                $minRecords = DB::table('ecritures_comptables')
                     ->select('code_journal', 'reference_document', DB::raw('MIN(id) as min_id'))
                     ->whereIn('reference_document', $references)
                     ->groupBy('code_journal', 'reference_document')
-                    ->get()
-                    ->mapWithKeys(function ($item) {
-                        return [$item->code_journal . '_' . $item->reference_document => $item->min_id];
-                    })
-                    ->toArray();
+                    ->get();
 
-                // Cartographie des ID d'opérations de trésorerie pour faire correspondre le N° saisie à l'ID d'opération
-                $tresoMap = TresorerieJournal::whereIn('reference_document', $references)
-                    ->pluck('id', 'reference_document')
-                    ->toArray();
-
-                $venteMap = Vente::whereIn('numero_facture', $references)
-                    ->pluck('id', 'numero_facture')
-                    ->toArray();
-
-                $achatMap = Achat::whereIn('numero_facture', $references)
-                    ->pluck('id', 'numero_facture')
-                    ->toArray();
+                foreach ($minRecords as $item) {
+                    $minIds[$item->reference_document] = $item->min_id;
+                    $minIds[$item->code_journal . '_' . $item->reference_document] = $item->min_id;
+                }
             }
         } else {
             // Vue opérations (Trésorerie / Caisse)
@@ -95,32 +83,75 @@ class ComptabiliteControleur
 
             $operations = $query->orderBy('date_operation', 'desc')->orderBy('id', 'desc')->paginate(30);
 
-            // Charger en lot pour éviter le problème N+1
+            // ── Charger les tiers et statuts liés aux références ─────────────
             $references = $operations->pluck('reference_document')->filter()->unique();
-            $ventes = collect();
-            $achats = collect();
+            $ventes     = collect();
+            $achats     = collect();
 
-            $venteRefs = $references->filter(fn($ref) => str_starts_with($ref, 'VT-'));
+            // Préfixes ventes : VTE-, DEV-, BC-, FAC-, AVO-VTE-, AVO-VT-
+            $venteRefs = $references->filter(fn($ref) =>
+                str_starts_with($ref, 'VTE-')     ||
+                str_starts_with($ref, 'DEV-')     ||
+                str_starts_with($ref, 'BC-')      ||
+                str_starts_with($ref, 'FAC-')     ||
+                str_starts_with($ref, 'AVO-VTE-') ||
+                str_starts_with($ref, 'AVO-VT-')
+            );
             if ($venteRefs->isNotEmpty()) {
                 $ventes = Vente::whereIn('numero_facture', $venteRefs)->with('client')->get()->keyBy('numero_facture');
             }
 
-            $achatRefs = $references->filter(fn($ref) => str_starts_with($ref, 'AC-'));
+            // Préfixes achats : ACH-, AVO-ACH-
+            $achatRefs = $references->filter(fn($ref) =>
+                str_starts_with($ref, 'ACH-')    ||
+                str_starts_with($ref, 'AVO-ACH-')
+            );
             if ($achatRefs->isNotEmpty()) {
                 $achats = Achat::whereIn('numero_facture', $achatRefs)->with('fournisseur')->get()->keyBy('numero_facture');
             }
 
+            // ── Construire la map N° saisie (lier opération ↔ écritures) ─────
+            // Chaque opération et ses écritures partagent le même reference_document.
+            // On récupère le MIN(id) des écritures par reference_document → N° saisie.
+            $minEcrituresIds = [];
+            if ($references->isNotEmpty()) {
+                $minEcrituresIds = DB::table('ecritures_comptables')
+                    ->select('reference_document', DB::raw('MIN(id) as min_id'))
+                    ->whereIn('reference_document', $references)
+                    ->groupBy('reference_document')
+                    ->pluck('min_id', 'reference_document')
+                    ->toArray();
+            }
+
             foreach ($operations as $op) {
                 $op->tier_nom = '—';
+                $op->statut   = $op->statut ?? '—';
+
+                // N° saisie = MIN(id) des écritures liées, ou l'id de l'opération elle-même
+                $op->no_saisie = $op->reference_document
+                    ? ($minEcrituresIds[$op->reference_document] ?? $op->id)
+                    : $op->id;
+
                 if ($op->reference_document) {
-                    if (str_starts_with($op->reference_document, 'VT-')) {
-                        $vente = $ventes->get($op->reference_document);
+                    $ref = $op->reference_document;
+                    // Lien ventes (tous préfixes)
+                    if (str_starts_with($ref, 'VTE-') || str_starts_with($ref, 'DEV-') ||
+                        str_starts_with($ref, 'BC-')  ||
+                        str_starts_with($ref, 'FAC-') || str_starts_with($ref, 'AVO-VTE-') ||
+                        str_starts_with($ref, 'AVO-VT-')) {
+                        $vente = $ventes->get($ref);
                         $op->tier_nom = $vente?->client?->nom ?? 'Client de passage';
-                        $op->statut = $vente?->statut ?? '—';
-                    } elseif (str_starts_with($op->reference_document, 'AC-')) {
-                        $achat = $achats->get($op->reference_document);
+                        $op->statut   = $vente?->statut ?? '—';
+                    }
+                    // Lien achats
+                    elseif (str_starts_with($ref, 'ACH-') || str_starts_with($ref, 'AVO-ACH-')) {
+                        $achat = $achats->get($ref);
                         $op->tier_nom = $achat?->fournisseur?->nom ?? '—';
-                        $op->statut = $achat?->statut ?? '—';
+                        $op->statut   = $achat?->statut ?? '—';
+                    }
+                    // OD Production
+                    elseif (str_starts_with($ref, 'OD-')) {
+                        $op->tier_nom = 'Production interne';
                     }
                 }
             }
