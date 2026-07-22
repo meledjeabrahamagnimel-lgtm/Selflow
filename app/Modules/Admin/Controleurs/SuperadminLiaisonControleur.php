@@ -90,8 +90,8 @@ class SuperadminLiaisonControleur
             return back()->with('error', "❌ Aucun admin trouvé pour «{$entreprise->nom}».");
         }
 
-        $comptaflowUrl = config('services.comptaflow.url', env('COMPTAFLOW_URL', 'http://127.0.0.1:8004'));
-        $superSecret   = config('services.comptaflow.superadmin_secret', env('COMPTAFLOW_SUPERADMIN_SECRET', ''));
+        $comptaflowUrl = config('selflow.comptaflow_api_url');
+        $superSecret   = config('selflow.comptaflow_superadmin_secret');
 
         try {
             $response = Http::timeout(15)->post("{$comptaflowUrl}/api/superadmin/creer-depuis-selflow", [
@@ -146,7 +146,7 @@ class SuperadminLiaisonControleur
             return back()->with('error', "❌ «{$entreprise->nom}» n'est pas liée à COMPTAFLOW.");
         }
 
-        $comptaflowUrl = config('services.comptaflow.url', env('COMPTAFLOW_URL', 'http://127.0.0.1:8004'));
+        $comptaflowUrl = config('selflow.comptaflow_api_url');
 
         try {
             $response = Http::timeout(8)
@@ -171,8 +171,8 @@ class SuperadminLiaisonControleur
 
     private function fetchComptaflowEntreprises(): array
     {
-        $comptaflowUrl = config('services.comptaflow.url', env('COMPTAFLOW_URL', 'http://127.0.0.1:8004'));
-        $superSecret   = config('services.comptaflow.superadmin_secret', env('COMPTAFLOW_SUPERADMIN_SECRET', ''));
+        $comptaflowUrl = config('selflow.comptaflow_api_url');
+        $superSecret   = config('selflow.comptaflow_superadmin_secret');
 
         try {
             $response = Http::timeout(6)->get("{$comptaflowUrl}/api/superadmin/entreprises", [
