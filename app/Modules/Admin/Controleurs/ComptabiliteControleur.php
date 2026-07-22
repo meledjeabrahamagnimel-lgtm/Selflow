@@ -10,6 +10,7 @@ use App\Modules\Admin\Modeles\EcritureComptable;
 use App\Modules\Admin\Modeles\TresorerieJournal;
 use App\Modules\Admin\Modeles\PointDeVente;
 use App\Modules\Admin\Modeles\CodeJournal;
+use App\Modules\Admin\Modeles\Operation;
 use App\Modules\Admin\Services\CacheService;
 use App\Modules\Admin\Services\ComptabiliteService;
 use Illuminate\Http\RedirectResponse;
@@ -45,7 +46,7 @@ class ComptabiliteControleur
 
         if ($mode === 'ecritures') {
             // Vue écritures (Grand Livre double-entrée)
-            $query = EcritureComptable::with(['pointDeVente'])
+            $query = EcritureComptable::with(['pointDeVente', 'operation'])
                 ->where('entreprise_id', $entreprise->id);
 
             if (!empty($pdvFilter)) {
@@ -54,22 +55,10 @@ class ComptabiliteControleur
 
             $ecritures = $query->orderBy('date_ecriture', 'desc')->orderBy('id', 'desc')->paginate(30);
             $operations = collect();
-
-            // Récupérer le MIN(id) pour chaque groupe de transaction (même code_journal + même reference_document)
-            // afin de l'utiliser comme "N° saisie" commun en fallback
-            $references = $ecritures->pluck('reference_document')->filter()->unique();
-            if ($references->isNotEmpty()) {
-                $minRecords = DB::table('ecritures_comptables')
-                    ->select('code_journal', 'reference_document', DB::raw('MIN(id) as min_id'))
-                    ->whereIn('reference_document', $references)
-                    ->groupBy('code_journal', 'reference_document')
-                    ->get();
-
-                foreach ($minRecords as $item) {
-                    $minIds[$item->reference_document] = $item->min_id;
-                    $minIds[$item->code_journal . '_' . $item->reference_document] = $item->min_id;
-                }
-            }
+            // NB : le N° Saisie n'est plus recalculé à la volée (ancien MIN(id) par
+            // reference_document, qui mélangeait parfois deux opérations distinctes
+            // partageant le même n° de facture). Il est désormais lu directement
+            // depuis $ecriture->operation->numero_saisie dans la vue.
         } else {
             // Vue opérations (Trésorerie / Caisse)
             $query = TresorerieJournal::with(['pointDeVente'])
@@ -110,27 +99,29 @@ class ComptabiliteControleur
                 $achats = Achat::whereIn('numero_facture', $achatRefs)->with('fournisseur')->get()->keyBy('numero_facture');
             }
 
-            // ── Construire la map N° saisie (lier opération ↔ écritures) ─────
-            // Chaque opération et ses écritures partagent le même reference_document.
-            // On récupère le MIN(id) des écritures par reference_document → N° saisie.
-            $minEcrituresIds = [];
+            // ── Construire la map N° saisie (lier opération de trésorerie ↔ Operation comptable) ──
+            // NB : TresorerieJournal n'est pas encore rattaché par clé étrangère à
+            // Operation (voir Phase 3/5 de l'audit — fusion des deux tables à
+            // terme). En attendant, on résout au mieux par référence de pièce +
+            // entreprise, en privilégiant l'opération de règlement/comptant la
+            // plus récente pour ce document (celle qui correspond réellement au
+            // mouvement de trésorerie affiché).
+            $operationsParRef = [];
             if ($references->isNotEmpty()) {
-                $minEcrituresIds = DB::table('ecritures_comptables')
-                    ->select('reference_document', DB::raw('MIN(id) as min_id'))
+                $operationsParRef = Operation::where('entreprise_id', $entreprise->id)
                     ->whereIn('reference_document', $references)
-                    ->groupBy('reference_document')
-                    ->pluck('min_id', 'reference_document')
-                    ->toArray();
+                    ->orderByDesc('id')
+                    ->get()
+                    ->groupBy('reference_document');
             }
 
             foreach ($operations as $op) {
                 $op->tier_nom = '—';
                 $op->statut   = $op->statut ?? '—';
 
-                // N° saisie = MIN(id) des écritures liées, ou l'id de l'opération elle-même
-                $op->no_saisie = $op->reference_document
-                    ? ($minEcrituresIds[$op->reference_document] ?? $op->id)
-                    : $op->id;
+                // N° saisie = numéro de la vraie Operation liée à ce document (si trouvée), sinon l'id brut
+                $opsPourRef = $op->reference_document ? ($operationsParRef[$op->reference_document] ?? null) : null;
+                $op->no_saisie = $opsPourRef?->first()?->numero_saisie ?? $op->id;
 
                 if ($op->reference_document) {
                     $ref = $op->reference_document;
@@ -617,63 +608,86 @@ class ComptabiliteControleur
     }
 
     /**
-     * Enregistrer une écriture comptable manuelle
+     * Enregistrer une écriture comptable manuelle (OD), avec un nombre de
+     * lignes illimité (N débits / N crédits). Remplace l'ancienne saisie
+     * limitée à un seul compte au débit et un seul au crédit.
+     *
+     * Format attendu (voir vue globale.blade.php) :
+     *   lignes[0][compte] = '601000', lignes[0][sens] = 'debit', lignes[0][montant] = 50000, lignes[0][compte_tiers] = null
+     *   lignes[1][compte] = '571000', lignes[1][sens] = 'credit', lignes[1][montant] = 50000
+     *   ...
      */
     public function creerEcritureManuelle(Request $request): RedirectResponse
     {
         $entreprise = Auth::user()->entreprise;
 
         $request->validate([
-            'date_ecriture'     => ['required', 'date'],
-            'libelle'           => ['required', 'string', 'max:255'],
-            'description'       => ['nullable', 'string', 'max:2000'],
-            'code_journal'      => ['required', 'string', 'max:10'],
-            'compte_debit'      => ['required', 'string', 'max:50'],
-            'compte_credit'     => ['required', 'string', 'max:50'],
-            'montant'           => ['required', 'numeric', 'min:1'],
-            'point_de_vente_id' => ['nullable', 'integer', 'exists:points_de_vente,id'],
+            'date_ecriture'          => ['required', 'date'],
+            'libelle'                => ['required', 'string', 'max:255'],
+            'description'            => ['nullable', 'string', 'max:2000'],
+            'code_journal'           => ['required', 'string', 'max:10'],
+            'point_de_vente_id'      => ['nullable', 'integer', 'exists:points_de_vente,id'],
+            'lignes'                 => ['required', 'array', 'min:2'],
+            'lignes.*.compte'        => ['required', 'string', 'max:50'],
+            'lignes.*.compte_tiers'  => ['nullable', 'string', 'max:50'],
+            'lignes.*.sens'          => ['required', 'in:debit,credit'],
+            'lignes.*.montant'       => ['required', 'numeric', 'min:0.01'],
         ]);
 
         $pdvId = $request->point_de_vente_id;
         if (!$pdvId) {
-            $pdvId = session('point_de_vente_actif_id') 
-                ?? Auth::user()->point_de_vente_id 
+            $pdvId = session('point_de_vente_actif_id')
+                ?? Auth::user()->point_de_vente_id
                 ?? PointDeVente::where('entreprise_id', $entreprise->id)->value('id');
         }
 
-        $montant = floatval($request->montant);
-        $numPiece = 'MN-' . now()->format('YmdHis');
+        // Contrôle d'équilibre strict AVANT toute écriture en base — une
+        // écriture déséquilibrée ne doit jamais pouvoir être enregistrée,
+        // même en cas d'erreur de saisie ou de manipulation du formulaire.
+        $totalDebit = 0;
+        $totalCredit = 0;
+        foreach ($request->lignes as $ligne) {
+            if ($ligne['sens'] === 'debit') {
+                $totalDebit += (float) $ligne['montant'];
+            } else {
+                $totalCredit += (float) $ligne['montant'];
+            }
+        }
+        if (abs($totalDebit - $totalCredit) >= 0.01) {
+            return back()->withInput()->with('error',
+                "❌ Écriture déséquilibrée : Total Débit (" . number_format($totalDebit, 0, ',', ' ') .
+                " F) ≠ Total Crédit (" . number_format($totalCredit, 0, ',', ' ') . " F). Corrigez avant d'enregistrer."
+            );
+        }
 
-        DB::transaction(function () use ($entreprise, $pdvId, $request, $montant, $numPiece) {
-            // Créer le débit
-            EcritureComptable::create([
-                'entreprise_id'      => $entreprise->id,
-                'point_de_vente_id'  => $pdvId,
-                'date_ecriture'      => $request->date_ecriture,
-                'libelle'            => $request->libelle,
-                'description'        => $request->description,
-                'reference_document' => $numPiece,
-                'code_journal'       => $request->code_journal,
-                'compte_debit'       => $request->compte_debit,
-                'compte_credit'      => null,
-                'debit'              => $montant,
-                'credit'             => 0,
-            ]);
+        $numPiece = \App\Modules\Admin\Services\NumerotationService::genererNumeroOD($entreprise->id);
+        $date = $request->date_ecriture;
 
-            // Créer le crédit
-            EcritureComptable::create([
-                'entreprise_id'      => $entreprise->id,
-                'point_de_vente_id'  => $pdvId,
-                'date_ecriture'      => $request->date_ecriture,
-                'libelle'            => $request->libelle,
-                'description'        => $request->description,
-                'reference_document' => $numPiece,
-                'code_journal'       => $request->code_journal,
-                'compte_debit'       => null,
-                'compte_credit'      => $request->compte_credit,
-                'debit'              => 0,
-                'credit'             => $montant,
-            ]);
+        DB::transaction(function () use ($entreprise, $pdvId, $request, $numPiece, $date) {
+            $operation = Operation::creer(
+                $entreprise->id, $pdvId, $date, 'OD',
+                $request->code_journal, $numPiece, $request->libelle
+            );
+
+            foreach ($request->lignes as $ligne) {
+                EcritureComptable::create([
+                    'operation_id'       => $operation->id,
+                    'entreprise_id'      => $entreprise->id,
+                    'point_de_vente_id'  => $pdvId,
+                    'date_ecriture'      => $date,
+                    'libelle'            => $request->libelle,
+                    'description'        => $request->description,
+                    'reference_document' => $numPiece,
+                    'code_journal'       => $request->code_journal,
+                    'compte_debit'       => $ligne['sens'] === 'debit' ? $ligne['compte'] : null,
+                    'compte_credit'      => $ligne['sens'] === 'credit' ? $ligne['compte'] : null,
+                    'compte_tiers'       => $ligne['compte_tiers'] ?? null,
+                    'debit'              => $ligne['sens'] === 'debit' ? (float) $ligne['montant'] : 0,
+                    'credit'             => $ligne['sens'] === 'credit' ? (float) $ligne['montant'] : 0,
+                ]);
+            }
+
+            $operation->cloturerEquilibre();
         });
 
         return back()->with('succes', 'Écriture manuelle enregistrée avec succès.');

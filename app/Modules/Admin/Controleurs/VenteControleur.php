@@ -105,6 +105,29 @@ class VenteControleur
         }
 
         $venteId = null;
+        $etapePrevue = $request->input('etape', 'Facture');
+
+        // Vérification de disponibilité AVANT toute écriture en base : une
+        // facturation (décrémentation immédiate du stock) ne doit jamais
+        // pouvoir dépasser le stock réellement disponible. Un Devis ou Bon
+        // de commande, eux, ne décrémentent rien et ne sont donc pas bloqués
+        // ici (ils peuvent réserver plus que le stock actuel, à charge pour
+        // l'utilisateur de réapprovisionner avant facturation).
+        if ($etapePrevue === 'Facture') {
+            foreach ($request->articles as $article) {
+                if (empty($article['produit_id'])) continue;
+
+                $produit = Produit::find($article['produit_id']);
+                if (!$produit || !$produit->estStockable()) continue;
+
+                $stockDisponible = $produit->stockActuel($pointDeVenteId);
+                if ($stockDisponible < $article['quantite']) {
+                    return back()->withInput()->with('error',
+                        "❌ Stock insuffisant pour « {$produit->nom} » : disponible {$stockDisponible}, demandé {$article['quantite']}."
+                    );
+                }
+            }
+        }
 
         DB::transaction(function () use ($request, $pointDeVenteId, &$venteId, $entreprise) {
             $montantHt  = 0;
@@ -205,7 +228,7 @@ class VenteControleur
                 $ht = $article['quantite'] * $prix;
                 $tva = $ht * ($tvaRate / 100);
 
-                VenteDetail::create([
+                $detail = VenteDetail::create([
                     'vente_id'        => $vente->id,
                     'produit_id'      => $produit ? $produit->id : null,
                     'libelle_virtuel' => $produit ? null : $nomElement,
@@ -218,7 +241,24 @@ class VenteControleur
 
                 if ($produit && $etape === 'Facture' && $produit->estStockable()) {
                     $stockAvant = $produit->stockActuel($pointDeVenteId);
+
+                    // Contrôle final sous verrou (Produit::lockForUpdate() ci-dessus) :
+                    // seconde vérification, autoritaire cette fois, qui protège contre
+                    // les ventes concurrentes passées entre la pré-vérification et ici.
+                    if ($stockAvant < $article['quantite']) {
+                        throw new \InvalidArgumentException(
+                            "Stock insuffisant pour « {$produit->nom} » (Disponible: {$stockAvant}, Demandé: {$article['quantite']})."
+                        );
+                    }
+
                     $produit->decrementStock($pointDeVenteId, $article['quantite']);
+
+                    // Marquer la ligne comme totalement livrée : la facturation directe
+                    // implique une sortie de stock immédiate. Sans cela, cette même
+                    // ligne réapparaîtrait dans la file de "Livraisons à valider"
+                    // (StockControleur::livraisons()) et son stock serait décrémenté
+                    // UNE SECONDE FOIS si un utilisateur validait une "livraison" dessus.
+                    $detail->update(['quantite_livree' => $article['quantite']]);
 
                     MouvementStock::create([
                         'produit_id'         => $produit->id,
@@ -242,8 +282,18 @@ class VenteControleur
                 // Normalisation FNE en arrière-plan (Section 18.5) — n'attendons pas la réponse HTTP
                 NormaliserFactureFne::dispatch($vente, $estRne);
 
-                // Écriture de facturation
-                \App\Modules\Admin\Services\ComptabiliteService::genererEcritureFactureVente($vente);
+                // Écritures de facturation (+ règlement immédiat le cas échéant).
+                // genererEcrituresVente() décide seule si la vente est comptant
+                // (aucune ligne 411) ou à crédit total/partiel (411 pour le solde
+                // réellement non couvert) — voir ComptabiliteService pour le détail.
+                \App\Modules\Admin\Services\ComptabiliteService::genererEcrituresVente(
+                    $vente,
+                    $statutVente === 'Crédit' ? 0 : $montantPaye,
+                    $modePaiementFinal,
+                    now()->toDateString(),
+                    $request->mode_paiement === 'Banque' ? $request->moyen_bancaire : null,
+                    $request->mode_paiement === 'Banque' ? $request->reference_paiement : null
+                );
 
                 if ($statutVente !== 'Crédit' && $montantPaye > 0) {
                     $soldeActuel = TresorerieJournal::where('point_de_vente_id', $pointDeVenteId)
@@ -262,16 +312,6 @@ class VenteControleur
                         'solde_resultat'     => $soldeActuel + $montantPaye,
                         'reference_document' => $numero,
                     ]);
-
-                    // Écriture comptable de règlement
-                    \App\Modules\Admin\Services\ComptabiliteService::genererEcritureReglementVente(
-                        $vente,
-                        $montantPaye,
-                        $modePaiementFinal,
-                        now()->toDateString(),
-                        $request->mode_paiement === 'Banque' ? $request->moyen_bancaire : null,
-                        $request->mode_paiement === 'Banque' ? $request->reference_paiement : null
-                    );
                 }
             } else {
                 // Étape Devis : Enregistrer le règlement (acompte) dans la trésorerie si présent
@@ -510,11 +550,17 @@ class VenteControleur
         DB::transaction(function () use ($vente, $request) {
             $pointDeVenteId = $vente->point_de_vente_id;
 
-            // 1. Restituer les stocks anciens
+            $etaitFacturee = $vente->etape === 'Facture';
+
+            // 1. Restituer les stocks anciens — UNIQUEMENT si la vente était déjà
+            //    facturée (le stock n'a jamais été décrémenté pour un Devis ou un
+            //    Bon de commande ; l'incrémenter ici serait une fuite de stock fictive).
             $oldDetails = VenteDetail::where('vente_id', $vente->id)->with('produit')->get();
-            foreach ($oldDetails as $oldDetail) {
-                if ($oldDetail->produit) {
-                    $oldDetail->produit->incrementStock($pointDeVenteId, $oldDetail->quantite);
+            if ($etaitFacturee) {
+                foreach ($oldDetails as $oldDetail) {
+                    if ($oldDetail->produit && $oldDetail->produit->estStockable()) {
+                        $oldDetail->produit->incrementStock($pointDeVenteId, $oldDetail->quantite);
+                    }
                 }
             }
 
@@ -627,9 +673,23 @@ class VenteControleur
                     'montant_ttc'     => $ht + $tva,
                 ]);
 
-                if ($produit) {
+                if ($produit && $etaitFacturee && $produit->estStockable()) {
                     $stockAvant = $produit->stockActuel($pointDeVenteId);
+
+                    if ($stockAvant < $article['quantite']) {
+                        throw new \InvalidArgumentException(
+                            "Stock insuffisant pour « {$produit->nom} » (Disponible: {$stockAvant}, Demandé: {$article['quantite']})."
+                        );
+                    }
+
                     $produit->decrementStock($pointDeVenteId, $article['quantite']);
+                    // Voir explication dans store() : évite le double décrément via la
+                    // file "Livraisons à valider" (StockControleur::livraisons()).
+                    VenteDetail::where('vente_id', $vente->id)
+                        ->where('produit_id', $produit->id)
+                        ->latest('id')
+                        ->limit(1)
+                        ->update(['quantite_livree' => $article['quantite']]);
 
                     MouvementStock::create([
                         'produit_id'         => $produit->id,
@@ -690,14 +750,31 @@ class VenteControleur
         }
 
         DB::transaction(function () use ($vente) {
+            // Vérification de disponibilité AVANT toute décrémentation.
+            foreach ($vente->details as $detail) {
+                if ($detail->produit && $detail->produit->estStockable()) {
+                    $dispo = $detail->produit->stockActuel($vente->point_de_vente_id);
+                    if ($dispo < $detail->quantite) {
+                        throw new \InvalidArgumentException(
+                            "Stock insuffisant pour « {$detail->produit->nom} » (Disponible: {$dispo}, Demandé: {$detail->quantite})."
+                        );
+                    }
+                }
+            }
+
             $vente->update(['etape' => 'Facture']);
 
             // 1. Décrémenter le stock uniquement pour les articles stockables
             foreach ($vente->details as $detail) {
-                $produit = $detail->produit;
+                // Verrou de ligne pour éviter toute décrémentation concurrente incohérente
+                $produit = $detail->produit ? \App\Modules\Admin\Modeles\Produit::lockForUpdate()->find($detail->produit->id) : null;
                 if ($produit && $produit->estStockable()) {
                     $stockAvant = $produit->stockActuel($vente->point_de_vente_id);
                     $produit->decrementStock($vente->point_de_vente_id, $detail->quantite);
+
+                    // Évite le double décrément via la file "Livraisons à valider"
+                    // (StockControleur::livraisons()) — voir explication dans store().
+                    $detail->update(['quantite_livree' => $detail->quantite]);
 
                     MouvementStock::create([
                         'produit_id'         => $produit->id,
@@ -715,44 +792,46 @@ class VenteControleur
             $estRne = empty($vente->client_id) || ($vente->client_id == 'divers');
             NormaliserFactureFne::dispatch($vente, $estRne);
 
-            // 3. Générer l'écriture comptable de facturation
-            \App\Modules\Admin\Services\ComptabiliteService::genererEcritureFactureVente($vente);
+            // 3. Trésorerie : enregistrer le solde encaissé aujourd'hui, si la facture
+            //    est totalement soldée (un éventuel acompte a pu être versé plus tôt,
+            //    au stade Devis — voir le bloc "Étape Devis" dans store()).
+            $dejaPayeAvant = TresorerieJournal::where('reference_document', $vente->numero_facture)->sum('montant_entree');
+            $resteAPayer = $vente->statut === 'Payé' ? max(0, $vente->montant_ttc - $dejaPayeAvant) : 0;
 
-            // 3. Trésorerie et Écriture de règlement si payé
-            // 3. Trésorerie et Écriture de règlement si payé
-            if ($vente->statut === 'Payé') {
-                $dejaPaye = TresorerieJournal::where('reference_document', $vente->numero_facture)->sum('montant_entree');
-                $resteAPayer = max(0, $vente->montant_ttc - $dejaPaye);
+            if ($resteAPayer > 0) {
+                $soldeActuel = TresorerieJournal::where('point_de_vente_id', $vente->point_de_vente_id)
+                    ->orderByDesc('created_at')->value('solde_resultat') ?? 0;
 
-                if ($resteAPayer > 0) {
-                    $soldeActuel = TresorerieJournal::where('point_de_vente_id', $vente->point_de_vente_id)
-                        ->orderByDesc('created_at')->value('solde_resultat') ?? 0;
-
-                    TresorerieJournal::create([
-                        'point_de_vente_id'  => $vente->point_de_vente_id,
-                        'date_operation'     => now()->toDateString(),
-                        'type_operation'     => 'Encaissement',
-                        'libelle'            => 'Vente — Règlement solde Facture ' . $vente->numero_facture,
-                        'mode_paiement'      => $vente->mode_paiement,
-                        'moyen_bancaire'     => $vente->moyen_bancaire,
-                        'reference_paiement' => $vente->reference_paiement,
-                        'montant_entree'     => $resteAPayer,
-                        'montant_sortie'     => 0,
-                        'solde_resultat'     => $soldeActuel + $resteAPayer,
-                        'reference_document' => $vente->numero_facture,
-                    ]);
-
-                    // Écriture de règlement
-                    \App\Modules\Admin\Services\ComptabiliteService::genererEcritureReglementVente(
-                        $vente,
-                        $resteAPayer,
-                        $vente->mode_paiement,
-                        now()->toDateString(),
-                        $vente->moyen_bancaire,
-                        $vente->reference_paiement
-                    );
-                }
+                TresorerieJournal::create([
+                    'point_de_vente_id'  => $vente->point_de_vente_id,
+                    'date_operation'     => now()->toDateString(),
+                    'type_operation'     => 'Encaissement',
+                    'libelle'            => 'Vente — Règlement solde Facture ' . $vente->numero_facture,
+                    'mode_paiement'      => $vente->mode_paiement,
+                    'moyen_bancaire'     => $vente->moyen_bancaire,
+                    'reference_paiement' => $vente->reference_paiement,
+                    'montant_entree'     => $resteAPayer,
+                    'montant_sortie'     => 0,
+                    'solde_resultat'     => $soldeActuel + $resteAPayer,
+                    'reference_document' => $vente->numero_facture,
+                ]);
             }
+
+            // 4. Écritures comptables de facturation, en une seule opération cohérente :
+            //    - le montant total déjà encaissé à ce jour (acompte devis + solde ci-dessus)
+            //      est transmis à genererEcrituresVente(), qui décide seule s'il s'agit
+            //      d'une facture intégralement soldée (aucune ligne 411) ou d'une facture
+            //      à crédit total/partiel (411 pour la part réellement non couverte).
+            $montantPayeTotal = $dejaPayeAvant + $resteAPayer;
+
+            \App\Modules\Admin\Services\ComptabiliteService::genererEcrituresVente(
+                $vente,
+                $montantPayeTotal,
+                $vente->mode_paiement,
+                now()->toDateString(),
+                $vente->moyen_bancaire,
+                $vente->reference_paiement
+            );
         });
 
         return back()->with('succes', 'Facture validée, stock mis à jour et écritures comptables générées.');

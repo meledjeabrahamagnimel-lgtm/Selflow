@@ -7,6 +7,9 @@ use App\Modules\Admin\Modeles\BonLivraison;
 use App\Modules\Admin\Modeles\BonLivraisonDetail;
 use App\Modules\Admin\Modeles\Vente;
 use App\Modules\Admin\Modeles\Stock;
+use App\Modules\Admin\Modeles\Produit;
+use App\Modules\Admin\Modeles\VenteDetail;
+use App\Modules\Admin\Modeles\MouvementStock;
 use App\Modules\Admin\Modeles\CodeJournal;
 use App\Modules\Admin\Modeles\TresorerieJournal;
 use App\Jobs\NormaliserFactureFne;
@@ -123,6 +126,22 @@ class BonLivraisonControleur extends Controller
 
         $blId = null;
 
+        // Vérification de disponibilité AVANT toute écriture en base.
+        foreach ($request->lignes as $ligne) {
+            $qteL = max(0, (int) ($ligne['qte_livree'] ?? 0));
+            if ($qteL > 0 && !empty($ligne['produit_id'])) {
+                $produit = Produit::find($ligne['produit_id']);
+                if ($produit && $produit->estStockable()) {
+                    $dispo = $produit->stockActuel($vente->point_de_vente_id);
+                    if ($dispo < $qteL) {
+                        return back()->withInput()->with('erreur',
+                            "❌ Stock insuffisant pour livrer « {$produit->nom} » (Disponible: {$dispo}, Demandé: {$qteL})."
+                        );
+                    }
+                }
+            }
+        }
+
         DB::transaction(function () use ($request, $vente, $entreprise, &$blId) {
             $numeroBL    = NumerotationService::genererNumeroBL($entreprise->id);
             $totalCom    = 0;
@@ -173,11 +192,44 @@ class BonLivraisonControleur extends Controller
                     'qte_livree'       => $qteL,
                 ]);
 
-                // Déduire du stock (sortie)
+                // Déduire du stock (sortie), avec verrou, contrôle final et traçabilité
                 if ($qteL > 0 && !empty($ligne['produit_id'])) {
-                    \App\Modules\Admin\Modeles\Stock::where('produit_id', $ligne['produit_id'])
-                        ->where('point_de_vente_id', $vente->point_de_vente_id)
-                        ->decrement('quantite_disponible', $qteL);
+                    $produit = Produit::lockForUpdate()->find($ligne['produit_id']);
+
+                    if ($produit && $produit->estStockable()) {
+                        $stockAvant = $produit->stockActuel($vente->point_de_vente_id);
+
+                        if ($stockAvant < $qteL) {
+                            throw new \InvalidArgumentException(
+                                "Stock insuffisant pour livrer « {$produit->nom} » (Disponible: {$stockAvant}, Demandé: {$qteL})."
+                            );
+                        }
+
+                        $produit->decrementStock($vente->point_de_vente_id, $qteL);
+
+                        // Traçabilité : auparavant ce mouvement n'était enregistré nulle
+                        // part (Stock::decrement brut, sans ligne MouvementStock).
+                        MouvementStock::create([
+                            'produit_id'         => $produit->id,
+                            'point_de_vente_id'  => $vente->point_de_vente_id,
+                            'type_mouvement'     => 'Sortie',
+                            'quantite'           => $qteL,
+                            'stock_avant'        => $stockAvant,
+                            'stock_apres'        => $stockAvant - $qteL,
+                            'reference_document' => $numeroBL,
+                        ]);
+
+                        // Synchroniser avec le détail de vente d'origine : évite le
+                        // double décrément si l'utilisateur passe aussi par la file
+                        // "Livraisons à valider" (StockControleur::livraisons()),
+                        // qui se base sur VenteDetail.quantite_livree.
+                        $venteDetail = VenteDetail::where('vente_id', $vente->id)
+                            ->where('produit_id', $produit->id)
+                            ->first();
+                        if ($venteDetail) {
+                            $venteDetail->increment('quantite_livree', $qteL);
+                        }
+                    }
                 }
             }
 
@@ -347,8 +399,17 @@ class BonLivraisonControleur extends Controller
                 $newDetail->save();
             }
 
-            // Mouvements comptables & Trésorerie
-            \App\Modules\Admin\Services\ComptabiliteService::genererEcritureFactureVente($facture);
+            // Écritures comptables (+ règlement immédiat le cas échéant) : décide
+            // seule si vente comptant (aucune ligne 411) ou à crédit (411 pour
+            // le solde réellement non couvert immédiatement).
+            \App\Modules\Admin\Services\ComptabiliteService::genererEcrituresVente(
+                $facture,
+                $statutVente === 'Crédit' ? 0 : $montantPaye,
+                $modePaiementFinal,
+                now()->toDateString(),
+                $request->mode_paiement === 'Banque' ? $request->moyen_bancaire : null,
+                $request->mode_paiement === 'Banque' ? $request->reference_paiement : null
+            );
 
             if ($statutVente !== 'Crédit' && $montantPaye > 0) {
                 $soldeActuel = TresorerieJournal::where('point_de_vente_id', $pointDeVenteId)
@@ -367,15 +428,6 @@ class BonLivraisonControleur extends Controller
                     'solde_resultat'     => $soldeActuel + $montantPaye,
                     'reference_document' => $numeroFacture,
                 ]);
-
-                \App\Modules\Admin\Services\ComptabiliteService::genererEcritureReglementVente(
-                    $facture,
-                    $montantPaye,
-                    $modePaiementFinal,
-                    now()->toDateString(),
-                    $request->mode_paiement === 'Banque' ? $request->moyen_bancaire : null,
-                    $request->mode_paiement === 'Banque' ? $request->reference_paiement : null
-                );
             }
 
             // Normalisation FNE

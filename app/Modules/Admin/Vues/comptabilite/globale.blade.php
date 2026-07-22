@@ -166,7 +166,7 @@
                                     <a href="{{ route('admin.comptabilite.globale', ['mode' => 'ecritures', 'ref' => $op->reference_document]) }}"
                                        style="color:var(--primary); text-decoration:none;"
                                        title="Voir les écritures liées">
-                                        #{{ $op->no_saisie }}
+                                        {{ is_numeric($op->no_saisie) ? '#' . $op->no_saisie : $op->no_saisie }}
                                     </a>
                                 @else
                                     #{{ $op->id }}
@@ -254,21 +254,23 @@
                     <tbody>
                         @foreach($ecritures as $ecr)
                         @php
-                            // Compte mouvementé (débit ou crédit)
+                            // Compte général mouvementé (débit ou crédit) — TOUJOURS le compte
+                            // collectif réel (ex: 411000), plus jamais le code tiers individuel
+                            // depuis le correctif du 22/07/2026.
                             $compte = $ecr->compte_debit ?? $ecr->compte_credit;
-                            $isTiers = str_starts_with($compte, '411') || str_starts_with($compte, '401');
 
-                            // N° Saisie unifié du groupe de pièce (MIN(id) des écritures du document)
-                            $saisieKey = $ecr->reference_document;
-                            $saisieNum = $minIds[$saisieKey] ?? $minIds[$ecr->code_journal . '_' . $ecr->reference_document] ?? $ecr->id;
+                            // N° Saisie : lu directement depuis l'Operation liée (colonne réelle
+                            // stockée en base, séquentielle par journal) — ne dépend plus d'un
+                            // recalcul MIN(id) à la volée.
+                            $saisieNum = $ecr->operation ? ('#' . $ecr->operation->numero_saisie) : ('#' . $ecr->id);
                         @endphp
                         <tr>
                             <td style="font-weight: 500; white-space:nowrap;">{{ \Carbon\Carbon::parse($ecr->date_ecriture)->format('d/m/Y') }}</td>
-                            <td style="font-weight: 700; color: var(--primary);">#{{ $saisieNum }}</td>
+                            <td style="font-weight: 700; color: var(--primary);">{{ $saisieNum }}</td>
                             <td><span class="badge" style="background: var(--bg3); color: var(--primary); font-weight:700;">{{ $ecr->code_journal }}</span></td>
                             <td style="font-weight: 700; color: var(--primary);">{{ $ecr->reference_document ?? '—' }}</td>
                             <td style="font-weight: 700; color: var(--text-1);">
-                                {{-- En SYSCOHADA, le Compte Général est TOUJOURS affiché (y compris 401100 / 411100) --}}
+                                {{-- En SYSCOHADA, le Compte Général est TOUJOURS affiché (y compris 401000 / 411000) --}}
                                 {{ $compte }}
                             </td>
                             <td style="white-space: normal; min-width: 240px; font-weight:500;">{{ $ecr->libelle }}</td>
@@ -279,7 +281,9 @@
                                 {{ $ecr->credit > 0 ? number_format($ecr->credit, 0, ',', ' ') . ' F' : '—' }}
                             </td>
                             <td style="font-weight: 600; color: var(--text-2);">
-                                {{ $isTiers ? $compte : '—' }}
+                                {{-- Compte Tiers : code individuel du client/fournisseur (colonne
+                                     dédiée compte_tiers), distinct du compte général ci-dessus --}}
+                                {{ $ecr->compte_tiers ?? '—' }}
                             </td>
                             <td><span style="background:var(--bg3); color:var(--primary); padding:3px 8px; border-radius:6px; font-weight:600; font-size:12px;">{{ $ecr->pointDeVente->nom }}</span></td>
                         </tr>
@@ -301,9 +305,9 @@
             <h3 style="font-size:16px; font-weight:700; color:var(--text-1); margin:0;"><i class="fas fa-plus" style="color:var(--primary)"></i> Nouvelle écriture manuelle</h3>
             <button type="button" class="modal-close" onclick="fermerModalEcriture()" style="background:none; border:none; font-size:24px; cursor:pointer; color:var(--text-3);">&times;</button>
         </div>
-        <form method="POST" action="{{ route('admin.comptabilite.ecriture_manuelle') }}" style="margin:0; padding:20px;">
+        <form method="POST" action="{{ route('admin.comptabilite.ecriture_manuelle') }}" id="formEcritureManuelle" style="margin:0; padding:20px;">
             @csrf
-            
+
             <div style="display:grid; grid-template-columns:1fr 1fr; gap:14px; margin-bottom:14px;">
                 <div class="form-group">
                     <label class="form-label">Date d'écriture <span style="color:var(--danger)">*</span></label>
@@ -327,7 +331,7 @@
 
             <div class="form-group" style="margin-bottom:14px;">
                 <label class="form-label">Titre / Libellé court <span style="color:var(--danger)">*</span></label>
-                <input type="text" name="libelle" class="form-control" required placeholder="Ex: Constatation provision, Vente exceptionnelle..." maxlength="255">
+                <input type="text" name="libelle" class="form-control" required placeholder="Ex: Constatation provision, Régularisation paie..." maxlength="255">
             </div>
 
             <div class="form-group" style="margin-bottom:14px;">
@@ -335,46 +339,100 @@
                 <textarea name="description" class="form-control" rows="2" placeholder="Saisissez des précisions sur cette écriture..." maxlength="2000"></textarea>
             </div>
 
-            <div style="display:grid; grid-template-columns:1fr 1fr; gap:14px; margin-bottom:14px;">
-                <div class="form-group">
-                    <label class="form-label">Compte Débit <span style="color:var(--danger)">*</span></label>
-                    <input type="text" name="compte_debit" class="form-control" required placeholder="Ex: 601100" pattern="[0-9]+" title="Veuillez entrer un numéro de compte comptable valide.">
-                </div>
-                <div class="form-group">
-                    <label class="form-label">Compte Crédit <span style="color:var(--danger)">*</span></label>
-                    <input type="text" name="compte_credit" class="form-control" required placeholder="Ex: 571000" pattern="[0-9]+" title="Veuillez entrer un numéro de compte comptable valide.">
-                </div>
+            @if($isAdmin)
+            <div class="form-group" style="margin-bottom:14px;">
+                <label class="form-label">Affectation Point de Vente</label>
+                <select name="point_de_vente_id" class="form-control">
+                    <option value="">Sélectionner un site...</option>
+                    @foreach($pointsDeVente as $pdv)
+                        <option value="{{ $pdv->id }}">{{ $pdv->nom }}</option>
+                    @endforeach
+                </select>
+            </div>
+            @endif
+
+            {{-- Lignes de l'écriture : nombre illimité, débit ou crédit chacune --}}
+            <div style="border-top:1px solid var(--border); padding-top:14px; margin-top:4px;">
+                <label class="form-label" style="margin-bottom:8px; display:block;">Lignes de l'écriture <span style="color:var(--danger)">*</span></label>
+                <div id="lignesEcriture"></div>
+                <button type="button" class="btn btn-outline" onclick="ajouterLigneEcriture()" style="margin-top:8px; font-size:13px;">
+                    <i class="fas fa-plus"></i> Ajouter une ligne
+                </button>
             </div>
 
-            <div style="display:grid; grid-template-columns:1fr 1fr; gap:14px; margin-bottom:14px;">
-                <div class="form-group">
-                    <label class="form-label">Montant (FCFA) <span style="color:var(--danger)">*</span></label>
-                    <input type="number" name="montant" class="form-control" required placeholder="Ex: 50000" min="1">
-                </div>
-                @if($isAdmin)
-                <div class="form-group">
-                    <label class="form-label">Affectation Point de Vente</label>
-                    <select name="point_de_vente_id" class="form-control">
-                        <option value="">Sélectionner un site...</option>
-                        @foreach($pointsDeVente as $pdv)
-                            <option value="{{ $pdv->id }}">{{ $pdv->nom }}</option>
-                        @endforeach
-                    </select>
-                </div>
-                @endif
-            </div>
+            <div id="equilibreInfo" style="margin-top:14px; padding:10px 12px; border-radius:8px; font-size:13px; font-weight:600;"></div>
 
             <div style="border-top:1px solid var(--border); padding-top:14px; margin-top:14px; display:flex; justify-content:flex-end; gap:10px;">
                 <button type="button" class="btn btn-outline" onclick="fermerModalEcriture()">Annuler</button>
-                <button type="submit" class="btn btn-primary"><i class="fas fa-save"></i> Enregistrer l'écriture</button>
+                <button type="submit" class="btn btn-primary" id="btnEnregistrerEcriture"><i class="fas fa-save"></i> Enregistrer l'écriture</button>
             </div>
         </form>
     </div>
 </div>
 
 <script>
+let compteurLignesEcriture = 0;
+
+function ligneEcritureTemplate(index) {
+    return `
+        <div class="ligne-ecriture" data-index="${index}" style="display:grid; grid-template-columns: 2fr 1.4fr 1fr 1.2fr auto; gap:8px; align-items:center; margin-bottom:8px;">
+            <input type="text" name="lignes[${index}][compte]" class="form-control" placeholder="N° Compte (ex: 601000)" pattern="[0-9]+" required title="Numéro de compte comptable">
+            <input type="text" name="lignes[${index}][compte_tiers]" class="form-control" placeholder="Compte tiers (optionnel)">
+            <select name="lignes[${index}][sens]" class="form-control ligne-sens" required onchange="recalculerEquilibre()">
+                <option value="debit">Débit</option>
+                <option value="credit">Crédit</option>
+            </select>
+            <input type="number" name="lignes[${index}][montant]" class="form-control ligne-montant" placeholder="Montant" min="0.01" step="0.01" required oninput="recalculerEquilibre()">
+            <button type="button" class="btn btn-outline" style="padding:6px 10px; color:var(--danger); border-color:var(--danger);" onclick="retirerLigneEcriture(${index})" title="Retirer cette ligne">
+                <i class="fas fa-trash"></i>
+            </button>
+        </div>
+    `;
+}
+
+function ajouterLigneEcriture(sensParDefaut) {
+    const conteneur = document.getElementById('lignesEcriture');
+    const index = compteurLignesEcriture++;
+    conteneur.insertAdjacentHTML('beforeend', ligneEcritureTemplate(index));
+    if (sensParDefaut) {
+        conteneur.querySelector(`.ligne-ecriture[data-index="${index}"] .ligne-sens`).value = sensParDefaut;
+    }
+    recalculerEquilibre();
+}
+
+function retirerLigneEcriture(index) {
+    const ligne = document.querySelector(`.ligne-ecriture[data-index="${index}"]`);
+    if (ligne) ligne.remove();
+    recalculerEquilibre();
+}
+
+function recalculerEquilibre() {
+    let totalDebit = 0, totalCredit = 0;
+    document.querySelectorAll('.ligne-ecriture').forEach(ligne => {
+        const sens = ligne.querySelector('.ligne-sens').value;
+        const montant = parseFloat(ligne.querySelector('.ligne-montant').value) || 0;
+        if (sens === 'debit') totalDebit += montant; else totalCredit += montant;
+    });
+
+    const info = document.getElementById('equilibreInfo');
+    const btn = document.getElementById('btnEnregistrerEcriture');
+    const formatteur = new Intl.NumberFormat('fr-FR');
+    const equilibree = Math.abs(totalDebit - totalCredit) < 0.01 && totalDebit > 0;
+
+    info.textContent = `Total Débit : ${formatteur.format(totalDebit)} F  —  Total Crédit : ${formatteur.format(totalCredit)} F` +
+        (equilibree ? '  ✅ Équilibrée' : '  ⚠️ Non équilibrée');
+    info.style.background = equilibree ? '#ecfdf5' : '#fef2f2';
+    info.style.color = equilibree ? '#065f46' : '#7f1d1d';
+    btn.disabled = !equilibree;
+}
+
 function ouvrirModalEcriture() {
     const modal = document.getElementById('modalEcritureManuelle');
+    // Réinitialiser avec 2 lignes de départ (1 débit, 1 crédit) à chaque ouverture
+    document.getElementById('lignesEcriture').innerHTML = '';
+    compteurLignesEcriture = 0;
+    ajouterLigneEcriture('debit');
+    ajouterLigneEcriture('credit');
     modal.style.display = 'flex';
 }
 function fermerModalEcriture() {
