@@ -17,6 +17,10 @@ return [
     'postmark' => [
         'key' => env('POSTMARK_API_KEY'),
     ],
+    
+    'hub' => [
+    'token' => env('HUB_TOKEN', 'super_secret_123'),
+    ],
 
     'resend' => [
         'key' => env('RESEND_API_KEY'),
