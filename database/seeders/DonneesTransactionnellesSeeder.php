@@ -71,7 +71,7 @@ class DonneesTransactionnellesSeeder extends Seeder
         // ─────────────────────────────────────────────────────────────────────
         $clientsE1 = Client::where('entreprise_id', $entreprise1->id)->get();
         if ($clientsE1->isEmpty()) {
-            $c1 = Client::create(['entreprise_id' => $entreprise1->id, 'nom' => 'CIVIL CONSTRUCTION SARL', 'telephone' => '+225 07001122', 'email' => 'contact@civil-const.ci', 'compte_comptable' => '411100']);
+            $c1 = Client::create(['entreprise_id' => $entreprise1->id, 'nom' => 'CIVIL CONSTRUCTION SARL', 'telephone' => '+225 07001122', 'email' => 'contact@civil-const.ci', 'compte_comptable' => '411000']);
             $c2 = Client::create(['entreprise_id' => $entreprise1->id, 'nom' => 'SOCIETE IVOIRIENNE DE BATIMENT', 'telephone' => '+225 07003344', 'email' => 'contact@sib-ci.com', 'compte_comptable' => '411200']);
             $clientsE1 = collect([$c1, $c2]);
         }
@@ -80,7 +80,7 @@ class DonneesTransactionnellesSeeder extends Seeder
 
         $fournisseursE1 = Fournisseur::where('entreprise_id', $entreprise1->id)->get();
         if ($fournisseursE1->isEmpty()) {
-            $f1 = Fournisseur::create(['entreprise_id' => $entreprise1->id, 'nom' => 'ACIÉRIE ET MÉTALLURGIE CI', 'telephone' => '+225 27210099', 'email' => 'commercial@acierie.ci', 'compte_comptable' => '401100']);
+            $f1 = Fournisseur::create(['entreprise_id' => $entreprise1->id, 'nom' => 'ACIÉRIE ET MÉTALLURGIE CI', 'telephone' => '+225 27210099', 'email' => 'commercial@acierie.ci', 'compte_comptable' => '401000']);
             $f2 = Fournisseur::create(['entreprise_id' => $entreprise1->id, 'nom' => 'COMPOSITES ET PLASTIQUES D ABIDJAN', 'telephone' => '+225 27228811', 'email' => 'contact@cpa.ci', 'compte_comptable' => '401200']);
             $fournisseursE1 = collect([$f1, $f2]);
         }
@@ -308,7 +308,7 @@ class DonneesTransactionnellesSeeder extends Seeder
             'libelle'           => "Vente Facture {$ref} — {$client->nom}",
             'reference_document'=> $ref,
             'code_journal'      => $codeJournal,
-            'compte_debit'      => $client->compte_comptable ?? '411100',
+            'compte_debit'      => $client->compte_comptable ?? '411000',
             'compte_credit'     => null,
             'debit'             => $v->montant_ttc,
             'credit'            => 0,
@@ -323,7 +323,7 @@ class DonneesTransactionnellesSeeder extends Seeder
             'reference_document'=> $ref,
             'code_journal'      => $codeJournal,
             'compte_debit'      => null,
-            'compte_credit'     => '701100',
+            'compte_credit'     => '701000',
             'debit'             => 0,
             'credit'            => $v->montant_ht,
         ]);
@@ -361,7 +361,7 @@ class DonneesTransactionnellesSeeder extends Seeder
             'libelle'           => "Avoir sur vente — Facture {$ref}",
             'reference_document'=> $ref,
             'code_journal'      => $codeJournal,
-            'compte_debit'      => '701100',
+            'compte_debit'      => '701000',
             'compte_credit'     => null,
             'debit'             => $ht,
             'credit'            => 0,
@@ -392,7 +392,7 @@ class DonneesTransactionnellesSeeder extends Seeder
             'reference_document'=> $ref,
             'code_journal'      => $codeJournal,
             'compte_debit'      => null,
-            'compte_credit'     => $client->compte_comptable ?? '411100',
+            'compte_credit'     => $client->compte_comptable ?? '411000',
             'debit'             => 0,
             'credit'            => $ttc,
         ]);
@@ -411,7 +411,7 @@ class DonneesTransactionnellesSeeder extends Seeder
             'libelle'           => "Achat matières/marchandises — Facture {$ref}",
             'reference_document'=> $ref,
             'code_journal'      => $codeJournal,
-            'compte_debit'      => '601100',
+            'compte_debit'      => '601000',
             'compte_credit'     => null,
             'debit'             => $a->montant_ht,
             'credit'            => 0,
@@ -442,7 +442,7 @@ class DonneesTransactionnellesSeeder extends Seeder
             'reference_document'=> $ref,
             'code_journal'      => $codeJournal,
             'compte_debit'      => null,
-            'compte_credit'     => $fourn->compte_comptable ?? '401100',
+            'compte_credit'     => $fourn->compte_comptable ?? '401000',
             'debit'             => 0,
             'credit'            => $a->montant_ttc,
         ]);
@@ -464,7 +464,7 @@ class DonneesTransactionnellesSeeder extends Seeder
             'libelle'           => "Annulation dette Fournisseur — Facture {$ref}",
             'reference_document'=> $ref,
             'code_journal'      => $codeJournal,
-            'compte_debit'      => $fourn->compte_comptable ?? '401100',
+            'compte_debit'      => $fourn->compte_comptable ?? '401000',
             'compte_credit'     => null,
             'debit'             => $ttc,
             'credit'            => 0,
@@ -479,7 +479,7 @@ class DonneesTransactionnellesSeeder extends Seeder
             'reference_document'=> $ref,
             'code_journal'      => $codeJournal,
             'compte_debit'      => null,
-            'compte_credit'     => '601100',
+            'compte_credit'     => '601000',
             'debit'             => 0,
             'credit'            => $ht,
         ]);

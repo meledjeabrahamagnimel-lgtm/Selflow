@@ -110,7 +110,7 @@
         </div>
         <div class="detail-item">
             <span class="detail-label">Compte Comptable</span>
-            <span class="detail-val" style="font-family: monospace; color: var(--primary);">{{ $tier->compte_comptable ?: ($type === 'client' ? '411100' : '401100') }}</span>
+            <span class="detail-val" style="font-family: monospace; color: var(--primary);">{{ $tier->compte_comptable ?: ($type === 'client' ? '411000' : '401000') }}</span>
         </div>
         <div class="detail-item">
             <span class="detail-label">Solde actuel</span>

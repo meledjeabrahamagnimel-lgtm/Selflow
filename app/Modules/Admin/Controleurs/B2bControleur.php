@@ -343,9 +343,13 @@ class B2bControleur extends Controller
             // Normalisation FNE en arrière-plan (Section 18.5)
             NormaliserFactureFne::dispatch($vente, false);
 
-            // Comptabilisation de la vente chez le fournisseur
-            ComptabiliteService::genererEcritureFactureVente($vente);
-            if ($request->mode_paiement !== 'Crédit') {
+            // Comptabilisation de la vente chez le fournisseur : décide seule si
+            // vente comptant (aucune ligne 411) ou à crédit (411 pour le TTC).
+            $montantPayeB2b = $request->mode_paiement !== 'Crédit' ? $vente->montant_ttc : 0;
+
+            ComptabiliteService::genererEcrituresVente($vente, $montantPayeB2b, $request->mode_paiement, now()->toDateString());
+
+            if ($montantPayeB2b > 0) {
                 $soldeActuel = TresorerieJournal::where('point_de_vente_id', $pdvId)
                     ->orderByDesc('created_at')->value('solde_resultat') ?? 0;
 
@@ -355,13 +359,11 @@ class B2bControleur extends Controller
                     'type_operation'     => 'Encaissement',
                     'libelle'            => 'Encaissement — Vente ' . $numero,
                     'mode_paiement'      => $request->mode_paiement,
-                    'montant_entree'     => $vente->montant_ttc,
+                    'montant_entree'     => $montantPayeB2b,
                     'montant_sortie'     => 0,
-                    'solde_resultat'     => $soldeActuel + $vente->montant_ttc,
+                    'solde_resultat'     => $soldeActuel + $montantPayeB2b,
                     'reference_document' => $numero,
                 ]);
-
-                ComptabiliteService::genererEcritureReglementVente($vente, $vente->montant_ttc, $request->mode_paiement, now()->toDateString());
             }
 
             return $vente;
@@ -425,8 +427,8 @@ class B2bControleur extends Controller
                         'prix_achat'    => $det->prix_unitaire,
                         'prix_vente'    => $det->produit->prix_vente ?? ($det->prix_unitaire * 1.25),
                         'taux_tva'      => $det->produit->taux_tva ?? 18,
-                        'compte_achat'  => '601100',
-                        'compte_vente'  => '701100',
+                        'compte_achat'  => config('selflow.plan_comptable_defaut.achat_defaut'),
+                        'compte_vente'  => config('selflow.plan_comptable_defaut.vente_defaut'),
                     ]);
                 }
 
@@ -494,11 +496,10 @@ class B2bControleur extends Controller
                 }
             }
 
-            // Générer l'écriture comptable de la facture d'achat chez le client
-            ComptabiliteService::genererEcritureFactureAchat($achat);
+            // Si c'est payé au comptant, sortir de la trésorerie
+            $montantPayeB2b = $modePaiement !== 'Crédit' ? $achat->montant_ttc : 0;
 
-            // Si c'est payé au comptant, sortir de la trésorerie et enregistrer le règlement
-            if ($modePaiement !== 'Crédit') {
+            if ($montantPayeB2b > 0) {
                 $soldeActuel = TresorerieJournal::where('point_de_vente_id', $achat->point_de_vente_id)
                     ->orderByDesc('created_at')->value('solde_resultat') ?? 0;
 
@@ -509,13 +510,15 @@ class B2bControleur extends Controller
                     'libelle'            => 'Achat B2B — Facture ' . $achat->numero_facture,
                     'mode_paiement'      => $modePaiement,
                     'montant_entree'     => 0,
-                    'montant_sortie'     => $achat->montant_ttc,
-                    'solde_resultat'     => $soldeActuel - $achat->montant_ttc,
+                    'montant_sortie'     => $montantPayeB2b,
+                    'solde_resultat'     => $soldeActuel - $montantPayeB2b,
                     'reference_document' => $achat->numero_facture,
                 ]);
-
-                ComptabiliteService::genererEcritureReglementAchat($achat, $achat->montant_ttc, $modePaiement, now()->toDateString());
             }
+
+            // Générer l'écriture comptable de la facture d'achat chez le client :
+            // décide seule si achat comptant (aucune ligne 401) ou à crédit.
+            ComptabiliteService::genererEcrituresAchat($achat, $montantPayeB2b, $modePaiement, now()->toDateString());
         });
 
         return redirect()->route('admin.achats.factures')

@@ -86,6 +86,7 @@ class EcritureComptable extends Model
     }
 
     protected $fillable = [
+        'operation_id',
         'entreprise_id',
         'point_de_vente_id',
         'date_ecriture',
@@ -94,6 +95,7 @@ class EcritureComptable extends Model
         'code_journal',
         'compte_debit',
         'compte_credit',
+        'compte_tiers',
         'debit',
         'credit',
         'description',
@@ -117,5 +119,10 @@ class EcritureComptable extends Model
     public function pointDeVente(): BelongsTo
     {
         return $this->belongsTo(PointDeVente::class, 'point_de_vente_id');
+    }
+
+    public function operation(): BelongsTo
+    {
+        return $this->belongsTo(Operation::class, 'operation_id');
     }
 }

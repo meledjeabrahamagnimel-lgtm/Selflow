@@ -166,7 +166,7 @@
                                     <a href="{{ route('admin.comptabilite.globale', ['mode' => 'ecritures', 'ref' => $op->reference_document]) }}"
                                        style="color:var(--primary); text-decoration:none;"
                                        title="Voir les écritures liées">
-                                        #{{ $op->no_saisie }}
+                                        {{ is_numeric($op->no_saisie) ? '#' . $op->no_saisie : $op->no_saisie }}
                                     </a>
                                 @else
                                     #{{ $op->id }}
@@ -254,21 +254,23 @@
                     <tbody>
                         @foreach($ecritures as $ecr)
                         @php
-                            // Compte mouvementé (débit ou crédit)
+                            // Compte général mouvementé (débit ou crédit) — TOUJOURS le compte
+                            // collectif réel (ex: 411000), plus jamais le code tiers individuel
+                            // depuis le correctif du 22/07/2026.
                             $compte = $ecr->compte_debit ?? $ecr->compte_credit;
-                            $isTiers = str_starts_with($compte, '411') || str_starts_with($compte, '401');
 
-                            // N° Saisie unifié du groupe de pièce (MIN(id) des écritures du document)
-                            $saisieKey = $ecr->reference_document;
-                            $saisieNum = $minIds[$saisieKey] ?? $minIds[$ecr->code_journal . '_' . $ecr->reference_document] ?? $ecr->id;
+                            // N° Saisie : lu directement depuis l'Operation liée (colonne réelle
+                            // stockée en base, séquentielle par journal) — ne dépend plus d'un
+                            // recalcul MIN(id) à la volée.
+                            $saisieNum = $ecr->operation->numero_saisie ?? ('#' . $ecr->id);
                         @endphp
                         <tr>
                             <td style="font-weight: 500; white-space:nowrap;">{{ \Carbon\Carbon::parse($ecr->date_ecriture)->format('d/m/Y') }}</td>
-                            <td style="font-weight: 700; color: var(--primary);">#{{ $saisieNum }}</td>
+                            <td style="font-weight: 700; color: var(--primary);">{{ $saisieNum }}</td>
                             <td><span class="badge" style="background: var(--bg3); color: var(--primary); font-weight:700;">{{ $ecr->code_journal }}</span></td>
                             <td style="font-weight: 700; color: var(--primary);">{{ $ecr->reference_document ?? '—' }}</td>
                             <td style="font-weight: 700; color: var(--text-1);">
-                                {{-- En SYSCOHADA, le Compte Général est TOUJOURS affiché (y compris 401100 / 411100) --}}
+                                {{-- En SYSCOHADA, le Compte Général est TOUJOURS affiché (y compris 401000 / 411000) --}}
                                 {{ $compte }}
                             </td>
                             <td style="white-space: normal; min-width: 240px; font-weight:500;">{{ $ecr->libelle }}</td>
@@ -279,7 +281,9 @@
                                 {{ $ecr->credit > 0 ? number_format($ecr->credit, 0, ',', ' ') . ' F' : '—' }}
                             </td>
                             <td style="font-weight: 600; color: var(--text-2);">
-                                {{ $isTiers ? $compte : '—' }}
+                                {{-- Compte Tiers : code individuel du client/fournisseur (colonne
+                                     dédiée compte_tiers), distinct du compte général ci-dessus --}}
+                                {{ $ecr->compte_tiers ?? '—' }}
                             </td>
                             <td><span style="background:var(--bg3); color:var(--primary); padding:3px 8px; border-radius:6px; font-weight:600; font-size:12px;">{{ $ecr->pointDeVente->nom }}</span></td>
                         </tr>
@@ -338,7 +342,7 @@
             <div style="display:grid; grid-template-columns:1fr 1fr; gap:14px; margin-bottom:14px;">
                 <div class="form-group">
                     <label class="form-label">Compte Débit <span style="color:var(--danger)">*</span></label>
-                    <input type="text" name="compte_debit" class="form-control" required placeholder="Ex: 601100" pattern="[0-9]+" title="Veuillez entrer un numéro de compte comptable valide.">
+                    <input type="text" name="compte_debit" class="form-control" required placeholder="Ex: 601000" pattern="[0-9]+" title="Veuillez entrer un numéro de compte comptable valide.">
                 </div>
                 <div class="form-group">
                     <label class="form-label">Compte Crédit <span style="color:var(--danger)">*</span></label>

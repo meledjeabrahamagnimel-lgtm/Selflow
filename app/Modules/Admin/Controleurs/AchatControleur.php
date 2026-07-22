@@ -186,35 +186,41 @@ class AchatControleur
 
             // Trésorerie et Comptabilité (uniquement si Facture)
             if ($etape === 'Facture') {
-                // Écriture comptable générale
-                \App\Modules\Admin\Services\ComptabiliteService::genererEcritureFactureAchat($achat);
+                // NB (correctif) : le code précédent décaissait systématiquement le montant
+                // TTC total, y compris pour un achat "Crédit" (statutInitial === 'Crédit'),
+                // ce qui payait à tort une dette fournisseur censée rester impayée.
+                // On ne décaisse désormais que si l'achat n'est pas à crédit.
+                $montantPaye = $statutInitial === 'Crédit' ? 0 : $montantTtc;
 
-                $soldeActuel = TresorerieJournal::where('point_de_vente_id', $pointDeVenteId)
-                    ->orderByDesc('created_at')->value('solde_resultat') ?? 0;
-
-                TresorerieJournal::create([
-                    'point_de_vente_id'  => $pointDeVenteId,
-                    'date_operation'     => $request->date_achat,
-                    'type_operation'     => 'Décaissement',
-                    'libelle'            => 'Achat — Facture ' . $numero,
-                    'mode_paiement'      => $modePaiementFinal,
-                    'moyen_bancaire'     => $request->mode_paiement === 'Banque' ? $request->moyen_bancaire : null,
-                    'reference_paiement' => $request->mode_paiement === 'Banque' ? $request->reference_paiement : null,
-                    'montant_entree'     => 0,
-                    'montant_sortie'     => $montantTtc,
-                    'solde_resultat'     => $soldeActuel - $montantTtc,
-                    'reference_document' => $numero,
-                ]);
-
-                // Écriture comptable de règlement
-                \App\Modules\Admin\Services\ComptabiliteService::genererEcritureReglementAchat(
+                // Écritures comptables : décide seule si achat comptant (aucune ligne 401)
+                // ou achat à crédit (401 pour le montant non payé immédiatement).
+                \App\Modules\Admin\Services\ComptabiliteService::genererEcrituresAchat(
                     $achat,
-                    $montantTtc,
+                    $montantPaye,
                     $modePaiementFinal,
                     $request->date_achat,
                     $request->mode_paiement === 'Banque' ? $request->moyen_bancaire : null,
                     $request->mode_paiement === 'Banque' ? $request->reference_paiement : null
                 );
+
+                if ($montantPaye > 0) {
+                    $soldeActuel = TresorerieJournal::where('point_de_vente_id', $pointDeVenteId)
+                        ->orderByDesc('created_at')->value('solde_resultat') ?? 0;
+
+                    TresorerieJournal::create([
+                        'point_de_vente_id'  => $pointDeVenteId,
+                        'date_operation'     => $request->date_achat,
+                        'type_operation'     => 'Décaissement',
+                        'libelle'            => 'Achat — Facture ' . $numero,
+                        'mode_paiement'      => $modePaiementFinal,
+                        'moyen_bancaire'     => $request->mode_paiement === 'Banque' ? $request->moyen_bancaire : null,
+                        'reference_paiement' => $request->mode_paiement === 'Banque' ? $request->reference_paiement : null,
+                        'montant_entree'     => 0,
+                        'montant_sortie'     => $montantPaye,
+                        'solde_resultat'     => $soldeActuel - $montantPaye,
+                        'reference_document' => $numero,
+                    ]);
+                }
             }
 
             return $achat;
@@ -368,30 +374,34 @@ class AchatControleur
                 }
             }
 
-            // 2. Écriture comptable de facturation
-            \App\Modules\Admin\Services\ComptabiliteService::genererEcritureFactureAchat($achat);
+            // 2. Trésorerie : ne décaisser que si l'achat n'est pas à crédit
+            //    (correctif : l'ancien code décaissait systématiquement le TTC
+            //    total même pour un achat "Crédit", payant à tort une dette
+            //    fournisseur censée rester impayée).
+            $montantPaye = $nouveauStatut === 'Crédit' ? 0 : $achat->montant_ttc;
 
-            // 3. Trésorerie & Écriture de règlement
-            $montantPaye = $achat->montant_ttc;
-            $soldeActuel = TresorerieJournal::where('point_de_vente_id', $achat->point_de_vente_id)
-                ->orderByDesc('created_at')->value('solde_resultat') ?? 0;
+            if ($montantPaye > 0) {
+                $soldeActuel = TresorerieJournal::where('point_de_vente_id', $achat->point_de_vente_id)
+                    ->orderByDesc('created_at')->value('solde_resultat') ?? 0;
 
-            TresorerieJournal::create([
-                'point_de_vente_id'  => $achat->point_de_vente_id,
-                'date_operation'     => $achat->date_achat->toDateString(),
-                'type_operation'     => 'Décaissement',
-                'libelle'            => 'Achat — Facture ' . $achat->numero_facture,
-                'mode_paiement'      => $achat->mode_paiement,
-                'moyen_bancaire'     => $achat->moyen_bancaire,
-                'reference_paiement' => $achat->reference_paiement,
-                'montant_entree'     => 0,
-                'montant_sortie'     => $montantPaye,
-                'solde_resultat'     => $soldeActuel - $montantPaye,
-                'reference_document' => $achat->numero_facture,
-            ]);
+                TresorerieJournal::create([
+                    'point_de_vente_id'  => $achat->point_de_vente_id,
+                    'date_operation'     => $achat->date_achat->toDateString(),
+                    'type_operation'     => 'Décaissement',
+                    'libelle'            => 'Achat — Facture ' . $achat->numero_facture,
+                    'mode_paiement'      => $achat->mode_paiement,
+                    'moyen_bancaire'     => $achat->moyen_bancaire,
+                    'reference_paiement' => $achat->reference_paiement,
+                    'montant_entree'     => 0,
+                    'montant_sortie'     => $montantPaye,
+                    'solde_resultat'     => $soldeActuel - $montantPaye,
+                    'reference_document' => $achat->numero_facture,
+                ]);
+            }
 
-            // Écriture de règlement
-            \App\Modules\Admin\Services\ComptabiliteService::genererEcritureReglementAchat(
+            // 3. Écritures comptables : décide seule si achat comptant (aucune
+            //    ligne 401) ou achat à crédit (401 pour le solde non payé).
+            \App\Modules\Admin\Services\ComptabiliteService::genererEcrituresAchat(
                 $achat,
                 $montantPaye,
                 $achat->mode_paiement,

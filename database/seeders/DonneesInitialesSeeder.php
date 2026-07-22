@@ -161,17 +161,17 @@ class DonneesInitialesSeeder extends Seeder
             ['numero' => '244000', 'libelle' => 'Matériel et mobilier de bureau'],
             ['numero' => '311000', 'libelle' => 'Marchandises (Stock)'],
             ['numero' => '401000', 'libelle' => 'Fournisseurs - Dettes en compte (Général)'],
-            ['numero' => '401100', 'libelle' => 'Fournisseurs d\'exploitation'],
+            ['numero' => '401000', 'libelle' => 'Fournisseurs d\'exploitation'],
             ['numero' => '411000', 'libelle' => 'Clients - Créances en compte (Général)'],
-            ['numero' => '411100', 'libelle' => 'Clients d\'exploitation'],
+            ['numero' => '411000', 'libelle' => 'Clients d\'exploitation'],
             ['numero' => '443100', 'libelle' => 'TVA facturée sur ventes (18%)'],
             ['numero' => '445100', 'libelle' => 'TVA récupérable sur achats'],
             ['numero' => '521000', 'libelle' => 'Banques locales (BQE)'],
             ['numero' => '571000', 'libelle' => 'Caisse (CAI)'],
-            ['numero' => '601100', 'libelle' => 'Achat de marchandises'],
+            ['numero' => '601000', 'libelle' => 'Achat de marchandises'],
             ['numero' => '601500', 'libelle' => 'Frais accessoires d\'achat'],
             ['numero' => '605100', 'libelle' => 'Fournitures non stockables (Eau, Électricité)'],
-            ['numero' => '701100', 'libelle' => 'Vente de marchandises dans la région'],
+            ['numero' => '701000', 'libelle' => 'Vente de marchandises dans la région'],
             ['numero' => '701200', 'libelle' => 'Vente de marchandises hors région'],
             ['numero' => '810000', 'libelle' => 'Valeurs comptables des cessions d\'actifs'],
             ['numero' => '900000', 'libelle' => 'Comptabilité analytique'],
@@ -186,12 +186,12 @@ class DonneesInitialesSeeder extends Seeder
         // Seed Produits avec comptes par défaut pour les deux entreprises
         // -----------------------------------------------------------------------
         $produits = [
-            ['reference' => 'ART-001', 'nom' => 'Huile Dinor 1L',       'categorie' => 'Épicerie',  'prix_achat' => 900,  'prix_vente' => 1200, 'stock_actuel' => 42, 'stock_minimum' => 10, 'compte_vente' => '701100', 'compte_achat' => '601100'],
-            ['reference' => 'ART-002', 'nom' => 'Sucre 1kg',            'categorie' => 'Épicerie',  'prix_achat' => 550,  'prix_vente' => 750,  'stock_actuel' => 80, 'stock_minimum' => 15, 'compte_vente' => '701100', 'compte_achat' => '601100'],
-            ['reference' => 'ART-003', 'nom' => 'Lait en poudre 500g',  'categorie' => 'Épicerie',  'prix_achat' => 2000, 'prix_vente' => 2500, 'stock_actuel' => 5,  'stock_minimum' => 8,  'compte_vente' => '701100', 'compte_achat' => '601100'],
-            ['reference' => 'ART-004', 'nom' => 'Savon Palmolive',      'categorie' => 'Hygiène',   'prix_achat' => 400,  'prix_vente' => 600,  'stock_actuel' => 34, 'stock_minimum' => 10, 'compte_vente' => '701100', 'compte_achat' => '601100'],
-            ['reference' => 'ART-005', 'nom' => 'Eau minérale 1.5L',    'categorie' => 'Boissons',  'prix_achat' => 300,  'prix_vente' => 450,  'stock_actuel' => 120,'stock_minimum' => 20, 'compte_vente' => '701100', 'compte_achat' => '601100'],
-            ['reference' => 'ART-006', 'nom' => 'Riz parfumé 5kg',      'categorie' => 'Épicerie',  'prix_achat' => 4000, 'prix_vente' => 5000, 'stock_actuel' => 18, 'stock_minimum' => 5,  'compte_vente' => '701100', 'compte_achat' => '601100'],
+            ['reference' => 'ART-001', 'nom' => 'Huile Dinor 1L',       'categorie' => 'Épicerie',  'prix_achat' => 900,  'prix_vente' => 1200, 'stock_actuel' => 42, 'stock_minimum' => 10, 'compte_vente' => '701000', 'compte_achat' => '601000'],
+            ['reference' => 'ART-002', 'nom' => 'Sucre 1kg',            'categorie' => 'Épicerie',  'prix_achat' => 550,  'prix_vente' => 750,  'stock_actuel' => 80, 'stock_minimum' => 15, 'compte_vente' => '701000', 'compte_achat' => '601000'],
+            ['reference' => 'ART-003', 'nom' => 'Lait en poudre 500g',  'categorie' => 'Épicerie',  'prix_achat' => 2000, 'prix_vente' => 2500, 'stock_actuel' => 5,  'stock_minimum' => 8,  'compte_vente' => '701000', 'compte_achat' => '601000'],
+            ['reference' => 'ART-004', 'nom' => 'Savon Palmolive',      'categorie' => 'Hygiène',   'prix_achat' => 400,  'prix_vente' => 600,  'stock_actuel' => 34, 'stock_minimum' => 10, 'compte_vente' => '701000', 'compte_achat' => '601000'],
+            ['reference' => 'ART-005', 'nom' => 'Eau minérale 1.5L',    'categorie' => 'Boissons',  'prix_achat' => 300,  'prix_vente' => 450,  'stock_actuel' => 120,'stock_minimum' => 20, 'compte_vente' => '701000', 'compte_achat' => '601000'],
+            ['reference' => 'ART-006', 'nom' => 'Riz parfumé 5kg',      'categorie' => 'Épicerie',  'prix_achat' => 4000, 'prix_vente' => 5000, 'stock_actuel' => 18, 'stock_minimum' => 5,  'compte_vente' => '701000', 'compte_achat' => '601000'],
         ];
 
         foreach ($produits as $donnees) {
@@ -262,23 +262,23 @@ class DonneesInitialesSeeder extends Seeder
         // Seed Clients et Fournisseurs croisés B2B + Clients/Fournisseurs standards
         // -----------------------------------------------------------------------
         // Entreprise 1 (Maison Dupont)
-        Client::create(['entreprise_id' => $entreprise->id, 'nom' => 'Koffi Amos',     'telephone' => '+225 07 11 22 33', 'email' => 'koffi@mail.com',  'adresse' => 'Cocody, Abidjan', 'ncc' => '1982341 X', 'regime_imposition' => 'RNI', 'compte_comptable' => '411100', 'numero_tiers' => '411001']);
-        Client::create(['entreprise_id' => $entreprise->id, 'nom' => 'Diallo Mariam',  'telephone' => '+225 07 44 55 66', 'email' => 'diallo@mail.com', 'adresse' => 'Plateau, Abidjan', 'ncc' => '1982342 X', 'regime_imposition' => 'RNI', 'compte_comptable' => '411100', 'numero_tiers' => '411002']);
+        Client::create(['entreprise_id' => $entreprise->id, 'nom' => 'Koffi Amos',     'telephone' => '+225 07 11 22 33', 'email' => 'koffi@mail.com',  'adresse' => 'Cocody, Abidjan', 'ncc' => '1982341 X', 'regime_imposition' => 'RNI', 'compte_comptable' => '411000', 'numero_tiers' => '411001']);
+        Client::create(['entreprise_id' => $entreprise->id, 'nom' => 'Diallo Mariam',  'telephone' => '+225 07 44 55 66', 'email' => 'diallo@mail.com', 'adresse' => 'Plateau, Abidjan', 'ncc' => '1982342 X', 'regime_imposition' => 'RNI', 'compte_comptable' => '411000', 'numero_tiers' => '411002']);
         // Client croisé B2B lié à l'Entreprise 2 (NCC B2B Agro = CI9876543210)
-        Client::create(['entreprise_id' => $entreprise->id, 'nom' => 'B2B Agro Fournitures (Client B2B)', 'telephone' => '+225 27 22 99 99', 'email' => 'contact@b2bagro.ci', 'adresse' => 'Abidjan', 'ncc' => 'CI9876543210', 'regime_imposition' => 'RNI', 'compte_comptable' => '411100', 'numero_tiers' => '411003']);
+        Client::create(['entreprise_id' => $entreprise->id, 'nom' => 'B2B Agro Fournitures (Client B2B)', 'telephone' => '+225 27 22 99 99', 'email' => 'contact@b2bagro.ci', 'adresse' => 'Abidjan', 'ncc' => 'CI9876543210', 'regime_imposition' => 'RNI', 'compte_comptable' => '411000', 'numero_tiers' => '411003']);
 
-        Fournisseur::create(['entreprise_id' => $entreprise->id, 'nom' => 'CDCI Distribution', 'telephone' => '+225 27 20 01 01', 'email' => 'contact@cdci.ci',   'adresse' => 'Abidjan, Treichville', 'ncc' => '2019871 Y', 'regime_imposition' => 'RSI', 'secteur' => 'Alimentation', 'compte_comptable' => '401100', 'numero_tiers' => '401001']);
+        Fournisseur::create(['entreprise_id' => $entreprise->id, 'nom' => 'CDCI Distribution', 'telephone' => '+225 27 20 01 01', 'email' => 'contact@cdci.ci',   'adresse' => 'Abidjan, Treichville', 'ncc' => '2019871 Y', 'regime_imposition' => 'RSI', 'secteur' => 'Alimentation', 'compte_comptable' => '401000', 'numero_tiers' => '401001']);
         // Fournisseur croisé B2B lié à l'Entreprise 2 (NCC B2B Agro = CI9876543210)
-        Fournisseur::create(['entreprise_id' => $entreprise->id, 'nom' => 'B2B Agro Fournitures (Fournisseur B2B)', 'telephone' => '+225 27 22 99 99', 'email' => 'contact@b2bagro.ci', 'adresse' => 'Abidjan', 'ncc' => 'CI9876543210', 'regime_imposition' => 'RSI', 'secteur' => 'Alimentation', 'compte_comptable' => '401100', 'numero_tiers' => '401002']);
+        Fournisseur::create(['entreprise_id' => $entreprise->id, 'nom' => 'B2B Agro Fournitures (Fournisseur B2B)', 'telephone' => '+225 27 22 99 99', 'email' => 'contact@b2bagro.ci', 'adresse' => 'Abidjan', 'ncc' => 'CI9876543210', 'regime_imposition' => 'RSI', 'secteur' => 'Alimentation', 'compte_comptable' => '401000', 'numero_tiers' => '401002']);
 
         // Entreprise 2 (B2B Agro)
-        Client::create(['entreprise_id' => $entreprise2->id, 'nom' => 'Diallo Awa',     'telephone' => '+225 07 55 66 77', 'email' => 'awa@mail.com',  'adresse' => 'Cocody, Abidjan', 'ncc' => '2982341 X', 'regime_imposition' => 'RNI', 'compte_comptable' => '411100', 'numero_tiers' => '411011']);
+        Client::create(['entreprise_id' => $entreprise2->id, 'nom' => 'Diallo Awa',     'telephone' => '+225 07 55 66 77', 'email' => 'awa@mail.com',  'adresse' => 'Cocody, Abidjan', 'ncc' => '2982341 X', 'regime_imposition' => 'RNI', 'compte_comptable' => '411000', 'numero_tiers' => '411011']);
         // Client croisé B2B lié à l'Entreprise 1 (NCC Maison Dupont = CI0123456789)
-        Client::create(['entreprise_id' => $entreprise2->id, 'nom' => 'Maison Dupont SARL (Client B2B)', 'telephone' => '+225 27 22 10 00', 'email' => 'contact@maisondupont.ci', 'adresse' => 'Abidjan', 'ncc' => 'CI0123456789', 'regime_imposition' => 'RNI', 'compte_comptable' => '411100', 'numero_tiers' => '411012']);
+        Client::create(['entreprise_id' => $entreprise2->id, 'nom' => 'Maison Dupont SARL (Client B2B)', 'telephone' => '+225 27 22 10 00', 'email' => 'contact@maisondupont.ci', 'adresse' => 'Abidjan', 'ncc' => 'CI0123456789', 'regime_imposition' => 'RNI', 'compte_comptable' => '411000', 'numero_tiers' => '411012']);
  
-        Fournisseur::create(['entreprise_id' => $entreprise2->id, 'nom' => 'ProFoods CI',        'telephone' => '+225 27 20 02 02', 'email' => 'info@profoods.ci',  'adresse' => 'Abidjan, Zone 3', 'ncc' => '2019872 Y', 'regime_imposition' => 'RSI', 'secteur' => 'Alimentation', 'compte_comptable' => '401100', 'numero_tiers' => '401011']);
+        Fournisseur::create(['entreprise_id' => $entreprise2->id, 'nom' => 'ProFoods CI',        'telephone' => '+225 27 20 02 02', 'email' => 'info@profoods.ci',  'adresse' => 'Abidjan, Zone 3', 'ncc' => '2019872 Y', 'regime_imposition' => 'RSI', 'secteur' => 'Alimentation', 'compte_comptable' => '401000', 'numero_tiers' => '401011']);
         // Fournisseur croisé B2B lié à l'Entreprise 1 (NCC Maison Dupont = CI0123456789)
-        Fournisseur::create(['entreprise_id' => $entreprise2->id, 'nom' => 'Maison Dupont SARL (Fournisseur B2B)', 'telephone' => '+225 27 22 10 00', 'email' => 'contact@maisondupont.ci', 'adresse' => 'Abidjan', 'ncc' => 'CI0123456789', 'regime_imposition' => 'RSI', 'secteur' => 'Alimentation', 'compte_comptable' => '401100', 'numero_tiers' => '401012']);
+        Fournisseur::create(['entreprise_id' => $entreprise2->id, 'nom' => 'Maison Dupont SARL (Fournisseur B2B)', 'telephone' => '+225 27 22 10 00', 'email' => 'contact@maisondupont.ci', 'adresse' => 'Abidjan', 'ncc' => 'CI0123456789', 'regime_imposition' => 'RSI', 'secteur' => 'Alimentation', 'compte_comptable' => '401000', 'numero_tiers' => '401012']);
 
         // Réactiver les contraintes de clés étrangères
         Schema::enableForeignKeyConstraints();

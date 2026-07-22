@@ -6,14 +6,17 @@ use App\Modules\Admin\Modeles\Vente;
 use App\Modules\Admin\Modeles\Achat;
 use App\Modules\Admin\Modeles\EcritureComptable;
 use App\Modules\Admin\Modeles\CodeJournal;
+use App\Modules\Admin\Modeles\Operation;
 use App\Modules\Admin\Modeles\OrdreProduction;
+use Illuminate\Support\Facades\DB;
 
 /**
  * ComptabiliteService — Moteur d'écritures comptables SYSCOHADA révisé (Côte d'Ivoire)
  *
- * Comptes de référence utilisés :
- *  411xxx  Clients (tiers individuels)
- *  401xxx  Fournisseurs (tiers individuels)
+ * Comptes de référence utilisés (voir config('selflow.plan_comptable_defaut') pour les
+ * valeurs par défaut, centralisées et modifiables à un seul endroit) :
+ *  411xxx  Clients (compte collectif générique)
+ *  401xxx  Fournisseurs (compte collectif générique)
  *  70xxxx  Produits des activités ordinaires (Classe 7)
  *  60xxxx  Achats de marchandises / matières (Classe 6)
  *  443100  État, TVA facturée sur ventes (collectée)
@@ -22,194 +25,137 @@ use App\Modules\Admin\Modeles\OrdreProduction;
  *  571xxx  Caisse
  *  731100  Variation des stocks de produits fabriqués (production)
  *  603200  Variation des stocks de matières premières
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * RÈGLE FONDAMENTALE (corrigée le 22/07/2026 suite audit) :
+ *
+ * Une vente/achat réglé(e) INTÉGRALEMENT ET IMMÉDIATEMENT au moment de la
+ * facturation ne transite JAMAIS par le compte 411/401. Le compte 411/401
+ * n'est mouvementé que s'il subsiste une créance/dette réelle (paiement
+ * différé, total ou partiel). Auparavant le service générait toujours une
+ * écriture "facture" (411 débit) PUIS une écriture "règlement" séparée
+ * (411 crédit) même pour un encaissement simultané, ce qui créait un
+ * mouvement fictif sur le 411 qui s'annulait instantanément — inutile et
+ * trompeur pour le lettrage. Utiliser genererEcrituresVente()/
+ * genererEcrituresAchat() ci-dessous, qui décident automatiquement.
+ *
+ * Chaque écriture générée est maintenant rattachée à une Operation
+ * (numero_saisie séquentiel par journal), et le compte tiers individuel
+ * (numero_tiers du client/fournisseur) est stocké dans la colonne dédiée
+ * compte_tiers — jamais à la place du compte général.
+ * ─────────────────────────────────────────────────────────────────────────
  */
 class ComptabiliteService
 {
+    // ─────────────────────────────────────────────────────────────────
+    // VENTES
+    // ─────────────────────────────────────────────────────────────────
+
     /**
-     * Génère les écritures de facturation pour une vente.
-     * Débit Client (TTC) vs Crédit Vente (HT) & Crédit TVA (Groupés par Compte)
+     * Point d'entrée unique pour la facturation d'une vente.
+     * Décide automatiquement s'il s'agit d'une vente comptant (aucune ligne
+     * 411) ou d'une vente à crédit / partiellement réglée (411 pour le
+     * solde non couvert immédiatement).
+     *
+     * @param Vente  $vente
+     * @param float  $montantPaye     Montant réellement encaissé au moment de la facturation (0 si vente à crédit pure)
+     * @param string $modePaiement    'Espèces', 'Banque : <intitulé>', etc.
      */
-    public static function genererEcritureFactureVente(Vente $vente): void
-    {
+    public static function genererEcrituresVente(
+        Vente $vente,
+        float $montantPaye,
+        string $modePaiement,
+        ?string $date = null,
+        ?string $moyenBancaire = null,
+        ?string $referencePaiement = null
+    ): void {
         $entrepriseId = $vente->pointDeVente->entreprise_id;
         $pdvId = $vente->point_de_vente_id;
-        $date = $vente->date_vente ? $vente->date_vente->toDateString() : now()->toDateString();
+        $date = $date ?? ($vente->date_vente ? $vente->date_vente->toDateString() : now()->toDateString());
         $refDoc = $vente->numero_facture;
+        $ttc = (float) $vente->montant_ttc;
+        $montantPaye = max(0, min($montantPaye, $ttc));
 
-        // Trouver le code journal vente
-        $codeJournal = CodeJournal::where('entreprise_id', $entrepriseId)
-            ->where('type', 'Vente')
-            ->value('code') ?? 'VTE';
+        $codeJournalVente = self::codeJournal($entrepriseId, 'Vente', 'VTE');
+        [$compteFinancier, $codeJournalFinancier] = self::compteEtJournalFinancier($entrepriseId, $modePaiement);
 
-        $compteClient = $vente->client?->numero_tiers ?? $vente->client?->compte_comptable ?? '411100';
+        $ventilation = self::ventilationVente($vente);
+        $libelleGeneral = self::libelleGeneralVente($ventilation);
 
-        // 1. Débit Client (TTC)
-        EcritureComptable::create([
-            'entreprise_id'     => $entrepriseId,
-            'point_de_vente_id'  => $pdvId,
-            'date_ecriture'     => $date,
-            'libelle'           => $refDoc . '/Facturation Vente',
-            'reference_document'=> $refDoc,
-            'code_journal'      => $codeJournal,
-            'compte_debit'      => $compteClient,
-            'compte_credit'     => null,
-            'debit'             => $vente->montant_ttc,
-            'credit'            => 0,
-        ]);
+        DB::transaction(function () use (
+            $vente, $entrepriseId, $pdvId, $date, $refDoc, $ttc, $montantPaye,
+            $codeJournalVente, $compteFinancier, $codeJournalFinancier,
+            $ventilation, $libelleGeneral, $modePaiement
+        ) {
+            $estPaiementIntegralImmediat = $montantPaye >= $ttc && $ttc > 0;
 
-        // Calcul de la remise globale au prorata pour chaque produit
-        $pourcentageRemise = ($vente->remise > 0 && $vente->montant_ht > 0) 
-            ? ($vente->remise / $vente->montant_ht) 
-            : 0;
+            if ($estPaiementIntegralImmediat) {
+                // ── Vente comptant : UNE SEULE opération, aucune ligne 411 ──
+                $operation = Operation::creer(
+                    $entrepriseId, $pdvId, $date, 'VenteComptant',
+                    $codeJournalFinancier, $refDoc, $libelleGeneral . ' (comptant)'
+                );
 
-        // Regroupement par compte de vente
-        $ventilation = [];
-        foreach ($vente->details as $detail) {
-            $ht = $detail->quantite * $detail->prix_unitaire;
-            if ($pourcentageRemise > 0) {
-                $ht = $ht - ($ht * $pourcentageRemise);
-            }
+                self::ligne($operation, $entrepriseId, $pdvId, $date, $refDoc, $codeJournalFinancier,
+                    $refDoc . '/Vente comptant', $compteFinancier, null, null, $ttc, 0);
 
-            if ($ht > 0) {
-                $compte = $detail->produit?->compte_vente ?? '701100';
-                if (!isset($ventilation[$compte])) {
-                    $ventilation[$compte] = 0;
+                foreach ($ventilation['comptes'] as $compte => $montantHt) {
+                    self::ligne($operation, $entrepriseId, $pdvId, $date, $refDoc, $codeJournalFinancier,
+                        $refDoc . ' / Vente suivant détail - Compte ' . $compte, null, $compte, null, 0, $montantHt);
                 }
-                $ventilation[$compte] += $ht;
+                if ($ventilation['tva'] > 0) {
+                    self::ligne($operation, $entrepriseId, $pdvId, $date, $refDoc, $codeJournalFinancier,
+                        $refDoc . '/TVA Collectée Vente', null, config('selflow.plan_comptable_defaut.tva_collectee'), null, 0, $ventilation['tva']);
+                }
+
+                $operation->cloturerEquilibre();
+                return;
             }
-        }
 
-        // 2. Crédit Vente par compte (HT Net agrégé)
-        foreach ($ventilation as $compte => $montantHt) {
-            EcritureComptable::create([
-                'entreprise_id'     => $entrepriseId,
-                'point_de_vente_id'  => $pdvId,
-                'date_ecriture'     => $date,
-                'libelle'           => $refDoc . ' / Vente suivant détail - Compte ' . $compte,
-                'reference_document'=> $refDoc,
-                'code_journal'      => $codeJournal,
-                'compte_debit'      => null,
-                'compte_credit'     => $compte,
-                'debit'             => 0,
-                'credit'            => $montantHt,
-            ]);
-        }
+            // ── Vente à crédit (totale ou partielle) : passage obligatoire par le 411 ──
+            $compteClientGeneral = $vente->client?->compte_comptable ?? config('selflow.plan_comptable_defaut.client_collectif');
+            $compteClientTiers = $vente->client?->numero_tiers;
 
-        // 3. Crédit TVA Collectée (si active)
-        if ($vente->montant_tva > 0) {
-            EcritureComptable::create([
-                'entreprise_id'     => $entrepriseId,
-                'point_de_vente_id'  => $pdvId,
-                'date_ecriture'     => $date,
-                'libelle'           => $refDoc . '/TVA Collectée Vente',
-                'reference_document'=> $refDoc,
-                'code_journal'      => $codeJournal,
-                'compte_debit'      => null,
-                'compte_credit'     => '443100',
-                'debit'             => 0,
-                'credit'            => $vente->montant_tva,
-            ]);
-        }
+            $opFacture = Operation::creer(
+                $entrepriseId, $pdvId, $date, 'FactureVente',
+                $codeJournalVente, $refDoc, $libelleGeneral
+            );
+
+            self::ligne($opFacture, $entrepriseId, $pdvId, $date, $refDoc, $codeJournalVente,
+                $refDoc . '/Facturation Vente', $compteClientGeneral, null, $compteClientTiers, $ttc, 0);
+
+            foreach ($ventilation['comptes'] as $compte => $montantHt) {
+                self::ligne($opFacture, $entrepriseId, $pdvId, $date, $refDoc, $codeJournalVente,
+                    $refDoc . ' / Vente suivant détail - Compte ' . $compte, null, $compte, null, 0, $montantHt);
+            }
+            if ($ventilation['tva'] > 0) {
+                self::ligne($opFacture, $entrepriseId, $pdvId, $date, $refDoc, $codeJournalVente,
+                    $refDoc . '/TVA Collectée Vente', null, config('selflow.plan_comptable_defaut.tva_collectee'), null, 0, $ventilation['tva']);
+            }
+            $opFacture->cloturerEquilibre();
+
+            // ── Règlement partiel encaissé immédiatement (solde restant à crédit) ──
+            if ($montantPaye > 0) {
+                self::genererEcritureReglementVente($vente, $montantPaye, $modePaiement, $date, null, null, 'Acompte à la facturation');
+            }
+        });
     }
 
     /**
-     * Génère les écritures de facturation pour un achat.
-     * Crédit Fournisseur (TTC) vs Débit Achat (HT) & Débit TVA (Groupés par Compte)
-     */
-    public static function genererEcritureFactureAchat(Achat $achat): void
-    {
-        $entrepriseId = $achat->pointDeVente->entreprise_id;
-        $pdvId = $achat->point_de_vente_id;
-        $date = $achat->date_achat ? $achat->date_achat->toDateString() : now()->toDateString();
-        $refDoc = $achat->numero_facture;
-
-        // Trouver le code journal achat
-        $codeJournal = CodeJournal::where('entreprise_id', $entrepriseId)
-            ->where('type', 'Achat')
-            ->value('code') ?? 'ACH';
-
-        $compteFournisseur = $achat->fournisseur?->numero_tiers ?? $achat->fournisseur?->compte_comptable ?? '401100';
-
-        // 1. Crédit Fournisseur (TTC)
-        EcritureComptable::create([
-            'entreprise_id'     => $entrepriseId,
-            'point_de_vente_id'  => $pdvId,
-            'date_ecriture'     => $date,
-            'libelle'           => $refDoc . '/Facturation Achat',
-            'reference_document'=> $refDoc,
-            'code_journal'      => $codeJournal,
-            'compte_debit'      => null,
-            'compte_credit'     => $compteFournisseur,
-            'debit'             => 0,
-            'credit'            => $achat->montant_ttc,
-        ]);
-
-        // Regroupement par compte d'achat
-        $ventilation = [];
-        foreach ($achat->details as $detail) {
-            $ht = $detail->quantite * $detail->prix_unitaire;
-            if ($ht > 0) {
-                $compte = $detail->produit?->compte_achat ?? '601100';
-                if (!isset($ventilation[$compte])) {
-                    $ventilation[$compte] = 0;
-                }
-                $ventilation[$compte] += $ht;
-            }
-        }
-
-        // 2. Débit Achat par compte (HT Net agrégé)
-        foreach ($ventilation as $compte => $montantHt) {
-            EcritureComptable::create([
-                'entreprise_id'     => $entrepriseId,
-                'point_de_vente_id'  => $pdvId,
-                'date_ecriture'     => $date,
-                'libelle'           => $refDoc . ' / Achat suivant détail - Compte ' . $compte,
-                'reference_document'=> $refDoc,
-                'code_journal'      => $codeJournal,
-                'compte_debit'      => $compte,
-                'compte_credit'     => null,
-                'debit'             => $montantHt,
-                'credit'            => 0,
-            ]);
-        }
-
-        // 3. Débit TVA Déductible sur achats — Compte 445200 (SYSCOHADA CI révisé)
-        // La TVA est calculée ligne par ligne depuis le taux de chaque produit.
-        // On agrège toutes les TVA de toutes les lignes pour un seul crédit 401 TTC.
-        $totalTvaCalculee = 0;
-        foreach ($achat->details as $detail) {
-            $ht = $detail->quantite * $detail->prix_unitaire;
-            $tauxTva = $detail->produit?->taux_tva ?? 0;
-            if ($tauxTva > 0 && $ht > 0) {
-                $totalTvaCalculee += round($ht * ($tauxTva / 100), 2);
-            }
-        }
-
-        // Utiliser la TVA recalculée si > 0, sinon utiliser la TVA enregistrée sur la facture
-        $montantTvaFinal = $totalTvaCalculee > 0 ? $totalTvaCalculee : (float)$achat->montant_tva;
-
-        if ($montantTvaFinal > 0) {
-            EcritureComptable::create([
-                'entreprise_id'     => $entrepriseId,
-                'point_de_vente_id'  => $pdvId,
-                'date_ecriture'     => $date,
-                'libelle'           => $refDoc . '/TVA Déductible Achat (445200)',
-                'reference_document'=> $refDoc,
-                'code_journal'      => $codeJournal,
-                'compte_debit'      => '445200', // SYSCOHADA CI : TVA récupérable sur achats courants
-                'compte_credit'     => null,
-                'debit'             => $montantTvaFinal,
-                'credit'            => 0,
-            ]);
-        }
-    }
-
-    /**
-     * Génère l'écriture de règlement client (vente).
+     * Génère l'écriture de règlement client pour un encaissement DIFFÉRÉ
+     * (postérieur à la facturation) ou pour un acompte encaissé en même
+     * temps qu'une facturation à crédit partielle.
      * Débit Caisse/Banque (Montant) vs Crédit Client (Montant)
      */
-    public static function genererEcritureReglementVente(Vente $vente, float $montant, string $modePaiement, ?string $date = null, ?string $moyenBancaire = null, ?string $referencePaiement = null): void
-    {
+    public static function genererEcritureReglementVente(
+        Vente $vente,
+        float $montant,
+        string $modePaiement,
+        ?string $date = null,
+        ?string $moyenBancaire = null,
+        ?string $referencePaiement = null,
+        ?string $contexte = null
+    ): void {
         if ($montant <= 0) return;
 
         $entrepriseId = $vente->pointDeVente->entreprise_id;
@@ -217,80 +163,137 @@ class ComptabiliteService
         $date = $date ?? now()->toDateString();
         $refDoc = $vente->numero_facture;
 
-        // Déterminer le journal et le compte financier
-        $isBanque = str_starts_with(strtolower($modePaiement), 'banque');
-        $codeJournal = 'CAI';
-        $compteFinancier = '571000';
-        if ($isBanque) {
-            $parts = explode(' : ', $modePaiement);
-            $intitule = isset($parts[1]) ? trim($parts[1]) : '';
-            $journalObj = CodeJournal::where('entreprise_id', $entrepriseId)
-                ->where('type', 'Banque')
-                ->where('intitule', $intitule)
-                ->first();
-            if ($journalObj) {
-                $codeJournal = $journalObj->code;
-                $compteFinancier = $journalObj->compte;
-            } else {
-                $codeJournal = 'BQE';
-                $compteFinancier = '521000';
-            }
-        }
+        [$compteFinancier, $codeJournal] = self::compteEtJournalFinancier($entrepriseId, $modePaiement);
 
-        $compteClient = $vente->client?->numero_tiers ?? $vente->client?->compte_comptable ?? '411100';
+        $compteClientGeneral = $vente->client?->compte_comptable ?? config('selflow.plan_comptable_defaut.client_collectif');
+        $compteClientTiers = $vente->client?->numero_tiers;
 
-        $vente->loadMissing('details.produit');
-        $produits = [];
-        foreach ($vente->details as $detail) {
-            $nom = $detail->libelle_virtuel ?? $detail->produit?->nom;
-            if ($nom) {
-                $produits[] = $nom;
-            }
-        }
-        $produitsStr = count($produits) > 0 ? implode(', ', array_unique($produits)) : 'Marchandises';
-
+        $produitsStr = self::libelleProduits($vente->loadMissing('details.produit')->details);
         $refPaiement = $referencePaiement ?? $vente->reference_paiement;
-        $libellePaiement = 'Rglt/' . $refDoc;
-        if ($refPaiement) {
-            $libellePaiement .= '/' . $refPaiement;
-        }
-        $libellePaiement .= '/Vente ' . $produitsStr;
+        $libellePaiement = 'Rglt/' . $refDoc . ($refPaiement ? '/' . $refPaiement : '') . '/Vente ' . $produitsStr;
 
-        // 1. Débit Banque/Caisse
-        EcritureComptable::create([
-            'entreprise_id'     => $entrepriseId,
-            'point_de_vente_id'  => $pdvId,
-            'date_ecriture'     => $date,
-            'libelle'           => $libellePaiement,
-            'reference_document'=> $refDoc,
-            'code_journal'      => $codeJournal,
-            'compte_debit'      => $compteFinancier,
-            'compte_credit'     => null,
-            'debit'             => $montant,
-            'credit'            => 0,
-        ]);
+        DB::transaction(function () use (
+            $entrepriseId, $pdvId, $date, $refDoc, $codeJournal, $compteFinancier,
+            $compteClientGeneral, $compteClientTiers, $libellePaiement, $montant, $contexte
+        ) {
+            $operation = Operation::creer(
+                $entrepriseId, $pdvId, $date, 'ReglementVente',
+                $codeJournal, $refDoc, $contexte ?? 'Règlement client'
+            );
 
-        // 2. Crédit Client
-        EcritureComptable::create([
-            'entreprise_id'     => $entrepriseId,
-            'point_de_vente_id'  => $pdvId,
-            'date_ecriture'     => $date,
-            'libelle'           => $libellePaiement,
-            'reference_document'=> $refDoc,
-            'code_journal'      => $codeJournal,
-            'compte_debit'      => null,
-            'compte_credit'     => $compteClient,
-            'debit'             => 0,
-            'credit'            => $montant,
-        ]);
+            self::ligne($operation, $entrepriseId, $pdvId, $date, $refDoc, $codeJournal,
+                $libellePaiement, $compteFinancier, null, null, $montant, 0);
+
+            self::ligne($operation, $entrepriseId, $pdvId, $date, $refDoc, $codeJournal,
+                $libellePaiement, null, $compteClientGeneral, $compteClientTiers, 0, $montant);
+
+            $operation->cloturerEquilibre();
+        });
+    }
+
+    // ─────────────────────────────────────────────────────────────────
+    // ACHATS
+    // ─────────────────────────────────────────────────────────────────
+
+    /**
+     * Point d'entrée unique pour la facturation d'un achat.
+     * Symétrique de genererEcrituresVente().
+     */
+    public static function genererEcrituresAchat(
+        Achat $achat,
+        float $montantPaye,
+        string $modePaiement,
+        ?string $date = null,
+        ?string $moyenBancaire = null,
+        ?string $referencePaiement = null
+    ): void {
+        $entrepriseId = $achat->pointDeVente->entreprise_id;
+        $pdvId = $achat->point_de_vente_id;
+        $date = $date ?? ($achat->date_achat ? $achat->date_achat->toDateString() : now()->toDateString());
+        $refDoc = $achat->numero_facture;
+        $ttc = (float) $achat->montant_ttc;
+        $montantPaye = max(0, min($montantPaye, $ttc));
+
+        $codeJournalAchat = self::codeJournal($entrepriseId, 'Achat', 'ACH');
+        [$compteFinancier, $codeJournalFinancier] = self::compteEtJournalFinancier($entrepriseId, $modePaiement);
+
+        $ventilation = self::ventilationAchat($achat);
+        $libelleGeneral = self::libelleGeneralAchat($ventilation);
+
+        DB::transaction(function () use (
+            $achat, $entrepriseId, $pdvId, $date, $refDoc, $ttc, $montantPaye,
+            $codeJournalAchat, $compteFinancier, $codeJournalFinancier,
+            $ventilation, $libelleGeneral, $modePaiement
+        ) {
+            $estPaiementIntegralImmediat = $montantPaye >= $ttc && $ttc > 0;
+
+            if ($estPaiementIntegralImmediat) {
+                // ── Achat comptant : UNE SEULE opération, aucune ligne 401 ──
+                $operation = Operation::creer(
+                    $entrepriseId, $pdvId, $date, 'AchatComptant',
+                    $codeJournalFinancier, $refDoc, $libelleGeneral . ' (comptant)'
+                );
+
+                foreach ($ventilation['comptes'] as $compte => $montantHt) {
+                    self::ligne($operation, $entrepriseId, $pdvId, $date, $refDoc, $codeJournalFinancier,
+                        $refDoc . ' / Achat suivant détail - Compte ' . $compte, $compte, null, null, $montantHt, 0);
+                }
+                if ($ventilation['tva'] > 0) {
+                    self::ligne($operation, $entrepriseId, $pdvId, $date, $refDoc, $codeJournalFinancier,
+                        $refDoc . '/TVA Déductible Achat', config('selflow.plan_comptable_defaut.tva_deductible'), null, null, $ventilation['tva'], 0);
+                }
+
+                self::ligne($operation, $entrepriseId, $pdvId, $date, $refDoc, $codeJournalFinancier,
+                    $refDoc . '/Achat comptant', null, $compteFinancier, null, 0, $ttc);
+
+                $operation->cloturerEquilibre();
+                return;
+            }
+
+            // ── Achat à crédit (total ou partiel) : passage obligatoire par le 401 ──
+            $compteFournisseurGeneral = $achat->fournisseur?->compte_comptable ?? config('selflow.plan_comptable_defaut.fournisseur_collectif');
+            $compteFournisseurTiers = $achat->fournisseur?->numero_tiers;
+
+            $opFacture = Operation::creer(
+                $entrepriseId, $pdvId, $date, 'FactureAchat',
+                $codeJournalAchat, $refDoc, $libelleGeneral
+            );
+
+            foreach ($ventilation['comptes'] as $compte => $montantHt) {
+                self::ligne($opFacture, $entrepriseId, $pdvId, $date, $refDoc, $codeJournalAchat,
+                    $refDoc . ' / Achat suivant détail - Compte ' . $compte, $compte, null, null, $montantHt, 0);
+            }
+            if ($ventilation['tva'] > 0) {
+                self::ligne($opFacture, $entrepriseId, $pdvId, $date, $refDoc, $codeJournalAchat,
+                    $refDoc . '/TVA Déductible Achat', config('selflow.plan_comptable_defaut.tva_deductible'), null, null, $ventilation['tva'], 0);
+            }
+
+            self::ligne($opFacture, $entrepriseId, $pdvId, $date, $refDoc, $codeJournalAchat,
+                $refDoc . '/Facturation Achat', null, $compteFournisseurGeneral, $compteFournisseurTiers, 0, $ttc);
+
+            $opFacture->cloturerEquilibre();
+
+            if ($montantPaye > 0) {
+                self::genererEcritureReglementAchat($achat, $montantPaye, $modePaiement, $date, null, null, 'Acompte à la facturation');
+            }
+        });
     }
 
     /**
-     * Génère l'écriture de règlement fournisseur (achat).
+     * Génère l'écriture de règlement fournisseur pour un décaissement
+     * DIFFÉRÉ ou un acompte encaissé en même temps qu'une facturation
+     * à crédit partielle.
      * Débit Fournisseur (Montant) vs Crédit Caisse/Banque (Montant)
      */
-    public static function genererEcritureReglementAchat(Achat $achat, float $montant, string $modePaiement, ?string $date = null, ?string $moyenBancaire = null, ?string $referencePaiement = null): void
-    {
+    public static function genererEcritureReglementAchat(
+        Achat $achat,
+        float $montant,
+        string $modePaiement,
+        ?string $date = null,
+        ?string $moyenBancaire = null,
+        ?string $referencePaiement = null,
+        ?string $contexte = null
+    ): void {
         if ($montant <= 0) return;
 
         $entrepriseId = $achat->pointDeVente->entreprise_id;
@@ -298,73 +301,37 @@ class ComptabiliteService
         $date = $date ?? now()->toDateString();
         $refDoc = $achat->numero_facture;
 
-        // Déterminer le journal et le compte financier
-        $isBanque = str_starts_with(strtolower($modePaiement), 'banque');
-        $codeJournal = 'CAI';
-        $compteFinancier = '571000';
-        if ($isBanque) {
-            $parts = explode(' : ', $modePaiement);
-            $intitule = isset($parts[1]) ? trim($parts[1]) : '';
-            $journalObj = CodeJournal::where('entreprise_id', $entrepriseId)
-                ->where('type', 'Banque')
-                ->where('intitule', $intitule)
-                ->first();
-            if ($journalObj) {
-                $codeJournal = $journalObj->code;
-                $compteFinancier = $journalObj->compte;
-            } else {
-                $codeJournal = 'BQE';
-                $compteFinancier = '521000';
-            }
-        }
+        [$compteFinancier, $codeJournal] = self::compteEtJournalFinancier($entrepriseId, $modePaiement);
 
-        $compteFournisseur = $achat->fournisseur?->numero_tiers ?? $achat->fournisseur?->compte_comptable ?? '401100';
+        $compteFournisseurGeneral = $achat->fournisseur?->compte_comptable ?? config('selflow.plan_comptable_defaut.fournisseur_collectif');
+        $compteFournisseurTiers = $achat->fournisseur?->numero_tiers;
 
-        $achat->loadMissing('details.produit');
-        $produits = [];
-        foreach ($achat->details as $detail) {
-            $nom = $detail->libelle_virtuel ?? $detail->produit?->nom;
-            if ($nom) {
-                $produits[] = $nom;
-            }
-        }
-        $produitsStr = count($produits) > 0 ? implode(', ', array_unique($produits)) : 'Marchandises';
-
+        $produitsStr = self::libelleProduits($achat->loadMissing('details.produit')->details);
         $refPaiement = $referencePaiement ?? $achat->reference_paiement;
-        $libellePaiement = 'Rglt/' . $refDoc;
-        if ($refPaiement) {
-            $libellePaiement .= '/' . $refPaiement;
-        }
-        $libellePaiement .= '/Achat ' . $produitsStr;
+        $libellePaiement = 'Rglt/' . $refDoc . ($refPaiement ? '/' . $refPaiement : '') . '/Achat ' . $produitsStr;
 
-        // 1. Débit Fournisseur
-        EcritureComptable::create([
-            'entreprise_id'     => $entrepriseId,
-            'point_de_vente_id'  => $pdvId,
-            'date_ecriture'     => $date,
-            'libelle'           => $libellePaiement,
-            'reference_document'=> $refDoc,
-            'code_journal'      => $codeJournal,
-            'compte_debit'      => $compteFournisseur,
-            'compte_credit'     => null,
-            'debit'             => $montant,
-            'credit'            => 0,
-        ]);
+        DB::transaction(function () use (
+            $entrepriseId, $pdvId, $date, $refDoc, $codeJournal, $compteFinancier,
+            $compteFournisseurGeneral, $compteFournisseurTiers, $libellePaiement, $montant, $contexte
+        ) {
+            $operation = Operation::creer(
+                $entrepriseId, $pdvId, $date, 'ReglementAchat',
+                $codeJournal, $refDoc, $contexte ?? 'Règlement fournisseur'
+            );
 
-        // 2. Crédit Banque/Caisse
-        EcritureComptable::create([
-            'entreprise_id'     => $entrepriseId,
-            'point_de_vente_id'  => $pdvId,
-            'date_ecriture'     => $date,
-            'libelle'           => $libellePaiement,
-            'reference_document'=> $refDoc,
-            'code_journal'      => $codeJournal,
-            'compte_debit'      => null,
-            'compte_credit'     => $compteFinancier,
-            'debit'             => 0,
-            'credit'            => $montant,
-        ]);
+            self::ligne($operation, $entrepriseId, $pdvId, $date, $refDoc, $codeJournal,
+                $libellePaiement, $compteFournisseurGeneral, null, $compteFournisseurTiers, $montant, 0);
+
+            self::ligne($operation, $entrepriseId, $pdvId, $date, $refDoc, $codeJournal,
+                $libellePaiement, null, $compteFinancier, null, 0, $montant);
+
+            $operation->cloturerEquilibre();
+        });
     }
+
+    // ─────────────────────────────────────────────────────────────────
+    // PRODUCTION
+    // ─────────────────────────────────────────────────────────────────
 
     /**
      * Génère les écritures comptables d'un ordre de production.
@@ -374,10 +341,6 @@ class ComptabiliteService
      *     Débit  603200 (Variation des stocks de MP)   vs Crédit 311000 (Stock MP)
      *   Pour le produit fini fabriqué :
      *     Débit  351100 (Stock produits finis)          vs Crédit 731100 (Variation stocks PF)
-     *
-     * @param OrdreProduction $ordre  L'ordre validé (doit avoir produitFini et details chargés)
-     * @param array $consommations    [['produit' => Produit, 'quantite' => float, 'valeur_unitaire' => float], ...]
-     * @param float $valeurProduction Valeur estimée du lot fabriqué (quantite × coût unitaire PF)
      */
     public static function genererEcritureProduction(
         OrdreProduction $ordre,
@@ -392,79 +355,44 @@ class ComptabiliteService
         $pdvId        = $ordre->point_de_vente_id;
         $date         = now()->toDateString();
         $refDoc       = $ordre->code_ordre;
+        $codeJournal  = self::codeJournal($entrepriseId, 'OD', 'OD');
 
-        $codeJournal = CodeJournal::where('entreprise_id', $entrepriseId)
-            ->where('type', 'OD') // Journal des opérations diverses
-            ->value('code') ?? 'OD';
+        DB::transaction(function () use ($ordre, $consommations, $valeurProduction, $entrepriseId, $pdvId, $date, $refDoc, $codeJournal) {
+            $operation = Operation::creer(
+                $entrepriseId, $pdvId, $date, 'Production',
+                $codeJournal, $refDoc, 'Production interne — ' . ($ordre->produitFini->nom ?? '')
+            );
 
-        // 1. Sorties de matières premières consommées
-        foreach ($consommations as $conso) {
-            $valeurMp = round($conso['quantite'] * ($conso['valeur_unitaire'] ?? $conso['produit']->prix_achat ?? 0), 2);
-            if ($valeurMp <= 0) continue;
+            foreach ($consommations as $conso) {
+                $valeurMp = round($conso['quantite'] * ($conso['valeur_unitaire'] ?? $conso['produit']->prix_achat ?? 0), 2);
+                if ($valeurMp <= 0) continue;
 
-            // Débit 603200 — Variation stocks MP (constate la consommation)
-            EcritureComptable::create([
-                'entreprise_id'     => $entrepriseId,
-                'point_de_vente_id' => $pdvId,
-                'date_ecriture'     => $date,
-                'libelle'           => $refDoc . '/Conso MP ' . $conso['produit']->nom,
-                'reference_document'=> $refDoc,
-                'code_journal'      => $codeJournal,
-                'compte_debit'      => '603200', // Variation des stocks de matières premières
-                'compte_credit'     => null,
-                'debit'             => $valeurMp,
-                'credit'            => 0,
-            ]);
+                self::ligne($operation, $entrepriseId, $pdvId, $date, $refDoc, $codeJournal,
+                    $refDoc . '/Conso MP ' . $conso['produit']->nom, '603200', null, null, $valeurMp, 0);
 
-            // Crédit 311000 — Stocks de matières premières (diminution de l'actif)
-            EcritureComptable::create([
-                'entreprise_id'     => $entrepriseId,
-                'point_de_vente_id' => $pdvId,
-                'date_ecriture'     => $date,
-                'libelle'           => $refDoc . '/Sortie Stock MP ' . $conso['produit']->nom,
-                'reference_document'=> $refDoc,
-                'code_journal'      => $codeJournal,
-                'compte_debit'      => null,
-                'compte_credit'     => '311000', // Stocks de matières premières
-                'debit'             => 0,
-                'credit'            => $valeurMp,
-            ]);
-        }
+                self::ligne($operation, $entrepriseId, $pdvId, $date, $refDoc, $codeJournal,
+                    $refDoc . '/Sortie Stock MP ' . $conso['produit']->nom, null, '311000', null, 0, $valeurMp);
+            }
 
-        // 2. Entrée du produit fini fabriqué
-        if ($valeurProduction > 0) {
-            // Débit 351100 — Stocks de produits finis (augmentation de l'actif)
-            EcritureComptable::create([
-                'entreprise_id'     => $entrepriseId,
-                'point_de_vente_id' => $pdvId,
-                'date_ecriture'     => $date,
-                'libelle'           => $refDoc . '/Entrée PF ' . $ordre->produitFini->nom,
-                'reference_document'=> $refDoc,
-                'code_journal'      => $codeJournal,
-                'compte_debit'      => '351100', // Stocks de produits finis
-                'compte_credit'     => null,
-                'debit'             => $valeurProduction,
-                'credit'            => 0,
-            ]);
+            if ($valeurProduction > 0) {
+                self::ligne($operation, $entrepriseId, $pdvId, $date, $refDoc, $codeJournal,
+                    $refDoc . '/Entrée PF ' . $ordre->produitFini->nom, '351100', null, null, $valeurProduction, 0);
 
-            // Crédit 731100 — Variation des stocks de produits fabriqués (produit)
-            EcritureComptable::create([
-                'entreprise_id'     => $entrepriseId,
-                'point_de_vente_id' => $pdvId,
-                'date_ecriture'     => $date,
-                'libelle'           => $refDoc . '/Production stockée ' . $ordre->produitFini->nom,
-                'reference_document'=> $refDoc,
-                'code_journal'      => $codeJournal,
-                'compte_debit'      => null,
-                'compte_credit'     => '731100', // Variation des stocks de produits fabriqués
-                'debit'             => 0,
-                'credit'            => $valeurProduction,
-            ]);
-        }
+                self::ligne($operation, $entrepriseId, $pdvId, $date, $refDoc, $codeJournal,
+                    $refDoc . '/Production stockée ' . $ordre->produitFini->nom, null, '731100', null, 0, $valeurProduction);
+            }
+
+            $operation->cloturerEquilibre();
+        });
     }
+
+    // ─────────────────────────────────────────────────────────────────
+    // AVOIRS
+    // ─────────────────────────────────────────────────────────────────
 
     /**
      * Génère les écritures comptables SYSCOHADA pour un avoir client.
+     * Inverse la facturation d'origine : Crédit Client / Débit Vente / Débit TVA.
      */
     public static function genererEcritureAvoirVente(Vente $avoir): void
     {
@@ -472,74 +400,42 @@ class ComptabiliteService
         $pdvId = $avoir->point_de_vente_id;
         $date = $avoir->date_vente ? $avoir->date_vente->toDateString() : now()->toDateString();
         $refDoc = $avoir->numero_facture;
+        $codeJournal = self::codeJournal($entrepriseId, 'Vente', 'VTE');
 
-        $codeJournal = CodeJournal::where('entreprise_id', $entrepriseId)
-            ->where('type', 'Vente')
-            ->value('code') ?? 'VTE';
+        $compteClientGeneral = $avoir->client?->compte_comptable ?? config('selflow.plan_comptable_defaut.client_collectif');
+        $compteClientTiers = $avoir->client?->numero_tiers;
 
-        $compteClient = $avoir->client?->numero_tiers ?? $avoir->client?->compte_comptable ?? '411100';
+        $ventilation = self::ventilationVente($avoir);
 
-        // 1. Crédit Client (TTC)
-        EcritureComptable::create([
-            'entreprise_id'     => $entrepriseId,
-            'point_de_vente_id'  => $pdvId,
-            'date_ecriture'     => $date,
-            'libelle'           => $refDoc . '/Facturation Avoir Client',
-            'reference_document'=> $refDoc,
-            'code_journal'      => $codeJournal,
-            'compte_debit'      => null,
-            'compte_credit'     => $compteClient,
-            'debit'             => 0,
-            'credit'            => $avoir->montant_ttc,
-        ]);
+        DB::transaction(function () use (
+            $entrepriseId, $pdvId, $date, $refDoc, $codeJournal,
+            $compteClientGeneral, $compteClientTiers, $ventilation, $avoir
+        ) {
+            $operation = Operation::creer(
+                $entrepriseId, $pdvId, $date, 'AvoirVente',
+                $codeJournal, $refDoc, 'Avoir client'
+            );
 
-        // 2. Débit Vente par compte (HT Net)
-        $ventilation = [];
-        foreach ($avoir->details as $detail) {
-            $ht = $detail->quantite * $detail->prix_unitaire;
-            if ($ht > 0) {
-                $compte = $detail->produit?->compte_vente ?? '701100';
-                if (!isset($ventilation[$compte])) {
-                    $ventilation[$compte] = 0;
-                }
-                $ventilation[$compte] += $ht;
+            self::ligne($operation, $entrepriseId, $pdvId, $date, $refDoc, $codeJournal,
+                $refDoc . '/Facturation Avoir Client', null, $compteClientGeneral, $compteClientTiers, 0, $avoir->montant_ttc);
+
+            foreach ($ventilation['comptes'] as $compte => $montantHt) {
+                self::ligne($operation, $entrepriseId, $pdvId, $date, $refDoc, $codeJournal,
+                    $refDoc . ' / Avoir Vente - Compte ' . $compte, $compte, null, null, $montantHt, 0);
             }
-        }
 
-        foreach ($ventilation as $compte => $montantHt) {
-            EcritureComptable::create([
-                'entreprise_id'     => $entrepriseId,
-                'point_de_vente_id'  => $pdvId,
-                'date_ecriture'     => $date,
-                'libelle'           => $refDoc . ' / Avoir Vente - Compte ' . $compte,
-                'reference_document'=> $refDoc,
-                'code_journal'      => $codeJournal,
-                'compte_debit'      => $compte,
-                'compte_credit'     => null,
-                'debit'             => $montantHt,
-                'credit'            => 0,
-            ]);
-        }
+            if ($ventilation['tva'] > 0) {
+                self::ligne($operation, $entrepriseId, $pdvId, $date, $refDoc, $codeJournal,
+                    $refDoc . '/Annulation TVA Collectée', config('selflow.plan_comptable_defaut.tva_collectee'), null, null, $ventilation['tva'], 0);
+            }
 
-        // 3. Débit TVA Collectée
-        if ($avoir->montant_tva > 0) {
-            EcritureComptable::create([
-                'entreprise_id'     => $entrepriseId,
-                'point_de_vente_id'  => $pdvId,
-                'date_ecriture'     => $date,
-                'libelle'           => $refDoc . '/Annulation TVA Collectée',
-                'reference_document'=> $refDoc,
-                'code_journal'      => $codeJournal,
-                'compte_debit'      => '443100',
-                'compte_credit'     => null,
-                'debit'             => $avoir->montant_tva,
-                'credit'            => 0,
-            ]);
-        }
+            $operation->cloturerEquilibre();
+        });
     }
 
     /**
      * Génère les écritures comptables SYSCOHADA pour un avoir fournisseur.
+     * Inverse la facturation d'origine : Débit Fournisseur / Crédit Achat / Crédit TVA.
      */
     public static function genererEcritureAvoirAchat(Achat $avoir): void
     {
@@ -547,71 +443,222 @@ class ComptabiliteService
         $pdvId = $avoir->point_de_vente_id;
         $date = $avoir->date_achat ? $avoir->date_achat->toDateString() : now()->toDateString();
         $refDoc = $avoir->numero_facture;
+        $codeJournal = self::codeJournal($entrepriseId, 'Achat', 'ACH');
 
-        $codeJournal = CodeJournal::where('entreprise_id', $entrepriseId)
-            ->where('type', 'Achat')
-            ->value('code') ?? 'ACH';
+        $compteFournisseurGeneral = $avoir->fournisseur?->compte_comptable ?? config('selflow.plan_comptable_defaut.fournisseur_collectif');
+        $compteFournisseurTiers = $avoir->fournisseur?->numero_tiers;
 
-        $compteFournisseur = $avoir->fournisseur?->numero_tiers ?? $avoir->fournisseur?->compte_comptable ?? '401100';
+        $ventilation = self::ventilationAchat($avoir);
 
-        // 1. Débit Fournisseur (TTC)
+        DB::transaction(function () use (
+            $entrepriseId, $pdvId, $date, $refDoc, $codeJournal,
+            $compteFournisseurGeneral, $compteFournisseurTiers, $ventilation, $avoir
+        ) {
+            $operation = Operation::creer(
+                $entrepriseId, $pdvId, $date, 'AvoirAchat',
+                $codeJournal, $refDoc, 'Avoir fournisseur'
+            );
+
+            self::ligne($operation, $entrepriseId, $pdvId, $date, $refDoc, $codeJournal,
+                $refDoc . '/Facturation Avoir Fournisseur', $compteFournisseurGeneral, null, $compteFournisseurTiers, $avoir->montant_ttc, 0);
+
+            foreach ($ventilation['comptes'] as $compte => $montantHt) {
+                self::ligne($operation, $entrepriseId, $pdvId, $date, $refDoc, $codeJournal,
+                    $refDoc . ' / Avoir Achat - Compte ' . $compte, null, $compte, null, 0, $montantHt);
+            }
+
+            if ($ventilation['tva'] > 0) {
+                self::ligne($operation, $entrepriseId, $pdvId, $date, $refDoc, $codeJournal,
+                    $refDoc . '/Annulation TVA Déductible', null, config('selflow.plan_comptable_defaut.tva_deductible'), null, 0, $ventilation['tva']);
+            }
+
+            $operation->cloturerEquilibre();
+        });
+    }
+
+    // ─────────────────────────────────────────────────────────────────
+    // HELPERS INTERNES
+    // ─────────────────────────────────────────────────────────────────
+
+    /**
+     * Crée une ligne d'écriture rattachée à une opération.
+     * Un seul et unique endroit du code écrit dans ecritures_comptables :
+     * garantit que operation_id et compte_tiers sont toujours renseignés
+     * cohéremment (jamais de compte tiers écrit à la place du compte général).
+     */
+    private static function ligne(
+        Operation $operation,
+        int $entrepriseId,
+        ?int $pdvId,
+        string $date,
+        ?string $refDoc,
+        string $codeJournal,
+        string $libelle,
+        ?string $compteDebit,
+        ?string $compteCredit,
+        ?string $compteTiers,
+        float $debit,
+        float $credit
+    ): void {
         EcritureComptable::create([
-            'entreprise_id'     => $entrepriseId,
+            'operation_id'       => $operation->id,
+            'entreprise_id'      => $entrepriseId,
             'point_de_vente_id'  => $pdvId,
-            'date_ecriture'     => $date,
-            'libelle'           => $refDoc . '/Facturation Avoir Fournisseur',
-            'reference_document'=> $refDoc,
-            'code_journal'      => $codeJournal,
-            'compte_debit'      => $compteFournisseur,
-            'compte_credit'     => null,
-            'debit'             => $avoir->montant_ttc,
-            'credit'            => 0,
+            'date_ecriture'      => $date,
+            'libelle'            => $libelle,
+            'reference_document' => $refDoc,
+            'code_journal'       => $codeJournal,
+            'compte_debit'       => $compteDebit,
+            'compte_credit'      => $compteCredit,
+            'compte_tiers'       => $compteTiers,
+            'debit'              => $debit,
+            'credit'             => $credit,
         ]);
+    }
 
-        // 2. Crédit Achat par compte (HT Net)
-        $ventilation = [];
-        foreach ($avoir->details as $detail) {
+    private static function codeJournal(int $entrepriseId, string $type, string $fallback): string
+    {
+        return CodeJournal::where('entreprise_id', $entrepriseId)
+            ->where('type', $type)
+            ->value('code') ?? $fallback;
+    }
+
+    /**
+     * Détermine le compte financier (caisse/banque) et le code journal
+     * correspondant au mode de paiement donné.
+     * @return array{0: string, 1: string} [compteFinancier, codeJournal]
+     */
+    private static function compteEtJournalFinancier(int $entrepriseId, string $modePaiement): array
+    {
+        $isBanque = str_starts_with(strtolower($modePaiement), 'banque');
+        if (!$isBanque) {
+            return [config('selflow.plan_comptable_defaut.caisse'), 'CAI'];
+        }
+
+        $parts = explode(' : ', $modePaiement);
+        $intitule = isset($parts[1]) ? trim($parts[1]) : '';
+        $journalObj = CodeJournal::where('entreprise_id', $entrepriseId)
+            ->where('type', 'Banque')
+            ->where('intitule', $intitule)
+            ->first();
+
+        if ($journalObj) {
+            return [$journalObj->compte, $journalObj->code];
+        }
+        return [config('selflow.plan_comptable_defaut.banque_defaut'), 'BQE'];
+    }
+
+    /**
+     * Ventile les lignes d'une vente par compte de produit, avec application
+     * de la remise globale au prorata, et calcule la TVA totale.
+     * @return array{comptes: array<string,float>, tva: float}
+     */
+    private static function ventilationVente(Vente $vente): array
+    {
+        $pourcentageRemise = ($vente->remise > 0 && $vente->montant_ht > 0)
+            ? ($vente->remise / $vente->montant_ht)
+            : 0;
+
+        $comptes = [];
+        foreach ($vente->details as $detail) {
             $ht = $detail->quantite * $detail->prix_unitaire;
+            if ($pourcentageRemise > 0) {
+                $ht = $ht - ($ht * $pourcentageRemise);
+            }
             if ($ht > 0) {
-                $compte = $detail->produit?->compte_achat ?? '601100';
-                if (!isset($ventilation[$compte])) {
-                    $ventilation[$compte] = 0;
-                }
-                $ventilation[$compte] += $ht;
+                $compte = $detail->produit?->compte_vente ?? config('selflow.plan_comptable_defaut.vente_defaut');
+                $comptes[$compte] = ($comptes[$compte] ?? 0) + $ht;
             }
         }
 
-        foreach ($ventilation as $compte => $montantHt) {
-            EcritureComptable::create([
-                'entreprise_id'     => $entrepriseId,
-                'point_de_vente_id'  => $pdvId,
-                'date_ecriture'     => $date,
-                'libelle'           => $refDoc . ' / Avoir Achat - Compte ' . $compte,
-                'reference_document'=> $refDoc,
-                'code_journal'      => $codeJournal,
-                'compte_debit'      => null,
-                'compte_credit'     => $compte,
-                'debit'             => 0,
-                'credit'            => $montantHt,
-            ]);
+        return ['comptes' => $comptes, 'tva' => (float) ($vente->montant_tva ?? 0)];
+    }
+
+    /**
+     * Ventile les lignes d'un achat par compte de produit, et recalcule la
+     * TVA totale ligne par ligne à partir du taux de chaque produit (plus
+     * fiable que le montant de TVA saisi globalement sur la facture).
+     * @return array{comptes: array<string,float>, tva: float}
+     */
+    private static function ventilationAchat(Achat $achat): array
+    {
+        $comptes = [];
+        $totalTva = 0;
+        foreach ($achat->details as $detail) {
+            $ht = $detail->quantite * $detail->prix_unitaire;
+            if ($ht > 0) {
+                $compte = $detail->produit?->compte_achat ?? config('selflow.plan_comptable_defaut.achat_defaut');
+                $comptes[$compte] = ($comptes[$compte] ?? 0) + $ht;
+
+                $tauxTva = $detail->produit?->taux_tva ?? 0;
+                if ($tauxTva > 0) {
+                    $totalTva += round($ht * ($tauxTva / 100), 2);
+                }
+            }
         }
 
-        // 3. Crédit TVA Déductible
-        if ($avoir->montant_tva > 0) {
-            EcritureComptable::create([
-                'entreprise_id'     => $entrepriseId,
-                'point_de_vente_id'  => $pdvId,
-                'date_ecriture'     => $date,
-                'libelle'           => $refDoc . '/Annulation TVA Déductible',
-                'reference_document'=> $refDoc,
-                'code_journal'      => $codeJournal,
-                'compte_debit'      => null,
-                'compte_credit'     => '445200',
-                'debit'             => 0,
-                'credit'            => $avoir->montant_tva,
-            ]);
-        }
+        $tva = $totalTva > 0 ? $totalTva : (float) ($achat->montant_tva ?? 0);
+        return ['comptes' => $comptes, 'tva' => $tva];
     }
+
+    /**
+     * Dérive un libellé général d'opération à partir des comptes de vente
+     * mouvementés (classe SYSCOHADA), au lieu d'un texte fixe générique.
+     */
+    private static function libelleGeneralVente(array $ventilation): string
+    {
+        return self::libelleGeneralDepuisComptes(array_keys($ventilation['comptes']), [
+            '701' => 'Vente de marchandises',
+            '702' => 'Vente de produits finis',
+            '703' => "Vente de produits intermédiaires et résiduels",
+            '704' => 'Travaux facturés',
+            '705' => 'Services vendus',
+            '706' => 'Travaux, services vendus',
+            '707' => 'Produits accessoires',
+        ], 'Vente de marchandises et services');
+    }
+
+    private static function libelleGeneralAchat(array $ventilation): string
+    {
+        return self::libelleGeneralDepuisComptes(array_keys($ventilation['comptes']), [
+            '601' => 'Achat de marchandises',
+            '602' => 'Achat de matières premières',
+            '604' => 'Achat de fournitures non stockées',
+            '605' => 'Autres achats',
+            '606' => 'Fournitures non stockables',
+        ], 'Achats divers');
+    }
+
+    private static function libelleGeneralDepuisComptes(array $comptes, array $table, string $fallbackMixte): string
+    {
+        if (empty($comptes)) {
+            return $fallbackMixte;
+        }
+
+        $prefixes = array_unique(array_map(fn($c) => substr((string) $c, 0, 3), $comptes));
+
+        if (count($prefixes) === 1 && isset($table[$prefixes[0]])) {
+            return $table[$prefixes[0]];
+        }
+
+        return $fallbackMixte;
+    }
+
+    private static function libelleProduits($details): string
+    {
+        $produits = [];
+        foreach ($details as $detail) {
+            $nom = $detail->libelle_virtuel ?? $detail->produit?->nom;
+            if ($nom) {
+                $produits[] = $nom;
+            }
+        }
+        return count($produits) > 0 ? implode(', ', array_unique($produits)) : 'Marchandises';
+    }
+
+    // ─────────────────────────────────────────────────────────────────
+    // SYNCHRONISATION COMPTAFLOW
+    // ─────────────────────────────────────────────────────────────────
 
     /**
      * Synchronise le plan comptable, les codes journaux et les tiers depuis COMPTAFLOW.
@@ -758,7 +805,7 @@ class ComptabiliteService
                                 [
                                     'nom'              => ucwords(strtolower($intitule)),
                                     'source'           => 'comptaflow',
-                                    'compte_comptable' => '411100',
+                                    'compte_comptable' => config('selflow.plan_comptable_defaut.client_collectif'),
                                     'numero_original'  => $numOriginal,
                                 ]
                             );
@@ -783,7 +830,7 @@ class ComptabiliteService
                                 [
                                     'nom'              => ucwords(strtolower($intitule)),
                                     'source'           => 'comptaflow',
-                                    'compte_comptable' => '401100',
+                                    'compte_comptable' => config('selflow.plan_comptable_defaut.fournisseur_collectif'),
                                     'numero_original'  => $numOriginal,
                                 ]
                             );
@@ -818,4 +865,3 @@ class ComptabiliteService
         }
     }
 }
-
