@@ -49,34 +49,52 @@ class Operation extends Model
     }
 
     /**
-     * Génère le prochain numéro de saisie séquentiel pour un journal donné,
-     * sur l'exercice (année) de la date d'opération fournie.
-     * Format : {CODE_JOURNAL}-{ANNEE}-{SEQUENCE sur 6 chiffres}
-     * ex : VTE-2026-000042
+     * Préfixes de numéro de saisie par type d'opération, conformes à la
+     * convention retenue : VTE-jjmmaa-xxx, ACH-jjmmaa-xxx, OD-jjmmaa-xxx,
+     * AVO-VTE-jjmmaa-xxx, AVO-ACH-jjmmaa-xxx.
+     */
+    private const PREFIXES_PAR_TYPE = [
+        'FactureVente'    => 'VTE',
+        'VenteComptant'   => 'VTE',
+        'ReglementVente'  => 'VTE',
+        'FactureAchat'    => 'ACH',
+        'AchatComptant'   => 'ACH',
+        'ReglementAchat'  => 'ACH',
+        'Production'      => 'OD',
+        'OD'              => 'OD',
+        'AvoirVente'      => 'AVO-VTE',
+        'AvoirAchat'      => 'AVO-ACH',
+    ];
+
+    /**
+     * Génère le prochain numéro de saisie séquentiel pour un type d'opération
+     * donné, à la date fournie (séquence remise à zéro chaque jour).
+     * Format : {PREFIXE}-{jjmmaa}-{séquence sur 3 chiffres}
+     * ex : VTE-220726-001, AVO-ACH-220726-004
      *
      * Utilise un verrou de ligne pour éviter les collisions en cas de
      * créations concurrentes.
      */
-    public static function prochainNumeroSaisie(int $entrepriseId, string $codeJournal, string $date): string
+    public static function prochainNumeroSaisie(int $entrepriseId, string $typeOperation, string $date): string
     {
-        $annee = \Carbon\Carbon::parse($date)->year;
-        $prefixe = $codeJournal . '-' . $annee . '-';
+        $prefixe = self::PREFIXES_PAR_TYPE[$typeOperation] ?? 'OD';
+        $jjmmaa = \Carbon\Carbon::parse($date)->format('dmy');
+        $debutCle = $prefixe . '-' . $jjmmaa . '-';
 
-        return DB::transaction(function () use ($entrepriseId, $codeJournal, $prefixe) {
+        return DB::transaction(function () use ($entrepriseId, $prefixe, $debutCle) {
             $dernier = self::where('entreprise_id', $entrepriseId)
-                ->where('code_journal', $codeJournal)
-                ->where('numero_saisie', 'like', $prefixe . '%')
+                ->where('numero_saisie', 'like', $debutCle . '%')
                 ->lockForUpdate()
                 ->orderByDesc('id')
                 ->value('numero_saisie');
 
             $prochainNum = 1;
             if ($dernier) {
-                $dernierNum = (int) substr($dernier, strlen($prefixe));
+                $dernierNum = (int) substr($dernier, strlen($debutCle));
                 $prochainNum = $dernierNum + 1;
             }
 
-            return $prefixe . str_pad((string) $prochainNum, 6, '0', STR_PAD_LEFT);
+            return $debutCle . str_pad((string) $prochainNum, 3, '0', STR_PAD_LEFT);
         });
     }
 
@@ -92,7 +110,7 @@ class Operation extends Model
         ?string $referenceDocument = null,
         ?string $libelleGeneral = null
     ): self {
-        $numeroSaisie = self::prochainNumeroSaisie($entrepriseId, $codeJournal, $date);
+        $numeroSaisie = self::prochainNumeroSaisie($entrepriseId, $typeOperation, $date);
 
         return self::create([
             'entreprise_id'       => $entrepriseId,

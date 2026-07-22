@@ -10,6 +10,7 @@ use App\Modules\Admin\Modeles\EcritureComptable;
 use App\Modules\Admin\Modeles\TresorerieJournal;
 use App\Modules\Admin\Modeles\PointDeVente;
 use App\Modules\Admin\Modeles\CodeJournal;
+use App\Modules\Admin\Modeles\Operation;
 use App\Modules\Admin\Services\CacheService;
 use App\Modules\Admin\Services\ComptabiliteService;
 use Illuminate\Http\RedirectResponse;
@@ -107,7 +108,7 @@ class ComptabiliteControleur
             // mouvement de trésorerie affiché).
             $operationsParRef = [];
             if ($references->isNotEmpty()) {
-                $operationsParRef = \App\Modules\Admin\Modeles\Operation::where('entreprise_id', $entreprise->id)
+                $operationsParRef = Operation::where('entreprise_id', $entreprise->id)
                     ->whereIn('reference_document', $references)
                     ->orderByDesc('id')
                     ->get()
@@ -607,63 +608,86 @@ class ComptabiliteControleur
     }
 
     /**
-     * Enregistrer une écriture comptable manuelle
+     * Enregistrer une écriture comptable manuelle (OD), avec un nombre de
+     * lignes illimité (N débits / N crédits). Remplace l'ancienne saisie
+     * limitée à un seul compte au débit et un seul au crédit.
+     *
+     * Format attendu (voir vue globale.blade.php) :
+     *   lignes[0][compte] = '601000', lignes[0][sens] = 'debit', lignes[0][montant] = 50000, lignes[0][compte_tiers] = null
+     *   lignes[1][compte] = '571000', lignes[1][sens] = 'credit', lignes[1][montant] = 50000
+     *   ...
      */
     public function creerEcritureManuelle(Request $request): RedirectResponse
     {
         $entreprise = Auth::user()->entreprise;
 
         $request->validate([
-            'date_ecriture'     => ['required', 'date'],
-            'libelle'           => ['required', 'string', 'max:255'],
-            'description'       => ['nullable', 'string', 'max:2000'],
-            'code_journal'      => ['required', 'string', 'max:10'],
-            'compte_debit'      => ['required', 'string', 'max:50'],
-            'compte_credit'     => ['required', 'string', 'max:50'],
-            'montant'           => ['required', 'numeric', 'min:1'],
-            'point_de_vente_id' => ['nullable', 'integer', 'exists:points_de_vente,id'],
+            'date_ecriture'          => ['required', 'date'],
+            'libelle'                => ['required', 'string', 'max:255'],
+            'description'            => ['nullable', 'string', 'max:2000'],
+            'code_journal'           => ['required', 'string', 'max:10'],
+            'point_de_vente_id'      => ['nullable', 'integer', 'exists:points_de_vente,id'],
+            'lignes'                 => ['required', 'array', 'min:2'],
+            'lignes.*.compte'        => ['required', 'string', 'max:50'],
+            'lignes.*.compte_tiers'  => ['nullable', 'string', 'max:50'],
+            'lignes.*.sens'          => ['required', 'in:debit,credit'],
+            'lignes.*.montant'       => ['required', 'numeric', 'min:0.01'],
         ]);
 
         $pdvId = $request->point_de_vente_id;
         if (!$pdvId) {
-            $pdvId = session('point_de_vente_actif_id') 
-                ?? Auth::user()->point_de_vente_id 
+            $pdvId = session('point_de_vente_actif_id')
+                ?? Auth::user()->point_de_vente_id
                 ?? PointDeVente::where('entreprise_id', $entreprise->id)->value('id');
         }
 
-        $montant = floatval($request->montant);
+        // Contrôle d'équilibre strict AVANT toute écriture en base — une
+        // écriture déséquilibrée ne doit jamais pouvoir être enregistrée,
+        // même en cas d'erreur de saisie ou de manipulation du formulaire.
+        $totalDebit = 0;
+        $totalCredit = 0;
+        foreach ($request->lignes as $ligne) {
+            if ($ligne['sens'] === 'debit') {
+                $totalDebit += (float) $ligne['montant'];
+            } else {
+                $totalCredit += (float) $ligne['montant'];
+            }
+        }
+        if (abs($totalDebit - $totalCredit) >= 0.01) {
+            return back()->withInput()->with('error',
+                "❌ Écriture déséquilibrée : Total Débit (" . number_format($totalDebit, 0, ',', ' ') .
+                " F) ≠ Total Crédit (" . number_format($totalCredit, 0, ',', ' ') . " F). Corrigez avant d'enregistrer."
+            );
+        }
+
         $numPiece = 'MN-' . now()->format('YmdHis');
+        $date = $request->date_ecriture;
 
-        DB::transaction(function () use ($entreprise, $pdvId, $request, $montant, $numPiece) {
-            // Créer le débit
-            EcritureComptable::create([
-                'entreprise_id'      => $entreprise->id,
-                'point_de_vente_id'  => $pdvId,
-                'date_ecriture'      => $request->date_ecriture,
-                'libelle'            => $request->libelle,
-                'description'        => $request->description,
-                'reference_document' => $numPiece,
-                'code_journal'       => $request->code_journal,
-                'compte_debit'       => $request->compte_debit,
-                'compte_credit'      => null,
-                'debit'              => $montant,
-                'credit'             => 0,
-            ]);
+        DB::transaction(function () use ($entreprise, $pdvId, $request, $numPiece, $date) {
+            $operation = Operation::creer(
+                $entreprise->id, $pdvId, $date, 'OD',
+                $request->code_journal, $numPiece, $request->libelle
+            );
 
-            // Créer le crédit
-            EcritureComptable::create([
-                'entreprise_id'      => $entreprise->id,
-                'point_de_vente_id'  => $pdvId,
-                'date_ecriture'      => $request->date_ecriture,
-                'libelle'            => $request->libelle,
-                'description'        => $request->description,
-                'reference_document' => $numPiece,
-                'code_journal'       => $request->code_journal,
-                'compte_debit'       => null,
-                'compte_credit'      => $request->compte_credit,
-                'debit'              => 0,
-                'credit'             => $montant,
-            ]);
+            foreach ($request->lignes as $ligne) {
+                EcritureComptable::create([
+                    'operation_id'       => $operation->id,
+                    'entreprise_id'      => $entreprise->id,
+                    'point_de_vente_id'  => $pdvId,
+                    'date_ecriture'      => $date,
+                    'libelle'            => $request->libelle,
+                    'description'        => $request->description,
+                    'reference_document' => $numPiece,
+                    'code_journal'       => $request->code_journal,
+                    'compte_debit'       => $ligne['sens'] === 'debit' ? $ligne['compte'] : null,
+                    'compte_credit'      => $ligne['sens'] === 'credit' ? $ligne['compte'] : null,
+                    'compte_tiers'       => $ligne['compte_tiers'] ?? null,
+                    'debit'              => $ligne['sens'] === 'debit' ? (float) $ligne['montant'] : 0,
+                    'credit'             => $ligne['sens'] === 'credit' ? (float) $ligne['montant'] : 0,
+                ]);
+            }
+
+            $operation->cloturerEquilibre();
         });
 
         return back()->with('succes', 'Écriture manuelle enregistrée avec succès.');
