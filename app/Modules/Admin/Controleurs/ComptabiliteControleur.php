@@ -660,7 +660,7 @@ class ComptabiliteControleur
             );
         }
 
-        $numPiece = 'MN-' . now()->format('YmdHis');
+        $numPiece = \App\Modules\Admin\Services\NumerotationService::genererNumeroOD($entreprise->id);
         $date = $request->date_ecriture;
 
         DB::transaction(function () use ($entreprise, $pdvId, $request, $numPiece, $date) {

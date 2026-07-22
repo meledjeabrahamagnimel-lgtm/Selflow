@@ -262,7 +262,7 @@
                             // N° Saisie : lu directement depuis l'Operation liée (colonne réelle
                             // stockée en base, séquentielle par journal) — ne dépend plus d'un
                             // recalcul MIN(id) à la volée.
-                            $saisieNum = $ecr->operation->numero_saisie ?? ('#' . $ecr->id);
+                            $saisieNum = $ecr->operation ? ('#' . $ecr->operation->numero_saisie) : ('#' . $ecr->id);
                         @endphp
                         <tr>
                             <td style="font-weight: 500; white-space:nowrap;">{{ \Carbon\Carbon::parse($ecr->date_ecriture)->format('d/m/Y') }}</td>

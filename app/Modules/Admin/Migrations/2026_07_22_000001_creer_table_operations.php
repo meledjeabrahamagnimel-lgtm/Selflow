@@ -8,7 +8,7 @@ use Illuminate\Support\Facades\Schema;
  * Table "operations" — Introduit la notion réelle d'opération comptable.
  *
  * Chaque facturation, règlement, avoir ou OD génère UNE opération, qui porte
- * un numéro de saisie séquentiel PAR JOURNAL (ex: VTE-2026-000042). Toutes
+ * un numéro de saisie séquentiel PAR ENTREPRISE (simple compteur 1, 2, 3...). Toutes
  * les lignes d'écriture (ecritures_comptables) issues de cette opération
  * partagent son id via la colonne operation_id.
  *
@@ -35,8 +35,10 @@ return new class extends Migration
             // Code du journal concerné (VTE, ACH, CAI, BQ..., OD)
             $table->string('code_journal')->index();
 
-            // Numéro de saisie séquentiel, unique par (entreprise, journal, exercice)
-            // ex: VTE-2026-000042
+            // Numéro de saisie séquentiel, simple compteur unique par entreprise
+            // (ex: "1", "2", "3"...) — la convention datée (VTE-jjmmaa-xxx) concerne
+            // les références de factures (numero_facture), pas ce champ.
+            // ex: "42"
             $table->string('numero_saisie')->index();
 
             // Référence de la pièce justificative (n° facture, n° chèque...) — optionnelle
@@ -54,7 +56,7 @@ return new class extends Migration
 
             $table->timestamps();
 
-            $table->unique(['entreprise_id', 'code_journal', 'numero_saisie'], 'uniq_operation_saisie_par_journal');
+            $table->unique(['entreprise_id', 'numero_saisie'], 'uniq_operation_saisie_par_entreprise');
 
             $table->foreign('entreprise_id', 'fk_operations_entreprises')
                 ->references('id')->on('entreprises')->onDelete('cascade');

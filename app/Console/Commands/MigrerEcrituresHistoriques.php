@@ -192,16 +192,19 @@ class MigrerEcrituresHistoriques extends Command
             return str_starts_with($c, '411') || str_starts_with($c, '401');
         });
 
-        if (str_starts_with($refDoc, 'AV-')) {
-            return str_contains(strtolower($codeJournal), 'ach') ? 'AvoirAchat' : 'AvoirVente';
-        }
         if (str_starts_with($refDoc, 'OD-') || str_starts_with($refDoc, 'MN-')) {
             return 'OD';
         }
-        if (str_starts_with($refDoc, 'VT-') || str_starts_with($refDoc, 'BC-') || str_starts_with($refDoc, 'DV-')) {
+        if (str_starts_with($refDoc, 'AVO-VTE-')) {
+            return 'AvoirVente';
+        }
+        if (str_starts_with($refDoc, 'AVO-ACH-')) {
+            return 'AvoirAchat';
+        }
+        if (str_starts_with($refDoc, 'VTE-') || str_starts_with($refDoc, 'VT-') || str_starts_with($refDoc, 'BC-') || str_starts_with($refDoc, 'DV-')) {
             return $aUnCompteClientOuFournisseur ? 'FactureVente' : 'ReglementVente';
         }
-        if (str_starts_with($refDoc, 'AC-') || str_starts_with($refDoc, 'DP-')) {
+        if (str_starts_with($refDoc, 'ACH-') || str_starts_with($refDoc, 'AC-') || str_starts_with($refDoc, 'DP-')) {
             return $aUnCompteClientOuFournisseur ? 'FactureAchat' : 'ReglementAchat';
         }
         return 'OD';
