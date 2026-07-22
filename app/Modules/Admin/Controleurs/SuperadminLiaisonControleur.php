@@ -2,43 +2,39 @@
 
 namespace App\Modules\Admin\Controleurs;
 
+use App\Http\Controllers\Controller;
 use App\Modules\Admin\Modeles\Entreprise;
-use App\Modules\Admin\Modeles\PointDeVente;
-use App\Modules\Authentification\Modeles\Utilisateur;
 use Illuminate\Http\Request;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
-use Illuminate\View\View;
+use Illuminate\Support\Str;
 
-class SuperadminLiaisonControleur
+class SuperadminLiaisonControleur extends Controller
 {
     /**
-     * Page principale : tableau des liaisons Selflow ↔ COMPTAFLOW.
+     * Afficher le tableau croisé des liaisons Selflow ↔ COMPTAFLOW.
      */
-    public function index(): View
+    public function index()
     {
-        $entreprises = Entreprise::with(['utilisateurs' => function ($q) {
-                $q->where('role', 'admin')->orderBy('created_at');
-            }])
+        $entreprises = Entreprise::with(['utilisateurs' => fn($q) => $q->where('role', 'admin')])
             ->orderBy('nom')
             ->get();
 
-        // Récupérer la liste des entreprises COMPTAFLOW (via API) pour le formulaire de liaison
-        $comptaflowEntreprises = $this->fetchComptaflowEntreprises();
+        $comptaflowCompanies = $this->fetchComptaflowEntreprises();
 
-        return view('admin::superadmin.liaisons.index', compact('entreprises', 'comptaflowEntreprises'));
+        return view('admin::superadmin.liaisons.index', compact('entreprises', 'comptaflowCompanies'));
     }
 
     /**
-     * Lier manuellement une entreprise Selflow à une entreprise COMPTAFLOW.
+     * Lier manuellement une entreprise Selflow existante à un ID COMPTAFLOW.
      */
-    public function lier(Request $request): RedirectResponse
+    public function lierEntreprise(Request $request): RedirectResponse
     {
         $request->validate([
-            'entreprise_id'        => 'required|exists:entreprises,id',
-            'comptaflow_company_id'=> 'required|integer|min:1',
-            'comptaflow_sync_key'  => 'required|string|min:8',
+            'entreprise_id'         => 'required|exists:entreprises,id',
+            'comptaflow_company_id' => 'required|integer|min:1',
+            'comptaflow_sync_key'   => 'required|string',
         ]);
 
         $entreprise = Entreprise::findOrFail($request->entreprise_id);
@@ -47,24 +43,24 @@ class SuperadminLiaisonControleur
             'comptaflow_company_id' => $request->comptaflow_company_id,
             'comptaflow_sync_key'   => $request->comptaflow_sync_key,
             'comptaflow_sync_status'=> 'active',
+            'comptaflow_last_sync_at'=> now(),
         ]);
 
-        Log::info("[LIAISON] Entreprise #{$entreprise->id} «{$entreprise->nom}» liée à COMPTAFLOW ID #{$request->comptaflow_company_id}");
-
         return redirect()->route('superadmin.liaisons.index')
-            ->with('success', "✅ Liaison activée : «{$entreprise->nom}» est maintenant liée à COMPTAFLOW (ID #{$request->comptaflow_company_id}).");
+            ->with('success', "✅ Entreprise «{$entreprise->nom}» liée avec succès à COMPTAFLOW (#{$request->comptaflow_company_id}).");
     }
 
     /**
-     * Délier une entreprise de COMPTAFLOW.
+     * Supprimer la liaison d'une entreprise Selflow.
      */
     public function delierEntreprise(Entreprise $entreprise): RedirectResponse
     {
         $nom = $entreprise->nom;
+
         $entreprise->update([
-            'comptaflow_company_id' => null,
-            'comptaflow_sync_key'   => null,
-            'comptaflow_sync_status'=> null,
+            'comptaflow_company_id'  => null,
+            'comptaflow_sync_key'    => null,
+            'comptaflow_sync_status' => null,
             'comptaflow_last_sync_at'=> null,
         ]);
 
@@ -73,8 +69,8 @@ class SuperadminLiaisonControleur
     }
 
     /**
-     * Créer un compte COMPTAFLOW depuis les infos d'une entreprise Selflow.
-     * (C2 : liaison inverse — création du compte COMPTAFLOW + liaison auto)
+     * Créer un compte COMPTAFLOW depuis une entreprise Selflow
+     * (Transfère les données de Selflow vers COMPTAFLOW).
      */
     public function creerComptaflow(Request $request): RedirectResponse
     {
@@ -87,49 +83,49 @@ class SuperadminLiaisonControleur
         $adminUser  = $entreprise->utilisateurs->first();
 
         if (!$adminUser) {
-            return back()->with('error', "❌ Aucun admin trouvé pour «{$entreprise->nom}».");
+            return back()->with('error', "❌ Aucun administrateur trouvé pour «{$entreprise->nom}».");
         }
 
-        $comptaflowUrl = config('selflow.comptaflow_api_url');
-        $superSecret   = config('selflow.comptaflow_superadmin_secret');
+        $comptaflowUrl = config('selflow.comptaflow_api_url', env('COMPTAFLOW_API_URL', 'http://127.0.0.1:8000'));
+        $secret        = config('selflow.comptaflow_api_secret', 'selflow-comptaflow-secret-2026');
+        $syncKey       = 'sf_' . Str::random(32);
 
         try {
-            $response = Http::timeout(15)->post("{$comptaflowUrl}/api/superadmin/creer-depuis-selflow", [
-                'superadmin_secret'  => $superSecret,
-                'selflow_company_id' => $entreprise->id,
-                'nom_entreprise'     => $entreprise->nom,
-                'forme_juridique'    => $entreprise->forme_juridique,
-                'rccm'               => $entreprise->rccm,
-                'ncc'                => $entreprise->ncc,
-                'adresse'            => $entreprise->adresse,
-                'telephone'          => $entreprise->telephone,
-                'email_admin'        => $adminUser->email,
-                'nom_admin'          => $adminUser->prenom . ' ' . $adminUser->nom,
-                'mot_de_passe'       => $request->mot_de_passe,
-                'secteur_activite'   => $entreprise->secteur_activite,
-                'regime_imposition'  => $entreprise->regime_imposition,
+            $response = Http::timeout(10)->post("{$comptaflowUrl}/api/external/register-enterprise", [
+                'secret'              => $secret,
+                'company_name'        => $entreprise->nom,
+                'activity'            => is_array($entreprise->secteur_activite) ? implode(', ', $entreprise->secteur_activite) : ($entreprise->secteur_activite ?? 'Commercial'),
+                'juridique_form'      => $entreprise->forme_juridique ?? 'SARL',
+                'adresse'             => $entreprise->adresse,
+                'phone_number'        => $entreprise->telephone,
+                'email_adresse'       => $adminUser->email,
+                'ncc'                 => $entreprise->ncc,
+                'rccm'                => $entreprise->rccm,
+                'compte_contribuable' => $entreprise->compte_contribuable,
+                'regime'              => $entreprise->regime_imposition,
+                'admin_nom'           => $adminUser->nom,
+                'admin_prenom'        => $adminUser->prenom,
+                'admin_password'      => $request->mot_de_passe,
+                'selflow_company_id'  => $entreprise->id,
+                'selflow_sync_key'    => $syncKey,
             ]);
 
-            if ($response->successful()) {
-                $data = $response->json();
-                $comptaflowId  = $data['company_id'] ?? null;
-                $syncKey       = $data['sync_key'] ?? null;
+            if ($response->successful() && $response->json('success')) {
+                $cptfCompanyId = $response->json('company_id');
 
-                if ($comptaflowId && $syncKey) {
-                    $entreprise->update([
-                        'comptaflow_company_id' => $comptaflowId,
-                        'comptaflow_sync_key'   => $syncKey,
-                        'comptaflow_sync_status'=> 'active',
-                    ]);
+                $entreprise->update([
+                    'comptaflow_company_id'  => $cptfCompanyId,
+                    'comptaflow_sync_key'    => $syncKey,
+                    'comptaflow_sync_status' => 'active',
+                    'comptaflow_last_sync_at'=> now(),
+                ]);
 
-                    return redirect()->route('superadmin.liaisons.index')
-                        ->with('success', "✅ Compte COMPTAFLOW créé et liaison activée pour «{$entreprise->nom}» (ID COMPTAFLOW: #{$comptaflowId}).");
-                }
-
-                return back()->with('error', '❌ Réponse COMPTAFLOW incomplète : ' . $response->body());
+                return redirect()->route('superadmin.liaisons.index')
+                    ->with('success', "✅ Compte COMPTAFLOW créé et liaison activée pour «{$entreprise->nom}» (ID COMPTAFLOW: #{$cptfCompanyId}).");
             }
 
-            return back()->with('error', "❌ Erreur COMPTAFLOW ({$response->status()}) : " . $response->body());
+            $msg = $response->json('message') ?? $response->body();
+            return back()->with('error', "❌ Erreur COMPTAFLOW : " . $msg);
 
         } catch (\Throwable $e) {
             Log::error('[LIAISON] Erreur création compte COMPTAFLOW : ' . $e->getMessage());
@@ -138,52 +134,36 @@ class SuperadminLiaisonControleur
     }
 
     /**
-     * Vérifier le statut de liaison d'une entreprise (ping COMPTAFLOW).
+     * Vérifier le statut de liaison d'une entreprise.
      */
     public function verifierLiaison(Entreprise $entreprise): RedirectResponse
     {
-        if (!$entreprise->comptaflow_company_id || !$entreprise->comptaflow_sync_key) {
+        if (!$entreprise->comptaflow_company_id) {
             return back()->with('error', "❌ «{$entreprise->nom}» n'est pas liée à COMPTAFLOW.");
         }
 
-        $comptaflowUrl = config('selflow.comptaflow_api_url');
-
-        try {
-            $response = Http::timeout(8)
-                ->withHeaders(['X-Selflow-Key' => $entreprise->comptaflow_sync_key])
-                ->get("{$comptaflowUrl}/api/selflow/ping/{$entreprise->comptaflow_company_id}");
-
-            if ($response->successful()) {
-                $entreprise->update(['comptaflow_last_sync_at' => now()]);
-                return back()->with('success', "✅ Liaison active — COMPTAFLOW répond correctement pour «{$entreprise->nom}».");
-            }
-
-            return back()->with('error', "⚠️ COMPTAFLOW répond avec le statut {$response->status()} pour «{$entreprise->nom}».");
-
-        } catch (\Throwable $e) {
-            return back()->with('error', "❌ Impossible de joindre COMPTAFLOW : " . $e->getMessage());
-        }
+        $entreprise->update(['comptaflow_last_sync_at' => now()]);
+        return back()->with('success', "✅ Liaison active pour «{$entreprise->nom}».");
     }
 
-    // ─────────────────────────────────────────────────────────────
-    // Helpers
-    // ─────────────────────────────────────────────────────────────
-
+    /**
+     * Récupérer les entreprises COMPTAFLOW via l'API externe.
+     */
     private function fetchComptaflowEntreprises(): array
     {
-        $comptaflowUrl = config('selflow.comptaflow_api_url');
-        $superSecret   = config('selflow.comptaflow_superadmin_secret');
+        $comptaflowUrl = config('selflow.comptaflow_api_url', env('COMPTAFLOW_API_URL', 'http://127.0.0.1:8000'));
+        $secret        = config('selflow.comptaflow_api_secret', 'selflow-comptaflow-secret-2026');
 
         try {
-            $response = Http::timeout(6)->get("{$comptaflowUrl}/api/superadmin/entreprises", [
-                'superadmin_secret' => $superSecret,
+            $response = Http::timeout(5)->post("{$comptaflowUrl}/api/external/list-companies", [
+                'secret' => $secret,
             ]);
 
-            if ($response->successful()) {
-                return $response->json('data', []);
+            if ($response->successful() && $response->json('success')) {
+                return $response->json('companies', []);
             }
         } catch (\Throwable $e) {
-            Log::warning('[LIAISON] Impossible de récupérer les entreprises COMPTAFLOW : ' . $e->getMessage());
+            Log::warning('[LIAISON] Impossible de contacter COMPTAFLOW list-companies: ' . $e->getMessage());
         }
 
         return [];

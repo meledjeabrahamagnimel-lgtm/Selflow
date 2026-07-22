@@ -27,17 +27,6 @@ return [
 
     /*
     |--------------------------------------------------------------------------
-    | Secret superadmin COMPTAFLOW
-    |--------------------------------------------------------------------------
-    | Distinct du secret d'entreprise ci-dessus : utilisé uniquement pour les
-    | actions superadmin inter-applications (créer un compte COMPTAFLOW depuis
-    | Selflow, lister les entreprises COMPTAFLOW). Doit être identique des
-    | deux côtés (Selflow .env et COMPTAFLOW .env).
-    */
-    'comptaflow_superadmin_secret' => env('COMPTAFLOW_SUPERADMIN_SECRET', ''),
-
-    /*
-    |--------------------------------------------------------------------------
     | Timeout des requêtes HTTP sortantes (secondes)
     |--------------------------------------------------------------------------
     */
