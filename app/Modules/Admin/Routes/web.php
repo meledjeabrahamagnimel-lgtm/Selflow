@@ -16,6 +16,7 @@ use App\Modules\Admin\Controleurs\TransfertStockControleur;
 use App\Modules\Admin\Controleurs\ProductionControleur;
 use App\Modules\Admin\Controleurs\B2bControleur;
 use App\Modules\Admin\Controleurs\BonLivraisonControleur;
+use App\Modules\Admin\Controleurs\SuperadminLiaisonControleur;
 use Illuminate\Support\Facades\Route;
 
 Route::prefix('admin')
@@ -246,6 +247,15 @@ Route::prefix('superadmin')
         Route::delete('/entreprises/{entreprise}', [\App\Modules\Admin\Controleurs\SuperadminControleur::class, 'supprimer'])->name('entreprises.supprimer');
         Route::get('/utilisateurs', [\App\Modules\Admin\Controleurs\SuperadminControleur::class, 'utilisateurs'])->name('utilisateurs');
         Route::put('/utilisateurs/{utilisateur}', [\App\Modules\Admin\Controleurs\SuperadminControleur::class, 'modifierUtilisateur'])->name('utilisateurs.modifier');
+
+        // ── Liaisons SELFLOW ↔ COMPTAFLOW ──
+        Route::prefix('liaisons')->name('liaisons.')->group(function () {
+            Route::get('/',                                    [SuperadminLiaisonControleur::class, 'index'])->name('index');
+            Route::post('/lier',                               [SuperadminLiaisonControleur::class, 'lier'])->name('lier');
+            Route::delete('/{entreprise}/delierEntreprise',    [SuperadminLiaisonControleur::class, 'delierEntreprise'])->name('delierEntreprise');
+            Route::post('/creer-comptaflow',                   [SuperadminLiaisonControleur::class, 'creerComptaflow'])->name('creerComptaflow');
+            Route::post('/{entreprise}/verifier',              [SuperadminLiaisonControleur::class, 'verifierLiaison'])->name('verifier');
+        });
     });
 
 // ───────────────────────────────────────────────────────────────────────

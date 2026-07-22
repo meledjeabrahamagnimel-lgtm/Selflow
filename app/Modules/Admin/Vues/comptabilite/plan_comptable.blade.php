@@ -57,6 +57,7 @@
                         <th style="width: 150px;">Numéro</th>
                         <th>Libellé du compte</th>
                         <th style="width: 120px;">Classe</th>
+                        <th style="width: 140px;">Origine</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -70,14 +71,27 @@
                                 </div>
                             @endif
                         </td>
-                        <td style="font-weight: 600;">{{ $compte->libelle }}</td>
+                        <td style="font-weight: 600;">
+                            {{ $compte->libelle }}
+                        </td>
                         <td>
                             <span class="badge badge-purple">Classe {{ substr($compte->numero, 0, 1) }}</span>
+                        </td>
+                        <td>
+                            @if(isset($compte->source) && $compte->source === 'comptaflow')
+                                <span style="display:inline-flex; align-items:center; gap:5px; background:#dbeafe; color:#1d4ed8; padding:3px 9px; border-radius:20px; font-size:11px; font-weight:700;">
+                                    <i class="fas fa-sync" style="font-size:9px;"></i> COMPTAFLOW
+                                </span>
+                            @else
+                                <span style="display:inline-flex; align-items:center; gap:5px; background:#f1f5f9; color:#64748b; padding:3px 9px; border-radius:20px; font-size:11px; font-weight:700;">
+                                    <i class="fas fa-database" style="font-size:9px;"></i> Local
+                                </span>
+                            @endif
                         </td>
                     </tr>
                     @empty
                     <tr>
-                        <td colspan="3" style="text-align: center; color: var(--text-3); padding: 32px;">
+                        <td colspan="4" style="text-align: center; color: var(--text-3); padding: 32px;">
                             Aucun compte trouvé correspondant aux critères.
                         </td>
                     </tr>

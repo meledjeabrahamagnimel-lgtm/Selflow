@@ -230,4 +230,87 @@ class ExternalSyncControleur
             'companies'   => $entreprises,
         ]);
     }
+
+    /**
+     * Retourne les détails complets d'un tiers (Client/Fournisseur) pour COMPTAFLOW.
+     * POST /api/external/tier-info
+     */
+    public function tierInfo(Request $request): JsonResponse
+    {
+        $expectedSecret = config('selflow.comptaflow_api_secret', 'selflow-comptaflow-secret-2026');
+        $providedSecret = $request->input('secret') ?? $request->header('X-Sync-Secret');
+
+        if ($providedSecret !== $expectedSecret) {
+            return response()->json(['success' => false, 'message' => 'Accès non autorisé.'], 401);
+        }
+
+        $entrepriseId = $request->input('selflow_company_id');
+        $numeroOriginal = $request->input('numero_original');
+        $intitule = trim($request->input('intitule', ''));
+        $type = strtolower($request->input('type', ''));
+
+        $tierData = null;
+
+        if (str_contains($type, 'fourn') || str_starts_with($type, '40')) {
+            // Chercher fournisseur
+            $fournisseur = null;
+            if ($numeroOriginal) {
+                $fournisseur = \App\Modules\Admin\Modeles\Fournisseur::where('entreprise_id', $entrepriseId)->find($numeroOriginal);
+            }
+            if (!$fournisseur && $intitule) {
+                $fournisseur = \App\Modules\Admin\Modeles\Fournisseur::where('entreprise_id', $entrepriseId)->where('nom', 'LIKE', "%{$intitule}%")->first();
+            }
+
+            if ($fournisseur) {
+                $achatsCount = \App\Modules\Admin\Modeles\Achat::whereHas('pointDeVente', fn($q) => $q->where('entreprise_id', $entrepriseId))
+                    ->where('fournisseur_id', $fournisseur->id)->count();
+
+                $tierData = [
+                    'type'             => 'Fournisseur',
+                    'nom'              => $fournisseur->nom,
+                    'ncc'              => $fournisseur->ncc ?? '—',
+                    'rccm'             => $fournisseur->rccm ?? '—',
+                    'regime'           => $fournisseur->regime_imposition ?? '—',
+                    'telephone'        => $fournisseur->telephone ?? '—',
+                    'email'            => $fournisseur->email ?? '—',
+                    'adresse'          => $fournisseur->adresse ?? '—',
+                    'secteur_activite' => $fournisseur->secteur_activite ?? '—',
+                    'nombre_achats'    => $achatsCount,
+                    'created_at'       => $fournisseur->created_at ? $fournisseur->created_at->format('d/m/Y') : '—',
+                ];
+            }
+        } else {
+            // Chercher client
+            $client = null;
+            if ($numeroOriginal) {
+                $client = \App\Modules\Admin\Modeles\Client::where('entreprise_id', $entrepriseId)->find($numeroOriginal);
+            }
+            if (!$client && $intitule) {
+                $client = \App\Modules\Admin\Modeles\Client::where('entreprise_id', $entrepriseId)->where('nom', 'LIKE', "%{$intitule}%")->first();
+            }
+
+            if ($client) {
+                $achatsCount = \App\Modules\Admin\Modeles\Vente::whereHas('pointDeVente', fn($q) => $q->where('entreprise_id', $entrepriseId))
+                    ->where('client_id', $client->id)->count();
+
+                $tierData = [
+                    'type'          => 'Client',
+                    'nom'           => $client->nom,
+                    'ncc'           => $client->ncc ?? '—',
+                    'rccm'          => $client->rccm ?? '—',
+                    'regime'        => $client->regime_imposition ?? '—',
+                    'telephone'     => $client->telephone ?? '—',
+                    'email'         => $client->email ?? '—',
+                    'adresse'       => $client->adresse ?? '—',
+                    'nombre_achats' => $achatsCount,
+                    'created_at'    => $client->created_at ? $client->created_at->format('d/m/Y') : '—',
+                ];
+            }
+        }
+
+        return response()->json([
+            'success' => !empty($tierData),
+            'tier'    => $tierData,
+        ]);
+    }
 }

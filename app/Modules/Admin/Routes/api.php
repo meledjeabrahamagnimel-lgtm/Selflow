@@ -117,5 +117,7 @@ Route::prefix('external')->group(function () {
         ->name('api.external.company-info');
     Route::post('/list-companies', [\App\Modules\Admin\Controleurs\Api\ExternalSyncControleur::class, 'listCompanies'])
         ->name('api.external.list-companies');
+    Route::post('/tier-info', [\App\Modules\Admin\Controleurs\Api\ExternalSyncControleur::class, 'tierInfo'])
+        ->name('api.external.tier-info');
 });
 

@@ -513,6 +513,11 @@
             <a href="{{ route('superadmin.utilisateurs') }}" class="nav-item {{ request()->routeIs('superadmin.utilisateurs*') ? 'active' : '' }}">
                 <i class="fas fa-users-gear"></i> Habilitations &amp; Accès
             </a>
+
+            <div class="nav-section"><span>INTÉGRATIONS</span></div>
+            <a href="{{ route('superadmin.liaisons.index') }}" class="nav-item {{ request()->routeIs('superadmin.liaisons*') ? 'active' : '' }}">
+                <i class="fas fa-link"></i> Liaisons COMPTAFLOW
+            </a>
         @elseif(request()->routeIs('caissier.*'))
             <!-- ── CAISSIER SIDEBAR ── -->
             <div class="nav-section"><span>Caisse</span></div>
