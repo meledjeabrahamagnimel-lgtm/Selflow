@@ -470,6 +470,13 @@ class AchatControleur
                 // Décrémenter le stock si le produit est stockable
                 if ($detail->produit && $detail->produit->estStockable()) {
                     $stockAvant = $detail->produit->stockActuel($achat->point_de_vente_id);
+
+                    if ($stockAvant < $detail->quantite) {
+                        throw new \InvalidArgumentException(
+                            "Retour fournisseur impossible pour « {$detail->produit->nom} » : stock actuel ({$stockAvant}) inférieur à la quantité à retourner ({$detail->quantite}). Une partie a probablement déjà été revendue."
+                        );
+                    }
+
                     $detail->produit->decrementStock($achat->point_de_vente_id, $detail->quantite);
 
                     MouvementStock::create([
@@ -684,6 +691,13 @@ class AchatControleur
                         $stockAction = $itemData['stock_action'] ?? 'none';
                         if ($stockAction === 'reinject') {
                             $stockAvant = $produit->stockActuel($parent->point_de_vente_id);
+
+                            if ($stockAvant < $qteAvoir) {
+                                throw new \InvalidArgumentException(
+                                    "Retour fournisseur impossible pour « {$produit->nom} » : stock actuel ({$stockAvant}) inférieur à la quantité à retourner ({$qteAvoir})."
+                                );
+                            }
+
                             $produit->decrementStock($parent->point_de_vente_id, $qteAvoir);
 
                             MouvementStock::create([

@@ -105,6 +105,29 @@ class VenteControleur
         }
 
         $venteId = null;
+        $etapePrevue = $request->input('etape', 'Facture');
+
+        // Vérification de disponibilité AVANT toute écriture en base : une
+        // facturation (décrémentation immédiate du stock) ne doit jamais
+        // pouvoir dépasser le stock réellement disponible. Un Devis ou Bon
+        // de commande, eux, ne décrémentent rien et ne sont donc pas bloqués
+        // ici (ils peuvent réserver plus que le stock actuel, à charge pour
+        // l'utilisateur de réapprovisionner avant facturation).
+        if ($etapePrevue === 'Facture') {
+            foreach ($request->articles as $article) {
+                if (empty($article['produit_id'])) continue;
+
+                $produit = Produit::find($article['produit_id']);
+                if (!$produit || !$produit->estStockable()) continue;
+
+                $stockDisponible = $produit->stockActuel($pointDeVenteId);
+                if ($stockDisponible < $article['quantite']) {
+                    return back()->withInput()->with('error',
+                        "❌ Stock insuffisant pour « {$produit->nom} » : disponible {$stockDisponible}, demandé {$article['quantite']}."
+                    );
+                }
+            }
+        }
 
         DB::transaction(function () use ($request, $pointDeVenteId, &$venteId, $entreprise) {
             $montantHt  = 0;
@@ -205,7 +228,7 @@ class VenteControleur
                 $ht = $article['quantite'] * $prix;
                 $tva = $ht * ($tvaRate / 100);
 
-                VenteDetail::create([
+                $detail = VenteDetail::create([
                     'vente_id'        => $vente->id,
                     'produit_id'      => $produit ? $produit->id : null,
                     'libelle_virtuel' => $produit ? null : $nomElement,
@@ -218,7 +241,24 @@ class VenteControleur
 
                 if ($produit && $etape === 'Facture' && $produit->estStockable()) {
                     $stockAvant = $produit->stockActuel($pointDeVenteId);
+
+                    // Contrôle final sous verrou (Produit::lockForUpdate() ci-dessus) :
+                    // seconde vérification, autoritaire cette fois, qui protège contre
+                    // les ventes concurrentes passées entre la pré-vérification et ici.
+                    if ($stockAvant < $article['quantite']) {
+                        throw new \InvalidArgumentException(
+                            "Stock insuffisant pour « {$produit->nom} » (Disponible: {$stockAvant}, Demandé: {$article['quantite']})."
+                        );
+                    }
+
                     $produit->decrementStock($pointDeVenteId, $article['quantite']);
+
+                    // Marquer la ligne comme totalement livrée : la facturation directe
+                    // implique une sortie de stock immédiate. Sans cela, cette même
+                    // ligne réapparaîtrait dans la file de "Livraisons à valider"
+                    // (StockControleur::livraisons()) et son stock serait décrémenté
+                    // UNE SECONDE FOIS si un utilisateur validait une "livraison" dessus.
+                    $detail->update(['quantite_livree' => $article['quantite']]);
 
                     MouvementStock::create([
                         'produit_id'         => $produit->id,
@@ -510,11 +550,17 @@ class VenteControleur
         DB::transaction(function () use ($vente, $request) {
             $pointDeVenteId = $vente->point_de_vente_id;
 
-            // 1. Restituer les stocks anciens
+            $etaitFacturee = $vente->etape === 'Facture';
+
+            // 1. Restituer les stocks anciens — UNIQUEMENT si la vente était déjà
+            //    facturée (le stock n'a jamais été décrémenté pour un Devis ou un
+            //    Bon de commande ; l'incrémenter ici serait une fuite de stock fictive).
             $oldDetails = VenteDetail::where('vente_id', $vente->id)->with('produit')->get();
-            foreach ($oldDetails as $oldDetail) {
-                if ($oldDetail->produit) {
-                    $oldDetail->produit->incrementStock($pointDeVenteId, $oldDetail->quantite);
+            if ($etaitFacturee) {
+                foreach ($oldDetails as $oldDetail) {
+                    if ($oldDetail->produit && $oldDetail->produit->estStockable()) {
+                        $oldDetail->produit->incrementStock($pointDeVenteId, $oldDetail->quantite);
+                    }
                 }
             }
 
@@ -627,9 +673,23 @@ class VenteControleur
                     'montant_ttc'     => $ht + $tva,
                 ]);
 
-                if ($produit) {
+                if ($produit && $etaitFacturee && $produit->estStockable()) {
                     $stockAvant = $produit->stockActuel($pointDeVenteId);
+
+                    if ($stockAvant < $article['quantite']) {
+                        throw new \InvalidArgumentException(
+                            "Stock insuffisant pour « {$produit->nom} » (Disponible: {$stockAvant}, Demandé: {$article['quantite']})."
+                        );
+                    }
+
                     $produit->decrementStock($pointDeVenteId, $article['quantite']);
+                    // Voir explication dans store() : évite le double décrément via la
+                    // file "Livraisons à valider" (StockControleur::livraisons()).
+                    VenteDetail::where('vente_id', $vente->id)
+                        ->where('produit_id', $produit->id)
+                        ->latest('id')
+                        ->limit(1)
+                        ->update(['quantite_livree' => $article['quantite']]);
 
                     MouvementStock::create([
                         'produit_id'         => $produit->id,
@@ -690,14 +750,31 @@ class VenteControleur
         }
 
         DB::transaction(function () use ($vente) {
+            // Vérification de disponibilité AVANT toute décrémentation.
+            foreach ($vente->details as $detail) {
+                if ($detail->produit && $detail->produit->estStockable()) {
+                    $dispo = $detail->produit->stockActuel($vente->point_de_vente_id);
+                    if ($dispo < $detail->quantite) {
+                        throw new \InvalidArgumentException(
+                            "Stock insuffisant pour « {$detail->produit->nom} » (Disponible: {$dispo}, Demandé: {$detail->quantite})."
+                        );
+                    }
+                }
+            }
+
             $vente->update(['etape' => 'Facture']);
 
             // 1. Décrémenter le stock uniquement pour les articles stockables
             foreach ($vente->details as $detail) {
-                $produit = $detail->produit;
+                // Verrou de ligne pour éviter toute décrémentation concurrente incohérente
+                $produit = $detail->produit ? \App\Modules\Admin\Modeles\Produit::lockForUpdate()->find($detail->produit->id) : null;
                 if ($produit && $produit->estStockable()) {
                     $stockAvant = $produit->stockActuel($vente->point_de_vente_id);
                     $produit->decrementStock($vente->point_de_vente_id, $detail->quantite);
+
+                    // Évite le double décrément via la file "Livraisons à valider"
+                    // (StockControleur::livraisons()) — voir explication dans store().
+                    $detail->update(['quantite_livree' => $detail->quantite]);
 
                     MouvementStock::create([
                         'produit_id'         => $produit->id,
