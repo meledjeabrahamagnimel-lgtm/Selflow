@@ -45,7 +45,7 @@ class ComptabiliteControleur
 
         if ($mode === 'ecritures') {
             // Vue écritures (Grand Livre double-entrée)
-            $query = EcritureComptable::with(['pointDeVente'])
+            $query = EcritureComptable::with(['pointDeVente', 'operation'])
                 ->where('entreprise_id', $entreprise->id);
 
             if (!empty($pdvFilter)) {
@@ -54,22 +54,10 @@ class ComptabiliteControleur
 
             $ecritures = $query->orderBy('date_ecriture', 'desc')->orderBy('id', 'desc')->paginate(30);
             $operations = collect();
-
-            // Récupérer le MIN(id) pour chaque groupe de transaction (même code_journal + même reference_document)
-            // afin de l'utiliser comme "N° saisie" commun en fallback
-            $references = $ecritures->pluck('reference_document')->filter()->unique();
-            if ($references->isNotEmpty()) {
-                $minRecords = DB::table('ecritures_comptables')
-                    ->select('code_journal', 'reference_document', DB::raw('MIN(id) as min_id'))
-                    ->whereIn('reference_document', $references)
-                    ->groupBy('code_journal', 'reference_document')
-                    ->get();
-
-                foreach ($minRecords as $item) {
-                    $minIds[$item->reference_document] = $item->min_id;
-                    $minIds[$item->code_journal . '_' . $item->reference_document] = $item->min_id;
-                }
-            }
+            // NB : le N° Saisie n'est plus recalculé à la volée (ancien MIN(id) par
+            // reference_document, qui mélangeait parfois deux opérations distinctes
+            // partageant le même n° de facture). Il est désormais lu directement
+            // depuis $ecriture->operation->numero_saisie dans la vue.
         } else {
             // Vue opérations (Trésorerie / Caisse)
             $query = TresorerieJournal::with(['pointDeVente'])
@@ -110,27 +98,29 @@ class ComptabiliteControleur
                 $achats = Achat::whereIn('numero_facture', $achatRefs)->with('fournisseur')->get()->keyBy('numero_facture');
             }
 
-            // ── Construire la map N° saisie (lier opération ↔ écritures) ─────
-            // Chaque opération et ses écritures partagent le même reference_document.
-            // On récupère le MIN(id) des écritures par reference_document → N° saisie.
-            $minEcrituresIds = [];
+            // ── Construire la map N° saisie (lier opération de trésorerie ↔ Operation comptable) ──
+            // NB : TresorerieJournal n'est pas encore rattaché par clé étrangère à
+            // Operation (voir Phase 3/5 de l'audit — fusion des deux tables à
+            // terme). En attendant, on résout au mieux par référence de pièce +
+            // entreprise, en privilégiant l'opération de règlement/comptant la
+            // plus récente pour ce document (celle qui correspond réellement au
+            // mouvement de trésorerie affiché).
+            $operationsParRef = [];
             if ($references->isNotEmpty()) {
-                $minEcrituresIds = DB::table('ecritures_comptables')
-                    ->select('reference_document', DB::raw('MIN(id) as min_id'))
+                $operationsParRef = \App\Modules\Admin\Modeles\Operation::where('entreprise_id', $entreprise->id)
                     ->whereIn('reference_document', $references)
-                    ->groupBy('reference_document')
-                    ->pluck('min_id', 'reference_document')
-                    ->toArray();
+                    ->orderByDesc('id')
+                    ->get()
+                    ->groupBy('reference_document');
             }
 
             foreach ($operations as $op) {
                 $op->tier_nom = '—';
                 $op->statut   = $op->statut ?? '—';
 
-                // N° saisie = MIN(id) des écritures liées, ou l'id de l'opération elle-même
-                $op->no_saisie = $op->reference_document
-                    ? ($minEcrituresIds[$op->reference_document] ?? $op->id)
-                    : $op->id;
+                // N° saisie = numéro de la vraie Operation liée à ce document (si trouvée), sinon l'id brut
+                $opsPourRef = $op->reference_document ? ($operationsParRef[$op->reference_document] ?? null) : null;
+                $op->no_saisie = $opsPourRef?->first()?->numero_saisie ?? $op->id;
 
                 if ($op->reference_document) {
                     $ref = $op->reference_document;

@@ -347,8 +347,17 @@ class BonLivraisonControleur extends Controller
                 $newDetail->save();
             }
 
-            // Mouvements comptables & Trésorerie
-            \App\Modules\Admin\Services\ComptabiliteService::genererEcritureFactureVente($facture);
+            // Écritures comptables (+ règlement immédiat le cas échéant) : décide
+            // seule si vente comptant (aucune ligne 411) ou à crédit (411 pour
+            // le solde réellement non couvert immédiatement).
+            \App\Modules\Admin\Services\ComptabiliteService::genererEcrituresVente(
+                $facture,
+                $statutVente === 'Crédit' ? 0 : $montantPaye,
+                $modePaiementFinal,
+                now()->toDateString(),
+                $request->mode_paiement === 'Banque' ? $request->moyen_bancaire : null,
+                $request->mode_paiement === 'Banque' ? $request->reference_paiement : null
+            );
 
             if ($statutVente !== 'Crédit' && $montantPaye > 0) {
                 $soldeActuel = TresorerieJournal::where('point_de_vente_id', $pointDeVenteId)
@@ -367,15 +376,6 @@ class BonLivraisonControleur extends Controller
                     'solde_resultat'     => $soldeActuel + $montantPaye,
                     'reference_document' => $numeroFacture,
                 ]);
-
-                \App\Modules\Admin\Services\ComptabiliteService::genererEcritureReglementVente(
-                    $facture,
-                    $montantPaye,
-                    $modePaiementFinal,
-                    now()->toDateString(),
-                    $request->mode_paiement === 'Banque' ? $request->moyen_bancaire : null,
-                    $request->mode_paiement === 'Banque' ? $request->reference_paiement : null
-                );
             }
 
             // Normalisation FNE

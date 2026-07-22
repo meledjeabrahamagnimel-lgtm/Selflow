@@ -242,8 +242,18 @@ class VenteControleur
                 // Normalisation FNE en arrière-plan (Section 18.5) — n'attendons pas la réponse HTTP
                 NormaliserFactureFne::dispatch($vente, $estRne);
 
-                // Écriture de facturation
-                \App\Modules\Admin\Services\ComptabiliteService::genererEcritureFactureVente($vente);
+                // Écritures de facturation (+ règlement immédiat le cas échéant).
+                // genererEcrituresVente() décide seule si la vente est comptant
+                // (aucune ligne 411) ou à crédit total/partiel (411 pour le solde
+                // réellement non couvert) — voir ComptabiliteService pour le détail.
+                \App\Modules\Admin\Services\ComptabiliteService::genererEcrituresVente(
+                    $vente,
+                    $statutVente === 'Crédit' ? 0 : $montantPaye,
+                    $modePaiementFinal,
+                    now()->toDateString(),
+                    $request->mode_paiement === 'Banque' ? $request->moyen_bancaire : null,
+                    $request->mode_paiement === 'Banque' ? $request->reference_paiement : null
+                );
 
                 if ($statutVente !== 'Crédit' && $montantPaye > 0) {
                     $soldeActuel = TresorerieJournal::where('point_de_vente_id', $pointDeVenteId)
@@ -262,16 +272,6 @@ class VenteControleur
                         'solde_resultat'     => $soldeActuel + $montantPaye,
                         'reference_document' => $numero,
                     ]);
-
-                    // Écriture comptable de règlement
-                    \App\Modules\Admin\Services\ComptabiliteService::genererEcritureReglementVente(
-                        $vente,
-                        $montantPaye,
-                        $modePaiementFinal,
-                        now()->toDateString(),
-                        $request->mode_paiement === 'Banque' ? $request->moyen_bancaire : null,
-                        $request->mode_paiement === 'Banque' ? $request->reference_paiement : null
-                    );
                 }
             } else {
                 // Étape Devis : Enregistrer le règlement (acompte) dans la trésorerie si présent
@@ -715,44 +715,46 @@ class VenteControleur
             $estRne = empty($vente->client_id) || ($vente->client_id == 'divers');
             NormaliserFactureFne::dispatch($vente, $estRne);
 
-            // 3. Générer l'écriture comptable de facturation
-            \App\Modules\Admin\Services\ComptabiliteService::genererEcritureFactureVente($vente);
+            // 3. Trésorerie : enregistrer le solde encaissé aujourd'hui, si la facture
+            //    est totalement soldée (un éventuel acompte a pu être versé plus tôt,
+            //    au stade Devis — voir le bloc "Étape Devis" dans store()).
+            $dejaPayeAvant = TresorerieJournal::where('reference_document', $vente->numero_facture)->sum('montant_entree');
+            $resteAPayer = $vente->statut === 'Payé' ? max(0, $vente->montant_ttc - $dejaPayeAvant) : 0;
 
-            // 3. Trésorerie et Écriture de règlement si payé
-            // 3. Trésorerie et Écriture de règlement si payé
-            if ($vente->statut === 'Payé') {
-                $dejaPaye = TresorerieJournal::where('reference_document', $vente->numero_facture)->sum('montant_entree');
-                $resteAPayer = max(0, $vente->montant_ttc - $dejaPaye);
+            if ($resteAPayer > 0) {
+                $soldeActuel = TresorerieJournal::where('point_de_vente_id', $vente->point_de_vente_id)
+                    ->orderByDesc('created_at')->value('solde_resultat') ?? 0;
 
-                if ($resteAPayer > 0) {
-                    $soldeActuel = TresorerieJournal::where('point_de_vente_id', $vente->point_de_vente_id)
-                        ->orderByDesc('created_at')->value('solde_resultat') ?? 0;
-
-                    TresorerieJournal::create([
-                        'point_de_vente_id'  => $vente->point_de_vente_id,
-                        'date_operation'     => now()->toDateString(),
-                        'type_operation'     => 'Encaissement',
-                        'libelle'            => 'Vente — Règlement solde Facture ' . $vente->numero_facture,
-                        'mode_paiement'      => $vente->mode_paiement,
-                        'moyen_bancaire'     => $vente->moyen_bancaire,
-                        'reference_paiement' => $vente->reference_paiement,
-                        'montant_entree'     => $resteAPayer,
-                        'montant_sortie'     => 0,
-                        'solde_resultat'     => $soldeActuel + $resteAPayer,
-                        'reference_document' => $vente->numero_facture,
-                    ]);
-
-                    // Écriture de règlement
-                    \App\Modules\Admin\Services\ComptabiliteService::genererEcritureReglementVente(
-                        $vente,
-                        $resteAPayer,
-                        $vente->mode_paiement,
-                        now()->toDateString(),
-                        $vente->moyen_bancaire,
-                        $vente->reference_paiement
-                    );
-                }
+                TresorerieJournal::create([
+                    'point_de_vente_id'  => $vente->point_de_vente_id,
+                    'date_operation'     => now()->toDateString(),
+                    'type_operation'     => 'Encaissement',
+                    'libelle'            => 'Vente — Règlement solde Facture ' . $vente->numero_facture,
+                    'mode_paiement'      => $vente->mode_paiement,
+                    'moyen_bancaire'     => $vente->moyen_bancaire,
+                    'reference_paiement' => $vente->reference_paiement,
+                    'montant_entree'     => $resteAPayer,
+                    'montant_sortie'     => 0,
+                    'solde_resultat'     => $soldeActuel + $resteAPayer,
+                    'reference_document' => $vente->numero_facture,
+                ]);
             }
+
+            // 4. Écritures comptables de facturation, en une seule opération cohérente :
+            //    - le montant total déjà encaissé à ce jour (acompte devis + solde ci-dessus)
+            //      est transmis à genererEcrituresVente(), qui décide seule s'il s'agit
+            //      d'une facture intégralement soldée (aucune ligne 411) ou d'une facture
+            //      à crédit total/partiel (411 pour la part réellement non couverte).
+            $montantPayeTotal = $dejaPayeAvant + $resteAPayer;
+
+            \App\Modules\Admin\Services\ComptabiliteService::genererEcrituresVente(
+                $vente,
+                $montantPayeTotal,
+                $vente->mode_paiement,
+                now()->toDateString(),
+                $vente->moyen_bancaire,
+                $vente->reference_paiement
+            );
         });
 
         return back()->with('succes', 'Facture validée, stock mis à jour et écritures comptables générées.');

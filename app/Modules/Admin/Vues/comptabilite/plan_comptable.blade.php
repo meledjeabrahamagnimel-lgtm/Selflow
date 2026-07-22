@@ -183,7 +183,7 @@
             @csrf
             <div class="form-group">
                 <label class="form-label">Numéro de compte <span style="color: var(--danger)">*</span></label>
-                <input type="text" name="numero" class="form-control" placeholder="Ex: 411100" required>
+                <input type="text" name="numero" class="form-control" placeholder="Ex: 411000" required>
             </div>
             <div class="form-group">
                 <label class="form-label">Libellé du compte <span style="color: var(--danger)">*</span></label>

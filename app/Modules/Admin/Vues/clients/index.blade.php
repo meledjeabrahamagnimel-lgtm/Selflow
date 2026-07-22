@@ -79,9 +79,9 @@
                         <td>{{ $c->ncc ?? '—' }}</td>
                         <td>{{ $c->rccm ?? '—' }}</td>
                         <td style="font-family: monospace; font-weight: 700;">
-                            {{ $c->compte_comptable ?? '411100' }}
+                            {{ $c->compte_comptable ?? '411000' }}
                             @php
-                                $compteObj = $comptes->firstWhere('numero', $c->compte_comptable ?? '411100');
+                                $compteObj = $comptes->firstWhere('numero', $c->compte_comptable ?? '411000');
                             @endphp
                             @if($compteObj && !empty($compteObj->numero_original))
                                 <div style="font-size: 10px; color: var(--text-3); font-weight: normal; margin-top: 3px; display: flex; align-items: center; gap: 4px;">
@@ -107,7 +107,7 @@
                                 data-ncc="{{ $c->ncc }}"
                                 data-rccm="{{ $c->rccm }}"
                                 data-regime="{{ $c->regime_imposition }}"
-                                data-compte="{{ $c->compte_comptable ?? '411100' }}"
+                                data-compte="{{ $c->compte_comptable ?? '411000' }}"
                                 data-numero="{{ $c->numero_tiers }}"
                                 data-source="{{ $c->source }}"
                                 style="padding: 5px 10px;">
@@ -207,9 +207,9 @@
                             <td>{{ $c->ncc ?? '—' }}</td>
                             <td>{{ $c->rccm ?? '—' }}</td>
                             <td style="font-family: monospace; font-weight: 700;">
-                             {{ $c->compte_comptable ?? '411100' }}
+                             {{ $c->compte_comptable ?? '411000' }}
                              @php
-                                 $compteObj = $comptes->firstWhere('numero', $c->compte_comptable ?? '411100');
+                                 $compteObj = $comptes->firstWhere('numero', $c->compte_comptable ?? '411000');
                              @endphp
                              @if($compteObj && !empty($compteObj->numero_original))
                                  <div style="font-size: 10px; color: var(--text-3); font-weight: normal; margin-top: 3px; display: flex; align-items: center; gap: 4px;">
@@ -235,7 +235,7 @@
                                     data-ncc="{{ $c->ncc }}"
                                     data-rccm="{{ $c->rccm }}"
                                     data-regime="{{ $c->regime_imposition }}"
-                                    data-compte="{{ $c->compte_comptable ?? '411100' }}"
+                                    data-compte="{{ $c->compte_comptable ?? '411000' }}"
                                     data-numero="{{ $c->numero_tiers }}"
                                     data-source="{{ $c->source }}"
                                     style="padding: 5px 10px;">
@@ -312,7 +312,7 @@
                             <label class="form-label">Compte comptable général collective</label>
                             <select name="compte_comptable" class="form-control" required>
                                 @foreach($comptes as $compte)
-                                    <option value="{{ $compte->numero }}" {{ $compte->numero == '411100' ? 'selected' : '' }}>
+                                    <option value="{{ $compte->numero }}" {{ $compte->numero == '411000' ? 'selected' : '' }}>
                                         {{ $compte->numero }} - {{ $compte->libelle }}
                                     </option>
                                 @endforeach
@@ -487,7 +487,7 @@ document.querySelectorAll('.btn-modifier-client').forEach(function(btn) {
         if (selectRegime) selectRegime.value = data.regime || '';
 
         const selectCompte = document.getElementById('edit_compte_comptable');
-        if (selectCompte) selectCompte.value = data.compte || '411100';
+        if (selectCompte) selectCompte.value = data.compte || '411000';
 
         // Champs COMPTAFLOW → lecture seule
         const lockFields  = ['edit_nom', 'edit_compte_comptable', 'edit_numero_tiers'];

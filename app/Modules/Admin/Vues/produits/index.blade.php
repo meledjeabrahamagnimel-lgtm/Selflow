@@ -300,7 +300,7 @@
                                     <label class="form-label">Nature de la vente (Compte de vente) <span style="color:var(--danger)">*</span></label>
                                     <select name="compte_vente" id="compte_vente_select_{{ $p->id }}" class="form-control" required>
                                         @foreach($syscohadaKws->where('type_lie', 'Vente') as $kw)
-                                            <option value="{{ $kw->compte_comptable_reel }}" {{ ($p->compte_vente ?? '701100') == $kw->compte_comptable_reel ? 'selected' : '' }}>
+                                            <option value="{{ $kw->compte_comptable_reel }}" {{ ($p->compte_vente ?? '701000') == $kw->compte_comptable_reel ? 'selected' : '' }}>
                                                 {{ $kw->libelle_affiche }} @if(Auth::user()->role === 'admin') ({{ $kw->compte_comptable_reel }}) @endif
                                             </option>
                                         @endforeach
@@ -310,7 +310,7 @@
                                     <label class="form-label">Nature de l'achat (Compte d'achat) <span style="color:var(--danger)">*</span></label>
                                     <select name="compte_achat" id="compte_achat_select_{{ $p->id }}" class="form-control" required>
                                         @foreach($syscohadaKws->where('type_lie', 'Achat') as $kw)
-                                            <option value="{{ $kw->compte_comptable_reel }}" {{ ($p->compte_achat ?? '601100') == $kw->compte_comptable_reel ? 'selected' : '' }}>
+                                            <option value="{{ $kw->compte_comptable_reel }}" {{ ($p->compte_achat ?? '601000') == $kw->compte_comptable_reel ? 'selected' : '' }}>
                                                 {{ $kw->libelle_affiche }} @if(Auth::user()->role === 'admin') ({{ $kw->compte_comptable_reel }}) @endif
                                             </option>
                                         @endforeach
@@ -328,7 +328,7 @@
                                     <label class="form-label">Compte de vente personnalisé</label>
                                     <select id="custom_compte_vente_{{ $p->id }}" class="form-control">
                                         @foreach($comptes as $compte)
-                                            <option value="{{ $compte->numero }}" {{ ($p->compte_vente ?? '701100') == $compte->numero ? 'selected' : '' }}>
+                                            <option value="{{ $compte->numero }}" {{ ($p->compte_vente ?? '701000') == $compte->numero ? 'selected' : '' }}>
                                                 {{ $compte->numero }} - {{ $compte->libelle }}
                                             </option>
                                         @endforeach
@@ -338,7 +338,7 @@
                                     <label class="form-label">Compte d'achat personnalisé</label>
                                     <select id="custom_compte_achat_{{ $p->id }}" class="form-control">
                                         @foreach($comptes as $compte)
-                                            <option value="{{ $compte->numero }}" {{ ($p->compte_achat ?? '601100') == $compte->numero ? 'selected' : '' }}>
+                                            <option value="{{ $compte->numero }}" {{ ($p->compte_achat ?? '601000') == $compte->numero ? 'selected' : '' }}>
                                                 {{ $compte->numero }} - {{ $compte->libelle }}
                                             </option>
                                         @endforeach
@@ -459,7 +459,7 @@
                     <label class="form-label">Nature de la vente (Compte de vente) <span style="color:var(--danger)">*</span></label>
                     <select name="compte_vente" id="compte_vente_select_nouveau" class="form-control" required>
                         @foreach($syscohadaKws->where('type_lie', 'Vente') as $kw)
-                            <option value="{{ $kw->compte_comptable_reel }}" {{ $kw->compte_comptable_reel == '701100' ? 'selected' : '' }}>
+                            <option value="{{ $kw->compte_comptable_reel }}" {{ $kw->compte_comptable_reel == '701000' ? 'selected' : '' }}>
                                 {{ $kw->libelle_affiche }} @if(Auth::user()->role === 'admin') ({{ $kw->compte_comptable_reel }}) @endif
                             </option>
                         @endforeach
@@ -469,7 +469,7 @@
                     <label class="form-label">Nature de l'achat (Compte d'achat) <span style="color:var(--danger)">*</span></label>
                     <select name="compte_achat" id="compte_achat_select_nouveau" class="form-control" required>
                         @foreach($syscohadaKws->where('type_lie', 'Achat') as $kw)
-                            <option value="{{ $kw->compte_comptable_reel }}" {{ $kw->compte_comptable_reel == '601100' ? 'selected' : '' }}>
+                            <option value="{{ $kw->compte_comptable_reel }}" {{ $kw->compte_comptable_reel == '601000' ? 'selected' : '' }}>
                                 {{ $kw->libelle_affiche }} @if(Auth::user()->role === 'admin') ({{ $kw->compte_comptable_reel }}) @endif
                             </option>
                         @endforeach
@@ -487,7 +487,7 @@
                     <label class="form-label">Compte de vente personnalisé</label>
                     <select id="custom_compte_vente_nouveau" class="form-control">
                         @foreach($comptes as $compte)
-                            <option value="{{ $compte->numero }}" {{ $compte->numero == '701100' ? 'selected' : '' }}>
+                            <option value="{{ $compte->numero }}" {{ $compte->numero == '701000' ? 'selected' : '' }}>
                                 {{ $compte->numero }} - {{ $compte->libelle }}
                             </option>
                         @endforeach
@@ -497,7 +497,7 @@
                     <label class="form-label">Compte d'achat personnalisé</label>
                     <select id="custom_compte_achat_nouveau" class="form-control">
                         @foreach($comptes as $compte)
-                            <option value="{{ $compte->numero }}" {{ $compte->numero == '601100' ? 'selected' : '' }}>
+                            <option value="{{ $compte->numero }}" {{ $compte->numero == '601000' ? 'selected' : '' }}>
                                 {{ $compte->numero }} - {{ $compte->libelle }}
                             </option>
                         @endforeach
