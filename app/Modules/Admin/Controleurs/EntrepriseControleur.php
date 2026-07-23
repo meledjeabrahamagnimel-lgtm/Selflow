@@ -23,7 +23,18 @@ class EntrepriseControleur
         $periodes = \App\Modules\Admin\Modeles\Periode::where('entreprise_id', $entreprise->id)
             ->orderBy('date_debut', 'desc')
             ->get();
-        return view('admin::entreprise.parametres', compact('entreprise', 'periodes'));
+
+        // Statut FNE uniquement — jamais la clé elle-même (voir SuperadminFneControleur
+        // pour la gestion des clés, réservée au superadmin).
+        $fneCredential = $entreprise->fneCredential;
+        $fneStatut = [
+            'statut'       => $fneCredential?->statut ?? 'non_configure',
+            'label'        => $fneCredential?->statutLabel() ?? 'Non connecté',
+            'derniere_verification' => $fneCredential?->derniere_verification_at,
+            'derniere_verification_resultat' => $fneCredential?->derniere_verification_resultat,
+        ];
+
+        return view('admin::entreprise.parametres', compact('entreprise', 'periodes', 'fneStatut'));
     }
 
     /**
@@ -226,5 +237,51 @@ class EntrepriseControleur
             'success' => false,
             'message' => $result['message'],
         ]);
+    }
+
+    /**
+     * Vérifie la joignabilité de l'API FNE avec la clé active de l'entreprise
+     * (test ou réelle selon le statut). Ne révèle JAMAIS la clé — la lecture
+     * de la clé pour l'appel se fait côté serveur uniquement.
+     *
+     * NB : ceci est un contrôle de JOIGNABILITÉ réseau conservateur (le
+     * serveur DGI répond-il ?), pas une validation complète d'authentification
+     * — on évite volontairement de soumettre une facture de test réelle ici
+     * pour ne jamais risquer d'émettre un document fiscal par erreur en
+     * environnement de production. La validation complète de la clé se fait
+     * naturellement via la normalisation d'une vraie facture de test.
+     */
+    public function testerConnexionFne(): \Illuminate\Http\JsonResponse
+    {
+        $entreprise = Auth::user()->entreprise;
+        $cred = $entreprise->fneCredential;
+
+        if (!$cred || !$cred->estConfiguree()) {
+            return response()->json(['success' => false, 'message' => "Aucune clé FNE n'est configurée pour votre entreprise. Contactez votre administrateur Selflow."]);
+        }
+
+        $urlSandbox = config('selflow.fne_api_url_sandbox', 'https://fne-sandbox.dgi.gouv.ci');
+        $urlProd    = config('selflow.fne_api_url_production', 'https://fne.dgi.gouv.ci');
+        $url = $cred->statut === 'validee' ? $urlProd : $urlSandbox;
+
+        $resultat = 'echec';
+        $message = "❌ Impossible de joindre le serveur DGI ({$url}).";
+
+        try {
+            $reponse = Http::timeout(6)->get($url);
+            // Peu importe le code retourné (401/403 inclus) : si on obtient une
+            // réponse HTTP, le serveur est joignable — c'est tout ce qu'on teste ici.
+            $resultat = 'succes';
+            $message = "✅ Serveur DGI joignable (" . ($cred->statut === 'validee' ? 'production' : 'sandbox') . ").";
+        } catch (\Throwable $e) {
+            Log::warning("[FNE] Test de connexion échoué pour l'entreprise #{$entreprise->id} : " . $e->getMessage());
+        }
+
+        $cred->update([
+            'derniere_verification_resultat' => $resultat,
+            'derniere_verification_at' => now(),
+        ]);
+
+        return response()->json(['success' => $resultat === 'succes', 'message' => $message]);
     }
 }

@@ -57,4 +57,15 @@ return [
         'banque_defaut'         => '521000', // Banque (si aucun journal banque dédié trouvé)
     ],
 
+    /*
+    |--------------------------------------------------------------------------
+    | FNE — Facture Normalisée Électronique (DGI Côte d'Ivoire)
+    |--------------------------------------------------------------------------
+    | Chaque entreprise a sa PROPRE clé (voir table fne_credentials), gérée
+    | exclusivement par le superadmin. Ces URLs sont communes à toutes les
+    | entreprises (seule la clé change), donc centralisées ici.
+    */
+    'fne_api_url_sandbox'    => env('FNE_API_URL_SANDBOX', 'https://fne-sandbox.dgi.gouv.ci'),
+    'fne_api_url_production' => env('FNE_API_URL_PRODUCTION', 'https://fne.dgi.gouv.ci'),
+
 ];

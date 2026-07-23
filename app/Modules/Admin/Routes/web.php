@@ -215,6 +215,7 @@ Route::prefix('admin')
         // ── Paramètres entreprise ──
         Route::get('/entreprise/parametres', [EntrepriseControleur::class, 'parametres'])->name('entreprise.parametres');
         Route::put('/entreprise/parametres', [EntrepriseControleur::class, 'enregistrerParametres'])->name('entreprise.parametres.enregistrer');
+        Route::post('/entreprise/fne/tester-connexion', [EntrepriseControleur::class, 'testerConnexionFne'])->name('entreprise.fne.tester_connexion');
         Route::post('/entreprise/comptaflow/sync-simulation', [EntrepriseControleur::class, 'simulerSyncComptaflow'])->name('entreprise.comptaflow.sync');
         Route::post('/entreprise/comptaflow/sync', [EntrepriseControleur::class, 'synchroniserComptaflow'])->name('entreprise.comptaflow.sync_real');
 
@@ -255,6 +256,16 @@ Route::prefix('superadmin')
             Route::delete('/{entreprise}/delierEntreprise',    [SuperadminLiaisonControleur::class, 'delierEntreprise'])->name('delierEntreprise');
             Route::post('/creer-comptaflow',                   [SuperadminLiaisonControleur::class, 'creerComptaflow'])->name('creerComptaflow');
             Route::post('/{entreprise}/verifier',              [SuperadminLiaisonControleur::class, 'verifierLiaison'])->name('verifier');
+        });
+
+        // ── Gestion des clés FNE (DGI) ──
+        Route::prefix('fne')->name('fne.')->group(function () {
+            Route::get('/',                                       [\App\Modules\Admin\Controleurs\SuperadminFneControleur::class, 'index'])->name('index');
+            Route::post('/{entreprise}/cle-test',                 [\App\Modules\Admin\Controleurs\SuperadminFneControleur::class, 'ajouterCleTest'])->name('cle_test');
+            Route::post('/{entreprise}/cle-reelle',               [\App\Modules\Admin\Controleurs\SuperadminFneControleur::class, 'ajouterCleReelle'])->name('cle_reelle');
+            Route::post('/{entreprise}/voir-cle',                 [\App\Modules\Admin\Controleurs\SuperadminFneControleur::class, 'voirCle'])->name('voir_cle');
+            Route::delete('/{entreprise}/cle',                    [\App\Modules\Admin\Controleurs\SuperadminFneControleur::class, 'supprimerCle'])->name('supprimer_cle');
+            Route::post('/{entreprise}/notes',                    [\App\Modules\Admin\Controleurs\SuperadminFneControleur::class, 'mettreAJourNotes'])->name('notes');
         });
     });
 

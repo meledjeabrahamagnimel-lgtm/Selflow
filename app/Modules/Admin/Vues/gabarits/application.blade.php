@@ -518,6 +518,9 @@
             <a href="{{ route('superadmin.liaisons.index') }}" class="nav-item {{ request()->routeIs('superadmin.liaisons*') ? 'active' : '' }}">
                 <i class="fas fa-link"></i> Liaisons COMPTAFLOW
             </a>
+            <a href="{{ route('superadmin.fne.index') }}" class="nav-item {{ request()->routeIs('superadmin.fne*') ? 'active' : '' }}">
+                <i class="fas fa-key"></i> Gestion FNE
+            </a>
         @elseif(request()->routeIs('caissier.*'))
             <!-- ── CAISSIER SIDEBAR ── -->
             <div class="nav-section"><span>Caisse</span></div>

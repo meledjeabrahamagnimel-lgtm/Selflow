@@ -19,10 +19,16 @@ class FneService
     {
         $entreprise = $vente->pointDeVente->entreprise;
         $nccEmetteur = preg_replace('/[^0-9A-Z]/', '', $entreprise->ncc ?? '0100000A');
-        
-        // Clé API FNE stockée de façon sécurisée
-        $apiKey = env('FNE_API_KEY');
-        $apiUrl = env('FNE_API_URL', 'https://fne-sandbox.dgi.gouv.ci/api/v1/factures');
+
+        // Clé API FNE propre à CETTE entreprise (il n'existe pas de clé unique
+        // partagée — chaque entreprise a la sienne, fournie par la DGI et
+        // gérée par le superadmin). Voir FneCredential::cleActive() : utilise
+        // la clé réelle si validée, sinon la clé de test.
+        $credential = $entreprise->fneCredential;
+        $apiKey = $credential?->cleActive();
+        $apiUrl = $credential && $credential->statut === 'validee'
+            ? config('selflow.fne_api_url_production', 'https://fne.dgi.gouv.ci') . '/api/v1/factures'
+            : config('selflow.fne_api_url_sandbox', 'https://fne-sandbox.dgi.gouv.ci') . '/api/v1/factures';
 
         // Préparation du payload standard DGI-CI
         $payload = [
@@ -144,8 +150,11 @@ class FneService
         $entreprise = $pointDeVente->entreprise;
         $nccAcheteur = preg_replace('/[^0-9A-Z]/', '', $entreprise->ncc ?? '0100000A');
 
-        $apiKey = env('FNE_API_KEY');
-        $apiUrl = env('FNE_API_URL', 'https://fne-sandbox.dgi.gouv.ci/api/v1/factures');
+        $credential = $entreprise->fneCredential;
+        $apiKey = $credential?->cleActive();
+        $apiUrl = $credential && $credential->statut === 'validee'
+            ? config('selflow.fne_api_url_production', 'https://fne.dgi.gouv.ci') . '/api/v1/factures'
+            : config('selflow.fne_api_url_sandbox', 'https://fne-sandbox.dgi.gouv.ci') . '/api/v1/factures';
 
         // Préparation du payload standard BAPA DGI-CI
         $payload = [

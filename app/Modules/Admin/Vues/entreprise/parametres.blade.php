@@ -442,4 +442,106 @@ function lancerSyncSimulation() {
     });
 }
 </script>
+
+{{-- ── STATUT FNE (DGI) — Lecture seule, la clé n'est jamais affichée ici ── --}}
+<div class="card" style="margin-top:24px; padding:24px;">
+    <div style="font-size:14px;font-weight:700;color:var(--text);text-transform:uppercase;letter-spacing:.5px;margin-bottom:20px;display:flex;align-items:center;gap:8px;border-bottom:1px solid var(--border);padding-bottom:10px;">
+        <i class="fas fa-key" style="color:var(--primary); font-size:16px;"></i> FNE — Facture Normalisée Électronique (DGI)
+    </div>
+
+    <div style="display:grid; grid-template-columns: 1fr 2fr; gap:32px; align-items:center;">
+        <div>
+            <div style="font-size:13px; color:var(--text-2); margin-bottom:14px; line-height:1.5;">
+                La normalisation électronique des factures auprès de la DGI nécessite une clé propre à votre entreprise.
+                Pour des raisons de sécurité, cette clé n'est ni affichée ni modifiable ici — seul le support Selflow
+                (superadmin) peut la configurer, sur la base de la clé que vous recevez de la DGI.
+            </div>
+
+            <div style="display:flex; flex-direction:column; gap:10px; font-size:13px;">
+                <div>
+                    Statut :
+                    @php
+                        $fneBadgeClasse = match($fneStatut['statut']) {
+                            'validee' => 'badge-success',
+                            'test'    => 'badge-warning',
+                            default   => 'badge-danger',
+                        };
+                    @endphp
+                    <span id="fne-status-badge" class="badge {{ $fneBadgeClasse }}">{{ $fneStatut['label'] }}</span>
+                </div>
+                <div>
+                    Dernière vérification :
+                    <strong id="fne-last-check">{{ $fneStatut['derniere_verification'] ? \Carbon\Carbon::parse($fneStatut['derniere_verification'])->format('d/m/Y \à H:i:s') : 'Jamais vérifié' }}</strong>
+                </div>
+                @if($fneStatut['statut'] === 'non_configure')
+                <div style="color:#92400e; background:#fffbeb; border:1px solid #fcd34d; border-radius:8px; padding:10px 12px; margin-top:4px;">
+                    <i class="fas fa-circle-info"></i> Aucune clé FNE n'est encore configurée. Contactez le support Selflow pour lancer la demande auprès de la DGI.
+                </div>
+                @elseif($fneStatut['statut'] === 'test')
+                <div style="color:#92400e; background:#fffbeb; border:1px solid #fcd34d; border-radius:8px; padding:10px 12px; margin-top:4px;">
+                    <i class="fas fa-flask"></i> Vous êtes en phase de test DGI. Les factures normalisées ne sont pas encore fiscalement définitives.
+                </div>
+                @endif
+            </div>
+        </div>
+
+        <div style="background:var(--bg3); border-radius:10px; padding:24px; border:1px solid var(--border); text-align:center;">
+            <p style="font-size:13px; font-weight:600; margin-bottom:16px; color:var(--text-1);">Vérifier la joignabilité du serveur DGI</p>
+
+            <div id="fne-feedback" style="display:none; padding:12px; border-radius:8px; font-size:13px; margin-bottom:16px; text-align:left; font-weight:500;"></div>
+
+            <button type="button" id="btn-fne-test" onclick="testerConnexionFne()" class="btn btn-primary" style="margin:0 auto; padding:10px 24px; font-weight:700; gap:8px;" {{ $fneStatut['statut'] === 'non_configure' ? 'disabled' : '' }}>
+                <i class="fas fa-satellite-dish"></i> Tester la connexion
+            </button>
+            <span id="fne-loader" style="display:none; font-size:13px; color:var(--text-3); font-weight:600;">
+                <i class="fas fa-spinner fa-spin" style="color:var(--primary); margin-right:8px;"></i> Test en cours...
+            </span>
+        </div>
+    </div>
+</div>
+
+<script>
+function testerConnexionFne() {
+    const btn = document.getElementById('btn-fne-test');
+    const loader = document.getElementById('fne-loader');
+    const feedback = document.getElementById('fne-feedback');
+    const lastCheck = document.getElementById('fne-last-check');
+
+    btn.style.display = 'none';
+    loader.style.display = 'inline-flex';
+    feedback.style.display = 'none';
+
+    fetch("{{ route('admin.entreprise.fne.tester_connexion') }}", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "X-CSRF-TOKEN": "{{ csrf_token() }}" }
+    })
+    .then(response => response.json())
+    .then(data => {
+        btn.style.display = 'inline-flex';
+        loader.style.display = 'none';
+        feedback.style.display = 'block';
+
+        if (data.success) {
+            feedback.style.background = '#d1fae5';
+            feedback.style.border = '1px solid #6ee7b7';
+            feedback.style.color = '#065f46';
+        } else {
+            feedback.style.background = '#fee2e2';
+            feedback.style.border = '1px solid #fca5a5';
+            feedback.style.color = '#991b1b';
+        }
+        feedback.innerHTML = data.message;
+        lastCheck.textContent = new Date().toLocaleString('fr-FR');
+    })
+    .catch(() => {
+        btn.style.display = 'inline-flex';
+        loader.style.display = 'none';
+        feedback.style.display = 'block';
+        feedback.style.background = '#fee2e2';
+        feedback.style.border = '1px solid #fca5a5';
+        feedback.style.color = '#991b1b';
+        feedback.innerHTML = "Une erreur réseau s'est produite lors du test.";
+    });
+}
+</script>
 @endsection

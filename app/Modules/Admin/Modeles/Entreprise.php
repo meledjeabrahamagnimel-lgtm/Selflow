@@ -4,6 +4,7 @@ namespace App\Modules\Admin\Modeles;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 
 class Entreprise extends Model
 {
@@ -64,5 +65,10 @@ class Entreprise extends Model
     public function fournisseurs(): HasMany
     {
         return $this->hasMany(Fournisseur::class, 'entreprise_id');
+    }
+
+    public function fneCredential(): HasOne
+    {
+        return $this->hasOne(FneCredential::class, 'entreprise_id');
     }
 }
