@@ -72,7 +72,7 @@ class B2bControleur extends Controller
             'articles.*.prix'       => ['required', 'numeric', 'min:0'],
         ]);
 
-        $fournisseur = Fournisseur::findOrFail($request->fournisseur_id);
+        $fournisseur = Fournisseur::where('entreprise_id', $entreprise->id)->findOrFail($request->fournisseur_id);
 
         if (empty($fournisseur->ncc)) {
             return back()->with('erreur', "Ce fournisseur n'a pas de NCC enregistré. La liaison B2B n'est pas possible.");

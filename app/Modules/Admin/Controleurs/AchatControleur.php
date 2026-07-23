@@ -114,7 +114,7 @@ class AchatControleur
             // Déterminer le mode de paiement final
             $modePaiementFinal = $request->mode_paiement;
             if ($request->mode_paiement === 'Banque' && $request->filled('banque_id')) {
-                $codeJournal = CodeJournal::findOrFail($request->banque_id);
+                $codeJournal = CodeJournal::where('entreprise_id', Auth::user()->entreprise_id)->findOrFail($request->banque_id);
                 $modePaiementFinal = 'Banque : ' . $codeJournal->intitule;
             }
 

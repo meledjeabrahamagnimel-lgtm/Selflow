@@ -408,13 +408,20 @@ class ComptabiliteControleur
             $montant = floatval($request->montant);
             $mode = $request->mode_paiement;
             if ($request->mode_paiement === 'Banque' && $request->filled('banque_id')) {
-                $codeJournal = CodeJournal::findOrFail($request->banque_id);
+                $codeJournal = CodeJournal::where('entreprise_id', $entreprise->id)->findOrFail($request->banque_id);
                 $mode = 'Banque : ' . $codeJournal->intitule;
             }
             $date = $request->date_operation;
 
             if ($request->type === 'client') {
-                $vente = Vente::where('numero_facture', $numFacture)->firstOrFail();
+                // Filtre par entreprise indispensable : numero_facture n'est unique
+                // que PAR entreprise (chaque entreprise a sa propre séquence),
+                // jamais globalement. Sans ce filtre, un utilisateur pourrait
+                // enregistrer un règlement sur la facture d'une autre entreprise
+                // en devinant/saisissant son numéro.
+                $vente = Vente::whereHas('pointDeVente', fn($q) => $q->where('entreprise_id', $entreprise->id))
+                    ->where('numero_facture', $numFacture)
+                    ->firstOrFail();
                 if (!$vente->point_de_vente_id) {
                     $vente->point_de_vente_id = session('point_de_vente_actif_id')
                         ?? Auth::user()->point_de_vente_id
@@ -468,7 +475,9 @@ class ComptabiliteControleur
                     $vente->update(['statut' => 'Avance']);
                 }
             } else {
-                $achat = Achat::where('numero_facture', $numFacture)->firstOrFail();
+                $achat = Achat::whereHas('pointDeVente', fn($q) => $q->where('entreprise_id', $entreprise->id))
+                    ->where('numero_facture', $numFacture)
+                    ->firstOrFail();
                 if (!$achat->point_de_vente_id) {
                     $achat->point_de_vente_id = session('point_de_vente_actif_id')
                         ?? Auth::user()->point_de_vente_id
