@@ -1,0 +1,267 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Gestion FNE — Selflow</title>
+  <!-- Tailwind CSS CDN pour un style fluide et moderne -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- FontAwesome pour les icônes -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <style>
+    body { font-family: 'Inter', system-ui, -apple-system, sans-serif; background-color: #f3f4f6; }
+    .fne-card { transition: transform 0.2s, box-shadow 0.2s; }
+    .fne-card:hover { transform: translateY(-2px); box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1); }
+  </style>
+</head>
+<body class="bg-gray-100 text-gray-800">
+
+  <div class="flex h-screen overflow-hidden">
+    
+    <!-- SIDEBAR SELFLOW (Rappel du menu existant) -->
+    <aside class="w-64 bg-slate-900 text-slate-300 flex flex-col justify-between hidden md:flex">
+      <div>
+        <div class="p-4 border-b border-slate-800 flex items-center space-x-3">
+          <div class="bg-blue-600 text-white font-bold p-2 rounded-lg text-lg">S</div>
+          <div>
+            <h1 class="font-bold text-white leading-none">Selflow</h1>
+            <span class="text-xs text-slate-400">Gestion Commerciale</span>
+          </div>
+        </div>
+
+        <nav class="p-4 space-y-6 text-sm">
+          <div>
+            <div class="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">Tableau de bord</div>
+            <a href="#" class="flex items-center space-x-2 p-2 rounded hover:bg-slate-800"><i class="fa-solid fa-chart-line w-5"></i><span>TDB Général</span></a>
+          </div>
+
+          <div>
+            <div class="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">Fiscalité & DGI</div>
+            <a href="#" class="flex items-center space-x-2 p-2 rounded bg-blue-600 text-white font-medium">
+              <i class="fa-solid fa-file-invoice-dollar w-5"></i>
+              <span>Gestion FNE</span>
+            </a>
+          </div>
+
+          <div>
+            <div class="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">Ventes & Achats</div>
+            <a href="#" class="flex items-center space-x-2 p-2 rounded hover:bg-slate-800"><i class="fa-solid fa-cart-shopping w-5"></i><span>Factures vente</span></a>
+            <a href="#" class="flex items-center space-x-2 p-2 rounded hover:bg-slate-800"><i class="fa-solid fa-bag-shopping w-5"></i><span>Factures achat</span></a>
+          </div>
+        </nav>
+      </div>
+
+      <div class="p-4 border-t border-slate-800 text-xs text-slate-500">
+        Connecté à l'API FNE v1.0.2
+      </div>
+    </aside>
+
+    <!-- CONTENU PRINCIPAL -->
+    <main class="flex-1 overflow-y-auto p-6 space-y-6">
+
+      <!-- EN-TÊTE PAGE & IDENTITÉ FISCALE FNE -->
+      <div class="bg-white rounded-xl p-5 shadow-sm border border-gray-200 flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4">
+        <div>
+          <div class="flex items-center space-x-3">
+            <h1 class="text-2xl font-bold text-gray-900">Module &lt;GESTION FNE&gt;</h1>
+            <span class="bg-emerald-100 text-emerald-800 text-xs font-semibold px-2.5 py-0.5 rounded-full border border-emerald-300">
+              <i class="fa-solid fa-circle-check mr-1"></i> API DGI Connectée
+            </span>
+          </div>
+          <p class="text-sm text-gray-500 mt-1">Données informatives et suivi de conformité issus de la plateforme FNE DGI</p>
+        </div>
+
+        <!-- Fiche d'identification DGI rapide -->
+        <div class="bg-slate-800 text-white p-3 rounded-lg text-xs grid grid-cols-2 sm:grid-cols-3 gap-x-6 gap-y-1 border-l-4 border-amber-500">
+          <div><span class="text-slate-400">Raison Sociale:</span> <strong class="block">MANDIOBA N'GONDIÉ</strong></div>
+          <div><span class="text-slate-400">NCC:</span> <strong class="block">4272107A</strong></div>
+          <div><span class="text-slate-400">Régime:</span> <strong class="block">TEE</strong></div>
+          <div><span class="text-slate-400">Centre Impôts:</span> <strong class="block truncate">964 - Deux-Plateaux I</strong></div>
+          <div><span class="text-slate-400">Secteur:</span> <strong class="block truncate">Commerce Général</strong></div>
+          <div><span class="text-slate-400">IDU:</span> <strong class="block">0</strong></div>
+        </div>
+      </div>
+
+      <!-- BARRE DE FILTRES GLOBALE (Temporel & Point de Vente) -->
+      <div class="bg-white rounded-xl p-4 shadow-sm border border-gray-200 flex flex-wrap items-center justify-between gap-4">
+        
+        <div class="flex flex-wrap items-center gap-3">
+          <span class="text-sm font-semibold text-gray-700"><i class="fa-solid fa-filter text-blue-600 mr-1"></i> Filtres :</span>
+          
+          <!-- Select Période -->
+          <div class="flex items-center space-x-1 bg-gray-50 border border-gray-300 rounded-lg p-1">
+            <input type="date" value="2026-07-23" class="bg-transparent text-sm font-medium text-gray-700 px-2 py-1 outline-none">
+          </div>
+
+          <!-- Filtre rapide -->
+          <select class="bg-gray-50 border border-gray-300 text-gray-700 text-sm rounded-lg p-2 font-medium">
+            <option value="jour">Jour spécifique</option>
+            <option value="semaine" selected>Semaine du mois (Sem. 3)</option>
+            <option value="mois">Mois (Juillet 2026)</option>
+            <option value="annee">Année (2026)</option>
+          </select>
+
+          <!-- Filtre Point de Vente -->
+          <select class="bg-gray-50 border border-gray-300 text-gray-700 text-sm rounded-lg p-2 font-medium">
+            <option value="tous">Tous les Points de Vente</option>
+            <option value="siege" selected>Siège</option>
+            <option value="magasin_a">Magasin A</option>
+          </select>
+        </div>
+
+        <button class="bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium px-4 py-2 rounded-lg flex items-center space-x-2 transition">
+          <i class="fa-solid fa-rotate"></i>
+          <span>Synchroniser DGI</span>
+        </button>
+      </div>
+
+      <!-- BOUTONS-SECTIONS (Onglets de sous-navigation) -->
+      <div class="flex space-x-2 border-b border-gray-200 pb-1">
+        <button class="px-4 py-2 bg-blue-600 text-white font-medium text-sm rounded-t-lg shadow-sm">
+          <i class="fa-solid fa-chart-pie mr-2"></i>Vue Synthétique DGI
+        </button>
+        <button class="px-4 py-2 bg-white text-gray-600 hover:bg-gray-50 font-medium text-sm rounded-t-lg border-t border-x border-gray-200">
+          <i class="fa-solid fa-arrow-down-left mr-2 text-emerald-600"></i>Entrées (Ventes FNE)
+        </button>
+        <button class="px-4 py-2 bg-white text-gray-600 hover:bg-gray-50 font-medium text-sm rounded-t-lg border-t border-x border-gray-200">
+          <i class="fa-solid fa-arrow-up-right mr-2 text-rose-600"></i>Sorties (Achats FNE)
+        </button>
+        <button class="px-4 py-2 bg-white text-gray-600 hover:bg-gray-50 font-medium text-sm rounded-t-lg border-t border-x border-gray-200">
+          <i class="fa-solid fa-ticket mr-2 text-amber-500"></i>Stickers & Timbres
+        </button>
+      </div>
+
+      <!-- BLOC 1: SUIVI DES STICKERS & CRÉDITS (Spécifique FNE) -->
+      <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+        
+        <div class="bg-white p-4 rounded-xl border border-gray-200 shadow-sm fne-card border-l-4 border-emerald-500">
+          <div class="text-xs font-semibold text-gray-500 uppercase">Solde Stickers Disponible</div>
+          <div class="text-2xl font-bold text-gray-900 mt-1">700 CFA</div>
+          <div class="text-xs text-emerald-600 mt-2"><i class="fa-solid fa-shield-halved"></i> Réserve valide</div>
+        </div>
+
+        <div class="bg-white p-4 rounded-xl border border-gray-200 shadow-sm fne-card border-l-4 border-blue-500">
+          <div class="text-xs font-semibold text-gray-500 uppercase">Achats de Stickers</div>
+          <div class="text-2xl font-bold text-gray-900 mt-1">0 CFA</div>
+          <div class="text-xs text-gray-400 mt-2">Cumul sur la période</div>
+        </div>
+
+        <div class="bg-white p-4 rounded-xl border border-gray-200 shadow-sm fne-card border-l-4 border-amber-500">
+          <div class="text-xs font-semibold text-gray-500 uppercase">Stickers Consommés</div>
+          <div class="text-2xl font-bold text-gray-900 mt-1">20 CFA</div>
+          <div class="text-xs text-gray-500 mt-2">1 sticker utilisé (Facture)</div>
+        </div>
+
+        <div class="bg-white p-4 rounded-xl border border-gray-200 shadow-sm fne-card border-l-4 border-purple-500">
+          <div class="text-xs font-semibold text-gray-500 uppercase">Timbre de Quittance</div>
+          <div class="text-2xl font-bold text-gray-900 mt-1">0 CFA</div>
+          <div class="text-xs text-gray-400 mt-2">Quantité: 0</div>
+        </div>
+
+      </div>
+
+      <!-- BLOC 2: KPIS VENTES & ENTRÉES CERTIFIÉES DGI -->
+      <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-5">
+        <h2 class="text-base font-bold text-gray-900 mb-4 flex items-center">
+          <i class="fa-solid fa-file-invoice text-blue-600 mr-2"></i> Indicateurs des Entrées (Ventes certifiées DGI)
+        </h2>
+
+        <div class="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-4">
+          <div class="bg-gray-50 p-3 rounded-lg border border-gray-200">
+            <span class="text-xs text-gray-500 block">Factures de vente</span>
+            <span class="text-lg font-bold text-gray-900">1</span>
+            <span class="text-xs block text-blue-600 font-semibold mt-1">800 000 CFA</span>
+          </div>
+
+          <div class="bg-gray-50 p-3 rounded-lg border border-gray-200">
+            <span class="text-xs text-gray-500 block">Factures d'avoir</span>
+            <span class="text-lg font-bold text-gray-900">0</span>
+            <span class="text-xs block text-gray-400 mt-1">0 CFA</span>
+          </div>
+
+          <div class="bg-gray-50 p-3 rounded-lg border border-gray-200">
+            <span class="text-xs text-gray-500 block">Reçus de vente</span>
+            <span class="text-lg font-bold text-gray-900">0</span>
+            <span class="text-xs block text-gray-400 mt-1">0 CFA</span>
+          </div>
+
+          <div class="bg-gray-50 p-3 rounded-lg border border-gray-200">
+            <span class="text-xs text-gray-500 block">Proforma</span>
+            <span class="text-lg font-bold text-gray-900">0</span>
+            <span class="text-xs block text-gray-400 mt-1">0 CFA</span>
+          </div>
+
+          <div class="bg-gray-50 p-3 rounded-lg border border-gray-200">
+            <span class="text-xs text-gray-500 block">Bordereaux d'achat</span>
+            <span class="text-lg font-bold text-gray-900">0</span>
+            <span class="text-xs block text-gray-400 mt-1">0 CFA</span>
+          </div>
+        </div>
+
+        <!-- Barre de totaux DGI -->
+        <div class="mt-5 pt-4 border-t border-gray-200 grid grid-cols-2 md:grid-cols-6 gap-4 text-center">
+          <div class="bg-blue-50 p-2 rounded-lg">
+            <span class="text-xs text-blue-700 block">Total HT</span>
+            <strong class="text-sm text-blue-900">800 000 CFA</strong>
+          </div>
+          <div class="bg-blue-50 p-2 rounded-lg">
+            <span class="text-xs text-blue-700 block">Total VAT (TVA)</span>
+            <strong class="text-sm text-blue-900">0 CFA</strong>
+          </div>
+          <div class="bg-blue-50 p-2 rounded-lg">
+            <span class="text-xs text-blue-700 block">Autres Taxes</span>
+            <strong class="text-sm text-blue-900">0 CFA</strong>
+          </div>
+          <div class="bg-blue-50 p-2 rounded-lg">
+            <span class="text-xs text-blue-700 block">Remises</span>
+            <strong class="text-sm text-blue-900">0 CFA</strong>
+          </div>
+          <div class="bg-blue-50 p-2 rounded-lg">
+            <span class="text-xs text-blue-700 block">Timbre Fiscal</span>
+            <strong class="text-sm text-blue-900">0 CFA</strong>
+          </div>
+          <div class="bg-emerald-600 text-white p-2 rounded-lg">
+            <span class="text-xs block opacity-90">Total TTC Certifié</span>
+            <strong class="text-base">800 000 CFA</strong>
+          </div>
+        </div>
+      </div>
+
+      <!-- BLOC 3: ACHATS & SORTIES RÉCEPTIONNÉES -->
+      <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-5">
+        <h2 class="text-base font-bold text-gray-900 mb-4 flex items-center">
+          <i class="fa-solid fa-boxes-packing text-rose-600 mr-2"></i> Factures & Reçus Réceptionnés (Achats DGI)
+        </h2>
+
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div class="p-4 border border-gray-200 rounded-lg flex justify-between items-center">
+            <div>
+              <span class="text-xs text-gray-500 block">Factures/Reçus Réceptionnés</span>
+              <span class="text-xl font-bold text-gray-900">0</span>
+            </div>
+            <i class="fa-solid fa-file-arrow-down text-2xl text-gray-300"></i>
+          </div>
+
+          <div class="p-4 border border-gray-200 rounded-lg flex justify-between items-center">
+            <div>
+              <span class="text-xs text-gray-500 block">Total Achats TTC</span>
+              <span class="text-xl font-bold text-gray-900">0 CFA</span>
+            </div>
+            <i class="fa-solid fa-coins text-2xl text-gray-300"></i>
+          </div>
+
+          <div class="p-4 border border-gray-200 rounded-lg flex justify-between items-center">
+            <div>
+              <span class="text-xs text-gray-500 block">TVA Déductible Estimée</span>
+              <span class="text-xl font-bold text-emerald-600">0 CFA</span>
+            </div>
+            <i class="fa-solid fa-percent text-2xl text-emerald-200"></i>
+          </div>
+        </div>
+      </div>
+
+    </main>
+  </div>
+
+</body>
+</html>
