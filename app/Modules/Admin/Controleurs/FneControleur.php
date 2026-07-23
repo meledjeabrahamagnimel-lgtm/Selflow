@@ -6,43 +6,37 @@ use App\Modules\Admin\Modeles\Achat;
 use App\Modules\Admin\Modeles\Vente;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
 
 /**
- * FneControleur — Stub pour la future intégration DGI/FNE.
+ * FneControleur — Recherche de documents fiscaux ENTRANTS (DGI/FNE).
  *
- * Lot I : Ce contrôleur est un stub (squelette documenté) prévu pour accueillir
- * la logique de recherche et de récupération d'informations fiscales via l'API
- * de la DGI (Direction Générale des Impôts) ou FNE (Fichier National des
- * Entreprises) dès que l'API sera disponible.
+ * Différent de FneService (qui NORMALISE les documents ÉMIS par l'entreprise
+ * — factures de vente, BAPA). Ici, il s'agit de RETROUVER un document déjà
+ * normalisé par un tiers (ex : une facture d'achat reçue d'un fournisseur,
+ * dont on veut vérifier la référence FNE auprès de la DGI).
  *
- * Utilisation prévue :
- * - Saisir une référence FNE dans les formulaires d'achat/vente.
- * - Appeler cette API pour récupérer les informations d'un document fiscal
- *   (fournisseur, montant, TVA, date, articles, etc.).
- * - Pré-remplir automatiquement le formulaire avec ces données.
+ * Connecté le 23/07/2026 au système de clés par entreprise (FneCredential —
+ * voir /PLAN/FNE-gestion-des-cles.md). Reste en mode STUB fonctionnel tant
+ * qu'aucune clé n'est configurée pour l'entreprise : répond alors clairement
+ * que la vérification n'est pas encore possible, sans jamais planter.
  *
- * Pour l'activer quand l'API DGI est disponible :
- * 1. Renseigner FNE_API_URL et FNE_API_KEY dans .env
- * 2. Décommenter les appels réels dans rechercherDocumentFiscal()
- * 3. Mapper le JSON de réponse aux champs Selflow
+ * Pour activer réellement la recherche dès que le format exact de l'API DGI
+ * est confirmé : ajuster l'URL/chemin ci-dessous (actuellement une
+ * supposition raisonnable calquée sur FneService, GET /documents/{ref}) et
+ * le mapping de la réponse JSON.
  */
 class FneControleur
 {
     /**
-     * Recherche un document fiscal par sa référence FNE.
-     *
-     * @param  Request  $request  Doit contenir 'reference_fne' (string)
-     * @return JsonResponse
-     *
-     * STUB : Retourne actuellement des données fictives simulées.
-     * Remplacer le corps par l'appel HTTP réel à l'API DGI/FNE.
+     * Recherche un document fiscal par sa référence FNE, avec la clé
+     * DGI propre à l'entreprise de l'utilisateur connecté.
      *
      * Exemple de requête :
      *   POST /admin/fne/rechercher
      *   { "reference_fne": "FNE-CI-2025-0001234" }
-     *
-     * Exemple de réponse attendue :
-     *   { "succes": true, "document": { "numero": "...", "fournisseur": {...}, ... } }
      */
     public function rechercherDocumentFiscal(Request $request): JsonResponse
     {
@@ -51,46 +45,68 @@ class FneControleur
         ]);
 
         $referenceFne = $request->input('reference_fne');
+        $entreprise = Auth::user()->entreprise;
+        $credential = $entreprise->fneCredential;
 
-        // =========================================================
-        // STUB — À REMPLACER PAR L'APPEL API DGI/FNE RÉEL
-        // =========================================================
-        // Exemple d'implémentation future :
-        //
-        // $apiUrl  = config('services.fne.url', env('FNE_API_URL'));
-        // $apiKey  = config('services.fne.key', env('FNE_API_KEY'));
-        //
-        // $response = Http::withHeaders([
-        //     'Authorization' => 'Bearer ' . $apiKey,
-        //     'Accept'        => 'application/json',
-        // ])->get($apiUrl . '/documents/' . $referenceFne);
-        //
-        // if ($response->failed()) {
-        //     return response()->json([
-        //         'succes'  => false,
-        //         'message' => 'Document FNE introuvable ou API indisponible.',
-        //     ], 404);
-        // }
-        //
-        // $document = $response->json('document');
-        // =========================================================
+        // Pas de clé configurée pour cette entreprise : stub explicite,
+        // jamais d'erreur brute — comportement inchangé par rapport à avant.
+        if (!$credential || !$credential->estConfiguree()) {
+            return response()->json([
+                'succes'  => false,
+                'stub'    => true,
+                'message' => "Aucune clé FNE n'est configurée pour votre entreprise. Contactez votre administrateur Selflow pour activer la vérification DGI. La référence '{$referenceFne}' a bien été enregistrée.",
+                'reference_fne' => $referenceFne,
+            ]);
+        }
 
-        // Réponse stub simulée pour tests et développement
-        return response()->json([
-            'succes'  => false,
-            'stub'    => true,
-            'message' => "L'API DGI/FNE n'est pas encore disponible. La référence '{$referenceFne}' a bien été enregistrée et sera vérifiable dès l'activation de l'API.",
-            'reference_fne' => $referenceFne,
-        ]);
+        $apiKey = $credential->cleActive();
+        $apiUrl = $credential->statut === 'validee'
+            ? config('selflow.fne_api_url_production', 'https://fne.dgi.gouv.ci')
+            : config('selflow.fne_api_url_sandbox', 'https://fne-sandbox.dgi.gouv.ci');
+
+        try {
+            $response = Http::withHeaders([
+                'Authorization' => 'Bearer ' . $apiKey,
+                'Accept'        => 'application/json',
+            ])->timeout(10)->get($apiUrl . '/api/v1/documents/' . $referenceFne);
+
+            if ($response->failed()) {
+                Log::warning("[FNE] Recherche document '{$referenceFne}' échouée pour l'entreprise #{$entreprise->id} : HTTP {$response->status()}");
+
+                return response()->json([
+                    'succes'  => false,
+                    'message' => 'Document FNE introuvable ou API DGI indisponible pour le moment.',
+                    'reference_fne' => $referenceFne,
+                ], 404);
+            }
+
+            return response()->json([
+                'succes'   => true,
+                'document' => $response->json('document') ?? $response->json(),
+                'reference_fne' => $referenceFne,
+            ]);
+        } catch (\Throwable $e) {
+            Log::error("[FNE] Erreur réseau recherche document '{$referenceFne}' entreprise #{$entreprise->id} : " . $e->getMessage());
+
+            return response()->json([
+                'succes'  => false,
+                'message' => "Impossible de joindre le serveur DGI pour le moment. Réessayez plus tard.",
+                'reference_fne' => $referenceFne,
+            ], 503);
+        }
     }
 
     /**
-     * Met à jour la référence FNE d'une facture de vente existante.
-     *
-     * STUB : La validation réelle via l'API DGI sera activée ultérieurement.
+     * Attache une référence FNE à une facture de vente existante.
      */
     public function attacherFneVente(Request $request, Vente $vente): JsonResponse
     {
+        // Sécurité (faille corrigée le 23/07/2026) : la vente référencée par
+        // ID doit appartenir à l'entreprise de l'utilisateur connecté — même
+        // règle que partout ailleurs dans l'application (voir MEMOIRE-SELFLOW,
+        // section 3, "Sécurité multi-tenant (IDOR)").
+        abort_unless($vente->pointDeVente->entreprise_id === Auth::user()->entreprise_id, 403);
+
         $request->validate([
             'numero_fne' => 'required|string|min:5|max:100',
         ]);
@@ -99,19 +115,19 @@ class FneControleur
 
         return response()->json([
             'succes'    => true,
-            'stub'      => true,
-            'message'   => "Référence FNE '{$request->numero_fne}' enregistrée. Validation DGI en attente d'activation de l'API.",
+            'message'   => "Référence FNE '{$request->numero_fne}' enregistrée sur la vente.",
             'numero_fne' => $request->numero_fne,
         ]);
     }
 
     /**
-     * Met à jour la référence FNE d'un achat existant.
-     *
-     * STUB : La validation réelle via l'API DGI sera activée ultérieurement.
+     * Attache une référence FNE à un achat existant.
      */
     public function attacherFneAchat(Request $request, Achat $achat): JsonResponse
     {
+        // Sécurité (faille corrigée le 23/07/2026) : même règle que ci-dessus.
+        abort_unless($achat->pointDeVente->entreprise_id === Auth::user()->entreprise_id, 403);
+
         $request->validate([
             'numero_fne' => 'required|string|min:5|max:100',
         ]);
@@ -120,8 +136,7 @@ class FneControleur
 
         return response()->json([
             'succes'    => true,
-            'stub'      => true,
-            'message'   => "Référence FNE '{$request->numero_fne}' enregistrée sur l'achat. Validation DGI en attente d'activation de l'API.",
+            'message'   => "Référence FNE '{$request->numero_fne}' enregistrée sur l'achat.",
             'numero_fne' => $request->numero_fne,
         ]);
     }
