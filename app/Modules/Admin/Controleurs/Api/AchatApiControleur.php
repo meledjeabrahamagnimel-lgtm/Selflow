@@ -37,6 +37,14 @@ class AchatApiControleur
 
     /**
      * Enregistrer un nouvel achat.
+     *
+     * Réécrit le 22/07/2026 pour aligner ce point d'entrée API sur le
+     * comportement du contrôleur web (AchatControleur) : numérotation
+     * NumerotationService (ACH-jjmmaa-xxx), code journal banque via
+     * CodeJournal (au lieu du modèle Banque, déconnecté de la config web),
+     * écritures comptables via ComptabiliteService (absentes auparavant :
+     * un achat créé par l'API n'était jusqu'ici jamais comptabilisé), et
+     * sécurité multi-entreprise (fournisseur/produit/banque scopés).
      */
     public function enregistrer(Request $request): JsonResponse
     {
@@ -60,15 +68,18 @@ class AchatApiControleur
 
         if ($request->mode_paiement === 'Banque') {
             $request->validate([
-                'banque_id'          => ['required', 'integer', 'exists:banques,id'],
+                'banque_id'          => ['required', 'integer'],
                 'moyen_bancaire'     => ['required', 'string', 'in:carte,virement,cheque'],
                 'reference_paiement' => ['required', 'string', 'max:255'],
             ]);
         }
 
+        // Sécurité : le fournisseur doit appartenir à l'entreprise de l'utilisateur.
+        $fournisseur = Fournisseur::where('entreprise_id', $entreprise->id)->findOrFail($request->fournisseur_id);
+
         $achatData = [];
 
-        DB::transaction(function () use ($request, $pointDeVenteId, &$achatData) {
+        DB::transaction(function () use ($request, $pointDeVenteId, $entreprise, $fournisseur, &$achatData) {
             $montantHt  = 0;
             $montantTva = 0;
 
@@ -80,7 +91,7 @@ class AchatApiControleur
             }
 
             $montantTtc = $montantHt + $montantTva;
-            
+
             $montantPaye = floatval($request->input('montant_paye', 0));
             $statutAchat = 'Crédit';
             if ($montantPaye >= $montantTtc && $montantTtc > 0) {
@@ -89,23 +100,21 @@ class AchatApiControleur
                 $statutAchat = 'Avance';
             }
 
-            // Générer le numéro de facture d'achat
-            $numero = 'AC-' . now()->format('d-m-Y') . '-' . str_pad(
-                Achat::whereYear('created_at', now()->year)->count() + 1,
-                4, '0', STR_PAD_LEFT
-            );
+            // Numéro de document — identique à la convention web (ACH-jjmmaa-xxx)
+            $numero = \App\Modules\Admin\Services\NumerotationService::genererNumeroAchat($entreprise->id, 'Facture');
 
             $modePaiementFinal = $request->mode_paiement ?? 'Espèces';
             if ($request->mode_paiement === 'Banque' && $request->filled('banque_id')) {
-                $banque = Banque::find($request->banque_id);
-                if ($banque) {
-                    $modePaiementFinal = 'Banque : ' . $banque->nom;
+                $codeJournal = \App\Modules\Admin\Modeles\CodeJournal::where('entreprise_id', $entreprise->id)
+                    ->find($request->banque_id);
+                if ($codeJournal) {
+                    $modePaiementFinal = 'Banque : ' . $codeJournal->intitule;
                 }
             }
 
             $achat = Achat::create([
                 'point_de_vente_id' => $pointDeVenteId,
-                'fournisseur_id'    => $request->fournisseur_id,
+                'fournisseur_id'    => $fournisseur->id,
                 'numero_facture'    => $numero,
                 'date_achat'        => $request->date_achat,
                 'mode_paiement'     => $modePaiementFinal,
@@ -115,10 +124,13 @@ class AchatApiControleur
                 'montant_tva'       => $montantTva,
                 'montant_ttc'       => $montantTtc,
                 'statut'            => $statutAchat,
+                'etape'             => 'Facture',
             ]);
 
             foreach ($request->articles as $article) {
-                $produit = !empty($article['produit_id']) ? Produit::lockForUpdate()->find($article['produit_id']) : null;
+                $produit = !empty($article['produit_id'])
+                    ? Produit::where('entreprise_id', $entreprise->id)->lockForUpdate()->find($article['produit_id'])
+                    : null;
                 $ht      = $article['quantite'] * $article['prix_unitaire'];
                 $tva     = $ht * 0.18;
 
@@ -134,6 +146,8 @@ class AchatApiControleur
                 ]);
 
                 // Augmenter le stock + mouvement si produit existe et stockable
+                // (pas de contrôle de disponibilité nécessaire ici : un achat
+                // AUGMENTE le stock, aucun risque de valeur négative).
                 if ($produit && $produit->estStockable()) {
                     $stockAvant = $produit->stockActuel($pointDeVenteId);
                     $produit->incrementStock($pointDeVenteId, $article['quantite']);
@@ -149,6 +163,17 @@ class AchatApiControleur
                     ]);
                 }
             }
+
+            // Écritures comptables — absentes de l'ancienne implémentation API
+            // (un achat créé via l'API n'était jusqu'ici JAMAIS comptabilisé).
+            \App\Modules\Admin\Services\ComptabiliteService::genererEcrituresAchat(
+                $achat,
+                $statutAchat === 'Crédit' ? 0 : $montantPaye,
+                $modePaiementFinal,
+                $request->date_achat,
+                $request->mode_paiement === 'Banque' ? $request->moyen_bancaire : null,
+                $request->mode_paiement === 'Banque' ? $request->reference_paiement : null
+            );
 
             // Enregistrement automatique en décaissement (trésorerie)
             if ($statutAchat !== 'Crédit' && $montantPaye > 0) {

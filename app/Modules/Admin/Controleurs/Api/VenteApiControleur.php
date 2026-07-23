@@ -9,7 +9,6 @@ use App\Modules\Admin\Modeles\Produit;
 use App\Modules\Admin\Modeles\TresorerieJournal;
 use App\Modules\Admin\Modeles\Vente;
 use App\Modules\Admin\Modeles\VenteDetail;
-use App\Modules\Admin\Modeles\Banque;
 use App\Modules\Admin\Modeles\PointDeVente;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -29,7 +28,11 @@ class VenteApiControleur
         $clients = Client::where('entreprise_id', $entreprise->id)->orderBy('nom')->get();
         $produits = Produit::where('entreprise_id', $entreprise->id)->orderBy('nom')->get();
         $categories = $produits->pluck('categorie')->unique()->sort()->values();
-        $banques = Banque::where('entreprise_id', $entreprise->id)->orderBy('nom')->get();
+        // Banques réellement configurées côté web (CodeJournal type='Banque') —
+        // le modèle Banque, séparé, n'est plus utilisé (il n'était jamais
+        // alimenté par la configuration faite depuis l'interface web).
+        $banques = \App\Modules\Admin\Modeles\CodeJournal::where('entreprise_id', $entreprise->id)
+            ->where('type', 'Banque')->orderBy('intitule')->get();
 
         return response()->json([
             'statut' => 'succes',
@@ -45,6 +48,13 @@ class VenteApiControleur
 
     /**
      * Enregistrer une nouvelle vente.
+     *
+     * Réécrit le 22/07/2026 pour aligner ce point d'entrée API sur le
+     * comportement du contrôleur web (VenteControleur) : même numérotation
+     * (NumerotationService), même architecture de stock (table Stock par
+     * point de vente, plus de colonne stock_actuel directe sur Produit),
+     * mêmes écritures comptables (ComptabiliteService), et mêmes contrôles
+     * de sécurité multi-entreprise (Produit/Banque/document parent scopés).
      */
     public function enregistrer(Request $request): JsonResponse
     {
@@ -67,7 +77,7 @@ class VenteApiControleur
 
         if ($request->mode_paiement === 'Banque') {
             $request->validate([
-                'banque_id'          => ['required', 'integer', 'exists:banques,id'],
+                'banque_id'          => ['required', 'integer'],
                 'moyen_bancaire'     => ['required', 'string', 'in:carte,virement,cheque'],
                 'reference_paiement' => ['required', 'string', 'max:255'],
             ]);
@@ -82,17 +92,48 @@ class VenteApiControleur
             ]);
         }
 
+        $typeDocument = $request->input('type_document', 'Facture');
+
+        // Correspondance avec les étapes du contrôleur web, pour une
+        // numérotation IDENTIQUE quelle que soit l'origine (web ou API) :
+        //   Devis -> DV-dd-mm-yyyy-xxxx | Commande -> BC-dd-mm-yyyy-xxxx
+        //   Facture -> VTE-jjmmaa-xxx (nouvelle convention datée)
+        $etape = match ($typeDocument) {
+            'Devis'    => 'Devis',
+            'Commande' => 'Bon de commande',
+            default    => 'Facture',
+        };
+
+        // Vérification de disponibilité AVANT toute écriture en base — voir
+        // VenteControleur::store() pour la même règle : uniquement pour une
+        // Facture (décrémentation immédiate), pas pour un Devis/BC.
+        if ($etape === 'Facture') {
+            foreach ($request->articles as $article) {
+                if (empty($article['produit_id'])) continue;
+                $produit = Produit::where('entreprise_id', $entreprise->id)->find($article['produit_id']);
+                if (!$produit || !$produit->estStockable()) continue;
+
+                $stockDisponible = $produit->stockActuel($pointDeVenteId);
+                if ($stockDisponible < $article['quantite']) {
+                    return response()->json([
+                        'statut'  => 'erreur',
+                        'message' => "Stock insuffisant pour « {$produit->nom} » : disponible {$stockDisponible}, demandé {$article['quantite']}.",
+                    ], 422);
+                }
+            }
+        }
+
         $venteData = [];
 
-        DB::transaction(function () use ($request, $pointDeVenteId, &$venteData) {
+        DB::transaction(function () use ($request, $pointDeVenteId, $entreprise, $etape, $typeDocument, &$venteData) {
             $montantHt  = 0;
             $tvaActive = $request->boolean('tva_active', false);
             $remise = floatval($request->input('remise', 0));
 
-            // Précalcul des montants
+            // Précalcul des montants — produit scopé à l'entreprise (sécurité)
             foreach ($request->articles as $article) {
                 if (!empty($article['produit_id'])) {
-                    $produit = Produit::findOrFail($article['produit_id']);
+                    $produit = Produit::where('entreprise_id', $entreprise->id)->findOrFail($article['produit_id']);
                     $prix = $produit->prix_vente;
                 } else {
                     $prix = floatval($article['prix_unitaire'] ?? 0);
@@ -106,41 +147,25 @@ class VenteApiControleur
             $montantTva = $tvaActive ? ($montantHtNet * 0.18) : 0;
             $montantTtc = $montantHtNet + $montantTva;
 
-            // Mode de paiement
+            // Mode de paiement — code journal banque scopé à l'entreprise
+            // (CodeJournal, comme sur le web ; le modèle Banque, séparé et
+            // non alimenté par la configuration web, n'est plus utilisé ici).
             $modePaiementFinal = $request->mode_paiement;
             if ($request->mode_paiement === 'Banque' && $request->filled('banque_id')) {
-                $banque = Banque::findOrFail($request->banque_id);
-                $modePaiementFinal = 'Banque : ' . $banque->nom;
+                $codeJournal = \App\Modules\Admin\Modeles\CodeJournal::where('entreprise_id', $entreprise->id)
+                    ->findOrFail($request->banque_id);
+                $modePaiementFinal = 'Banque : ' . $codeJournal->intitule;
             }
 
-            // Génération numéro facture
-            $numero = 'VT-' . now()->format('d-m-Y') . '-' . str_pad(
-                Vente::whereYear('created_at', now()->year)->count() + 1,
-                4, '0', STR_PAD_LEFT
-            );
+            // Numéro de document — identique à la convention web (NumerotationService)
+            $numero = \App\Modules\Admin\Services\NumerotationService::genererNumeroVente($entreprise->id, $etape);
 
-            $typeDocument = $request->input('type_document', 'Facture');
-
-            // Génération numéro facture et calcul du statut
             $montantPaye = 0;
-            if ($typeDocument === 'Devis') {
-                $numero = 'DEV-' . now()->year . '-' . str_pad(
-                    Vente::where('numero_facture', 'LIKE', 'DEV-%')->whereYear('created_at', now()->year)->count() + 1,
-                    4, '0', STR_PAD_LEFT
-                );
+            if ($etape === 'Devis') {
                 $statutVente = 'Brouillon';
-            } elseif ($typeDocument === 'Commande') {
-                $numero = 'CMD-' . now()->year . '-' . str_pad(
-                    Vente::where('numero_facture', 'LIKE', 'CMD-%')->whereYear('created_at', now()->year)->count() + 1,
-                    4, '0', STR_PAD_LEFT
-                );
+            } elseif ($etape === 'Bon de commande') {
                 $statutVente = 'Confirmée';
             } else {
-                $numero = 'VT-' . now()->year . '-' . str_pad(
-                    Vente::where('numero_facture', 'LIKE', 'VT-%')->whereYear('created_at', now()->year)->count() + 1,
-                    4, '0', STR_PAD_LEFT
-                );
-
                 if ($request->mode_paiement === 'Crédit') {
                     $statutVente = 'Crédit';
                 } else {
@@ -170,17 +195,22 @@ class VenteApiControleur
                 'montant_ttc'       => $montantTtc,
                 'statut'            => $statutVente,
                 'type_facture'      => $typeDocument,
+                'etape'             => $etape,
             ]);
 
             // Mettre à jour le document parent si existant (ex: Devis -> Facture)
+            // — scopé à l'entreprise (sécurité : évite de modifier le
+            // document d'une autre entreprise via un identifiant deviné).
             if ($request->filled('reference_parent_id')) {
-                Vente::where('numero_facture', $request->reference_parent_id)
+                Vente::whereHas('pointDeVente', fn($q) => $q->where('entreprise_id', $entreprise->id))
+                    ->where('numero_facture', $request->reference_parent_id)
                     ->update(['statut' => $typeDocument === 'Facture' ? 'Facturé' : 'Converti']);
             }
 
             foreach ($request->articles as $article) {
                 if (!empty($article['produit_id'])) {
-                    $produit = Produit::lockForUpdate()->findOrFail($article['produit_id']);
+                    $produit = Produit::where('entreprise_id', $entreprise->id)
+                        ->lockForUpdate()->findOrFail($article['produit_id']);
                     $prix = $produit->prix_vente;
                     $nomElement = $produit->nom;
                 } else {
@@ -192,7 +222,7 @@ class VenteApiControleur
                 $ht = $article['quantite'] * $prix;
                 $tva = $tvaActive ? ($ht * 0.18) : 0;
 
-                VenteDetail::create([
+                $detail = VenteDetail::create([
                     'vente_id'        => $vente->id,
                     'produit_id'      => $produit ? $produit->id : null,
                     'libelle_virtuel' => $produit ? null : $nomElement,
@@ -203,9 +233,21 @@ class VenteApiControleur
                     'montant_ttc'     => $ht + $tva,
                 ]);
 
-                if ($typeDocument === 'Facture' && $produit) {
-                    $stockAvant = $produit->stock_actuel;
-                    $produit->decrement('stock_actuel', $article['quantite']);
+                if ($etape === 'Facture' && $produit && $produit->estStockable()) {
+                    $stockAvant = $produit->stockActuel($pointDeVenteId);
+
+                    if ($stockAvant < $article['quantite']) {
+                        throw new \InvalidArgumentException(
+                            "Stock insuffisant pour « {$produit->nom} » (Disponible: {$stockAvant}, Demandé: {$article['quantite']})."
+                        );
+                    }
+
+                    // Table Stock (par point de vente), comme sur le web —
+                    // remplace l'ancien decrement('stock_actuel', ...) qui
+                    // touchait une colonne directement sur Produit, invisible
+                    // du reste de l'application (StockControleur, etc.).
+                    $produit->decrementStock($pointDeVenteId, $article['quantite']);
+                    $detail->update(['quantite_livree' => $article['quantite']]);
 
                     MouvementStock::create([
                         'produit_id'         => $produit->id,
@@ -219,14 +261,27 @@ class VenteApiControleur
                 }
             }
 
-            // Normalisation FNE DGI-CI en arrière-plan (Section 18.5)
-            if ($typeDocument === 'Facture') {
+            // Écritures comptables — absentes de l'ancienne implémentation API
+            // (une vente créée via l'API n'était jusqu'ici JAMAIS comptabilisée).
+            if ($etape === 'Facture') {
+                \App\Modules\Admin\Services\ComptabiliteService::genererEcrituresVente(
+                    $vente,
+                    $statutVente === 'Crédit' ? 0 : $montantPaye,
+                    $modePaiementFinal,
+                    now()->toDateString(),
+                    $request->mode_paiement === 'Banque' ? $request->moyen_bancaire : null,
+                    $request->mode_paiement === 'Banque' ? $request->reference_paiement : null
+                );
+            }
+
+            // Normalisation FNE DGI-CI en arrière-plan
+            if ($etape === 'Facture') {
                 $estRne = empty($request->client_id) || ($request->client_id == 'divers');
                 NormaliserFactureFne::dispatch($vente, $estRne);
             }
 
             // Trésorerie
-            if ($typeDocument === 'Facture' && $statutVente !== 'Crédit' && $montantPaye > 0) {
+            if ($etape === 'Facture' && $statutVente !== 'Crédit' && $montantPaye > 0) {
                 $soldeActuel = TresorerieJournal::where('point_de_vente_id', $pointDeVenteId)
                     ->orderByDesc('created_at')->value('solde_resultat') ?? 0;
 
@@ -274,7 +329,10 @@ class VenteApiControleur
         $entreprise = Auth::user()->entreprise;
         $ventes = Vente::with(['client', 'pointDeVente.entreprise', 'details.produit'])
             ->whereHas('pointDeVente', fn($q) => $q->where('entreprise_id', $entreprise->id))
-            ->where('numero_facture', 'LIKE', 'VT-%')
+            ->where(function($q) {
+                $q->where('numero_facture', 'LIKE', 'VT-%')
+                  ->orWhere('numero_facture', 'LIKE', 'VTE-%');
+            })
             ->latest()
             ->paginate(20);
 
@@ -292,7 +350,12 @@ class VenteApiControleur
         $entreprise = Auth::user()->entreprise;
         $ventes = Vente::with(['client', 'pointDeVente.entreprise', 'details.produit'])
             ->whereHas('pointDeVente', fn($q) => $q->where('entreprise_id', $entreprise->id))
-            ->where('numero_facture', 'LIKE', 'DEV-%')
+            ->where(function($q) {
+                // 'DEV-' : ancien préfixe (avant alignement du 22/07/2026)
+                // 'DV-'  : préfixe réel généré par NumerotationService (web et API)
+                $q->where('numero_facture', 'LIKE', 'DEV-%')
+                  ->orWhere('numero_facture', 'LIKE', 'DV-%');
+            })
             ->latest()
             ->paginate(20);
 
@@ -310,7 +373,12 @@ class VenteApiControleur
         $entreprise = Auth::user()->entreprise;
         $ventes = Vente::with(['client', 'pointDeVente.entreprise', 'details.produit'])
             ->whereHas('pointDeVente', fn($q) => $q->where('entreprise_id', $entreprise->id))
-            ->where('numero_facture', 'LIKE', 'CMD-%')
+            ->where(function($q) {
+                // 'CMD-' : ancien préfixe (avant alignement du 22/07/2026)
+                // 'BC-'  : préfixe réel généré par NumerotationService (Bon de commande)
+                $q->where('numero_facture', 'LIKE', 'CMD-%')
+                  ->orWhere('numero_facture', 'LIKE', 'BC-%');
+            })
             ->latest()
             ->paginate(20);
 
