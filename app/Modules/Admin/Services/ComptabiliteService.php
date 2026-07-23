@@ -784,6 +784,8 @@ class ComptabiliteService
                                     && is_numeric($numOriginal)
                                     && (int)$numOriginal > 0;
 
+                    $compteGen = $t['compte_general'] ?? $t['compte_numero'] ?? null;
+
                     if ($isClient) {
                         if ($isSelflowLinked) {
                             // Ce client vient de Selflow → mettre à jour son numéro COMPTAFLOW
@@ -792,8 +794,9 @@ class ComptabiliteService
                                 ->where('entreprise_id', $entreprise->id)
                                 ->whereIn('source', ['local', null])
                                 ->update([
-                                    'numero_tiers'    => $numTiers,
-                                    'numero_original' => $numOriginal,
+                                    'numero_tiers'     => $numTiers,
+                                    'numero_original'  => $numOriginal,
+                                    'compte_comptable' => $compteGen ?: config('selflow.plan_comptable_defaut.client_collectif'),
                                 ]);
                         } else {
                             // Tiers COMPTAFLOW natif (historique importé, etc.)
@@ -805,7 +808,7 @@ class ComptabiliteService
                                 [
                                     'nom'              => ucwords(strtolower($intitule)),
                                     'source'           => 'comptaflow',
-                                    'compte_comptable' => config('selflow.plan_comptable_defaut.client_collectif'),
+                                    'compte_comptable' => $compteGen ?: config('selflow.plan_comptable_defaut.client_collectif'),
                                     'numero_original'  => $numOriginal,
                                 ]
                             );
@@ -818,8 +821,9 @@ class ComptabiliteService
                                 ->where('entreprise_id', $entreprise->id)
                                 ->whereIn('source', ['local', null])
                                 ->update([
-                                    'numero_tiers'    => $numTiers,
-                                    'numero_original' => $numOriginal,
+                                    'numero_tiers'     => $numTiers,
+                                    'numero_original'  => $numOriginal,
+                                    'compte_comptable' => $compteGen ?: config('selflow.plan_comptable_defaut.fournisseur_collectif'),
                                 ]);
                         } else {
                             \App\Modules\Admin\Modeles\Fournisseur::updateOrCreate(
@@ -830,7 +834,7 @@ class ComptabiliteService
                                 [
                                     'nom'              => ucwords(strtolower($intitule)),
                                     'source'           => 'comptaflow',
-                                    'compte_comptable' => config('selflow.plan_comptable_defaut.fournisseur_collectif'),
+                                    'compte_comptable' => $compteGen ?: config('selflow.plan_comptable_defaut.fournisseur_collectif'),
                                     'numero_original'  => $numOriginal,
                                 ]
                             );
