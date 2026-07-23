@@ -244,68 +244,88 @@ class ExternalSyncControleur
             return response()->json(['success' => false, 'message' => 'Accès non autorisé.'], 401);
         }
 
-        $entrepriseId = $request->input('selflow_company_id');
+        $entrepriseId   = $request->input('selflow_company_id');
         $numeroOriginal = $request->input('numero_original');
-        $intitule = trim($request->input('intitule', ''));
-        $type = strtolower($request->input('type', ''));
+        $numeroTiers    = $request->input('numero_de_tiers');
+        $intitule       = trim($request->input('intitule', ''));
+        $type           = strtolower($request->input('type', ''));
 
         $tierData = null;
+        $isFournisseurPref = str_contains($type, 'fourn') || str_starts_with(strtolower($numeroTiers), '40');
 
-        if (str_contains($type, 'fourn') || str_starts_with($type, '40')) {
-            // Chercher fournisseur
-            $fournisseur = null;
+        // 1. Recherche Fournisseur
+        $fournisseur = null;
+        if ($isFournisseurPref || !$type) {
             if ($numeroOriginal) {
                 $fournisseur = \App\Modules\Admin\Modeles\Fournisseur::where('entreprise_id', $entrepriseId)->find($numeroOriginal);
             }
+            if (!$fournisseur && $numeroTiers) {
+                $fournisseur = \App\Modules\Admin\Modeles\Fournisseur::where('entreprise_id', $entrepriseId)
+                    ->where(function($q) use ($numeroTiers) {
+                        $q->where('numero_tiers', $numeroTiers)->orWhere('numero_original', $numeroTiers);
+                    })->first();
+            }
             if (!$fournisseur && $intitule) {
-                $fournisseur = \App\Modules\Admin\Modeles\Fournisseur::where('entreprise_id', $entrepriseId)->where('nom', 'LIKE', "%{$intitule}%")->first();
+                $fournisseur = \App\Modules\Admin\Modeles\Fournisseur::where('entreprise_id', $entrepriseId)
+                    ->where('nom', 'LIKE', "%{$intitule}%")
+                    ->first();
             }
+        }
 
-            if ($fournisseur) {
-                $achatsCount = \App\Modules\Admin\Modeles\Achat::whereHas('pointDeVente', fn($q) => $q->where('entreprise_id', $entrepriseId))
-                    ->where('fournisseur_id', $fournisseur->id)->count();
-
-                $tierData = [
-                    'type'             => 'Fournisseur',
-                    'nom'              => $fournisseur->nom,
-                    'ncc'              => $fournisseur->ncc ?? '—',
-                    'rccm'             => $fournisseur->rccm ?? '—',
-                    'regime'           => $fournisseur->regime_imposition ?? '—',
-                    'telephone'        => $fournisseur->telephone ?? '—',
-                    'email'            => $fournisseur->email ?? '—',
-                    'adresse'          => $fournisseur->adresse ?? '—',
-                    'secteur_activite' => $fournisseur->secteur_activite ?? '—',
-                    'nombre_achats'    => $achatsCount,
-                    'created_at'       => $fournisseur->created_at ? $fournisseur->created_at->format('d/m/Y') : '—',
-                ];
-            }
-        } else {
-            // Chercher client
-            $client = null;
+        // 2. Recherche Client (si pas trouvé en Fournisseur)
+        $client = null;
+        if (!$fournisseur) {
             if ($numeroOriginal) {
                 $client = \App\Modules\Admin\Modeles\Client::where('entreprise_id', $entrepriseId)->find($numeroOriginal);
             }
+            if (!$client && $numeroTiers) {
+                $client = \App\Modules\Admin\Modeles\Client::where('entreprise_id', $entrepriseId)
+                    ->where(function($q) use ($numeroTiers) {
+                        $q->where('numero_tiers', $numeroTiers)->orWhere('numero_original', $numeroTiers);
+                    })->first();
+            }
             if (!$client && $intitule) {
-                $client = \App\Modules\Admin\Modeles\Client::where('entreprise_id', $entrepriseId)->where('nom', 'LIKE', "%{$intitule}%")->first();
+                $client = \App\Modules\Admin\Modeles\Client::where('entreprise_id', $entrepriseId)
+                    ->where('nom', 'LIKE', "%{$intitule}%")
+                    ->first();
             }
+        }
 
-            if ($client) {
-                $achatsCount = \App\Modules\Admin\Modeles\Vente::whereHas('pointDeVente', fn($q) => $q->where('entreprise_id', $entrepriseId))
-                    ->where('client_id', $client->id)->count();
+        if ($fournisseur) {
+            $achatsCount = \App\Modules\Admin\Modeles\Achat::whereHas('pointDeVente', fn($q) => $q->where('entreprise_id', $entrepriseId))
+                ->where('fournisseur_id', $fournisseur->id)->count();
 
-                $tierData = [
-                    'type'          => 'Client',
-                    'nom'           => $client->nom,
-                    'ncc'           => $client->ncc ?? '—',
-                    'rccm'          => $client->rccm ?? '—',
-                    'regime'        => $client->regime_imposition ?? '—',
-                    'telephone'     => $client->telephone ?? '—',
-                    'email'         => $client->email ?? '—',
-                    'adresse'       => $client->adresse ?? '—',
-                    'nombre_achats' => $achatsCount,
-                    'created_at'    => $client->created_at ? $client->created_at->format('d/m/Y') : '—',
-                ];
-            }
+            $tierData = [
+                'type'                => 'Fournisseur',
+                'nom'                 => $fournisseur->nom,
+                'ncc'                 => $fournisseur->ncc ?? '—',
+                'rccm'                => $fournisseur->rccm ?? '—',
+                'compte_contribuable' => $fournisseur->compte_comptable ?? '—',
+                'regime'              => $fournisseur->regime_imposition ?? '—',
+                'telephone'           => $fournisseur->telephone ?? '—',
+                'email'               => $fournisseur->email ?? '—',
+                'adresse'             => $fournisseur->adresse ?? '—',
+                'secteur_activite'    => $fournisseur->secteur ?? '—',
+                'nombre_achats'       => $achatsCount,
+                'created_at'          => $fournisseur->created_at ? $fournisseur->created_at->format('d/m/Y') : '—',
+            ];
+        } elseif ($client) {
+            $ventesCount = \App\Modules\Admin\Modeles\Vente::whereHas('pointDeVente', fn($q) => $q->where('entreprise_id', $entrepriseId))
+                ->where('client_id', $client->id)->count();
+
+            $tierData = [
+                'type'                => 'Client',
+                'nom'                 => $client->nom,
+                'ncc'                 => $client->ncc ?? '—',
+                'rccm'                => $client->rccm ?? '—',
+                'compte_contribuable' => $client->compte_comptable ?? '—',
+                'regime'              => $client->regime_imposition ?? '—',
+                'telephone'           => $client->telephone ?? '—',
+                'email'               => $client->email ?? '—',
+                'adresse'             => $client->adresse ?? '—',
+                'nombre_achats'       => $ventesCount,
+                'created_at'          => $client->created_at ? $client->created_at->format('d/m/Y') : '—',
+            ];
         }
 
         return response()->json([
