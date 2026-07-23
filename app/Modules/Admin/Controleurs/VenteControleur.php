@@ -428,7 +428,12 @@ class VenteControleur
             $facturesDispoQuery = Vente::with('client')
                 ->whereHas('pointDeVente', fn($queryPdv) => $queryPdv->where('entreprise_id', $entreprise->id))
                 ->where('etape', 'Facture')
-                ->where('numero_facture', 'LIKE', 'VT-%')
+                ->where(function($queryNum) {
+                    // Accepte l'ancien préfixe (VT-) ET le nouveau (VTE-,
+                    // depuis le changement de convention de numérotation).
+                    $queryNum->where('numero_facture', 'LIKE', 'VT-%')
+                             ->orWhere('numero_facture', 'LIKE', 'VTE-%');
+                })
                 ->where(function($queryType) {
                     $queryType->whereNull('type_facture')->orWhere('type_facture', '!=', 'avoir');
                 })
@@ -852,7 +857,9 @@ class VenteControleur
         $avoirId = null;
 
         DB::transaction(function () use ($vente, $request, &$avoirId) {
-            $numAvoir = 'AV-' . $vente->numero_facture;
+            $numAvoir = \App\Modules\Admin\Services\NumerotationService::genererNumeroVente(
+                $vente->pointDeVente->entreprise_id, 'Facture', 'avoir'
+            );
 
             // 1. Création de la facture d'avoir
             $avoir = Vente::create([
@@ -1093,7 +1100,10 @@ class VenteControleur
         $query = Vente::with('client')
             ->whereHas('pointDeVente', fn($queryPdv) => $queryPdv->where('entreprise_id', $entreprise->id))
             ->where('etape', 'Facture')
-            ->where('numero_facture', 'LIKE', 'VT-%')
+            ->where(function($queryNum) {
+                $queryNum->where('numero_facture', 'LIKE', 'VT-%')
+                         ->orWhere('numero_facture', 'LIKE', 'VTE-%');
+            })
             ->where(function($queryType) {
                 $queryType->whereNull('type_facture')->orWhere('type_facture', '!=', 'avoir');
             })
@@ -1159,7 +1169,9 @@ class VenteControleur
         $avoirId = null;
 
         DB::transaction(function () use ($parent, $request, &$avoirId) {
-            $numAvoir = 'AV-' . $parent->numero_facture;
+            $numAvoir = \App\Modules\Admin\Services\NumerotationService::genererNumeroVente(
+                $parent->pointDeVente->entreprise_id, 'Facture', 'avoir'
+            );
 
             // 1. Création de la facture d'avoir
             $avoir = Vente::create([

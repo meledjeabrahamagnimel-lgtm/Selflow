@@ -201,6 +201,16 @@ class MigrerEcrituresHistoriques extends Command
         if (str_starts_with($refDoc, 'AVO-ACH-')) {
             return 'AvoirAchat';
         }
+        if (str_starts_with($refDoc, 'AV-')) {
+            // Ancien préfixe générique d'avoir (avant le 22/07/2026), utilisé
+            // aussi bien côté vente qu'achat — on distingue via la présence
+            // du compte client (411) vs fournisseur (401) dans les lignes.
+            $aUnCompte411 = $lignes->contains(function ($l) {
+                $c = $l->compte_debit ?? $l->compte_credit ?? '';
+                return str_starts_with($c, '411');
+            });
+            return $aUnCompte411 ? 'AvoirVente' : 'AvoirAchat';
+        }
         if (str_starts_with($refDoc, 'VTE-') || str_starts_with($refDoc, 'VT-') || str_starts_with($refDoc, 'BC-') || str_starts_with($refDoc, 'DV-')) {
             return $aUnCompteClientOuFournisseur ? 'FactureVente' : 'ReglementVente';
         }

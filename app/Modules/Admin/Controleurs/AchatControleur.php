@@ -289,7 +289,11 @@ class AchatControleur
                 ->whereHas('pointDeVente', fn($queryPdv) => $queryPdv->where('entreprise_id', $entreprise->id))
                 ->where('etape', 'Facture')
                 ->where(function($queryNum) {
+                    // Accepte l'ancien préfixe (AC-, avant le 22/07/2026) ET le
+                    // nouveau (ACH-, depuis le changement de convention de
+                    // numérotation), pour ne pas exclure les factures récentes.
                     $queryNum->where('numero_facture', 'LIKE', 'AC-%')
+                             ->orWhere('numero_facture', 'LIKE', 'ACH-%')
                              ->orWhere('numero_facture', 'LIKE', 'BA-%');
                 })
                 ->where(function($queryType) {
@@ -435,7 +439,9 @@ class AchatControleur
         $avoirId = null;
 
         DB::transaction(function () use ($achat, $request, &$avoirId) {
-            $numAvoir = 'AV-' . $achat->numero_facture;
+            $numAvoir = \App\Modules\Admin\Services\NumerotationService::genererNumeroAchat(
+                $achat->pointDeVente->entreprise_id, 'Facture', 'avoir'
+            );
 
             // 1. Création de la facture d'avoir d'achat
             $avoir = Achat::create([
@@ -528,6 +534,8 @@ class AchatControleur
      */
     public function normaliser(Achat $achat): RedirectResponse
     {
+        $this->autoriserAcces($achat);
+
         if ($achat->normalise) {
             return back()->with('info', 'Cet achat est déjà normalisé.');
         }
@@ -553,6 +561,7 @@ class AchatControleur
             ->where('etape', 'Facture')
             ->where(function($queryNum) {
                 $queryNum->where('numero_facture', 'LIKE', 'AC-%')
+                         ->orWhere('numero_facture', 'LIKE', 'ACH-%')
                          ->orWhere('numero_facture', 'LIKE', 'BA-%');
             })
             ->where(function($queryType) {
@@ -620,7 +629,9 @@ class AchatControleur
         $avoirId = null;
 
         DB::transaction(function () use ($parent, $request, &$avoirId) {
-            $numAvoir = 'AV-' . $parent->numero_facture;
+            $numAvoir = \App\Modules\Admin\Services\NumerotationService::genererNumeroAchat(
+                $parent->pointDeVente->entreprise_id, 'Facture', 'avoir'
+            );
 
             // 1. Création de la facture d'avoir d'achat
             $avoir = Achat::create([
