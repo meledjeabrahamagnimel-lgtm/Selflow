@@ -129,6 +129,16 @@ Route::prefix('admin')
             Route::post('/ecritures/manuelle', [\App\Modules\Admin\Controleurs\ComptabiliteControleur::class, 'creerEcritureManuelle'])->name('ecriture_manuelle');
         });
 
+        // ── Module Fiscalité & DGI (Gestion FNE) ──
+        Route::prefix('fne')->name('fne.')->middleware('modules:comptabilite')->group(function () {
+            Route::get('/gestion',        [\App\Modules\Admin\Controleurs\FneDashboardControleur::class, 'gestion'])->name('gestion');
+            Route::get('/gestion/donnees',[\App\Modules\Admin\Controleurs\FneDashboardControleur::class, 'gestionJson'])->name('gestion.donnees');
+            Route::get('/situation',        [\App\Modules\Admin\Controleurs\FneDashboardControleur::class, 'situation'])->name('situation');
+            Route::get('/situation/donnees',[\App\Modules\Admin\Controleurs\FneDashboardControleur::class, 'situationJson'])->name('situation.donnees');
+            Route::get('/factures',        [\App\Modules\Admin\Controleurs\FneDashboardControleur::class, 'factures'])->name('factures');
+            Route::get('/factures/donnees',[\App\Modules\Admin\Controleurs\FneDashboardControleur::class, 'facturesJson'])->name('factures.donnees');
+        });
+
         // ── Points de vente ──
         Route::prefix('points-de-vente')->name('pdv.')->group(function () {
             Route::get('/',                     [PointDeVenteControleur::class, 'index'])->name('index');

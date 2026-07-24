@@ -29,6 +29,7 @@ class Vente extends Model
         'type_facture',
         'normalise',
         'qr_code_data',
+        'fichier_fne_pdf_url',
         'signature_dgi',
         'etape',
         'archived',

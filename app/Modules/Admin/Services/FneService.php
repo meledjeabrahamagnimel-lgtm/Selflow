@@ -84,6 +84,9 @@ class FneService
                         'numero_recu'    => $data['numero_fne'] ?? self::genererNumeroLocal($nccEmetteur, $vente->id, $estRne),
                         'signature'      => $data['signature_dgi'] ?? self::calculerSignatureLocale($vente),
                         'qr_code_data'   => $data['qr_code_url'] ?? self::genererQrCodeUrl($vente, $estRne),
+                        // Nom de champ non confirmé avec la DGI — plusieurs alias tentés
+                        // par prudence (voir /PLAN/FNE-gestion-des-cles.md, section 1).
+                        'pdf_url'        => $data['document_url'] ?? $data['pdf_url'] ?? $data['fichier_pdf'] ?? null,
                     ];
                 }
 
@@ -104,6 +107,8 @@ class FneService
             'numero_recu'  => $numFne,
             'signature'    => $signature,
             'qr_code_data' => $qrCode,
+            // Pas de PDF officiel DGI en mode simulation locale (pas d'appel API réel).
+            'pdf_url'      => null,
         ];
     }
 
@@ -207,6 +212,7 @@ class FneService
                         'numero_recu'  => $data['numero_fne'] ?? self::genererNumeroLocalBapa($nccAcheteur, $achat->id),
                         'signature'    => $data['signature_dgi'] ?? self::calculerSignatureLocaleBapa($achat),
                         'qr_code_data' => $data['qr_code_url'] ?? self::genererQrCodeUrlBapaLocal(self::genererNumeroLocalBapa($nccAcheteur, $achat->id), self::calculerSignatureLocaleBapa($achat), $achat->montant_ttc),
+                        'pdf_url'      => $data['document_url'] ?? $data['pdf_url'] ?? $data['fichier_pdf'] ?? null,
                     ];
                 }
 
@@ -226,6 +232,7 @@ class FneService
             'numero_recu'  => $numFne,
             'signature'    => $signature,
             'qr_code_data' => $qrCode,
+            'pdf_url'      => null,
         ];
     }
 

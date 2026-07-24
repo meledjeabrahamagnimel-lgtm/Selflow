@@ -29,6 +29,7 @@ class Achat extends Model
         'numero_fne',
         'signature_dgi',
         'qr_code_data',
+        'fichier_fne_pdf_url',
         'type_facture',
         'archived',
         'parent_id',

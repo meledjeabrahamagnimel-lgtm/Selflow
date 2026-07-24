@@ -59,6 +59,7 @@ class NormaliserAchatBapaJob implements ShouldQueue
                         'numero_fne'    => $fneResult['numero_recu'],
                         'signature_dgi' => $fneResult['signature'] ?? null,
                         'qr_code_data'  => $fneResult['qr_code_data'],
+                        'fichier_fne_pdf_url' => $fneResult['pdf_url'] ?? null,
                     ]);
 
                     Log::info("NormaliserAchatBapaJob: Normalisation BAPA réussie - Achat #{$achat->id} → FNE: {$fneResult['numero_recu']}");

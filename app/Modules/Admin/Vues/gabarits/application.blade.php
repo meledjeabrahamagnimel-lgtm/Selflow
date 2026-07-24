@@ -675,6 +675,20 @@
             @endif
             @endif
 
+            <!-- Fiscalité & DGI (Module FNE) -->
+            @if(in_array('comptabilite', $modulesActifs))
+            <div class="nav-section"><span>Fiscalité &amp; DGI</span></div>
+            <a href="{{ route('admin.fne.gestion') }}" class="nav-item {{ request()->routeIs('admin.fne.gestion') ? 'active' : '' }}">
+                <i class="fas fa-calculator"></i> Gestion FNE
+            </a>
+            <a href="{{ route('admin.fne.situation') }}" class="nav-item {{ request()->routeIs('admin.fne.situation') ? 'active' : '' }}">
+                <i class="fas fa-chart-line"></i> Situation Générale
+            </a>
+            <a href="{{ route('admin.fne.factures') }}" class="nav-item {{ request()->routeIs('admin.fne.factures') ? 'active' : '' }}">
+                <i class="fas fa-receipt"></i> Factures &amp; Reçus émis/reçus
+            </a>
+            @endif
+
             <!-- 6. Points de vente (Inclus Personnel & Habilitations) -->
             @if(in_array('points_de_vente', $modulesActifs) && (auth()->user()->aHabilitation('gestion_pdv') || auth()->user()->aHabilitation('gestion_personnel') || auth()->user()->aHabilitation('gestion_habilitations')))
             <div class="nav-section"><span>Points de vente</span></div>
