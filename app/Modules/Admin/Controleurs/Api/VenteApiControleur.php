@@ -289,7 +289,7 @@ class VenteApiControleur
                     'point_de_vente_id'  => $pointDeVenteId,
                     'date_operation'     => now()->toDateString(),
                     'type_operation'     => 'Encaissement',
-                    'libelle'            => 'Vente — Facture ' . $numero,
+                    'libelle'            => \App\Modules\Admin\Services\ComptabiliteService::libelleTresorerieVente($vente),
                     'mode_paiement'      => $modePaiementFinal,
                     'moyen_bancaire'     => $request->mode_paiement === 'Banque' ? $request->moyen_bancaire : null,
                     'reference_paiement' => $request->mode_paiement === 'Banque' ? $request->reference_paiement : null,

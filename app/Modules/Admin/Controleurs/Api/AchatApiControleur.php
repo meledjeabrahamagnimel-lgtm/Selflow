@@ -184,7 +184,7 @@ class AchatApiControleur
                     'point_de_vente_id'  => $pointDeVenteId,
                     'date_operation'     => $request->date_achat,
                     'type_operation'     => 'Décaissement',
-                    'libelle'            => 'Achat — Facture ' . $numero,
+                    'libelle'            => \App\Modules\Admin\Services\ComptabiliteService::libelleTresorerieAchat($achat),
                     'mode_paiement'      => $modePaiementFinal,
                     'moyen_bancaire'     => $request->mode_paiement === 'Banque' ? $request->moyen_bancaire : null,
                     'reference_paiement' => $request->mode_paiement === 'Banque' ? $request->reference_paiement : null,

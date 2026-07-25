@@ -273,7 +273,20 @@
                                 {{-- En SYSCOHADA, le Compte Général est TOUJOURS affiché (y compris 401000 / 411000) --}}
                                 {{ $compte }}
                             </td>
-                            <td style="white-space: normal; min-width: 240px; font-weight:500;">{{ $ecr->libelle }}</td>
+                            <td style="white-space: normal; min-width: 240px; font-weight:500;">
+                                @if($ecr->description)
+                                    <span
+                                        onclick="this.nextElementSibling.style.display = this.nextElementSibling.style.display === 'none' ? 'block' : 'none';"
+                                        style="cursor:pointer; text-decoration:underline dotted; text-decoration-color:var(--text-3);"
+                                        title="Cliquer pour voir le détail complet"
+                                    >{{ $ecr->libelle }}</span>
+                                    <div style="display:none; margin-top:4px; font-size:12px; color:var(--text-2); background:#f8fafc; border:1px solid var(--border); border-radius:6px; padding:6px 8px;">
+                                        <i class="fas fa-list"></i> {{ $ecr->description }}
+                                    </div>
+                                @else
+                                    {{ $ecr->libelle }}
+                                @endif
+                            </td>
                             <td style="text-align: right; font-weight: 700; color: #1e3a8a;">
                                 {{ $ecr->debit > 0 ? number_format($ecr->debit, 0, ',', ' ') . ' F' : '—' }}
                             </td>
