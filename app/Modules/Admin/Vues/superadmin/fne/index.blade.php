@@ -199,6 +199,18 @@
 let entrepriseCourante = null;
 let motDePasseValide = null;
 
+// Modèles d'URL injectés côté serveur (via route()) — jamais codés en dur,
+// évite tout problème si l'application est un jour servie depuis un sous-chemin.
+const URLS_FNE = {
+    voirCle: "{{ route('superadmin.fne.voir_cle', ':id') }}",
+    cleTest: "{{ route('superadmin.fne.cle_test', ':id') }}",
+    cleReelle: "{{ route('superadmin.fne.cle_reelle', ':id') }}",
+    supprimerCle: "{{ route('superadmin.fne.supprimer_cle', ':id') }}",
+};
+function urlFne(cle, entrepriseId) {
+    return URLS_FNE[cle].replace(':id', entrepriseId);
+}
+
 function ouvrirModalGestion(entrepriseId, nom) {
     entrepriseCourante = entrepriseId;
     motDePasseValide = null;
@@ -224,7 +236,7 @@ async function verifierMotDePasseEtOuvrirGestion() {
     // On tente une "révélation" de la clé test (ou réelle) comme moyen de
     // vérifier le mot de passe ET récupérer la clé en une seule requête.
     try {
-        const res = await fetch(`/superadmin/fne/${entrepriseCourante}/voir-cle`, {
+        const res = await fetch(urlFne('voirCle', entrepriseCourante), {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content },
             body: JSON.stringify({ mot_de_passe: mdp, type: 'test' })
@@ -237,7 +249,7 @@ async function verifierMotDePasseEtOuvrirGestion() {
             return;
         }
 
-        // Mot de passe correct (que la clé existe ou non)
+        // Mot de passe correct (que la clé existe ou non — 404 = pas encore de clé, ce n'est pas une erreur de mot de passe)
         motDePasseValide = mdp;
         document.getElementById('etapeMotDePasse').style.display = 'none';
         document.getElementById('etapeGestion').style.display = 'block';
@@ -246,7 +258,7 @@ async function verifierMotDePasseEtOuvrirGestion() {
             : '<span style="color:var(--text-3); font-size:12px;">Non renseignée</span>';
 
         // Récupérer aussi la clé réelle pour affichage
-        const res2 = await fetch(`/superadmin/fne/${entrepriseCourante}/voir-cle`, {
+        const res2 = await fetch(urlFne('voirCle', entrepriseCourante), {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content },
             body: JSON.stringify({ mot_de_passe: mdp, type: 'reelle' })
@@ -269,7 +281,7 @@ function soumettreCle(type) {
 
     const form = document.createElement('form');
     form.method = 'POST';
-    form.action = `/superadmin/fne/${entrepriseCourante}/cle-${type === 'test' ? 'test' : 'reelle'}`;
+    form.action = urlFne(type === 'test' ? 'cleTest' : 'cleReelle', entrepriseCourante);
     form.innerHTML = `
         @csrf
         <input type="hidden" name="cle_${type === 'test' ? 'test' : 'reelle'}" value="${valeur.replace(/"/g, '&quot;')}">
@@ -285,7 +297,7 @@ function supprimerCle(type) {
 
     const form = document.createElement('form');
     form.method = 'POST';
-    form.action = `/superadmin/fne/${entrepriseCourante}/cle`;
+    form.action = urlFne('supprimerCle', entrepriseCourante);
     form.innerHTML = `
         @csrf
         @method('DELETE')
