@@ -2,1363 +2,1397 @@
 
 namespace App\Console\Commands;
 
+use App\Modules\Admin\Modeles\Entreprise;
+use App\Modules\Admin\Modeles\PointDeVente;
+use App\Modules\Admin\Modeles\Categorie;
+use App\Modules\Admin\Modeles\Produit;
+use App\Modules\Admin\Modeles\Stock;
+use App\Modules\Admin\Modeles\Client;
+use App\Modules\Admin\Modeles\Fournisseur;
+use App\Modules\Admin\Modeles\Vente;
+use App\Modules\Admin\Modeles\VenteDetail;
+use App\Modules\Admin\Modeles\Achat;
+use App\Modules\Admin\Modeles\AchatDetail;
+use App\Modules\Admin\Modeles\CodeJournal;
+use App\Modules\Admin\Modeles\FicheTechnique;
+use App\Modules\Admin\Modeles\FicheTechniqueDetail;
+use App\Modules\Admin\Modeles\OrdreProduction;
+use App\Modules\Admin\Modeles\TransfertStock;
+use App\Modules\Admin\Modeles\BonLivraison;
+use App\Modules\Admin\Modeles\BonLivraisonDetail;
+use App\Modules\Admin\Modeles\TresorerieJournal;
+use App\Modules\Admin\Modeles\FneCredential;
+use App\Modules\Admin\Services\ComptabiliteService;
+use App\Modules\Admin\Services\NumerotationService;
+use App\Modules\Authentification\Modeles\Utilisateur;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
-use Illuminate\Support\Facades\Schema;
-use Illuminate\Support\Str;
+use Carbon\Carbon;
 
+/**
+ * Peuplement massif de données réalistes pour 2 entreprises, EN PASSANT PAR
+ * LA VRAIE LOGIQUE MÉTIER (Eloquent + ComptabiliteService + NumerotationService)
+ * plutôt que des insertions SQL brutes qui contournaient (et reproduisaient
+ * les bugs corrigés de) l'application. Objectif explicite de l'utilisateur :
+ * "que ce peuplement serve de test et en même temps corrige ce qui ne va pas".
+ *
+ * Remplace l'ancien SeedMassiveCommand.php (supprimé le 24/07/2026), qui
+ * dupliquait manuellement la génération d'écritures comptables via des
+ * DB::table()->insert() directs, réintroduisant plusieurs bugs déjà corrigés
+ * cette session (411 débité sur vente comptant, code journal unique erroné,
+ * ancien préfixe d'avoir AV- au lieu de AVO-VTE-/AVO-ACH-, montants d'avoir
+ * stockés en négatif, numéro de saisie non généré via Operation, etc.).
+ *
+ * Usage :
+ *   php artisan selflow:seed-massif                  (avec confirmation)
+ *   php artisan selflow:seed-massif --force           (sans confirmation, pour CI/déploiement)
+ */
 class SeedMassiveCommand extends Command
 {
-    protected $signature = 'selflow:seed-massive';
-    protected $description = 'Vide completement la base de donnees et la peuple de donnees massives de test ultra-realistes pour les deux entreprises.';
+    protected $signature = 'selflow:seed-massif {--force : Ne pas demander de confirmation avant de purger les données}';
+    protected $description = 'Vide et repeuple intégralement les données des 2 entreprises de démonstration, via la vraie logique métier de l\'application.';
+
+    private array $codesJournauxParEntreprise = [];
+    private array $comptesVenteDisponibles = ['701000', '702000', '706000', '707000'];
+    private array $comptesAchatDisponibles = ['601000', '602000', '604000', '605000'];
 
     public function handle(): int
     {
-        $this->info('🚀 Demarrage de la purge et de la repopulation massive de la base de donnees...');
+        if (!$this->option('force')) {
+            $this->warn('⚠️  Cette commande va SUPPRIMER TOUTES les données des entreprises de démonstration et les repeupler entièrement.');
+            if (!$this->confirm('Avez-vous fait une sauvegarde de la base si nécessaire ? Continuer ?')) {
+                $this->info('Annulé.');
+                return self::FAILURE;
+            }
+        }
 
-        // 1. Purge complète de la base de données
-        Schema::disableForeignKeyConstraints();
-        
+        $debut = microtime(true);
+
+        $this->info('🧹 Purge des données existantes...');
+        $this->purgerDonnees();
+
+        $this->info('🏢 Création des entreprises...');
+        $entreprises = [
+            $this->creerEntreprise('DIST-CI DISTRIBUTION SARL', 'distribution.ci', '0102030405', 'CI-ABJ-2019-B-45678', '1245789K'),
+            $this->creerEntreprise('KIRÉNA AGRO-INDUSTRIE SARL', 'agroindustrie.ci', '0203040506', 'CI-ABJ-2020-B-56789', '2356891L'),
+        ];
+
+        foreach ($entreprises as $idx => $entrepriseId) {
+            $this->info("\n════════════════════════════════════════════════════");
+            $this->info("🏢 ENTREPRISE " . ($idx + 1) . " (id={$entrepriseId})");
+            $this->info("════════════════════════════════════════════════════");
+
+            $this->info('  📍 Points de vente...');
+            $pdvIds = $this->creerPointsDeVente($entrepriseId, $idx);
+
+            $this->info('  👤 Utilisateurs (admin, responsables, caissiers)...');
+            [$adminId, $utilisateursParPdv] = $this->creerUtilisateurs($entrepriseId, $pdvIds, $idx);
+
+            $this->info('  📊 Plan comptable SYSCOHADA...');
+            $this->creerPlanComptable($entrepriseId);
+
+            $this->info('  📓 Codes journaux (VTE, ACH, OD, CAI + banques + mobile money)...');
+            $this->creerCodesJournaux($entrepriseId);
+
+            $this->info('  🔑 Clé FNE de test...');
+            $this->creerFneCredential($entrepriseId, $adminId);
+
+            $this->info('  👥 Clients (100)...');
+            $clients = $this->creerClients($entrepriseId, 100, $idx);
+
+            $this->info('  🏭 Fournisseurs (100)...');
+            $fournisseurs = $this->creerFournisseurs($entrepriseId, 100, $idx);
+
+            $this->info('  📦 Catégories (100) + Produits (100/catégorie = 10 000)...');
+            $produits = $this->creerCategoriesEtProduits($entrepriseId, 100, 100, $idx);
+            $this->info('     → ' . count($produits) . ' produits créés.');
+
+            $this->info('  📈 Stocks initiaux (par point de vente)...');
+            $this->creerStocksInitiaux($produits, $pdvIds);
+
+            $this->info('  🏗️  Fiches techniques (100) + Ordres de production (100)...');
+            $this->creerProduction($entrepriseId, $pdvIds, $produits, $utilisateursParPdv, 100);
+
+            $this->info('  🧾 Ventes (100 minimum : comptant total/partiel, crédit, banque total/partiel)...');
+            $ventesCreees = $this->creerVentes($entrepriseId, $pdvIds, $clients, $produits, $utilisateursParPdv, 100);
+
+            $this->info('  📥 Achats (100 minimum : mêmes modes de règlement)...');
+            $achatsCreees = $this->creerAchats($entrepriseId, $pdvIds, $fournisseurs, $produits, $utilisateursParPdv, 100);
+
+            $this->info('  🔄 Cycle Devis → Bon de Commande → Bon de Livraison → Facture (20)...');
+            $this->creerCycleDocumentsVente($entrepriseId, $pdvIds, $clients, $produits, $utilisateursParPdv, 20);
+
+            $this->info('  ↩️  Avoirs clients (15) et fournisseurs (15)...');
+            $this->creerAvoirs($ventesCreees, $achatsCreees);
+
+            $this->info('  💰 Règlements différés sur créances à crédit...');
+            $this->creerReglementsDifferes($ventesCreees, $achatsCreees);
+
+            $this->info('  🔀 Transferts internes (20), commandes fournisseur à réceptionner (15)...');
+            $this->creerMouvementsDivers($entrepriseId, $pdvIds, $produits, $fournisseurs, $utilisateursParPdv);
+        }
+
+        $this->info("\n👑 Création du compte SuperAdmin en ligne...");
+        $this->creerSuperAdmin();
+
+        $duree = round(microtime(true) - $debut, 1);
+        $this->info("\n✅ Peuplement terminé en {$duree}s.");
+        $this->afficherAnomalies();
+
+        return self::SUCCESS;
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    // PURGE
+    // ═══════════════════════════════════════════════════════════════
+
+    private function purgerDonnees(): void
+    {
+        DB::statement('SET FOREIGN_KEY_CHECKS=0');
+
         $tables = [
-            'b2b_negotiations',
-            'bon_livraison_details',
-            'bons_livraison',
-            'vente_details',
-            'ventes',
-            'achat_details',
-            'achats',
-            'ordres_production',
-            'fiche_technique_details',
-            'fiches_techniques',
-            'stocks',
-            'mouvements_stock',
-            'tresorerie_journal',
-            'ecritures_comptables',
-            'operations',
-            'plan_comptable',
-            'codes_journaux',
-            'produits',
-            'categories',
-            'clients',
-            'fournisseurs',
-            'utilisateurs',
-            'points_de_vente',
-            'periodes',
-            'entreprises',
+            'ecritures_comptables', 'operations', 'tresorerie_journal', 'mouvements_stock',
+            'transferts_stock', 'bon_livraison_details', 'bons_livraison',
+            'vente_details', 'ventes', 'achat_details', 'achats',
+            'fiche_technique_details', 'fiches_techniques', 'ordres_production',
+            'stocks', 'produits', 'produit_details_libres', 'sous_categories', 'categories',
+            'clients', 'fournisseurs', 'plan_comptable', 'codes_journaux', 'banques',
+            'fne_credentials', 'b2b_negotiations',
+            'points_de_vente', 'periodes',
         ];
 
         foreach ($tables as $table) {
-            if (Schema::hasTable($table)) {
-                $this->info("🧹 Vidage de la table : {$table}");
+            if (DB::getSchemaBuilder()->hasTable($table)) {
                 DB::table($table)->truncate();
             }
         }
-        
-        Schema::enableForeignKeyConstraints();
-        $this->info('✅ Purge terminee avec succes !');
 
-        // 2. Creation des 2 entreprises
-        $this->info('🏢 Creation des deux entreprises...');
-        
-        $ent1 = DB::table('entreprises')->insertGetId([
-            'nom' => 'Maison Dupont SARL',
-            'adresse' => 'Immeuble Dupont, Boulevard Latrille, Cocody, Abidjan',
-            'telephone' => '+225 27 22 10 00',
-            'email' => 'contact@maisondupont.ci',
-            'rccm' => 'CI-ABJ-2019-B-12345',
-            'compte_contribuable' => 'CI0123456789',
-            'ncc' => '1234567 B',
+        DB::table('utilisateurs')->where('role', '!=', 'superadmin')->delete();
+        DB::table('utilisateurs')->where('email', 'superadmin@gmail.com')->delete();
+
+        DB::table('entreprises')->truncate();
+
+        DB::statement('SET FOREIGN_KEY_CHECKS=1');
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    // ENTREPRISE / POINTS DE VENTE / UTILISATEURS
+    // ═══════════════════════════════════════════════════════════════
+
+    private function creerEntreprise(string $nom, string $domaine, string $tel, string $rccm, string $ncc): int
+    {
+        $logoSeed = urlencode(substr($nom, 0, 2));
+        $id = Entreprise::create([
+            'nom' => $nom,
             'forme_juridique' => 'SARL',
-            'gerant_nom' => 'Dupont',
-            'gerant_prenom' => 'Jean-Marc',
-            'gerant_fonction' => 'Directeur General',
-            'regime_imposition' => 'RNI',
-            'centre_impots' => 'Cocody 1',
-            'ref_bancaire' => 'SGBCI CI083 01001 12345678901 23',
-            'logo_path' => 'https://images.unsplash.com/photo-1572021335469-31706a17aaef?w=400',
+            'gerant_nom' => 'KOUAME',
+            'gerant_prenom' => 'Jean-Baptiste',
+            'gerant_fonction' => 'Gérant',
+            'adresse' => 'Zone Industrielle, Abidjan, Côte d\'Ivoire',
+            'telephone' => '+225 ' . $tel,
+            'email' => 'contact@' . $domaine,
+            'rccm' => $rccm,
+            'compte_contribuable' => $ncc,
+            'ncc' => $ncc,
+            'regime_imposition' => 'RSI',
+            'centre_impots' => 'Centre des Impôts de Plateaux',
+            'ref_bancaire' => 'CI93 CI001 01234567890123456789',
+            'logo_path' => "https://ui-avatars.com/api/?name={$logoSeed}&background=0B2545&color=fff&size=256&bold=true",
             'quota_points_de_vente' => 10,
             'plan_abonnement' => 'Pro',
-            'secteur_activite' => json_encode(['Commercial', 'Services', 'Industriel']),
-            'modules_actifs' => json_encode(['principal', 'ventes', 'achats', 'stock', 'comptabilite', 'points_de_vente', 'produits', 'tiers', 'rapports', 'b2b', 'fne', 'production']),
-            'created_at' => now(),
-            'updated_at' => now(),
-        ]);
+            'secteur_activite' => ['Commerce général', 'Distribution'],
+            'modules_actifs' => ['ventes', 'achats', 'stock', 'production', 'comptabilite', 'tresorerie', 'b2b'],
+        ])->id;
 
-        $ent2 = DB::table('entreprises')->insertGetId([
-            'nom' => 'B2B Agro Fournitures',
-            'adresse' => 'Boulevard des Martyrs, Cocody, Abidjan',
-            'telephone' => '+225 27 22 99 99',
-            'email' => 'contact@b2bagro.ci',
-            'rccm' => 'CI-ABJ-2026-B-99999',
-            'compte_contribuable' => 'CI9876543210',
-            'ncc' => '9876543 A',
-            'forme_juridique' => 'SA',
-            'gerant_nom' => 'Koffi',
-            'gerant_prenom' => 'Kouame Pierre',
-            'gerant_fonction' => 'President du Conseil',
-            'regime_imposition' => 'RNI',
-            'centre_impots' => 'Plateau 2',
-            'ref_bancaire' => 'BNI CI092 01002 98765432109 87',
-            'logo_path' => 'https://images.unsplash.com/photo-1542838132-92c53300491e?w=400',
-            'quota_points_de_vente' => 10,
-            'plan_abonnement' => 'Pro',
-            'secteur_activite' => json_encode(['Commercial', 'Services', 'Industriel']),
-            'modules_actifs' => json_encode(['principal', 'ventes', 'achats', 'stock', 'comptabilite', 'points_de_vente', 'produits', 'tiers', 'rapports', 'b2b', 'fne', 'production']),
-            'created_at' => now(),
-            'updated_at' => now(),
-        ]);
+        return $id;
+    }
 
-        // 3. Creation des periodes comptables actives (Exercice 2026)
-        DB::table('periodes')->insert([
-            [
-                'entreprise_id' => $ent1,
-                'nom' => 'Exercice 2026',
-                'date_debut' => '2026-01-01',
-                'date_fin' => '2026-12-31',
-                'est_active' => true,
-                'created_at' => now(),
-                'updated_at' => now(),
-            ],
-            [
-                'entreprise_id' => $ent2,
-                'nom' => 'Exercice 2026',
-                'date_debut' => '2026-01-01',
-                'date_fin' => '2026-12-31',
-                'est_active' => true,
-                'created_at' => now(),
-                'updated_at' => now(),
-            ]
-        ]);
+    private function creerPointsDeVente(int $entrepriseId, int $idx): array
+    {
+        $villes = [
+            ['Abidjan', 'Cocody', 'Siège Social'],
+            ['Abidjan', 'Yopougon', 'Dépôt Yopougon'],
+            ['Abidjan', 'Marcory', 'Magasin Marcory'],
+            ['Bouaké', 'Centre', 'Agence Bouaké'],
+        ];
+        $responsables = ['TRAORE Aminata', 'KONE Ibrahim', 'BAMBA Fatou', 'OUATTARA Sékou'];
 
-        // 4. Creation de 4 points de vente par entreprise
-        $this->info('🏪 Creation des points de vente...');
-        $pdvIds1 = [];
-        $pdvIds2 = [];
-
-        $pdvNames1 = ['Agence Centrale', 'Annexe Cocody', 'Showroom Zone 4', 'Boutique Yopougon'];
-        foreach ($pdvNames1 as $name) {
-            $pdvIds1[] = DB::table('points_de_vente')->insertGetId([
-                'entreprise_id' => $ent1,
-                'nom' => $name,
-                'ville' => 'Abidjan',
-                'commune' => 'Cocody',
-                'responsable' => 'Responsable ' . $name,
-                'telephone' => '+225 27 00 00 ' . rand(10, 99),
-                'statut' => 'Ouvert',
-                'created_at' => now(),
-                'updated_at' => now(),
-            ]);
-        }
-
-        $pdvNames2 = ['Boutique Plateau', 'Depot San Pedro', 'Agence Bouake', 'Point Vente Yamoussoukro'];
-        foreach ($pdvNames2 as $name) {
-            $pdvIds2[] = DB::table('points_de_vente')->insertGetId([
-                'entreprise_id' => $ent2,
-                'nom' => $name,
-                'ville' => 'Abidjan',
-                'commune' => 'Plateau',
-                'responsable' => 'Responsable ' . $name,
-                'telephone' => '+225 27 00 00 ' . rand(10, 99),
-                'statut' => 'Ouvert',
-                'created_at' => now(),
-                'updated_at' => now(),
-            ]);
-        }
-
-        // 5. Creation des utilisateurs (Superadmin, Admins, Caissiers)
-        $this->info('👥 Creation des utilisateurs...');
-        $passwordHash = Hash::make('12345678');
-        $superHash = Hash::make('12345678SUPER');
-
-        // Superadmin
-        DB::table('utilisateurs')->insert([
-            'nom' => 'Super Administrateur',
-            'email' => 'superadmin@gmail.com',
-            'password' => $superHash,
-            'role' => 'superadmin',
-            'statut' => 'actif',
-            'created_at' => now(),
-            'updated_at' => now(),
-        ]);
-
-        // Admins des entreprises
-        $admin1 = DB::table('utilisateurs')->insertGetId([
-            'entreprise_id' => $ent1,
-            'nom' => 'Dupont',
-            'prenom' => 'Jean-Marc',
-            'email' => 'admin@gmail.com',
-            'password' => $passwordHash,
-            'role' => 'admin',
-            'statut' => 'actif',
-            'created_at' => now(),
-            'updated_at' => now(),
-        ]);
-
-        $admin2 = DB::table('utilisateurs')->insertGetId([
-            'entreprise_id' => $ent2,
-            'nom' => 'Agro',
-            'prenom' => 'Admin',
-            'email' => 'admin3@gmail.com',
-            'password' => $passwordHash,
-            'role' => 'admin',
-            'statut' => 'actif',
-            'created_at' => now(),
-            'updated_at' => now(),
-        ]);
-
-        // Caissiers et responsables par PDV
-        $caissiersPdv1 = [];
-        $caissiersPdv2 = [];
-
-        foreach ($pdvIds1 as $pdvId) {
-            // Responsable
-            DB::table('utilisateurs')->insert([
-                'entreprise_id' => $ent1,
-                'point_de_vente_id' => $pdvId,
-                'nom' => 'Resp_' . $pdvId,
-                'prenom' => 'PDV',
-                'email' => "resp_pdv_{$pdvId}@maisondupont.ci",
-                'password' => $passwordHash,
-                'role' => 'responsable_pdv',
+        $ids = [];
+        foreach ($villes as $i => [$ville, $commune, $nom]) {
+            $ids[] = PointDeVente::create([
+                'entreprise_id' => $entrepriseId,
+                'nom' => $nom,
+                'ville' => $ville,
+                'commune' => $commune,
+                'responsable' => $responsables[$i],
+                'telephone' => '+225 07' . str_pad((string) rand(10000000, 99999999), 8, '0', STR_PAD_LEFT),
                 'statut' => 'actif',
-                'created_at' => now(),
-                'updated_at' => now(),
-            ]);
-
-            // Caissier 1
-            $c1 = DB::table('utilisateurs')->insertGetId([
-                'entreprise_id' => $ent1,
-                'point_de_vente_id' => $pdvId,
-                'nom' => 'Caissier1_' . $pdvId,
-                'prenom' => 'Fatou',
-                'email' => "caissier1_{$pdvId}@maisondupont.ci",
-                'password' => $passwordHash,
-                'role' => 'caissier',
-                'statut' => 'actif',
-                'habilitations' => json_encode(['saisie_vente', 'gestion_caisse', 'annulation_ticket']),
-                'created_at' => now(),
-                'updated_at' => now(),
-            ]);
-            $caissiersPdv1[] = $c1;
+            ])->id;
         }
+        return $ids;
+    }
 
-        foreach ($pdvIds2 as $pdvId) {
-            // Responsable
-            DB::table('utilisateurs')->insert([
-                'entreprise_id' => $ent2,
-                'point_de_vente_id' => $pdvId,
-                'nom' => 'Resp_' . $pdvId,
-                'prenom' => 'PDV',
-                'email' => "resp_pdv_{$pdvId}@b2bagro.ci",
-                'password' => $passwordHash,
-                'role' => 'responsable_pdv',
-                'statut' => 'actif',
-                'created_at' => now(),
-                'updated_at' => now(),
-            ]);
-
-            // Caissier 1
-            $c2 = DB::table('utilisateurs')->insertGetId([
-                'entreprise_id' => $ent2,
-                'point_de_vente_id' => $pdvId,
-                'nom' => 'Caissier1_' . $pdvId,
-                'prenom' => 'Awa',
-                'email' => "caissier1_{$pdvId}@b2bagro.ci",
-                'password' => $passwordHash,
-                'role' => 'caissier',
-                'statut' => 'actif',
-                'habilitations' => json_encode(['saisie_vente', 'gestion_caisse', 'annulation_ticket']),
-                'created_at' => now(),
-                'updated_at' => now(),
-            ]);
-            $caissiersPdv2[] = $c2;
-        }
-
-        // 6. Plan Comptable SYSCOHADA (16 comptes reels standards)
-        $this->info('📊 Peuplement du Plan Comptable...');
-        $syscohada = [
-            ['numero' => '101000', 'libelle' => 'Capital social'],
-            ['numero' => '218200', 'libelle' => 'Materiel de transport'],
-            ['numero' => '311000', 'libelle' => 'Marchandises (Stock)'],
-            ['numero' => '312000', 'libelle' => 'Produits Finis (Stock)'],
-            ['numero' => '401000', 'libelle' => 'Fournisseurs - Dettes en compte'],
-            ['numero' => '411000', 'libelle' => 'Clients - Creances en compte'],
-            ['numero' => '443100', 'libelle' => 'TVA facturee sur ventes (18%)'],
-            ['numero' => '445200', 'libelle' => 'TVA recuperable sur achats'],
-            ['numero' => '445500', 'libelle' => 'TVA a decaisser'],
-            ['numero' => '521000', 'libelle' => 'Banques locales (BNI/SGBCI)'],
-            ['numero' => '571000', 'libelle' => 'Caisse Centrale'],
-            ['numero' => '601000', 'libelle' => 'Achat de marchandises'],
-            ['numero' => '602100', 'libelle' => 'Achat de matieres premieres'],
-            ['numero' => '603200', 'libelle' => 'Variation de stock de matieres premieres'],
-            ['numero' => '701000', 'libelle' => 'Vente de marchandises'],
-            ['numero' => '731100', 'libelle' => 'Variation de stock de produits finis'],
+    /**
+     * @return array{0: int, 1: array<int,int>} [adminId, [pdvId => [caissierId, ...]]]
+     */
+    private function creerUtilisateurs(int $entrepriseId, array $pdvIds, int $idx): array
+    {
+        $habilitationsResponsable = [
+            'tableau_de_bord_personnel', 'tableau_de_bord_general', 'nouvelle_vente', 'factures_vente',
+            'nouvel_achat', 'factures_achat', 'catalogue_produits', 'stock_articles', 'stock_mouvements',
+            'tiers_clients', 'tiers_fournisseurs', 'historique_ventes', 'historique_achats',
+            'comptabilite_creances', 'tresorerie_journal', 'tresorerie_encaissements', 'tresorerie_decaissements',
+            'gestion_pdv', 'rapports_analyse', 'production_ordres', 'production_recettes',
+        ];
+        $habilitationsCaissier = [
+            'tableau_de_bord_personnel', 'nouvelle_vente', 'factures_vente', 'catalogue_produits',
+            'tiers_clients', 'tresorerie_encaissements',
         ];
 
-        foreach ($syscohada as $compte) {
-            DB::table('plan_comptable')->insert([
-                array_merge($compte, ['entreprise_id' => $ent1, 'source' => 'comptaflow', 'created_at' => now(), 'updated_at' => now()]),
-                array_merge($compte, ['entreprise_id' => $ent2, 'source' => 'comptaflow', 'created_at' => now(), 'updated_at' => now()]),
-            ]);
+        $motDePasse = Hash::make('Selflow2026@');
+
+        $adminId = Utilisateur::create([
+            'entreprise_id' => $entrepriseId,
+            'point_de_vente_id' => null,
+            'nom' => $idx === 0 ? 'YAO' : 'KOFFI',
+            'prenom' => $idx === 0 ? 'Marie-Claire' : 'Adjoua',
+            'email' => 'admin' . ($idx + 1) . '@selflow-demo.ci',
+            'password' => $motDePasse,
+            'role' => 'admin',
+            'fonction' => 'Administrateur Général',
+            'statut' => 'actif',
+            'habilitations' => json_encode($habilitationsResponsable),
+            'doit_changer_password' => false,
+        ])->id;
+
+        $prenomsResponsables = ['TRAORE Aminata', 'KONE Ibrahim', 'BAMBA Fatou', 'OUATTARA Sékou'];
+        $prenomsCaissiers = [
+            ['DIALLO Mariam', 'COULIBALY Awa'], ['SORO Zié', 'KOUASSI Affoué'],
+            ['GNAHORE Paul', 'ADJOBI Chantal'], ['SANGARE Moussa', 'YEO Nathalie'],
+        ];
+
+        $utilisateursParPdv = [];
+        foreach ($pdvIds as $i => $pdvId) {
+            [$nomP, $prenomP] = array_pad(explode(' ', $prenomsResponsables[$i], 2), 2, 'Site');
+            $responsableId = Utilisateur::create([
+                'entreprise_id' => $entrepriseId,
+                'point_de_vente_id' => $pdvId,
+                'nom' => $nomP,
+                'prenom' => $prenomP,
+                'email' => 'responsable.pdv' . ($i + 1) . '.e' . ($idx + 1) . '@selflow-demo.ci',
+                'password' => $motDePasse,
+                'role' => 'caissier',
+                'fonction' => 'Responsable de site',
+                'statut' => 'actif',
+                'habilitations' => json_encode($habilitationsResponsable),
+                'doit_changer_password' => false,
+            ])->id;
+
+            $caissierIds = [$responsableId];
+            foreach ($prenomsCaissiers[$i] as $nomComplet) {
+                [$nomC, $prenomC] = array_pad(explode(' ', $nomComplet, 2), 2, 'Caissier');
+                $caissierIds[] = Utilisateur::create([
+                    'entreprise_id' => $entrepriseId,
+                    'point_de_vente_id' => $pdvId,
+                    'nom' => $nomC,
+                    'prenom' => $prenomC,
+                    'email' => 'caissier.' . strtolower($nomC) . '.e' . ($idx + 1) . '@selflow-demo.ci',
+                    'password' => $motDePasse,
+                    'role' => 'caissier',
+                    'fonction' => 'Caissier(ère)',
+                    'statut' => 'actif',
+                    'habilitations' => json_encode($habilitationsCaissier),
+                    'doit_changer_password' => false,
+                ])->id;
+            }
+            $utilisateursParPdv[$pdvId] = $caissierIds;
         }
 
-        // 7. Journaux de tresorerie et comptabilite
-        $this->info('📓 Peuplement des codes journaux...');
+        return [$adminId, $utilisateursParPdv];
+    }
+
+    private function creerFneCredential(int $entrepriseId, int $adminId): void
+    {
+        FneCredential::create([
+            'entreprise_id' => $entrepriseId,
+            'cle_test' => 'fne_test_' . bin2hex(random_bytes(16)),
+            'cle_test_ajoutee_at' => now()->subDays(rand(30, 90)),
+            'cle_test_ajoutee_par' => $adminId,
+            'statut' => 'test',
+            'ncc_associe' => null,
+            'notes_superadmin' => 'Clé de test générée automatiquement par le peuplement de démonstration — demande DGI simulée.',
+        ]);
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    // PLAN COMPTABLE / CODES JOURNAUX
+    // ═══════════════════════════════════════════════════════════════
+
+    private function creerPlanComptable(int $entrepriseId): void
+    {
+        $comptes = [
+            ['311000', 'Marchandises'], ['321000', 'Matières premières'], ['351000', 'Produits finis'],
+            ['401000', 'Fournisseurs'], ['411000', 'Clients'], ['421000', 'Personnel, rémunérations dues'],
+            ['443100', 'État, TVA facturée sur ventes'], ['445200', 'État, TVA déductible sur achats'],
+            ['445500', 'État, TVA collectée'], ['447000', 'État, autres impôts et taxes'],
+            ['471000', 'Compte d\'attente COMPTAFLOW'],
+            ['521000', 'Banques locales'], ['571000', 'Caisse siège'],
+            ['601000', 'Achats de marchandises'], ['602000', 'Achats de matières premières'],
+            ['604000', 'Achats de fournitures non stockées'], ['605000', 'Autres achats'],
+            ['611000', 'Transports sur achats'], ['613000', 'Locations'], ['622000', 'Rémunérations d\'intermédiaires'],
+            ['624000', 'Entretien, réparations et maintenance'], ['625000', 'Primes d\'assurance'],
+            ['628000', 'Divers autres services extérieurs'], ['631000', 'Frais bancaires'],
+            ['661000', 'Rémunérations directes versées au personnel'], ['664000', 'Charges sociales'],
+            ['701000', 'Ventes de marchandises'], ['702000', 'Ventes de produits finis'],
+            ['706000', 'Services vendus'], ['707000', 'Produits accessoires'],
+            ['603200', 'Variation des stocks de matières premières'], ['731100', 'Production stockée'],
+        ];
+
+        $lignes = [];
+        foreach ($comptes as [$numero, $libelle]) {
+            $lignes[] = [
+                'entreprise_id' => $entrepriseId,
+                'numero' => $numero,
+                'libelle' => $libelle,
+                'source' => 'local',
+                'created_at' => now(),
+                'updated_at' => now(),
+            ];
+        }
+        DB::table('plan_comptable')->insert($lignes);
+    }
+
+    private function creerCodesJournaux(int $entrepriseId): void
+    {
         $journaux = [
-            ['code' => 'VTE', 'type' => 'Vente', 'intitule' => 'Journal des Ventes', 'compte' => '411000'],
-            ['code' => 'ACH', 'type' => 'Achat', 'intitule' => 'Journal des Achats', 'compte' => '401000'],
-            ['code' => 'OD', 'type' => 'Autre', 'intitule' => 'Journal des Operations Diverses', 'compte' => '101000'],
-            ['code' => 'CAI', 'type' => 'Trésorerie', 'intitule' => 'Caisse Centrale', 'compte' => '571000'],
-            ['code' => 'BQ_BNI', 'type' => 'Trésorerie', 'intitule' => 'Banque BNI', 'compte' => '521000'],
-            ['code' => 'BQ_SGB', 'type' => 'Trésorerie', 'intitule' => 'Banque SGBCI', 'compte' => '521000'],
-            ['code' => 'OM', 'type' => 'Trésorerie', 'intitule' => 'Orange Money', 'compte' => '571000'],
-            ['code' => 'MTN', 'type' => 'Trésorerie', 'intitule' => 'MTN Mobile Money', 'compte' => '571000'],
-            ['code' => 'MOOV', 'type' => 'Trésorerie', 'intitule' => 'Moov Money', 'compte' => '571000'],
-            ['code' => 'WAVE', 'type' => 'Trésorerie', 'intitule' => 'Wave Money', 'compte' => '571000'],
+            ['VTE', 'Journal des Ventes', 'Vente', '701000'],
+            ['ACH', 'Journal des Achats', 'Achat', '601000'],
+            ['OD', 'Journal des Opérations Diverses', 'Autre', '471000'],
+            ['CAI', 'Caisse Siège', 'Trésorerie', '571000'],
+            ['BNI', 'BNI Côte d\'Ivoire', 'Banque', '521000'],
+            ['SGBCI', 'Société Générale Côte d\'Ivoire', 'Banque', '521000'],
+            ['OM', 'Orange Money', 'Banque', '521000'],
+            ['MTN', 'MTN Mobile Money', 'Banque', '521000'],
+            ['MOOV', 'Moov Money', 'Banque', '521000'],
+            ['WAVE', 'Wave', 'Banque', '521000'],
         ];
 
-        foreach ($journaux as $j) {
-            DB::table('codes_journaux')->insert([
-                array_merge($j, ['entreprise_id' => $ent1, 'source' => 'comptaflow', 'created_at' => now(), 'updated_at' => now()]),
-                array_merge($j, ['entreprise_id' => $ent2, 'source' => 'comptaflow', 'created_at' => now(), 'updated_at' => now()]),
-            ]);
-        }
-
-        // 8. Tiers (100 Clients & 100 Fournisseurs par entreprise)
-        $this->info('👥 Generation de 100 Clients et 100 Fournisseurs par entreprise...');
-        $clients1 = [];
-        $clients2 = [];
-        $fourn1 = [];
-        $fourn2 = [];
-
-        // Generation Clients Ent 1
-        for ($i = 1; $i <= 100; $i++) {
-            $numTiers = 411000 + $i;
-            $clients1[] = DB::table('clients')->insertGetId([
-                'entreprise_id' => $ent1,
-                'nom' => "Client Dupont #{$i}",
-                'telephone' => "+225 070000" . str_pad($i, 4, '0', STR_PAD_LEFT),
-                'email' => "client{$i}@maisondupont.ci",
-                'adresse' => "Abidjan, Cocody Rue {$i}",
-                'ncc' => "NCC-" . str_pad($i, 7, '0', STR_PAD_LEFT) . " X",
-                'rccm' => "CI-ABJ-2026-B-" . str_pad($i, 5, '0', STR_PAD_LEFT),
-                'regime_imposition' => 'RNI',
-                'compte_comptable' => '411000',
-                'numero_tiers' => (string)$numTiers,
-                'source' => 'comptaflow',
-                'created_at' => now(),
-                'updated_at' => now(),
-            ]);
-        }
-
-        // Generation Clients Ent 2
-        for ($i = 1; $i <= 100; $i++) {
-            $numTiers = 411000 + $i;
-            $clients2[] = DB::table('clients')->insertGetId([
-                'entreprise_id' => $ent2,
-                'nom' => "Client Agro #{$i}",
-                'telephone' => "+225 050000" . str_pad($i, 4, '0', STR_PAD_LEFT),
-                'email' => "client{$i}@b2bagro.ci",
-                'adresse' => "Abidjan, Plateau Rue {$i}",
-                'ncc' => "NCC-" . str_pad($i, 7, '0', STR_PAD_LEFT) . " A",
-                'rccm' => "CI-ABJ-2026-B-" . str_pad($i, 5, '0', STR_PAD_LEFT),
-                'regime_imposition' => 'RNI',
-                'compte_comptable' => '411000',
-                'numero_tiers' => (string)$numTiers,
-                'source' => 'comptaflow',
-                'created_at' => now(),
-                'updated_at' => now(),
-            ]);
-        }
-
-        // Generation Fournisseurs Ent 1
-        for ($i = 1; $i <= 100; $i++) {
-            $numTiers = 401000 + $i;
-            $fourn1[] = DB::table('fournisseurs')->insertGetId([
-                'entreprise_id' => $ent1,
-                'nom' => "Fournisseur Dupont #{$i}",
-                'telephone' => "+225 010000" . str_pad($i, 4, '0', STR_PAD_LEFT),
-                'email' => "fournisseur{$i}@maisondupont.ci",
-                'adresse' => "Abidjan, Zone 3 Rue {$i}",
-                'ncc' => "NCC-" . str_pad($i, 7, '1', STR_PAD_LEFT) . " Y",
-                'rccm' => "CI-ABJ-2026-B-" . str_pad($i + 100, 5, '0', STR_PAD_LEFT),
-                'regime_imposition' => 'RSI',
-                'compte_comptable' => '401000',
-                'numero_tiers' => (string)$numTiers,
-                'source' => 'comptaflow',
-                'created_at' => now(),
-                'updated_at' => now(),
-            ]);
-        }
-
-        // Generation Fournisseurs Ent 2
-        for ($i = 1; $i <= 100; $i++) {
-            $numTiers = 401000 + $i;
-            $fourn2[] = DB::table('fournisseurs')->insertGetId([
-                'entreprise_id' => $ent2,
-                'nom' => "Fournisseur Agro #{$i}",
-                'telephone' => "+225 090000" . str_pad($i, 4, '0', STR_PAD_LEFT),
-                'email' => "fournisseur{$i}@b2bagro.ci",
-                'adresse' => "Abidjan, Zone 4 Rue {$i}",
-                'ncc' => "NCC-" . str_pad($i, 7, '2', STR_PAD_LEFT) . " Z",
-                'rccm' => "CI-ABJ-2026-B-" . str_pad($i + 100, 5, '0', STR_PAD_LEFT),
-                'regime_imposition' => 'RSI',
-                'compte_comptable' => '401000',
-                'numero_tiers' => (string)$numTiers,
-                'source' => 'comptaflow',
-                'created_at' => now(),
-                'updated_at' => now(),
-            ]);
-        }
-
-        // 9. Categories et Produits (100 categories & 100 produits par categorie = 10 000 articles)
-        $this->info('📦 Generation massive des articles (10 000 par entreprise)...');
-        
-        $typesProduits = ['marchandise', 'matiere_premiere', 'produit_fini', 'service'];
-        $unites = ['Kg', 'Litre', 'Piece', 'Heure', 'Carton', 'Lot'];
-
-        // Entreprise 1
-        $catIds1 = [];
-        $catsInsert1 = [];
-        for ($c = 1; $c <= 100; $c++) {
-            $catsInsert1[] = [
-                'entreprise_id' => $ent1,
-                'nom' => "Categorie Dupont #{$c}",
-                'prefixe' => "CAT" . str_pad($c, 3, '0', STR_PAD_LEFT),
+        $lignes = [];
+        foreach ($journaux as [$code, $intitule, $type, $compte]) {
+            $lignes[] = [
+                'entreprise_id' => $entrepriseId,
+                'code' => $code,
+                'intitule' => $intitule,
+                'type' => $type,
+                'compte' => $compte,
+                'source' => 'local',
                 'created_at' => now(),
                 'updated_at' => now(),
             ];
         }
-        DB::table('categories')->insert($catsInsert1);
-        $catIds1 = DB::table('categories')->where('entreprise_id', $ent1)->pluck('id')->toArray();
+        DB::table('codes_journaux')->insert($lignes);
 
-        $this->info('  -> Insertion des produits pour l\'entreprise 1 (10 000 produits en cours)...');
-        foreach ($catIds1 as $indexCat => $catId) {
-            $productsBatch = [];
-            for ($p = 1; $p <= 100; $p++) {
-                $refIdx = ($indexCat * 100) + $p;
-                $type = $typesProduits[rand(0, 3)];
-                
-                $prixAchat = rand(5, 100) * 100;
-                $prixVente = $prixAchat * 1.35;
-                
-                $productsBatch[] = [
-                    'entreprise_id' => $ent1,
-                    'reference' => "REF-" . str_pad($refIdx, 6, '0', STR_PAD_LEFT),
-                    'nom' => "Produit Dupont #{$refIdx}",
-                    'type' => $type,
-                    'categorie_id' => $catId,
-                    'unite' => $unites[rand(0, 5)],
-                    'prix_achat' => $prixAchat,
-                    'prix_vente' => $prixVente,
-                    'taux_tva' => 18.00,
-                    'compte_vente' => '701000',
-                    'compte_achat' => $type === 'matiere_premiere' ? '602100' : '601000',
-                    'photo' => 'https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=400',
-                    'created_at' => now(),
-                    'updated_at' => now(),
-                ];
-            }
-            DB::table('produits')->insert($productsBatch);
-        }
-        $prodIds1 = DB::table('produits')->where('entreprise_id', $ent1)->pluck('id')->toArray();
-        $this->info('  -> Produits de l\'entreprise 1 generes !');
+        $this->codesJournauxParEntreprise[$entrepriseId] = collect($journaux)
+            ->filter(fn($j) => $j[2] === 'Banque')
+            ->pluck(1)
+            ->values()
+            ->all();
+    }
 
-        // Entreprise 2
-        $catIds2 = [];
-        $catsInsert2 = [];
-        for ($c = 1; $c <= 100; $c++) {
-            $catsInsert2[] = [
-                'entreprise_id' => $ent2,
-                'nom' => "Categorie Agro #{$c}",
-                'prefixe' => "CAT" . str_pad($c, 3, '0', STR_PAD_LEFT),
+    // ═══════════════════════════════════════════════════════════════
+    // CLIENTS / FOURNISSEURS
+    // ═══════════════════════════════════════════════════════════════
+
+    private const PRENOMS = ['Kouadio', 'Aya', 'Adama', 'Fatoumata', 'Yao', 'Akissi', 'Moussa', 'Aminata', 'Kouassi', 'Awa', 'Ibrahim', 'Affoué', 'Sékou', 'Nafissatou', 'Bakary', 'Chantal', 'Zié', 'Nathalie', 'Paul', 'Mariam'];
+    private const NOMS = ['Koné', 'Traoré', 'Bamba', 'Ouattara', 'Diallo', 'Coulibaly', 'Soro', 'Gnahoré', 'Adjobi', 'Sangaré', 'Yéo', 'Touré', 'Kamagaté', 'Diomandé', 'Fofana'];
+    private const RAISONS_SOCIALES = ['SARL', 'SUARL', 'SA', 'Établissements', 'Groupe', 'Ets'];
+    private const SECTEURS_ENTREPRISE = [
+        'BTP', 'Import-Export', 'Restauration', 'Textile', 'Quincaillerie', 'Agro-alimentaire',
+        'Transport', 'Informatique', 'Pharmacie', 'Cosmétique', 'Automobile', 'Immobilier',
+    ];
+
+    private function nomAleatoire(): string
+    {
+        return self::PRENOMS[array_rand(self::PRENOMS)] . ' ' . self::NOMS[array_rand(self::NOMS)];
+    }
+
+    private function raisonSocialeAleatoire(): string
+    {
+        $secteur = self::SECTEURS_ENTREPRISE[array_rand(self::SECTEURS_ENTREPRISE)];
+        $forme = self::RAISONS_SOCIALES[array_rand(self::RAISONS_SOCIALES)];
+        $nom = self::NOMS[array_rand(self::NOMS)];
+        return strtoupper($nom) . ' ' . $secteur . ' ' . $forme;
+    }
+
+    private function telephoneAleatoire(): string
+    {
+        $prefixes = ['01', '05', '07', '25'];
+        return '+225 ' . $prefixes[array_rand($prefixes)] . ' ' . rand(10, 99) . ' ' . rand(10, 99) . ' ' . rand(10, 99) . ' ' . rand(10, 99);
+    }
+
+    private function nccAleatoire(): string
+    {
+        return rand(1000000, 9999999) . chr(rand(65, 90));
+    }
+
+    private function adresseAleatoire(): string
+    {
+        $communes = ['Cocody', 'Yopougon', 'Marcory', 'Treichville', 'Plateau', 'Adjamé', 'Koumassi', 'Abobo', 'Bingerville', 'Bouaké'];
+        return 'Rue ' . rand(1, 40) . ', ' . $communes[array_rand($communes)] . ', Côte d\'Ivoire';
+    }
+
+    private function creerClients(int $entrepriseId, int $n, int $idx): array
+    {
+        $lignes = [];
+        for ($i = 1; $i <= $n; $i++) {
+            $estEntreprise = $i % 3 === 0;
+            $numeroTiers = '411' . str_pad((string) $i, 3, '0', STR_PAD_LEFT);
+            $lignes[] = [
+                'entreprise_id' => $entrepriseId,
+                'nom' => $estEntreprise ? $this->raisonSocialeAleatoire() : $this->nomAleatoire(),
+                'telephone' => $this->telephoneAleatoire(),
+                'email' => 'client' . $i . '.e' . ($idx + 1) . '@exemple.ci',
+                'adresse' => $this->adresseAleatoire(),
+                'ncc' => $estEntreprise ? $this->nccAleatoire() : null,
+                'regime_imposition' => $estEntreprise ? (rand(0, 1) ? 'RSI' : 'RNI') : null,
+                'rccm' => $estEntreprise ? ('CI-ABJ-' . rand(2015, 2025) . '-B-' . rand(10000, 99999)) : null,
+                'compte_comptable' => '411000',
+                'numero_tiers' => $numeroTiers,
+                'source' => 'local',
                 'created_at' => now(),
                 'updated_at' => now(),
             ];
         }
-        DB::table('categories')->insert($catsInsert2);
-        $catIds2 = DB::table('categories')->where('entreprise_id', $ent2)->pluck('id')->toArray();
+        DB::table('clients')->insert($lignes);
+        return Client::where('entreprise_id', $entrepriseId)->pluck('id')->all();
+    }
 
-        $this->info('  -> Insertion des produits pour l\'entreprise 2 (10 000 produits en cours)...');
-        foreach ($catIds2 as $indexCat => $catId) {
-            $productsBatch = [];
-            for ($p = 1; $p <= 100; $p++) {
-                $refIdx = ($indexCat * 100) + $p;
-                $type = $typesProduits[rand(0, 3)];
-                
-                $prixAchat = rand(5, 100) * 100;
-                $prixVente = $prixAchat * 1.4;
-                
-                $productsBatch[] = [
-                    'entreprise_id' => $ent2,
-                    'reference' => "REF-" . str_pad($refIdx + 10000, 6, '0', STR_PAD_LEFT),
-                    'nom' => "Produit Agro #{$refIdx}",
+    private function creerFournisseurs(int $entrepriseId, int $n, int $idx): array
+    {
+        $lignes = [];
+        for ($i = 1; $i <= $n; $i++) {
+            $numeroTiers = '401' . str_pad((string) $i, 3, '0', STR_PAD_LEFT);
+            $lignes[] = [
+                'entreprise_id' => $entrepriseId,
+                'nom' => $this->raisonSocialeAleatoire(),
+                'telephone' => $this->telephoneAleatoire(),
+                'email' => 'fournisseur' . $i . '.e' . ($idx + 1) . '@exemple.ci',
+                'secteur' => self::SECTEURS_ENTREPRISE[array_rand(self::SECTEURS_ENTREPRISE)],
+                'adresse' => $this->adresseAleatoire(),
+                'ncc' => $this->nccAleatoire(),
+                'regime_imposition' => rand(0, 1) ? 'RSI' : 'RNI',
+                'rccm' => 'CI-ABJ-' . rand(2010, 2025) . '-B-' . rand(10000, 99999),
+                'compte_comptable' => '401000',
+                'numero_tiers' => $numeroTiers,
+                'source' => 'local',
+                'created_at' => now(),
+                'updated_at' => now(),
+            ];
+        }
+        DB::table('fournisseurs')->insert($lignes);
+        return Fournisseur::where('entreprise_id', $entrepriseId)->pluck('id')->all();
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    // CATÉGORIES / PRODUITS
+    // ═══════════════════════════════════════════════════════════════
+
+    private const SECTEURS_CATEGORIES = [
+        'Riz & Céréales', 'Boissons Gazeuses', 'Boissons Alcoolisées', 'Eaux Minérales',
+        'Produits Laitiers', 'Épicerie Sucrée', 'Épicerie Salée', 'Légumineuses',
+        'Huiles & Condiments', 'Conserves & Sauces', 'Produits Surgelés', 'Boulangerie',
+        'Fruits & Légumes', 'Viandes & Charcuterie', 'Poissons & Fruits de Mer',
+        'Cosmétique & Hygiène', 'Produits d\'Entretien', 'Quincaillerie Générale',
+        'Peinture & Droguerie', 'Électroménager', 'Matériel Informatique',
+        'Téléphonie & Accessoires', 'Papeterie & Fournitures', 'Textile & Habillement',
+        'Chaussures', 'Bijouterie & Accessoires', 'Jouets & Loisirs', 'Articles de Sport',
+        'Meubles & Ameublement', 'Literie', 'Vaisselle & Ustensiles', 'Pièces Détachées Auto',
+        'Pneumatiques', 'Lubrifiants & Huiles Moteur', 'Matériaux de Construction',
+        'Plomberie', 'Électricité (Matériel)', 'Outillage Professionnel', 'Agro-Fournitures',
+        'Semences & Engrais', 'Aliments pour Bétail', 'Matériel Médical',
+        'Produits Pharmaceutiques', 'Cahiers & Livres Scolaires', 'Instruments de Musique',
+        'Matériel de Bureau', 'Emballages & Conditionnement', 'Produits Chimiques Industriels',
+        'Câblerie & Connectique', 'Climatisation & Ventilation', 'Sanitaires',
+    ];
+
+    private const SUFFIXES_VARIANTE = ['Import', 'Local', 'Gros', 'Détail'];
+
+    private const FORMATS = [
+        '250g', '500g', '1kg', '2kg', '5kg', '10kg', '25kg', '50kg',
+        '250ml', '500ml', '1L', '1.5L', '5L', '20L',
+        'Unité', 'Paquet', 'Carton de 12', 'Carton de 24', 'Pack de 6', 'Sachet',
+    ];
+
+    private const QUALIFICATIFS = [
+        'Premium', 'Classique', 'Économique', 'Extra', 'Super', 'Standard',
+        'Format Familial', 'Édition Spéciale', 'Nouvelle Formule', 'Origine Contrôlée',
+        'Qualité Export', 'Gamme Pro',
+    ];
+
+    private const CATEGORIES_SERVICE = [
+        'Services de Transport', 'Services de Réparation', 'Services de Conseil',
+        'Services Informatiques', 'Location de Matériel', 'Nettoyage & Blanchisserie',
+        'Photographie & Impression', 'Services de Restauration', 'Maintenance Technique',
+        'Formation Professionnelle',
+    ];
+
+    /**
+     * @return array<int, array{id:int, nom:string, prix_vente:float, prix_achat:float, compte_vente:string, compte_achat:string, taux_tva:float, type:string}>
+     */
+    private function creerCategoriesEtProduits(int $entrepriseId, int $nbCategories, int $produitsParCategorie, int $idx): array
+    {
+        $nomsCategories = [];
+        foreach (self::CATEGORIES_SERVICE as $c) {
+            $nomsCategories[] = $c;
+        }
+        foreach (self::SECTEURS_CATEGORIES as $c) {
+            $nomsCategories[] = $c;
+        }
+        $i = 0;
+        while (count($nomsCategories) < $nbCategories) {
+            $base = self::SECTEURS_CATEGORIES[$i % count(self::SECTEURS_CATEGORIES)];
+            $suffixe = self::SUFFIXES_VARIANTE[intdiv($i, count(self::SECTEURS_CATEGORIES)) % count(self::SUFFIXES_VARIANTE)];
+            $nomsCategories[] = $base . ' - ' . $suffixe;
+            $i++;
+        }
+        $nomsCategories = array_slice($nomsCategories, 0, $nbCategories);
+
+        $categorieLignes = [];
+        foreach ($nomsCategories as $nom) {
+            $prefixe = strtoupper(substr(preg_replace('/[^A-Za-z]/', '', $nom), 0, 3)) ?: 'CAT';
+            $categorieLignes[] = [
+                'entreprise_id' => $entrepriseId,
+                'nom' => $nom,
+                'prefixe' => $prefixe,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ];
+        }
+        DB::table('categories')->insert($categorieLignes);
+        $categories = Categorie::where('entreprise_id', $entrepriseId)->get(['id', 'nom']);
+
+        $produitsLignes = [];
+        $compteurGlobal = 0;
+        foreach ($categories as $categorie) {
+            $estService = in_array($categorie->nom, self::CATEGORIES_SERVICE);
+            $baseNom = preg_split('/[\s\-]/', $categorie->nom)[0];
+
+            for ($p = 1; $p <= $produitsParCategorie; $p++) {
+                $compteurGlobal++;
+                $qualificatif = self::QUALIFICATIFS[array_rand(self::QUALIFICATIFS)];
+                $format = self::FORMATS[array_rand(self::FORMATS)];
+                $nomProduit = trim("{$baseNom} {$qualificatif} {$format}") . ' #' . $p;
+
+                if ($estService) {
+                    $type = 'service';
+                    $prixVente = round(rand(2000, 150000) / 100) * 100;
+                    $prixAchat = 0;
+                } else {
+                    $rand100 = rand(1, 100);
+                    $type = match (true) {
+                        $rand100 <= 65 => 'marchandise',
+                        $rand100 <= 78 => 'matiere_premiere',
+                        $rand100 <= 88 => 'produit_fini',
+                        $rand100 <= 95 => 'consommable_stockable',
+                        default => 'consommable_non_stockable',
+                    };
+                    $prixAchat = round(rand(500, 50000) / 50) * 50;
+                    $prixVente = round($prixAchat * (1 + rand(15, 60) / 100) / 50) * 50;
+                }
+
+                $tauxTva = rand(1, 100) <= 90 ? 18.00 : 0.00;
+                $compteVente = $this->comptesVenteDisponibles[array_rand($this->comptesVenteDisponibles)];
+                $compteAchat = $this->comptesAchatDisponibles[array_rand($this->comptesAchatDisponibles)];
+
+                $produitsLignes[] = [
+                    'entreprise_id' => $entrepriseId,
+                    'reference' => 'P' . ($idx + 1) . '-' . str_pad((string) $compteurGlobal, 6, '0', STR_PAD_LEFT),
+                    'nom' => $nomProduit,
                     'type' => $type,
-                    'categorie_id' => $catId,
-                    'unite' => $unites[rand(0, 5)],
+                    'categorie_id' => $categorie->id,
+                    'unite' => 'Unité',
                     'prix_achat' => $prixAchat,
                     'prix_vente' => $prixVente,
-                    'taux_tva' => 18.00,
-                    'compte_vente' => '701000',
-                    'compte_achat' => $type === 'matiere_premiere' ? '602100' : '601000',
-                    'photo' => 'https://images.unsplash.com/photo-1542838132-92c53300491e?w=400',
+                    'taux_tva' => $tauxTva,
+                    'compte_vente' => $compteVente,
+                    'compte_achat' => $compteAchat,
+                    'quantite_commandee' => 0,
+                    'quantite_a_receptionner' => 0,
+                    'photo' => "https://picsum.photos/seed/p{$entrepriseId}-{$compteurGlobal}/400/400",
+                    'statut' => 'actif',
                     'created_at' => now(),
                     'updated_at' => now(),
                 ];
-            }
-            DB::table('produits')->insert($productsBatch);
-        }
-        $prodIds2 = DB::table('produits')->where('entreprise_id', $ent2)->pluck('id')->toArray();
-        $this->info('  -> Produits de l\'entreprise 2 generes !');
 
-        // Attribution des stocks initiaux
-        $this->info('📦 Generation des stocks physiques...');
-        $stocksToInsert = [];
-        
-        foreach ($pdvIds1 as $pdvId) {
-            $selectedProds = array_rand(array_flip($prodIds1), 300);
-            foreach ($selectedProds as $pId) {
-                $qte = rand(0, 200);
-                $stocksToInsert[] = [
-                    'produit_id' => $pId,
+                if (count($produitsLignes) >= 500) {
+                    DB::table('produits')->insert($produitsLignes);
+                    $produitsLignes = [];
+                }
+            }
+        }
+        if (!empty($produitsLignes)) {
+            DB::table('produits')->insert($produitsLignes);
+        }
+
+        return Produit::where('entreprise_id', $entrepriseId)
+            ->get(['id', 'nom', 'prix_vente', 'prix_achat', 'compte_vente', 'compte_achat', 'taux_tva', 'type'])
+            ->map(fn($p) => [
+                'id' => $p->id, 'nom' => $p->nom,
+                'prix_vente' => (float) $p->prix_vente, 'prix_achat' => (float) $p->prix_achat,
+                'compte_vente' => $p->compte_vente, 'compte_achat' => $p->compte_achat,
+                'taux_tva' => (float) $p->taux_tva, 'type' => $p->type,
+            ])
+            ->all();
+    }
+
+    private function creerStocksInitiaux(array $produits, array $pdvIds): void
+    {
+        $stockables = array_values(array_filter($produits, fn($p) => in_array($p['type'], Produit::TYPES_STOCKABLES)));
+        $lignes = [];
+
+        foreach ($stockables as $produit) {
+            $nbPdv = rand(1, count($pdvIds));
+            $pdvChoisis = (array) array_rand(array_flip($pdvIds), $nbPdv);
+            if (!is_array($pdvChoisis)) $pdvChoisis = [$pdvChoisis];
+
+            foreach ($pdvChoisis as $pdvId) {
+                $rand20 = rand(1, 20);
+                $quantite = match (true) {
+                    $rand20 === 1 => 0,
+                    $rand20 <= 3  => rand(1, 5),
+                    default       => rand(10, 500),
+                };
+
+                $lignes[] = [
+                    'produit_id' => $produit['id'],
                     'point_de_vente_id' => $pdvId,
-                    'quantite_disponible' => $qte,
+                    'quantite_disponible' => $quantite,
                     'stock_minimum' => 10,
-                    'stock_maximum' => 500,
+                    'stock_maximum' => 1000,
                     'created_at' => now(),
                     'updated_at' => now(),
                 ];
+
+                if (count($lignes) >= 500) {
+                    DB::table('stocks')->insert($lignes);
+                    $lignes = [];
+                }
             }
         }
+        if (!empty($lignes)) {
+            DB::table('stocks')->insert($lignes);
+        }
+    }
 
-        foreach ($pdvIds2 as $pdvId) {
-            $selectedProds = array_rand(array_flip($prodIds2), 300);
-            foreach ($selectedProds as $pId) {
-                $qte = rand(0, 200);
-                $stocksToInsert[] = [
-                    'produit_id' => $pId,
-                    'point_de_vente_id' => $pdvId,
-                    'quantite_disponible' => $qte,
-                    'stock_minimum' => 10,
-                    'stock_maximum' => 500,
-                    'created_at' => now(),
-                    'updated_at' => now(),
-                ];
-            }
+    // ═══════════════════════════════════════════════════════════════
+    // PRODUCTION
+    // ═══════════════════════════════════════════════════════════════
+
+    private function creerProduction(int $entrepriseId, array $pdvIds, array $produits, array $utilisateursParPdv, int $n): void
+    {
+        $matieresPremiere = array_values(array_filter($produits, fn($p) => $p['type'] === 'matiere_premiere'));
+        $produitsFinis = array_values(array_filter($produits, fn($p) => $p['type'] === 'produit_fini'));
+
+        if (empty($matieresPremiere) || empty($produitsFinis)) {
+            $this->warn('    ⚠️  Pas assez de matières premières/produits finis pour générer la production — étape ignorée.');
+            return;
         }
 
-        DB::table('stocks')->insert($stocksToInsert);
+        // NB : fiches_techniques a une contrainte UNIQUE(entreprise_id, produit_fini_id) —
+        // un seul "type de fiche" par produit fini. On crée donc D'ABORD un jeu de
+        // fiches techniques (une par produit fini distinct, jusqu'à 100 ou moins
+        // selon le nombre de produits finis disponibles), PUIS on génère $n ordres
+        // de production qui piochent parmi ces fiches (plusieurs ordres peuvent
+        // légitimement utiliser la même fiche/recette, comme dans la vraie vie).
+        $nbFiches = min(100, count($produitsFinis));
+        $produitsFinisChoisis = collect($produitsFinis)->random($nbFiches)->values();
 
-        // 10. Module Production (100 Recettes et Ordres de production)
-        $this->info('🏭 Generation du module Production (100 FT et 100 ordres)...');
-        
-        $matieresE1 = DB::table('produits')->where('entreprise_id', $ent1)->where('type', 'matiere_premiere')->pluck('id')->toArray();
-        $finisE1 = DB::table('produits')->where('entreprise_id', $ent1)->where('type', 'produit_fini')->pluck('id')->toArray();
-        
-        $matieresE2 = DB::table('produits')->where('entreprise_id', $ent2)->where('type', 'matiere_premiere')->pluck('id')->toArray();
-        $finisE2 = DB::table('produits')->where('entreprise_id', $ent2)->where('type', 'produit_fini')->pluck('id')->toArray();
+        $fiches = []; // [produit_fini_id => ['fiche_id' => x, 'ingredients' => [[id, quantite, prix_achat], ...]]]
 
-        // 100 FT + OP pour l'entreprise 1
-        for ($i = 0; $i < min(100, count($finisE1)); $i++) {
-            $pfId = $finisE1[$i];
-            
-            $ftId = DB::table('fiches_techniques')->insertGetId([
-                'entreprise_id' => $ent1,
-                'produit_fini_id' => $pfId,
-                'description' => "Recette de production de l'article fini #{$i}",
-                'created_at' => now(),
-                'updated_at' => now(),
-            ]);
+        foreach ($produitsFinisChoisis as $produitFini) {
+            $ficheId = FicheTechnique::create([
+                'entreprise_id' => $entrepriseId,
+                'produit_fini_id' => $produitFini['id'],
+                'description' => 'Recette de production — ' . $produitFini['nom'],
+            ])->id;
 
-            // Ajouter 2 ingredients
-            if (isset($matieresE1[$i])) {
-                DB::table('fiche_technique_details')->insert([
-                    [
-                        'fiche_technique_id' => $ftId,
-                        'ingredient_id' => $matieresE1[$i],
-                        'quantite' => 2.50,
-                        'unite' => 'Kg',
-                        'created_at' => now(),
-                        'updated_at' => now(),
-                    ]
+            $nbIngredients = min(rand(2, 4), count($matieresPremiere));
+            $ingredientsChoisis = collect($matieresPremiere)->random($nbIngredients)->values();
+
+            $ingredientsFiche = [];
+            foreach ($ingredientsChoisis as $mp) {
+                $quantite = rand(1, 10);
+                FicheTechniqueDetail::create([
+                    'fiche_technique_id' => $ficheId,
+                    'ingredient_id' => $mp['id'],
+                    'quantite' => $quantite,
+                    'unite' => 'Unité',
                 ]);
-            }
-            if (isset($matieresE1[$i + 1])) {
-                DB::table('fiche_technique_details')->insert([
-                    [
-                        'fiche_technique_id' => $ftId,
-                        'ingredient_id' => $matieresE1[$i + 1],
-                        'quantite' => 1.25,
-                        'unite' => 'Litre',
-                        'created_at' => now(),
-                        'updated_at' => now(),
-                    ]
-                ]);
+                $ingredientsFiche[] = ['id' => $mp['id'], 'quantite_unitaire' => $quantite, 'prix_achat' => $mp['prix_achat']];
             }
 
-            // Creer l'ordre de production
-            DB::table('ordres_production')->insert([
-                'entreprise_id' => $ent1,
-                'point_de_vente_id' => $pdvIds1[rand(0, 3)],
-                'produit_fini_id' => $pfId,
-                'code_ordre' => "OP-" . date('ymd') . "-" . str_pad($i + 1, 4, '0', STR_PAD_LEFT),
-                'quantite_cible' => rand(10, 100),
+            $fiches[$produitFini['id']] = ['fiche_id' => $ficheId, 'produit' => $produitFini, 'ingredients' => $ingredientsFiche];
+        }
+
+        $fichesDisponibles = array_values($fiches);
+
+        for ($i = 1; $i <= $n; $i++) {
+            $ficheChoisie = $fichesDisponibles[array_rand($fichesDisponibles)];
+            $produitFini = $ficheChoisie['produit'];
+            $pdvId = $pdvIds[array_rand($pdvIds)];
+
+            $dateProduction = now()->subDays(rand(1, 300))->toDateString();
+            $quantiteProduite = rand(5, 50);
+
+            $ordre = OrdreProduction::create([
+                'entreprise_id' => $entrepriseId,
+                'point_de_vente_id' => $pdvId,
+                'produit_fini_id' => $produitFini['id'],
+                'code_ordre' => NumerotationService::genererNumeroOD($entrepriseId),
+                'quantite_cible' => $quantiteProduite,
                 'statut' => 'Terminé',
-                'date_production' => now()->subDays(rand(1, 180))->toDateString(),
-                'created_at' => now(),
-                'updated_at' => now(),
-            ]);
-        }
-
-        // 100 FT + OP pour l'entreprise 2
-        for ($i = 0; $i < min(100, count($finisE2)); $i++) {
-            $pfId = $finisE2[$i];
-            
-            $ftId = DB::table('fiches_techniques')->insertGetId([
-                'entreprise_id' => $ent2,
-                'produit_fini_id' => $pfId,
-                'description' => "Recette de production de l'article fini #{$i}",
-                'created_at' => now(),
-                'updated_at' => now(),
+                'date_production' => $dateProduction,
             ]);
 
-            // Ajouter 2 ingredients
-            if (isset($matieresE2[$i])) {
-                DB::table('fiche_technique_details')->insert([
-                    [
-                        'fiche_technique_id' => $ftId,
-                        'ingredient_id' => $matieresE2[$i],
-                        'quantite' => 3.00,
-                        'unite' => 'Kg',
-                        'created_at' => now(),
-                        'updated_at' => now(),
-                    ]
-                ]);
+            $consommations = [];
+            foreach ($ficheChoisie['ingredients'] as $ing) {
+                $qte = $ing['quantite_unitaire'] * $quantiteProduite;
+                $produitModel = Produit::find($ing['id']);
+                if ($produitModel) {
+                    $stockActuel = $produitModel->stockActuel($pdvId);
+                    if ($stockActuel >= $qte) {
+                        $produitModel->decrementStock($pdvId, $qte);
+                        $consommations[] = ['produit' => $produitModel, 'quantite' => $qte, 'valeur_unitaire' => $ing['prix_achat']];
+                    }
+                }
             }
-            if (isset($matieresE2[$i + 1])) {
-                DB::table('fiche_technique_details')->insert([
-                    [
-                        'fiche_technique_id' => $ftId,
-                        'ingredient_id' => $matieresE2[$i + 1],
-                        'quantite' => 1.50,
-                        'unite' => 'Litre',
-                        'created_at' => now(),
-                        'updated_at' => now(),
-                    ]
-                ]);
+            $produitFiniModel = Produit::find($produitFini['id']);
+            if ($produitFiniModel) {
+                $produitFiniModel->incrementStock($pdvId, $quantiteProduite);
             }
 
-            // Creer l'ordre de production
-            DB::table('ordres_production')->insert([
-                'entreprise_id' => $ent2,
-                'point_de_vente_id' => $pdvIds2[rand(0, 3)],
-                'produit_fini_id' => $pfId,
-                'code_ordre' => "OP-" . date('ymd') . "-" . str_pad($i + 101, 4, '0', STR_PAD_LEFT),
-                'quantite_cible' => rand(10, 100),
-                'statut' => 'Terminé',
-                'date_production' => now()->subDays(rand(1, 180))->toDateString(),
-                'created_at' => now(),
-                'updated_at' => now(),
-            ]);
+            $valeurProduction = array_sum(array_map(fn($c) => $c['quantite'] * $c['valeur_unitaire'], $consommations));
+            if (!empty($consommations) || $valeurProduction > 0) {
+                ComptabiliteService::genererEcritureProduction($ordre, $consommations, $valeurProduction ?: ($quantiteProduite * $produitFini['prix_achat']));
+            }
         }
+    }
 
-        // 11. Ventes (100 transactions par entreprise avec ecritures, operations et cycle de documents)
-        $this->info('💰 Generation des ventes et achats massifs (100 de chaque par entreprise)...');
-        
-        $marchandises1 = DB::table('produits')->where('entreprise_id', $ent1)->where('type', 'marchandise')->pluck('id')->toArray();
-        $marchandises2 = DB::table('produits')->where('entreprise_id', $ent2)->where('type', 'marchandise')->pluck('id')->toArray();
+    // ═══════════════════════════════════════════════════════════════
+    // VENTES
+    // ═══════════════════════════════════════════════════════════════
 
-        $modes = ['espèces', 'virement', 'crédit', 'mobile_money'];
-        $moyens = ['WAVE', 'OM', 'MTN', 'MOOV', 'BNI', 'SGBCI'];
+    /**
+     * @return array<int> IDs des ventes créées
+     */
+    private function creerVentes(int $entrepriseId, array $pdvIds, array $clients, array $produits, array $utilisateursParPdv, int $n): array
+    {
+        $produitsVendables = array_values(array_filter($produits, fn($p) => $p['type'] !== 'matiere_premiere'));
+        $banques = $this->codesJournauxParEntreprise[$entrepriseId] ?? ['BNI'];
+        $ventesIds = [];
 
-        // Ventes Entreprise 1
-        for ($i = 1; $i <= 100; $i++) {
-            $clientId = $clients1[rand(0, 99)];
-            $pdvId = $pdvIds1[rand(0, 3)];
-            $caissierId = $caissiersPdv1[rand(0, 3)];
-            $ref = "VTE-" . date('ymd') . "-" . str_pad($i, 4, '0', STR_PAD_LEFT);
-            $mode = $modes[rand(0, 3)];
-            
-            $qte = rand(1, 10);
-            $px = rand(10, 100) * 100;
-            $ht = $qte * $px;
-            $tva = $ht * 0.18;
-            $ttc = $ht + $tva;
-            
-            $date = now()->subDays(rand(1, 180));
-            $etape = $i <= 25 ? 'Devis' : ($i <= 50 ? 'Bon de Commande' : ($i <= 75 ? 'Bon de Livraison' : 'Facture'));
-            $statut = $mode === 'crédit' ? 'Non payé' : 'Payé';
+        $repartition = [
+            'comptant_total'   => (int) round($n * 0.35),
+            'comptant_partiel' => (int) round($n * 0.15),
+            'credit'           => (int) round($n * 0.20),
+            'banque_totale'    => (int) round($n * 0.20),
+            'banque_partielle' => (int) round($n * 0.10),
+        ];
 
-            $vId = DB::table('ventes')->insertGetId([
-                'point_de_vente_id' => $pdvId,
-                'utilisateur_id' => $caissierId,
-                'client_id' => $clientId,
-                'numero_facture' => $ref,
-                'date_vente' => $date,
-                'mode_paiement' => $mode,
-                'moyen_bancaire' => $mode !== 'espèces' && $mode !== 'crédit' ? $moyens[rand(0, 5)] : null,
-                'montant_ht' => $ht,
-                'montant_tva' => $tva,
-                'montant_ttc' => $ttc,
-                'statut' => $statut,
-                'type_facture' => 'normale',
-                'normalise' => true,
-                'etape' => $etape,
-                'created_at' => now(),
-                'updated_at' => now(),
-            ]);
+        foreach ($repartition as $modeCle => $nombre) {
+            for ($i = 0; $i < $nombre; $i++) {
+                $pdvId = $pdvIds[array_rand($pdvIds)];
+                $utilisateurId = $utilisateursParPdv[$pdvId][array_rand($utilisateursParPdv[$pdvId])];
+                $client = rand(1, 100) <= 70 ? $clients[array_rand($clients)] : null;
+                $date = now()->subDays(rand(0, 360))->toDateString();
 
-            DB::table('vente_details')->insert([
-                'vente_id' => $vId,
-                'produit_id' => $marchandises1[rand(0, 99)],
-                'quantite' => $qte,
-                'prix_unitaire' => $px,
-                'montant_tva' => $tva,
-                'montant_ttc' => $ttc,
-                'created_at' => now(),
-                'updated_at' => now(),
-            ]);
+                $nbArticles = rand(1, 6);
+                $articlesChoisis = collect($produitsVendables)->random(min($nbArticles, count($produitsVendables)))->values();
 
-            if ($etape === 'Facture') {
-                $opId = DB::table('operations')->insertGetId([
-                    'entreprise_id' => $ent1,
+                $montantHt = 0;
+                $montantTva = 0;
+                $lignesDetail = [];
+                foreach ($articlesChoisis as $art) {
+                    $qte = rand(1, 20);
+                    $ht = $qte * $art['prix_vente'];
+                    $tva = $ht * ($art['taux_tva'] / 100);
+                    $montantHt += $ht;
+                    $montantTva += $tva;
+                    $lignesDetail[] = ['produit' => $art, 'quantite' => $qte, 'ht' => $ht, 'tva' => $tva];
+                }
+                $remise = rand(1, 100) <= 15 ? round($montantHt * (rand(1, 10) / 100)) : 0;
+                $montantTtc = $montantHt - $remise + $montantTva;
+
+                $modePaiement = match ($modeCle) {
+                    'comptant_total', 'comptant_partiel' => 'Espèces',
+                    'credit' => 'Crédit',
+                    default => 'Banque : ' . $banques[array_rand($banques)],
+                };
+
+                $numero = NumerotationService::genererNumeroVente($entrepriseId, 'Facture');
+
+                $vente = Vente::create([
                     'point_de_vente_id' => $pdvId,
-                    'date_operation' => $date,
-                    'type_operation' => 'FactureVente',
-                    'code_journal' => 'VTE',
-                    'numero_saisie' => (string)$i,
-                    'reference_document' => $ref,
-                    'libelle_general' => "Vente de marchandises - Facture {$ref}",
-                    'solde_equilibre' => 0.00,
-                    'est_equilibree' => true,
-                    'created_at' => now(),
-                    'updated_at' => now(),
+                    'utilisateur_id' => $utilisateurId,
+                    'client_id' => $client,
+                    'numero_facture' => $numero,
+                    'date_vente' => $date,
+                    'mode_paiement' => $modePaiement,
+                    'moyen_bancaire' => str_starts_with($modePaiement, 'Banque') ? ['carte', 'virement', 'cheque'][array_rand(['carte', 'virement', 'cheque'])] : null,
+                    'reference_paiement' => str_starts_with($modePaiement, 'Banque') ? 'REF' . rand(100000, 999999) : null,
+                    'montant_ht' => $montantHt,
+                    'montant_tva' => $montantTva,
+                    'montant_ttc' => $montantTtc,
+                    'remise' => $remise,
+                    'statut' => match ($modeCle) {
+                        'credit' => 'Crédit',
+                        'comptant_partiel', 'banque_partielle' => 'Avance',
+                        default => 'Payé',
+                    },
+                    'type_facture' => 'normale',
+                    'etape' => 'Facture',
+                    'normalise' => rand(1, 100) <= 70,
+                    'archived' => false,
                 ]);
 
-                // Debit client 411
-                DB::table('ecritures_comptables')->insert([
-                    'operation_id' => $opId,
-                    'entreprise_id' => $ent1,
-                    'point_de_vente_id' => $pdvId,
-                    'date_ecriture' => $date,
-                    'libelle' => "Facturation client - {$ref}",
-                    'reference_document' => $ref,
-                    'code_journal' => 'VTE',
-                    'compte_debit' => '411000',
-                    'debit' => $ttc,
+                foreach ($lignesDetail as $ld) {
+                    $detail = VenteDetail::create([
+                        'vente_id' => $vente->id,
+                        'produit_id' => $ld['produit']['id'],
+                        'quantite' => $ld['quantite'],
+                        'unite' => 'Unité',
+                        'prix_unitaire' => $ld['produit']['prix_vente'],
+                        'montant_tva' => $ld['tva'],
+                        'montant_ttc' => $ld['ht'] + $ld['tva'],
+                    ]);
+
+                    $produitModel = Produit::find($ld['produit']['id']);
+                    if ($produitModel && $produitModel->estStockable()) {
+                        $stockDispo = $produitModel->stockActuel($pdvId);
+                        if ($stockDispo >= $ld['quantite']) {
+                            $produitModel->decrementStock($pdvId, $ld['quantite']);
+                            $detail->update(['quantite_livree' => $ld['quantite']]);
+                        }
+                    }
+                }
+
+                $montantPaye = match ($modeCle) {
+                    'comptant_total', 'banque_totale' => $montantTtc,
+                    'comptant_partiel', 'banque_partielle' => round($montantTtc * (rand(30, 70) / 100)),
                     'credit' => 0,
-                    'created_at' => now(),
-                    'updated_at' => now(),
-                ]);
+                };
 
-                // Credit vente 701
-                DB::table('ecritures_comptables')->insert([
-                    'operation_id' => $opId,
-                    'entreprise_id' => $ent1,
-                    'point_de_vente_id' => $pdvId,
-                    'date_ecriture' => $date,
-                    'libelle' => "Produit des ventes - {$ref}",
-                    'reference_document' => $ref,
-                    'code_journal' => 'VTE',
-                    'compte_credit' => '701000',
-                    'debit' => 0,
-                    'credit' => $ht,
-                    'created_at' => now(),
-                    'updated_at' => now(),
-                ]);
+                ComptabiliteService::genererEcrituresVente($vente, $montantPaye, $modePaiement, $date);
 
-                // Credit TVA 4431
-                if ($tva > 0) {
-                    DB::table('ecritures_comptables')->insert([
-                        'operation_id' => $opId,
-                        'entreprise_id' => $ent1,
+                if ($montantPaye > 0) {
+                    $soldeActuel = TresorerieJournal::where('point_de_vente_id', $pdvId)->orderByDesc('created_at')->value('solde_resultat') ?? 0;
+                    TresorerieJournal::create([
                         'point_de_vente_id' => $pdvId,
-                        'date_ecriture' => $date,
-                        'libelle' => "TVA facturée - {$ref}",
-                        'reference_document' => $ref,
-                        'code_journal' => 'VTE',
-                        'compte_credit' => '443100',
-                        'debit' => 0,
-                        'credit' => $tva,
-                        'created_at' => now(),
-                        'updated_at' => now(),
-                    ]);
-                }
-
-                if ($statut === 'Payé') {
-                    DB::table('tresorerie_journal')->insert([
-                        'point_de_vente_id' => $pdvId,
-                        'utilisateur_id' => $caissierId,
                         'date_operation' => $date,
-                        'type_operation' => 'recette',
-                        'libelle' => "Encaissement Facture {$ref}",
-                        'mode_paiement' => $mode,
-                        'reference_paiement' => "PAI-{$ref}",
-                        'montant_entree' => $ttc,
-                        'montant_sortie' => 0.00,
-                        'solde_resultat' => $ttc,
-                        'reference_document' => $ref,
-                        'created_at' => now(),
-                        'updated_at' => now(),
+                        'type_operation' => 'Encaissement',
+                        'libelle' => ComptabiliteService::libelleTresorerieVente($vente),
+                        'mode_paiement' => $modePaiement,
+                        'montant_entree' => $montantPaye,
+                        'montant_sortie' => 0,
+                        'solde_resultat' => $soldeActuel + $montantPaye,
+                        'reference_document' => $numero,
                     ]);
                 }
+
+                $ventesIds[] = $vente->id;
             }
         }
 
-        // Ventes Entreprise 2
-        for ($i = 1; $i <= 100; $i++) {
-            $clientId = $clients2[rand(0, 99)];
-            $pdvId = $pdvIds2[rand(0, 3)];
-            $caissierId = $caissiersPdv2[rand(0, 3)];
-            $ref = "VTE-" . date('ymd') . "-" . str_pad($i + 100, 4, '0', STR_PAD_LEFT);
-            $mode = $modes[rand(0, 3)];
-            
-            $qte = rand(1, 10);
-            $px = rand(10, 100) * 100;
-            $ht = $qte * $px;
-            $tva = $ht * 0.18;
-            $ttc = $ht + $tva;
-            
-            $date = now()->subDays(rand(1, 180));
-            $etape = $i <= 25 ? 'Devis' : ($i <= 50 ? 'Bon de Commande' : ($i <= 75 ? 'Bon de Livraison' : 'Facture'));
-            $statut = $mode === 'crédit' ? 'Non payé' : 'Payé';
+        return $ventesIds;
+    }
 
-            $vId = DB::table('ventes')->insertGetId([
-                'point_de_vente_id' => $pdvId,
-                'utilisateur_id' => $caissierId,
-                'client_id' => $clientId,
-                'numero_facture' => $ref,
-                'date_vente' => $date,
-                'mode_paiement' => $mode,
-                'moyen_bancaire' => $mode !== 'espèces' && $mode !== 'crédit' ? $moyens[rand(0, 5)] : null,
-                'montant_ht' => $ht,
-                'montant_tva' => $tva,
-                'montant_ttc' => $ttc,
-                'statut' => $statut,
-                'type_facture' => 'normale',
-                'normalise' => true,
-                'etape' => $etape,
-                'created_at' => now(),
-                'updated_at' => now(),
-            ]);
+    // ═══════════════════════════════════════════════════════════════
+    // ACHATS
+    // ═══════════════════════════════════════════════════════════════
 
-            DB::table('vente_details')->insert([
-                'vente_id' => $vId,
-                'produit_id' => $marchandises2[rand(0, 99)],
-                'quantite' => $qte,
-                'prix_unitaire' => $px,
-                'montant_tva' => $tva,
-                'montant_ttc' => $ttc,
-                'created_at' => now(),
-                'updated_at' => now(),
-            ]);
+    private function creerAchats(int $entrepriseId, array $pdvIds, array $fournisseurs, array $produits, array $utilisateursParPdv, int $n): array
+    {
+        $produitsAchetables = array_values(array_filter($produits, fn($p) => $p['type'] !== 'service'));
+        $banques = $this->codesJournauxParEntreprise[$entrepriseId] ?? ['BNI'];
+        $achatsIds = [];
 
-            if ($etape === 'Facture') {
-                $opId = DB::table('operations')->insertGetId([
-                    'entreprise_id' => $ent2,
+        $repartition = [
+            'comptant_total'   => (int) round($n * 0.30),
+            'comptant_partiel' => (int) round($n * 0.10),
+            'credit'           => (int) round($n * 0.30),
+            'banque_totale'    => (int) round($n * 0.20),
+            'banque_partielle' => (int) round($n * 0.10),
+        ];
+
+        foreach ($repartition as $modeCle => $nombre) {
+            for ($i = 0; $i < $nombre; $i++) {
+                $pdvId = $pdvIds[array_rand($pdvIds)];
+                $utilisateurId = $utilisateursParPdv[$pdvId][array_rand($utilisateursParPdv[$pdvId])];
+                $fournisseurId = $fournisseurs[array_rand($fournisseurs)];
+                $date = now()->subDays(rand(0, 360))->toDateString();
+
+                $nbArticles = rand(1, 8);
+                $articlesChoisis = collect($produitsAchetables)->random(min($nbArticles, count($produitsAchetables)))->values();
+
+                $montantHt = 0;
+                $montantTva = 0;
+                $lignesDetail = [];
+                foreach ($articlesChoisis as $art) {
+                    $qte = rand(5, 100);
+                    $ht = $qte * $art['prix_achat'];
+                    $tva = $ht * ($art['taux_tva'] / 100);
+                    $montantHt += $ht;
+                    $montantTva += $tva;
+                    $lignesDetail[] = ['produit' => $art, 'quantite' => $qte, 'ht' => $ht, 'tva' => $tva];
+                }
+                $montantTtc = $montantHt + $montantTva;
+
+                $modePaiement = match ($modeCle) {
+                    'comptant_total', 'comptant_partiel' => 'Espèces',
+                    'credit' => 'Crédit',
+                    default => 'Banque : ' . $banques[array_rand($banques)],
+                };
+
+                $numero = NumerotationService::genererNumeroAchat($entrepriseId, 'Facture');
+
+                $achat = Achat::create([
                     'point_de_vente_id' => $pdvId,
-                    'date_operation' => $date,
-                    'type_operation' => 'FactureVente',
-                    'code_journal' => 'VTE',
-                    'numero_saisie' => (string)$i,
-                    'reference_document' => $ref,
-                    'libelle_general' => "Vente de marchandises - Facture {$ref}",
-                    'solde_equilibre' => 0.00,
-                    'est_equilibree' => true,
-                    'created_at' => now(),
-                    'updated_at' => now(),
+                    'utilisateur_id' => $utilisateurId,
+                    'fournisseur_id' => $fournisseurId,
+                    'numero_facture' => $numero,
+                    'date_achat' => $date,
+                    'mode_paiement' => $modePaiement,
+                    'moyen_bancaire' => str_starts_with($modePaiement, 'Banque') ? ['carte', 'virement', 'cheque'][array_rand(['carte', 'virement', 'cheque'])] : null,
+                    'reference_paiement' => str_starts_with($modePaiement, 'Banque') ? 'REF' . rand(100000, 999999) : null,
+                    'montant_ht' => $montantHt,
+                    'montant_tva' => $montantTva,
+                    'montant_ttc' => $montantTtc,
+                    'statut' => match ($modeCle) {
+                        'credit' => 'Crédit',
+                        'comptant_partiel', 'banque_partielle' => 'Avance',
+                        default => 'Payé',
+                    },
+                    'type_facture' => 'normale',
+                    'etape' => 'Facture',
+                    'normalise' => rand(1, 100) <= 60,
+                    'archived' => false,
                 ]);
 
-                // Debit client 411
-                DB::table('ecritures_comptables')->insert([
-                    'operation_id' => $opId,
-                    'entreprise_id' => $ent2,
-                    'point_de_vente_id' => $pdvId,
-                    'date_ecriture' => $date,
-                    'libelle' => "Facturation client - {$ref}",
-                    'reference_document' => $ref,
-                    'code_journal' => 'VTE',
-                    'compte_debit' => '411000',
-                    'debit' => $ttc,
+                foreach ($lignesDetail as $ld) {
+                    AchatDetail::create([
+                        'achat_id' => $achat->id,
+                        'produit_id' => $ld['produit']['id'],
+                        'quantite' => $ld['quantite'],
+                        'unite' => 'Unité',
+                        'prix_unitaire' => $ld['produit']['prix_achat'],
+                        'montant_tva' => $ld['tva'],
+                        'montant_ttc' => $ld['ht'] + $ld['tva'],
+                    ]);
+
+                    $produitModel = Produit::find($ld['produit']['id']);
+                    if ($produitModel && $produitModel->estStockable()) {
+                        $produitModel->incrementStock($pdvId, $ld['quantite']);
+                    }
+                }
+
+                $montantPaye = match ($modeCle) {
+                    'comptant_total', 'banque_totale' => $montantTtc,
+                    'comptant_partiel', 'banque_partielle' => round($montantTtc * (rand(30, 70) / 100)),
                     'credit' => 0,
-                    'created_at' => now(),
-                    'updated_at' => now(),
-                ]);
+                };
 
-                // Credit vente 701
-                DB::table('ecritures_comptables')->insert([
-                    'operation_id' => $opId,
-                    'entreprise_id' => $ent2,
-                    'point_de_vente_id' => $pdvId,
-                    'date_ecriture' => $date,
-                    'libelle' => "Produit des ventes - {$ref}",
-                    'reference_document' => $ref,
-                    'code_journal' => 'VTE',
-                    'compte_credit' => '701000',
-                    'debit' => 0,
-                    'credit' => $ht,
-                    'created_at' => now(),
-                    'updated_at' => now(),
-                ]);
+                ComptabiliteService::genererEcrituresAchat($achat, $montantPaye, $modePaiement, $date);
 
-                // Credit TVA 4431
-                if ($tva > 0) {
-                    DB::table('ecritures_comptables')->insert([
-                        'operation_id' => $opId,
-                        'entreprise_id' => $ent2,
+                if ($montantPaye > 0) {
+                    $soldeActuel = TresorerieJournal::where('point_de_vente_id', $pdvId)->orderByDesc('created_at')->value('solde_resultat') ?? 0;
+                    TresorerieJournal::create([
                         'point_de_vente_id' => $pdvId,
-                        'date_ecriture' => $date,
-                        'libelle' => "TVA facturée - {$ref}",
-                        'reference_document' => $ref,
-                        'code_journal' => 'VTE',
-                        'compte_credit' => '443100',
-                        'debit' => 0,
-                        'credit' => $tva,
-                        'created_at' => now(),
-                        'updated_at' => now(),
+                        'date_operation' => $date,
+                        'type_operation' => 'Décaissement',
+                        'libelle' => ComptabiliteService::libelleTresorerieAchat($achat),
+                        'mode_paiement' => $modePaiement,
+                        'montant_entree' => 0,
+                        'montant_sortie' => $montantPaye,
+                        'solde_resultat' => $soldeActuel - $montantPaye,
+                        'reference_document' => $numero,
                     ]);
                 }
 
-                if ($statut === 'Payé') {
-                    DB::table('tresorerie_journal')->insert([
-                        'point_de_vente_id' => $pdvId,
-                        'utilisateur_id' => $caissierId,
-                        'date_operation' => $date,
-                        'type_operation' => 'recette',
-                        'libelle' => "Encaissement Facture {$ref}",
-                        'mode_paiement' => $mode,
-                        'reference_paiement' => "PAI-{$ref}",
-                        'montant_entree' => $ttc,
-                        'montant_sortie' => 0.00,
-                        'solde_resultat' => $ttc,
-                        'reference_document' => $ref,
-                        'created_at' => now(),
-                        'updated_at' => now(),
+                $achatsIds[] = $achat->id;
+            }
+        }
+
+        return $achatsIds;
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    // CYCLE DEVIS → BON DE COMMANDE → BON DE LIVRAISON → FACTURE
+    // ═══════════════════════════════════════════════════════════════
+
+    private function creerCycleDocumentsVente(int $entrepriseId, array $pdvIds, array $clients, array $produits, array $utilisateursParPdv, int $n): void
+    {
+        $produitsVendables = array_values(array_filter($produits, fn($p) => $p['type'] !== 'matiere_premiere'));
+
+        for ($i = 0; $i < $n; $i++) {
+            $pdvId = $pdvIds[array_rand($pdvIds)];
+            $utilisateurId = $utilisateursParPdv[$pdvId][array_rand($utilisateursParPdv[$pdvId])];
+            $clientId = $clients[array_rand($clients)];
+            $dateDevis = now()->subDays(rand(10, 60));
+
+            $nbArticles = rand(1, 4);
+            $articlesChoisis = collect($produitsVendables)->random(min($nbArticles, count($produitsVendables)))->values();
+            $montantHt = 0; $montantTva = 0; $lignesDetail = [];
+            foreach ($articlesChoisis as $art) {
+                $qte = rand(1, 10);
+                $ht = $qte * $art['prix_vente'];
+                $tva = $ht * ($art['taux_tva'] / 100);
+                $montantHt += $ht; $montantTva += $tva;
+                $lignesDetail[] = ['produit' => $art, 'quantite' => $qte, 'ht' => $ht, 'tva' => $tva];
+            }
+            $montantTtc = $montantHt + $montantTva;
+
+            $devis = Vente::create([
+                'point_de_vente_id' => $pdvId, 'utilisateur_id' => $utilisateurId, 'client_id' => $clientId,
+                'numero_facture' => NumerotationService::genererNumeroVente($entrepriseId, 'Devis'),
+                'date_vente' => $dateDevis->toDateString(), 'mode_paiement' => 'Crédit',
+                'montant_ht' => $montantHt, 'montant_tva' => $montantTva, 'montant_ttc' => $montantTtc, 'remise' => 0,
+                'statut' => 'Brouillon', 'type_facture' => 'normale', 'etape' => 'Devis', 'normalise' => false, 'archived' => false,
+            ]);
+            foreach ($lignesDetail as $ld) {
+                VenteDetail::create([
+                    'vente_id' => $devis->id, 'produit_id' => $ld['produit']['id'], 'quantite' => $ld['quantite'],
+                    'unite' => 'Unité', 'prix_unitaire' => $ld['produit']['prix_vente'], 'montant_tva' => $ld['tva'], 'montant_ttc' => $ld['ht'] + $ld['tva'],
+                ]);
+            }
+
+            if (rand(1, 100) > 30) {
+                $bc = Vente::create([
+                    'point_de_vente_id' => $pdvId, 'utilisateur_id' => $utilisateurId, 'client_id' => $clientId,
+                    'numero_facture' => NumerotationService::genererNumeroVente($entrepriseId, 'Bon de commande'),
+                    'date_vente' => $dateDevis->copy()->addDays(rand(1, 5))->toDateString(), 'mode_paiement' => 'Crédit',
+                    'montant_ht' => $montantHt, 'montant_tva' => $montantTva, 'montant_ttc' => $montantTtc, 'remise' => 0,
+                    'statut' => 'Confirmée', 'type_facture' => 'normale', 'etape' => 'Bon de commande',
+                    'normalise' => false, 'archived' => false, 'parent_id' => $devis->id,
+                ]);
+                foreach ($lignesDetail as $ld) {
+                    VenteDetail::create([
+                        'vente_id' => $bc->id, 'produit_id' => $ld['produit']['id'], 'quantite' => $ld['quantite'],
+                        'unite' => 'Unité', 'prix_unitaire' => $ld['produit']['prix_vente'], 'montant_tva' => $ld['tva'], 'montant_ttc' => $ld['ht'] + $ld['tva'],
+                    ]);
+                }
+
+                if (rand(1, 100) > 40) {
+                    $dateFacture = $dateDevis->copy()->addDays(rand(6, 15))->toDateString();
+                    $numeroFacture = NumerotationService::genererNumeroVente($entrepriseId, 'Facture');
+
+                    $facture = Vente::create([
+                        'point_de_vente_id' => $pdvId, 'utilisateur_id' => $utilisateurId, 'client_id' => $clientId,
+                        'numero_facture' => $numeroFacture, 'date_vente' => $dateFacture, 'mode_paiement' => 'Espèces',
+                        'montant_ht' => $montantHt, 'montant_tva' => $montantTva, 'montant_ttc' => $montantTtc, 'remise' => 0,
+                        'statut' => 'Payé', 'type_facture' => 'normale', 'etape' => 'Facture',
+                        'normalise' => rand(1, 100) <= 70, 'archived' => false, 'parent_id' => $bc->id,
+                    ]);
+
+                    $bl = BonLivraison::create([
+                        'numero_bl' => NumerotationService::genererNumeroBL($entrepriseId),
+                        'vente_id' => $bc->id, 'facture_vente_id' => $facture->id, 'point_de_vente_id' => $pdvId,
+                        'client_id' => $clientId, 'created_by' => $utilisateurId,
+                        'date_livraison' => $dateFacture, 'statut' => 'Livré', 'livraison_partielle' => false,
+                    ]);
+
+                    foreach ($lignesDetail as $ld) {
+                        VenteDetail::create([
+                            'vente_id' => $facture->id, 'produit_id' => $ld['produit']['id'], 'quantite' => $ld['quantite'],
+                            'unite' => 'Unité', 'prix_unitaire' => $ld['produit']['prix_vente'], 'montant_tva' => $ld['tva'],
+                            'montant_ttc' => $ld['ht'] + $ld['tva'], 'quantite_livree' => $ld['quantite'],
+                        ]);
+                        BonLivraisonDetail::create([
+                            'bon_livraison_id' => $bl->id, 'produit_id' => $ld['produit']['id'],
+                            'libelle' => $ld['produit']['nom'], 'unite' => 'Unité',
+                            'qte_commandee' => $ld['quantite'], 'qte_livree' => $ld['quantite'],
+                        ]);
+
+                        $produitModel = Produit::find($ld['produit']['id']);
+                        if ($produitModel && $produitModel->estStockable()) {
+                            $stockDispo = $produitModel->stockActuel($pdvId);
+                            if ($stockDispo >= $ld['quantite']) {
+                                $produitModel->decrementStock($pdvId, $ld['quantite']);
+                            }
+                        }
+                    }
+
+                    ComptabiliteService::genererEcrituresVente($facture, $montantTtc, 'Espèces', $dateFacture);
+
+                    $soldeActuel = TresorerieJournal::where('point_de_vente_id', $pdvId)->orderByDesc('created_at')->value('solde_resultat') ?? 0;
+                    TresorerieJournal::create([
+                        'point_de_vente_id' => $pdvId, 'date_operation' => $dateFacture, 'type_operation' => 'Encaissement',
+                        'libelle' => ComptabiliteService::libelleTresorerieVente($facture), 'mode_paiement' => 'Espèces',
+                        'montant_entree' => $montantTtc, 'montant_sortie' => 0,
+                        'solde_resultat' => $soldeActuel + $montantTtc, 'reference_document' => $numeroFacture,
                     ]);
                 }
             }
         }
+    }
 
-        // Achats Entreprise 1
-        for ($i = 1; $i <= 100; $i++) {
-            $fournId = $fourn1[rand(0, 99)];
-            $pdvId = $pdvIds1[rand(0, 3)];
-            $adminUser = $admin1;
-            $ref = "ACH-" . date('ymd') . "-" . str_pad($i, 4, '0', STR_PAD_LEFT);
-            $mode = $modes[rand(0, 3)];
-            
-            $qte = rand(10, 50);
-            $px = rand(5, 50) * 100;
-            $ht = $qte * $px;
-            $tva = $ht * 0.18;
-            $ttc = $ht + $tva;
-            
-            $date = now()->subDays(rand(1, 180));
-            $etape = $i <= 25 ? 'Demande de prix' : ($i <= 50 ? 'Bon de commande' : 'Facture');
-            $statut = $mode === 'crédit' ? 'Non payé' : 'Payé';
+    // ═══════════════════════════════════════════════════════════════
+    // AVOIRS
+    // ═══════════════════════════════════════════════════════════════
 
-            $aId = DB::table('achats')->insertGetId([
-                'point_de_vente_id' => $pdvId,
-                'utilisateur_id' => $adminUser,
-                'fournisseur_id' => $fournId,
-                'numero_facture' => $ref,
-                'date_achat' => $date,
-                'mode_paiement' => $mode,
-                'montant_ht' => $ht,
-                'montant_tva' => $tva,
-                'montant_ttc' => $ttc,
-                'statut' => $statut,
-                'type_facture' => 'normale',
-                'etape' => $etape,
-                'created_at' => now(),
-                'updated_at' => now(),
-            ]);
+    private function creerAvoirs(array $ventesIds, array $achatsIds): void
+    {
+        $ventesEligibles = collect($ventesIds)->random(min(15, count($ventesIds)));
+        foreach ($ventesEligibles as $venteId) {
+            $vente = Vente::with('details.produit')->find($venteId);
+            if (!$vente || $vente->details->isEmpty()) continue;
 
-            DB::table('achat_details')->insert([
-                'achat_id' => $aId,
-                'produit_id' => $marchandises1[rand(0, 99)],
-                'quantite' => $qte,
-                'prix_unitaire' => $px,
-                'montant_tva' => $tva,
-                'montant_ttc' => $ttc,
-                'created_at' => now(),
-                'updated_at' => now(),
-            ]);
+            $pourcentage = [0.2, 0.3, 0.5, 1.0][array_rand([0.2, 0.3, 0.5, 1.0])];
+            $entrepriseId = $vente->pointDeVente->entreprise_id;
 
-            if ($etape === 'Facture') {
-                $opId = DB::table('operations')->insertGetId([
-                    'entreprise_id' => $ent1,
-                    'point_de_vente_id' => $pdvId,
-                    'date_operation' => $date,
-                    'type_operation' => 'FactureAchat',
-                    'code_journal' => 'ACH',
-                    'numero_saisie' => (string)($i + 200),
-                    'reference_document' => $ref,
-                    'libelle_general' => "Achat marchandises - Facture {$ref}",
-                    'solde_equilibre' => 0.00,
-                    'est_equilibree' => true,
-                    'created_at' => now(),
-                    'updated_at' => now(),
-                ]);
-
-                // Debit achat 601
-                DB::table('ecritures_comptables')->insert([
-                    'operation_id' => $opId,
-                    'entreprise_id' => $ent1,
-                    'point_de_vente_id' => $pdvId,
-                    'date_ecriture' => $date,
-                    'libelle' => "Achat de marchandises - {$ref}",
-                    'reference_document' => $ref,
-                    'code_journal' => 'ACH',
-                    'compte_debit' => '601000',
-                    'debit' => $ht,
-                    'credit' => 0,
-                    'created_at' => now(),
-                    'updated_at' => now(),
-                ]);
-
-                // Debit TVA 4452
-                if ($tva > 0) {
-                    DB::table('ecritures_comptables')->insert([
-                        'operation_id' => $opId,
-                        'entreprise_id' => $ent1,
-                        'point_de_vente_id' => $pdvId,
-                        'date_ecriture' => $date,
-                        'libelle' => "TVA déductible - {$ref}",
-                        'reference_document' => $ref,
-                        'code_journal' => 'ACH',
-                        'compte_debit' => '445200',
-                        'debit' => $tva,
-                        'credit' => 0,
-                        'created_at' => now(),
-                        'updated_at' => now(),
-                    ]);
-                }
-
-                // Credit fournisseur 401
-                DB::table('ecritures_comptables')->insert([
-                    'operation_id' => $opId,
-                    'entreprise_id' => $ent1,
-                    'point_de_vente_id' => $pdvId,
-                    'date_ecriture' => $date,
-                    'libelle' => "Dette Fournisseur - {$ref}",
-                    'reference_document' => $ref,
-                    'code_journal' => 'ACH',
-                    'compte_credit' => '401000',
-                    'debit' => 0,
-                    'credit' => $ttc,
-                    'created_at' => now(),
-                    'updated_at' => now(),
-                ]);
-
-                if ($statut === 'Payé') {
-                    DB::table('tresorerie_journal')->insert([
-                        'point_de_vente_id' => $pdvId,
-                        'utilisateur_id' => $adminUser,
-                        'date_operation' => $date,
-                        'type_operation' => 'dépense',
-                        'libelle' => "Decaissement Achat {$ref}",
-                        'mode_paiement' => $mode,
-                        'reference_paiement' => "PAI-ACH-{$ref}",
-                        'montant_entree' => 0.00,
-                        'montant_sortie' => $ttc,
-                        'solde_resultat' => -$ttc,
-                        'reference_document' => $ref,
-                        'created_at' => now(),
-                        'updated_at' => now(),
-                    ]);
-                }
-            }
-        }
-
-        // Achats Entreprise 2
-        for ($i = 1; $i <= 100; $i++) {
-            $fournId = $fourn2[rand(0, 99)];
-            $pdvId = $pdvIds2[rand(0, 3)];
-            $adminUser = $admin2;
-            $ref = "ACH-" . date('ymd') . "-" . str_pad($i + 100, 4, '0', STR_PAD_LEFT);
-            $mode = $modes[rand(0, 3)];
-            
-            $qte = rand(10, 50);
-            $px = rand(5, 50) * 100;
-            $ht = $qte * $px;
-            $tva = $ht * 0.18;
-            $ttc = $ht + $tva;
-            
-            $date = now()->subDays(rand(1, 180));
-            $etape = $i <= 25 ? 'Demande de prix' : ($i <= 50 ? 'Bon de commande' : 'Facture');
-            $statut = $mode === 'crédit' ? 'Non payé' : 'Payé';
-
-            $aId = DB::table('achats')->insertGetId([
-                'point_de_vente_id' => $pdvId,
-                'utilisateur_id' => $adminUser,
-                'fournisseur_id' => $fournId,
-                'numero_facture' => $ref,
-                'date_achat' => $date,
-                'mode_paiement' => $mode,
-                'montant_ht' => $ht,
-                'montant_tva' => $tva,
-                'montant_ttc' => $ttc,
-                'statut' => $statut,
-                'type_facture' => 'normale',
-                'etape' => $etape,
-                'created_at' => now(),
-                'updated_at' => now(),
-            ]);
-
-            DB::table('achat_details')->insert([
-                'achat_id' => $aId,
-                'produit_id' => $marchandises2[rand(0, 99)],
-                'quantite' => $qte,
-                'prix_unitaire' => $px,
-                'montant_tva' => $tva,
-                'montant_ttc' => $ttc,
-                'created_at' => now(),
-                'updated_at' => now(),
-            ]);
-
-            if ($etape === 'Facture') {
-                $opId = DB::table('operations')->insertGetId([
-                    'entreprise_id' => $ent2,
-                    'point_de_vente_id' => $pdvId,
-                    'date_operation' => $date,
-                    'type_operation' => 'FactureAchat',
-                    'code_journal' => 'ACH',
-                    'numero_saisie' => (string)($i + 200),
-                    'reference_document' => $ref,
-                    'libelle_general' => "Achat marchandises - Facture {$ref}",
-                    'solde_equilibre' => 0.00,
-                    'est_equilibree' => true,
-                    'created_at' => now(),
-                    'updated_at' => now(),
-                ]);
-
-                // Debit achat 601
-                DB::table('ecritures_comptables')->insert([
-                    'operation_id' => $opId,
-                    'entreprise_id' => $ent2,
-                    'point_de_vente_id' => $pdvId,
-                    'date_ecriture' => $date,
-                    'libelle' => "Achat de marchandises - {$ref}",
-                    'reference_document' => $ref,
-                    'code_journal' => 'ACH',
-                    'compte_debit' => '601000',
-                    'debit' => $ht,
-                    'credit' => 0,
-                    'created_at' => now(),
-                    'updated_at' => now(),
-                ]);
-
-                // Debit TVA 4452
-                if ($tva > 0) {
-                    DB::table('ecritures_comptables')->insert([
-                        'operation_id' => $opId,
-                        'entreprise_id' => $ent2,
-                        'point_de_vente_id' => $pdvId,
-                        'date_ecriture' => $date,
-                        'libelle' => "TVA déductible - {$ref}",
-                        'reference_document' => $ref,
-                        'code_journal' => 'ACH',
-                        'compte_debit' => '445200',
-                        'debit' => $tva,
-                        'credit' => 0,
-                        'created_at' => now(),
-                        'updated_at' => now(),
-                    ]);
-                }
-
-                // Credit fournisseur 401
-                DB::table('ecritures_comptables')->insert([
-                    'operation_id' => $opId,
-                    'entreprise_id' => $ent2,
-                    'point_de_vente_id' => $pdvId,
-                    'date_ecriture' => $date,
-                    'libelle' => "Dette Fournisseur - {$ref}",
-                    'reference_document' => $ref,
-                    'code_journal' => 'ACH',
-                    'compte_credit' => '401000',
-                    'debit' => 0,
-                    'credit' => $ttc,
-                    'created_at' => now(),
-                    'updated_at' => now(),
-                ]);
-
-                if ($statut === 'Payé') {
-                    DB::table('tresorerie_journal')->insert([
-                        'point_de_vente_id' => $pdvId,
-                        'utilisateur_id' => $adminUser,
-                        'date_operation' => $date,
-                        'type_operation' => 'dépense',
-                        'libelle' => "Decaissement Achat {$ref}",
-                        'mode_paiement' => $mode,
-                        'reference_paiement' => "PAI-ACH-{$ref}",
-                        'montant_entree' => 0.00,
-                        'montant_sortie' => $ttc,
-                        'solde_resultat' => -$ttc,
-                        'reference_document' => $ref,
-                        'created_at' => now(),
-                        'updated_at' => now(),
-                    ]);
-                }
-            }
-        }
-
-        // 12. Avoirs (5 Avoirs Clients et 5 Avoirs Fournisseurs par entreprise)
-        $this->info('📝 Generation des avoirs...');
-        for ($i = 1; $i <= 5; $i++) {
-            $ref = "AV-VTE-" . date('ymd') . "-" . str_pad($i, 4, '0', STR_PAD_LEFT);
-            $date = now()->subDays(rand(1, 10));
-            $ht = rand(10, 50) * 100;
-            $tva = $ht * 0.18;
-            $ttc = $ht + $tva;
-            
-            DB::table('ventes')->insert([
-                'point_de_vente_id' => $pdvIds1[rand(0, 3)],
-                'utilisateur_id' => $admin1,
-                'client_id' => $clients1[rand(0, 99)],
-                'numero_facture' => $ref,
-                'date_vente' => $date,
-                'mode_paiement' => 'crédit',
-                'montant_ht' => -$ht,
-                'montant_tva' => -$tva,
-                'montant_ttc' => -$ttc,
-                'statut' => 'Non payé',
-                'type_facture' => 'avoir',
-                'normalise' => true,
-                'etape' => 'Facture',
-                'created_at' => now(),
-                'updated_at' => now(),
-            ]);
-
-            $refAch = "AV-ACH-" . date('ymd') . "-" . str_pad($i, 4, '0', STR_PAD_LEFT);
-            DB::table('achats')->insert([
-                'point_de_vente_id' => $pdvIds1[rand(0, 3)],
-                'utilisateur_id' => $admin1,
-                'fournisseur_id' => $fourn1[rand(0, 99)],
-                'numero_facture' => $refAch,
-                'date_achat' => $date,
-                'mode_paiement' => 'crédit',
-                'montant_ht' => -$ht,
-                'montant_tva' => -$tva,
-                'montant_ttc' => -$ttc,
-                'statut' => 'Non payé',
+            $avoir = Vente::create([
+                'point_de_vente_id' => $vente->point_de_vente_id,
+                'utilisateur_id' => $vente->utilisateur_id,
+                'client_id' => $vente->client_id,
+                'numero_facture' => NumerotationService::genererNumeroVente($entrepriseId, 'Facture', 'avoir'),
+                'date_vente' => now()->subDays(rand(0, 30))->toDateString(),
+                'mode_paiement' => $vente->mode_paiement,
+                'montant_ht' => round($vente->montant_ht * $pourcentage, 2),
+                'montant_tva' => round($vente->montant_tva * $pourcentage, 2),
+                'montant_ttc' => round($vente->montant_ttc * $pourcentage, 2),
+                'remise' => 0,
+                'statut' => 'Payé',
                 'type_facture' => 'avoir',
                 'etape' => 'Facture',
-                'created_at' => now(),
-                'updated_at' => now(),
+                'normalise' => false,
+                'archived' => false,
+                'parent_id' => $vente->id,
             ]);
+
+            foreach ($vente->details as $detail) {
+                $qteAvoir = max(1, (int) round($detail->quantite * $pourcentage));
+                VenteDetail::create([
+                    'vente_id' => $avoir->id, 'produit_id' => $detail->produit_id, 'quantite' => $qteAvoir,
+                    'unite' => $detail->unite, 'prix_unitaire' => $detail->prix_unitaire,
+                    'montant_tva' => round($detail->montant_tva * $pourcentage, 2),
+                    'montant_ttc' => round(($detail->montant_ttc) * $pourcentage, 2),
+                ]);
+                if ($detail->produit && $detail->produit->estStockable()) {
+                    $detail->produit->incrementStock($vente->point_de_vente_id, $qteAvoir);
+                }
+            }
+
+            ComptabiliteService::genererEcritureAvoirVente($avoir);
         }
 
-        // 13. Mouvements de stock
-        $this->info('📦 Generation des transferts et mouvements de stock...');
-        for ($i = 1; $i <= 50; $i++) {
-            $pdvSrc = $pdvIds1[rand(0, 1)];
-            $pdvDst = $pdvIds1[rand(2, 3)];
-            $prodId = $prodIds1[rand(0, 100)];
-            $qte = rand(5, 20);
-            
-            DB::table('transferts_stock')->insert([
-                'point_de_vente_source_id'      => $pdvSrc,
-                'point_de_vente_destination_id' => $pdvDst,
-                'produit_id'                    => $prodId,
-                'quantite'                      => $qte,
-                'statut'                        => 'approuve',
-                'demandeur_id'                  => $admin1,
-                'approbateur_id'                => $admin1,
-                'note'                          => "Transfert interne #{$i}",
-                'approuve_le'                   => now()->subDays(rand(1, 60)),
-                'created_at'                    => now(),
-                'updated_at'                    => now(),
+        $achatsEligibles = collect($achatsIds)->random(min(15, count($achatsIds)));
+        foreach ($achatsEligibles as $achatId) {
+            $achat = Achat::with('details.produit')->find($achatId);
+            if (!$achat || $achat->details->isEmpty()) continue;
+
+            $pourcentage = [0.2, 0.3, 0.5, 1.0][array_rand([0.2, 0.3, 0.5, 1.0])];
+            $entrepriseId = $achat->pointDeVente->entreprise_id;
+
+            $avoir = Achat::create([
+                'point_de_vente_id' => $achat->point_de_vente_id,
+                'utilisateur_id' => $achat->utilisateur_id,
+                'fournisseur_id' => $achat->fournisseur_id,
+                'numero_facture' => NumerotationService::genererNumeroAchat($entrepriseId, 'Facture', 'avoir'),
+                'date_achat' => now()->subDays(rand(0, 30))->toDateString(),
+                'mode_paiement' => $achat->mode_paiement,
+                'montant_ht' => round($achat->montant_ht * $pourcentage, 2),
+                'montant_tva' => round($achat->montant_tva * $pourcentage, 2),
+                'montant_ttc' => round($achat->montant_ttc * $pourcentage, 2),
+                'statut' => 'Payé',
+                'type_facture' => 'avoir',
+                'etape' => 'Facture',
+                'normalise' => false,
+                'archived' => false,
+                'parent_id' => $achat->id,
             ]);
 
-            DB::table('mouvements_stock')->insert([
-                [
-                    'produit_id'               => $prodId,
-                    'point_de_vente_id'        => $pdvSrc,
-                    'type_mouvement'           => 'sortie',
-                    'sous_type'                => 'Transfert',
-                    'point_de_vente_source_id' => $pdvSrc,
-                    'utilisateur_id'           => $admin1,
-                    'quantite'                 => $qte,
-                    'stock_avant'              => 100,
-                    'stock_apres'              => 100 - $qte,
-                    'reference_document'       => "TRF-E1-{$i}",
-                    'created_at'               => now(),
-                    'updated_at'               => now(),
-                ],
-                [
-                    'produit_id'               => $prodId,
-                    'point_de_vente_id'        => $pdvDst,
-                    'type_mouvement'           => 'entrée',
-                    'sous_type'                => 'Transfert',
-                    'point_de_vente_source_id' => $pdvSrc,
-                    'utilisateur_id'           => $admin1,
-                    'quantite'                 => $qte,
-                    'stock_avant'              => 50,
-                    'stock_apres'              => 50 + $qte,
-                    'reference_document'       => "TRF-E1-{$i}",
-                    'created_at'               => now(),
-                    'updated_at'               => now(),
-                ]
+            foreach ($achat->details as $detail) {
+                $qteAvoir = max(1, (int) round($detail->quantite * $pourcentage));
+                AchatDetail::create([
+                    'achat_id' => $avoir->id, 'produit_id' => $detail->produit_id, 'quantite' => $qteAvoir,
+                    'unite' => $detail->unite, 'prix_unitaire' => $detail->prix_unitaire,
+                    'montant_tva' => round($detail->montant_tva * $pourcentage, 2),
+                    'montant_ttc' => round(($detail->montant_ttc) * $pourcentage, 2),
+                ]);
+                if ($detail->produit && $detail->produit->estStockable()) {
+                    $stockDispo = $detail->produit->stockActuel($achat->point_de_vente_id);
+                    if ($stockDispo >= $qteAvoir) {
+                        $detail->produit->decrementStock($achat->point_de_vente_id, $qteAvoir);
+                    }
+                }
+            }
+
+            ComptabiliteService::genererEcritureAvoirAchat($avoir);
+        }
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    // RÈGLEMENTS DIFFÉRÉS
+    // ═══════════════════════════════════════════════════════════════
+
+    private function creerReglementsDifferes(array $ventesIds, array $achatsIds): void
+    {
+        $ventesCredit = Vente::whereIn('id', $ventesIds)->where('statut', 'Crédit')->get();
+        foreach ($ventesCredit as $vente) {
+            if (rand(1, 100) > 60) continue;
+            $montantRegle = rand(1, 100) <= 50 ? $vente->montant_ttc : round($vente->montant_ttc * (rand(30, 80) / 100));
+            $dateReglement = Carbon::parse($vente->date_vente)->addDays(rand(5, 45))->toDateString();
+            ComptabiliteService::genererEcritureReglementVente($vente, $montantRegle, 'Espèces', $dateReglement);
+
+            $pdvId = $vente->point_de_vente_id;
+            $soldeActuel = TresorerieJournal::where('point_de_vente_id', $pdvId)->orderByDesc('created_at')->value('solde_resultat') ?? 0;
+            TresorerieJournal::create([
+                'point_de_vente_id' => $pdvId, 'date_operation' => $dateReglement, 'type_operation' => 'Encaissement',
+                'libelle' => 'Règlement créance — ' . $vente->numero_facture, 'mode_paiement' => 'Espèces',
+                'montant_entree' => $montantRegle, 'montant_sortie' => 0,
+                'solde_resultat' => $soldeActuel + $montantRegle, 'reference_document' => $vente->numero_facture,
             ]);
+            $vente->update(['statut' => $montantRegle >= $vente->montant_ttc ? 'Payé' : 'Avance']);
         }
 
-        // Transferts pour entreprise 2
-        for ($i = 1; $i <= 50; $i++) {
-            $pdvSrc = $pdvIds2[rand(0, 1)];
-            $pdvDst = $pdvIds2[rand(2, 3)];
-            $prodId = $prodIds2[rand(0, 100)];
-            $qte = rand(5, 20);
-            
-            DB::table('transferts_stock')->insert([
-                'point_de_vente_source_id'      => $pdvSrc,
-                'point_de_vente_destination_id' => $pdvDst,
-                'produit_id'                    => $prodId,
-                'quantite'                      => $qte,
-                'statut'                        => 'approuve',
-                'demandeur_id'                  => $admin2,
-                'approbateur_id'                => $admin2,
-                'note'                          => "Transfert interne B2B #{$i}",
-                'approuve_le'                   => now()->subDays(rand(1, 60)),
-                'created_at'                    => now(),
-                'updated_at'                    => now(),
+        $achatsCredit = Achat::whereIn('id', $achatsIds)->where('statut', 'Crédit')->get();
+        foreach ($achatsCredit as $achat) {
+            if (rand(1, 100) > 60) continue;
+            $montantRegle = rand(1, 100) <= 50 ? $achat->montant_ttc : round($achat->montant_ttc * (rand(30, 80) / 100));
+            $dateReglement = Carbon::parse($achat->date_achat)->addDays(rand(5, 45))->toDateString();
+            ComptabiliteService::genererEcritureReglementAchat($achat, $montantRegle, 'Espèces', $dateReglement);
+
+            $pdvId = $achat->point_de_vente_id;
+            $soldeActuel = TresorerieJournal::where('point_de_vente_id', $pdvId)->orderByDesc('created_at')->value('solde_resultat') ?? 0;
+            TresorerieJournal::create([
+                'point_de_vente_id' => $pdvId, 'date_operation' => $dateReglement, 'type_operation' => 'Décaissement',
+                'libelle' => 'Règlement dette — ' . $achat->numero_facture, 'mode_paiement' => 'Espèces',
+                'montant_entree' => 0, 'montant_sortie' => $montantRegle,
+                'solde_resultat' => $soldeActuel - $montantRegle, 'reference_document' => $achat->numero_facture,
+            ]);
+            $achat->update(['statut' => $montantRegle >= $achat->montant_ttc ? 'Payé' : 'Avance']);
+        }
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    // MOUVEMENTS DIVERS
+    // ═══════════════════════════════════════════════════════════════
+
+    private function creerMouvementsDivers(int $entrepriseId, array $pdvIds, array $produits, array $fournisseurs, array $utilisateursParPdv): void
+    {
+        $stockables = array_values(array_filter($produits, fn($p) => in_array($p['type'], Produit::TYPES_STOCKABLES)));
+
+        for ($i = 0; $i < 20; $i++) {
+            $produit = $stockables[array_rand($stockables)];
+            $produitModel = Produit::find($produit['id']);
+            [$source, $destination] = collect($pdvIds)->random(2)->values()->all();
+            $stockSource = $produitModel->stockActuel($source);
+            if ($stockSource < 2) continue;
+
+            $qte = min($stockSource, rand(1, 30));
+            $demandeurId = $utilisateursParPdv[$destination][array_rand($utilisateursParPdv[$destination])];
+            $approbateurId = $utilisateursParPdv[$source][array_rand($utilisateursParPdv[$source])];
+
+            TransfertStock::create([
+                'produit_id' => $produit['id'],
+                'point_de_vente_source_id' => $source,
+                'point_de_vente_destination_id' => $destination,
+                'quantite' => $qte,
+                'statut' => 'Validé',
+                'demandeur_id' => $demandeurId,
+                'approbateur_id' => $approbateurId,
+                'note' => 'Réapprovisionnement inter-site (démonstration)',
+                'approuve_le' => now()->subDays(rand(0, 90)),
             ]);
 
-            DB::table('mouvements_stock')->insert([
-                [
-                    'produit_id'               => $prodId,
-                    'point_de_vente_id'        => $pdvSrc,
-                    'type_mouvement'           => 'sortie',
-                    'sous_type'                => 'Transfert',
-                    'point_de_vente_source_id' => $pdvSrc,
-                    'utilisateur_id'           => $admin2,
-                    'quantite'                 => $qte,
-                    'stock_avant'              => 100,
-                    'stock_apres'              => 100 - $qte,
-                    'reference_document'       => "TRF-E2-{$i}",
-                    'created_at'               => now(),
-                    'updated_at'               => now(),
-                ],
-                [
-                    'produit_id'               => $prodId,
-                    'point_de_vente_id'        => $pdvDst,
-                    'type_mouvement'           => 'entrée',
-                    'sous_type'                => 'Transfert',
-                    'point_de_vente_source_id' => $pdvSrc,
-                    'utilisateur_id'           => $admin2,
-                    'quantite'                 => $qte,
-                    'stock_avant'              => 50,
-                    'stock_apres'              => 50 + $qte,
-                    'reference_document'       => "TRF-E2-{$i}",
-                    'created_at'               => now(),
-                    'updated_at'               => now(),
-                ]
-            ]);
+            $produitModel->decrementStock($source, $qte);
+            $produitModel->incrementStock($destination, $qte);
         }
 
+        for ($i = 0; $i < 15; $i++) {
+            $pdvId = $pdvIds[array_rand($pdvIds)];
+            $utilisateurId = $utilisateursParPdv[$pdvId][array_rand($utilisateursParPdv[$pdvId])];
+            $fournisseurId = $fournisseurs[array_rand($fournisseurs)];
+            $nbArticles = rand(1, 5);
+            $articlesChoisis = collect($stockables)->random(min($nbArticles, count($stockables)))->values();
 
-        $this->info('🎉 Base de donnees Selflow massive et realiste peuplee avec succes !');
-        return 0;
+            $montantHt = 0; $montantTva = 0;
+            foreach ($articlesChoisis as $art) {
+                $qte = rand(10, 100);
+                $ht = $qte * $art['prix_achat'];
+                $montantHt += $ht;
+                $montantTva += $ht * ($art['taux_tva'] / 100);
+            }
+            $montantTtc = $montantHt + $montantTva;
+
+            $bc = Achat::create([
+                'point_de_vente_id' => $pdvId, 'utilisateur_id' => $utilisateurId, 'fournisseur_id' => $fournisseurId,
+                'numero_facture' => NumerotationService::genererNumeroAchat($entrepriseId, 'Bon de commande'),
+                'date_achat' => now()->subDays(rand(0, 20))->toDateString(), 'mode_paiement' => 'Crédit',
+                'montant_ht' => $montantHt, 'montant_tva' => $montantTva, 'montant_ttc' => $montantTtc,
+                'statut' => 'Crédit', 'type_facture' => 'normale', 'etape' => 'Bon de commande',
+                'normalise' => false, 'archived' => false,
+            ]);
+            foreach ($articlesChoisis as $art) {
+                AchatDetail::create([
+                    'achat_id' => $bc->id, 'produit_id' => $art['id'], 'quantite' => rand(10, 100),
+                    'unite' => 'Unité', 'prix_unitaire' => $art['prix_achat'],
+                    'montant_tva' => 0, 'montant_ttc' => 0,
+                ]);
+            }
+        }
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    // SUPERADMIN
+    // ═══════════════════════════════════════════════════════════════
+
+    private function creerSuperAdmin(): void
+    {
+        $existant = Utilisateur::where('email', 'superadmin@gmail.com')->first();
+        if ($existant) {
+            $existant->update(['password' => Hash::make('12345678SUPER@'), 'role' => 'superadmin', 'statut' => 'actif']);
+            $this->warn('    ⚠️  Le compte superadmin@gmail.com existait déjà — mot de passe réinitialisé.');
+            return;
+        }
+
+        Utilisateur::create([
+            'entreprise_id' => null,
+            'point_de_vente_id' => null,
+            'nom' => 'ADMIN',
+            'prenom' => 'Super',
+            'email' => 'superadmin@gmail.com',
+            'password' => Hash::make('12345678SUPER@'),
+            'role' => 'superadmin',
+            'fonction' => 'Super Administrateur',
+            'statut' => 'actif',
+            'habilitations' => json_encode([]),
+            'doit_changer_password' => false,
+        ]);
+
+        $this->info('    ✅ Compte superadmin@gmail.com créé (mot de passe : 12345678SUPER@)');
+        $this->warn('    ⚠️  IMPORTANT : ce mot de passe est en clair dans ce fichier source, versionné sur GitHub.');
+        $this->warn('       Recommandé : le changer dès la première connexion, ou définir SUPERADMIN_PASSWORD en variable');
+        $this->warn('       d\'environnement et l\'utiliser à la place d\'une valeur codée en dur, avant tout usage en production réelle.');
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    // RAPPORT D'ANOMALIES
+    // ═══════════════════════════════════════════════════════════════
+
+    private function afficherAnomalies(): void
+    {
+        $this->info("\n📋 Points relevés pendant ce peuplement (à vérifier/tester manuellement) :");
+        $lignes = [
+            "1. Les montants payés partiels (statut 'Avance') sont volontairement inférieurs au TTC — vérifier que le solde restant apparaît correctement dans Comptabilité > Créances & Règlements.",
+            "2. ~5% des lignes de stock sont volontairement à 0 (rupture) — utile pour tester les alertes de rupture et le blocage de vente.",
+            "3. Les URLs d'images (produits: picsum.photos, logos: ui-avatars.com) sont des services externes de placeholder — à remplacer par de vraies images lors d'un usage réel, elles nécessitent une connexion internet pour s'afficher.",
+            "4. Le mot de passe superadmin est en clair dans le code source du seeder (demande explicite) — à faire tourner uniquement sur un dépôt privé, ou migrer vers une variable d'environnement.",
+            "5. La normalisation FNE est simulée directement en base (champ normalise=true/false aléatoire) et NE PASSE PAS par les Jobs réels (NormaliserFactureFne/NormaliserAchatBapaJob) — numero_fne/qr_code_data/signature_dgi restent donc vides même sur les documents marqués normalisés. Suffisant pour tester les pages KPI (Gestion FNE, Situation Générale), pas pour tester l'intégration DGI elle-même.",
+            "6. Ce script peut prendre plusieurs minutes (environ 20 000 produits + centaines de ventes/achats passant par la vraie logique comptable) — ne pas interrompre en cours d'exécution.",
+        ];
+        foreach ($lignes as $l) {
+            $this->line('   • ' . $l);
+        }
     }
 }
