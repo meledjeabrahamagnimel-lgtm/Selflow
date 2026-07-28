@@ -33,16 +33,26 @@
 </div>
 @endif
 
-{{-- Barre de recherche --}}
-<form method="GET" action="{{ route('admin.fournisseurs.index') }}" style="margin-bottom:16px;">
+{{-- Barre de recherche — filtre automatiquement dès la saisie (anti-rebond 500ms) --}}
+<form method="GET" action="{{ route('admin.fournisseurs.index') }}" style="margin-bottom:16px;" id="formRechercheFournisseurs">
     <div style="display:flex; gap:10px; align-items:center; max-width:450px;">
-        <input type="text" name="search" value="{{ $search ?? '' }}" placeholder="Rechercher par nom, secteur, tél., n° tiers..." class="form-control" style="flex:1;">
-        <button type="submit" class="btn btn-primary" style="white-space:nowrap;"><i class="fas fa-search"></i></button>
+        <input type="text" name="search" value="{{ $search ?? '' }}" placeholder="Rechercher par nom, secteur, tél., n° tiers..." class="form-control" style="flex:1;"
+               oninput="clearTimeout(window._rechercheFournisseursTimer); window._rechercheFournisseursTimer = setTimeout(() => document.getElementById('formRechercheFournisseurs').submit(), 500);">
+        <button type="submit" class="btn btn-primary" style="white-space:nowrap;" title="Rechercher maintenant"><i class="fas fa-search"></i></button>
         @if(!empty($search))
             <a href="{{ route('admin.fournisseurs.index') }}" class="btn btn-outline" style="white-space:nowrap;"><i class="fas fa-times"></i></a>
         @endif
     </div>
 </form>
+<script>
+    document.addEventListener('DOMContentLoaded', () => {
+        const champ = document.querySelector('#formRechercheFournisseurs input[name="search"]');
+        if (champ && champ.value) {
+            champ.focus();
+            champ.setSelectionRange(champ.value.length, champ.value.length);
+        }
+    });
+</script>
 
 <div id="section-local">
     <div class="card">

@@ -396,7 +396,7 @@ class VenteControleur
             $ventes = $blQuery->latest()->paginate(20);
         } else {
             $baseQuery = Vente::with(['client', 'pointDeVente', 'details.produit']);
-            
+
             if ($type === 'avoir') {
                 $baseQuery->where('type_facture', 'avoir');
                 $etapeActive = 'Facture';
@@ -420,7 +420,27 @@ class VenteControleur
                 $baseQuery->whereHas('pointDeVente', fn($q) => $q->where('entreprise_id', $entreprise->id));
             }
 
-            $ventes = $baseQuery->latest()->paginate(20);
+            // Filtres additionnels (recherche, statut, période) — appliqués
+            // automatiquement dès la saisie côté vue, aucun bouton requis.
+            if (request()->filled('recherche')) {
+                $recherche = request('recherche');
+                $baseQuery->where(function ($q) use ($recherche) {
+                    $q->where('numero_facture', 'like', "%{$recherche}%")
+                      ->orWhere('numero_fne', 'like', "%{$recherche}%")
+                      ->orWhereHas('client', fn($qc) => $qc->where('nom', 'like', "%{$recherche}%"));
+                });
+            }
+            if (request()->filled('statut_filtre')) {
+                $baseQuery->where('statut', request('statut_filtre'));
+            }
+            if (request()->filled('date_debut')) {
+                $baseQuery->whereDate('date_vente', '>=', request('date_debut'));
+            }
+            if (request()->filled('date_fin')) {
+                $baseQuery->whereDate('date_vente', '<=', request('date_fin'));
+            }
+
+            $ventes = $baseQuery->latest()->paginate(20)->appends(request()->query());
         }
 
         $facturesDispo = collect();

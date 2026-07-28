@@ -33,16 +33,27 @@
 </div>
 @endif
 
-{{-- Barre de recherche --}}
-<form method="GET" action="{{ route('admin.clients.index') }}" style="margin-bottom:16px;">
+{{-- Barre de recherche — filtre automatiquement dès la saisie (anti-rebond 500ms) --}}
+<form method="GET" action="{{ route('admin.clients.index') }}" style="margin-bottom:16px;" id="formRechercheClients">
     <div style="display:flex; gap:10px; align-items:center; max-width:450px;">
-        <input type="text" name="search" value="{{ $search ?? '' }}" placeholder="Rechercher par nom, tél., email, n° tiers..." class="form-control" style="flex:1;">
-        <button type="submit" class="btn btn-primary" style="white-space:nowrap;"><i class="fas fa-search"></i></button>
+        <input type="text" name="search" value="{{ $search ?? '' }}" placeholder="Rechercher par nom, tél., email, n° tiers..." class="form-control" style="flex:1;"
+               oninput="clearTimeout(window._rechercheClientsTimer); window._rechercheClientsTimer = setTimeout(() => document.getElementById('formRechercheClients').submit(), 500);">
+        <button type="submit" class="btn btn-primary" style="white-space:nowrap;" title="Rechercher maintenant"><i class="fas fa-search"></i></button>
         @if(!empty($search))
             <a href="{{ route('admin.clients.index') }}" class="btn btn-outline" style="white-space:nowrap;"><i class="fas fa-times"></i></a>
         @endif
     </div>
 </form>
+<script>
+    // Redonne le focus (curseur en fin de texte) après le rechargement déclenché par la saisie
+    document.addEventListener('DOMContentLoaded', () => {
+        const champ = document.querySelector('#formRechercheClients input[name="search"]');
+        if (champ && champ.value) {
+            champ.focus();
+            champ.setSelectionRange(champ.value.length, champ.value.length);
+        }
+    });
+</script>
 
 <div id="section-local">
     <div class="card">

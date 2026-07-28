@@ -44,11 +44,11 @@
 </div>
 
 <div class="card" style="margin-bottom:20px; padding:16px 20px; background:var(--bg2);">
-    <form method="GET" action="{{ route('admin.tresorerie.journal') }}" style="display:grid; grid-template-columns:repeat(auto-fit, minmax(200px, 1fr)) 120px 100px; gap:12px; align-items:end; margin:0;">
+    <form method="GET" action="{{ route('admin.tresorerie.journal') }}" style="display:grid; grid-template-columns:repeat(auto-fit, minmax(200px, 1fr)) 120px 100px; gap:12px; align-items:end; margin:0;" id="formFiltreTresorerie">
         {{-- Point de Vente --}}
         <div class="form-group" style="margin-bottom:0;">
             <label class="form-label" style="font-size:11px; font-weight:600; text-transform:uppercase; letter-spacing:.5px; color:var(--text-3); margin-bottom:6px;"><i class="fas fa-store"></i> Point de vente</label>
-            <select name="point_de_vente_id" class="form-control" style="padding:8px 12px; font-size:13px;" @if(Auth::user()->estCaissier()) disabled @endif>
+            <select name="point_de_vente_id" class="form-control" style="padding:8px 12px; font-size:13px;" onchange="document.getElementById('formFiltreTresorerie').submit();" @if(Auth::user()->estCaissier()) disabled @endif>
                 <option value="tous" {{ $pointDeVenteId === 'tous' ? 'selected' : '' }}>— Tous les sites —</option>
                 @foreach($pointsDeVente as $pdv)
                     <option value="{{ $pdv->id }}" {{ $pointDeVenteId == $pdv->id ? 'selected' : '' }}>{{ $pdv->nom }}</option>
@@ -62,7 +62,7 @@
         {{-- Mode de Paiement --}}
         <div class="form-group" style="margin-bottom:0;">
             <label class="form-label" style="font-size:11px; font-weight:600; text-transform:uppercase; letter-spacing:.5px; color:var(--text-3); margin-bottom:6px;"><i class="fas fa-credit-card"></i> Moyen de Paiement</label>
-            <select name="mode_paiement" class="form-control" style="padding:8px 12px; font-size:13px;">
+            <select name="mode_paiement" class="form-control" style="padding:8px 12px; font-size:13px;" onchange="document.getElementById('formFiltreTresorerie').submit();">
                 <option value="">— Tous —</option>
                 @foreach($modesDisponibles as $m)
                     <option value="{{ $m }}" {{ request('mode_paiement') === $m ? 'selected' : '' }}>{{ $m }}</option>
@@ -73,7 +73,7 @@
         {{-- Moyen Bancaire / Banque --}}
         <div class="form-group" style="margin-bottom:0;">
             <label class="form-label" style="font-size:11px; font-weight:600; text-transform:uppercase; letter-spacing:.5px; color:var(--text-3); margin-bottom:6px;"><i class="fas fa-bank"></i> Banque / Moyen bancaire</label>
-            <select name="moyen_bancaire" class="form-control" style="padding:8px 12px; font-size:13px;">
+            <select name="moyen_bancaire" class="form-control" style="padding:8px 12px; font-size:13px;" onchange="document.getElementById('formFiltreTresorerie').submit();">
                 <option value="">— Toutes —</option>
                 @foreach($moyensBancairesDisponibles as $mb)
                     <option value="{{ $mb }}" {{ request('moyen_bancaire') === $mb ? 'selected' : '' }}>{{ $mb }}</option>
@@ -81,7 +81,7 @@
             </select>
         </div>
 
-        <button type="submit" class="btn btn-primary" style="padding: 10px; font-weight: 600; justify-content: center; border-radius: 8px;">
+        <button type="submit" class="btn btn-primary" style="padding: 10px; font-weight: 600; justify-content: center; border-radius: 8px;" title="Les filtres s'appliquent déjà automatiquement — utile uniquement si JavaScript est désactivé">
             <i class="fas fa-filter"></i> Filtrer
         </button>
         <a href="{{ route('admin.tresorerie.journal') }}" class="btn btn-outline" style="padding: 10px; font-weight: 600; justify-content: center; border-radius: 8px;">

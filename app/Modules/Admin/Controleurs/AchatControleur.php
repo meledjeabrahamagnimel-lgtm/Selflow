@@ -263,6 +263,26 @@ class AchatControleur
             $baseQuery->where('etape', $etapeActive);
         }
 
+        // Filtres additionnels (recherche, statut, période) — appliqués
+        // automatiquement dès la saisie côté vue, aucun bouton requis.
+        if (request()->filled('recherche')) {
+            $recherche = request('recherche');
+            $baseQuery->where(function ($q) use ($recherche) {
+                $q->where('numero_facture', 'like', "%{$recherche}%")
+                  ->orWhere('numero_fne', 'like', "%{$recherche}%")
+                  ->orWhereHas('fournisseur', fn($qf) => $qf->where('nom', 'like', "%{$recherche}%"));
+            });
+        }
+        if (request()->filled('statut_filtre')) {
+            $baseQuery->where('statut', request('statut_filtre'));
+        }
+        if (request()->filled('date_debut')) {
+            $baseQuery->whereDate('date_achat', '>=', request('date_debut'));
+        }
+        if (request()->filled('date_fin')) {
+            $baseQuery->whereDate('date_achat', '<=', request('date_fin'));
+        }
+
         // Calcul des totaux par étape
         $compteQuery = Achat::whereHas('pointDeVente', fn($q) => $q->where('entreprise_id', $entreprise->id))
             ->where(function($q) {
@@ -281,7 +301,7 @@ class AchatControleur
         $nbBC = $totaux['Bon de commande'] ?? 0;
         $nbFacture = $totaux['Facture'] ?? 0;
 
-        $achats = $baseQuery->latest()->paginate(20);
+        $achats = $baseQuery->latest()->paginate(20)->appends(request()->query());
 
         $facturesDispo = collect();
         if ($type === 'avoir') {

@@ -559,8 +559,26 @@ class SeedMassiveCommand extends Command
         $nomsCategories = array_slice($nomsCategories, 0, $nbCategories);
 
         $categorieLignes = [];
+        $prefixesUtilises = [];
         foreach ($nomsCategories as $nom) {
-            $prefixe = strtoupper(substr(preg_replace('/[^A-Za-z]/', '', $nom), 0, 3)) ?: 'CAT';
+            $cleanNom = preg_replace('/[^A-Za-z]/', '', $nom);
+            $prefixe = strtoupper(substr($cleanNom, 0, 3)) ?: 'CAT';
+
+            // La colonne 'prefixe' est UNIQUE par entreprise (contrainte découverte
+            // le 27/07/2026 lors d'un test sur base réelle) — plusieurs catégories
+            // peuvent partager les 3 mêmes premières lettres (ex: "Services de
+            // Transport" et "Services de Réparation" donnent toutes deux "SER").
+            // On garantit l'unicité en ajoutant un compteur numérique si collision,
+            // même logique que celle déjà utilisée ailleurs dans l'application
+            // (2026_06_29_000002_creer_categories_et_sous_categories.php).
+            $prefixeOriginal = $prefixe;
+            $compteur = 1;
+            while (in_array($prefixe, $prefixesUtilises, true)) {
+                $compteur++;
+                $prefixe = substr($prefixeOriginal, 0, 3) . $compteur;
+            }
+            $prefixesUtilises[] = $prefixe;
+
             $categorieLignes[] = [
                 'entreprise_id' => $entrepriseId,
                 'nom' => $nom,
@@ -749,7 +767,7 @@ class SeedMassiveCommand extends Command
                 'entreprise_id' => $entrepriseId,
                 'point_de_vente_id' => $pdvId,
                 'produit_fini_id' => $produitFini['id'],
-                'code_ordre' => NumerotationService::genererNumeroOD($entrepriseId),
+                'code_ordre' => $this->genererCodeOrdreUnique($entrepriseId),
                 'quantite_cible' => $quantiteProduite,
                 'statut' => 'Terminé',
                 'date_production' => $dateProduction,
@@ -777,6 +795,30 @@ class SeedMassiveCommand extends Command
                 ComptabiliteService::genererEcritureProduction($ordre, $consommations, $valeurProduction ?: ($quantiteProduite * $produitFini['prix_achat']));
             }
         }
+    }
+
+    /**
+     * NumerotationService::genererNumeroOD() compte les numéros déjà utilisés
+     * via ecritures_comptables.reference_document — or un ordre de production
+     * sans consommation valide (genererEcritureProduction() retourne alors
+     * sans rien écrire) ne laisse aucune trace dans ecritures_comptables. Le
+     * compteur peut donc sous-estimer et régénérer un code déjà pris. Filet
+     * de sécurité : on vérifie/réessaie directement contre ordres_production
+     * (la vraie source de vérité pour ce cas d'usage précis) avant de retourner.
+     */
+    private function genererCodeOrdreUnique(int $entrepriseId): string
+    {
+        $tentatives = 0;
+        do {
+            $code = NumerotationService::genererNumeroOD($entrepriseId);
+            if ($tentatives > 0) {
+                $code .= '-' . $tentatives;
+            }
+            $existe = OrdreProduction::where('entreprise_id', $entrepriseId)->where('code_ordre', $code)->exists();
+            $tentatives++;
+        } while ($existe && $tentatives < 20);
+
+        return $code;
     }
 
     // ═══════════════════════════════════════════════════════════════
@@ -1026,6 +1068,28 @@ class SeedMassiveCommand extends Command
         return $achatsIds;
     }
 
+    /**
+     * bons_livraison.numero_bl est UNIQUE GLOBALEMENT (pas par entreprise),
+     * alors que NumerotationService::genererNumeroBL() ne compte que pour
+     * l'entreprise courante — deux entreprises créant leur premier BL le
+     * même jour généreraient la même chaîne. Même filet de sécurité que
+     * pour genererCodeOrdreUnique().
+     */
+    private function genererNumeroBLUnique(int $entrepriseId): string
+    {
+        $tentatives = 0;
+        do {
+            $code = NumerotationService::genererNumeroBL($entrepriseId);
+            if ($tentatives > 0) {
+                $code .= '-' . $tentatives;
+            }
+            $existe = BonLivraison::where('numero_bl', $code)->exists();
+            $tentatives++;
+        } while ($existe && $tentatives < 20);
+
+        return $code;
+    }
+
     // ═══════════════════════════════════════════════════════════════
     // CYCLE DEVIS → BON DE COMMANDE → BON DE LIVRAISON → FACTURE
     // ═══════════════════════════════════════════════════════════════
@@ -1095,7 +1159,7 @@ class SeedMassiveCommand extends Command
                     ]);
 
                     $bl = BonLivraison::create([
-                        'numero_bl' => NumerotationService::genererNumeroBL($entrepriseId),
+                        'numero_bl' => $this->genererNumeroBLUnique($entrepriseId),
                         'vente_id' => $bc->id, 'facture_vente_id' => $facture->id, 'point_de_vente_id' => $pdvId,
                         'client_id' => $clientId, 'created_by' => $utilisateurId,
                         'date_livraison' => $dateFacture, 'statut' => 'Livré', 'livraison_partielle' => false,

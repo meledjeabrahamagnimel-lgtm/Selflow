@@ -62,6 +62,45 @@
 </div>
 @endif
 
+<form method="GET" action="{{ route('admin.achats.factures') }}" id="formFiltreAchats" style="display:flex; gap:10px; flex-wrap:wrap; align-items:end; margin-bottom:16px; background:#fff; border:1px solid var(--border); border-radius:12px; padding:14px 16px;">
+    <input type="hidden" name="etape" value="{{ $etapeActive }}">
+    @if($type) <input type="hidden" name="type" value="{{ $type }}"> @endif
+
+    <div class="form-group" style="margin-bottom:0; flex:1; min-width:200px;">
+        <label class="form-label" style="font-size:11px; text-transform:uppercase; font-weight:700; color:var(--text-3); margin-bottom:4px; display:block;">Recherche</label>
+        <input type="text" name="recherche" value="{{ request('recherche') }}" class="form-control" placeholder="N° facture, N° FNE, fournisseur..."
+               oninput="clearTimeout(window._filtreAchatsTimer); window._filtreAchatsTimer = setTimeout(() => document.getElementById('formFiltreAchats').submit(), 500);">
+    </div>
+    @if($etapeActive === 'Facture')
+    <div class="form-group" style="margin-bottom:0;">
+        <label class="form-label" style="font-size:11px; text-transform:uppercase; font-weight:700; color:var(--text-3); margin-bottom:4px; display:block;">Statut</label>
+        <select name="statut_filtre" class="form-control" onchange="document.getElementById('formFiltreAchats').submit();">
+            <option value="">— Tous —</option>
+            @foreach(['Payé', 'Avance', 'Crédit'] as $s)
+                <option value="{{ $s }}" {{ request('statut_filtre') === $s ? 'selected' : '' }}>{{ $s }}</option>
+            @endforeach
+        </select>
+    </div>
+    @endif
+    <div class="form-group" style="margin-bottom:0;">
+        <label class="form-label" style="font-size:11px; text-transform:uppercase; font-weight:700; color:var(--text-3); margin-bottom:4px; display:block;">Du</label>
+        <input type="date" name="date_debut" value="{{ request('date_debut') }}" class="form-control" onchange="document.getElementById('formFiltreAchats').submit();">
+    </div>
+    <div class="form-group" style="margin-bottom:0;">
+        <label class="form-label" style="font-size:11px; text-transform:uppercase; font-weight:700; color:var(--text-3); margin-bottom:4px; display:block;">Au</label>
+        <input type="date" name="date_fin" value="{{ request('date_fin') }}" class="form-control" onchange="document.getElementById('formFiltreAchats').submit();">
+    </div>
+    @if(request('recherche') || request('statut_filtre') || request('date_debut') || request('date_fin'))
+        <a href="{{ route('admin.achats.factures', array_filter(['etape' => $etapeActive, 'type' => $type])) }}" class="btn btn-outline" style="white-space:nowrap;"><i class="fas fa-times"></i> Effacer</a>
+    @endif
+</form>
+<script>
+    document.addEventListener('DOMContentLoaded', () => {
+        const champ = document.querySelector('#formFiltreAchats input[name="recherche"]');
+        if (champ && champ.value) { champ.focus(); champ.setSelectionRange(champ.value.length, champ.value.length); }
+    });
+</script>
+
 <div class="card">
     <div class="table-wrap">
         @if($achats->isEmpty())
