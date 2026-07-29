@@ -52,10 +52,11 @@ class ClientControleur
 
         $request->validate([
             'nom'               => ['required', 'string', 'max:150'],
+            'type_facturation'  => ['nullable', 'in:B2B,B2C,B2G,B2F'],
             'telephone'         => ['nullable', 'string', 'max:30'],
             'email'             => ['nullable', 'email', 'max:150'],
             'adresse'           => ['nullable', 'string', 'max:255'],
-            'ncc'               => ['nullable', 'string', 'max:50'],
+            'ncc'               => ['required_if:type_facturation,B2B', 'nullable', 'string', 'max:50'],
             'rccm'              => ['nullable', 'string', 'max:100'],
             'regime_imposition' => ['nullable', 'string', 'max:100'],
             'compte_comptable'  => [
@@ -65,6 +66,8 @@ class ClientControleur
                     $q->whereNull('entreprise_id')->orWhere('entreprise_id', $entreprise->id);
                 })
             ],
+        ], [
+            'ncc.required_if' => 'Le NCC est obligatoire pour un client de type B2B (Entreprise à Entreprise).',
         ]);
 
         $autoNumero = $request->boolean('auto_numero_tiers');
@@ -98,10 +101,12 @@ class ClientControleur
         }
 
         Client::create(array_merge(
-            $request->only(['nom', 'telephone', 'email', 'adresse', 'ncc', 'rccm', 'regime_imposition', 'compte_comptable']),
+            $request->only(['nom', 'type_facturation', 'telephone', 'email', 'adresse', 'ncc', 'rccm', 'regime_imposition', 'compte_comptable']),
             [
                 'entreprise_id' => $entreprise->id,
-                'numero_tiers' => $numeroTiers,
+                'numero_tiers'  => $numeroTiers,
+                // Si pas B2B, vider le NCC pour cohérence
+                'ncc'           => ($request->input('type_facturation') === 'B2B') ? $request->input('ncc') : null,
             ]
         ));
 
@@ -116,25 +121,30 @@ class ClientControleur
         if ($client->source === 'comptaflow') {
             // Uniquement les champs spécifiques à Selflow
             $request->validate([
+                'type_facturation'  => ['nullable', 'in:B2B,B2C,B2G,B2F'],
                 'telephone'         => ['nullable', 'string', 'max:30'],
                 'email'             => ['nullable', 'email', 'max:150'],
                 'adresse'           => ['nullable', 'string', 'max:255'],
-                'ncc'               => ['nullable', 'string', 'max:50'],
+                'ncc'               => ['required_if:type_facturation,B2B', 'nullable', 'string', 'max:50'],
                 'rccm'              => ['nullable', 'string', 'max:100'],
                 'regime_imposition' => ['nullable', 'string', 'max:100'],
+            ], [
+                'ncc.required_if' => 'Le NCC est obligatoire pour un client de type B2B.',
             ]);
 
-            $client->update($request->only([
-                'telephone', 'email', 'adresse', 'ncc', 'rccm', 'regime_imposition'
-            ]));
+            $client->update(array_merge(
+                $request->only(['type_facturation', 'telephone', 'email', 'adresse', 'rccm', 'regime_imposition']),
+                ['ncc' => ($request->input('type_facturation') === 'B2B') ? $request->input('ncc') : null]
+            ));
         } else {
             // Tous les champs
             $request->validate([
                 'nom'               => ['required', 'string', 'max:150'],
+                'type_facturation'  => ['nullable', 'in:B2B,B2C,B2G,B2F'],
                 'telephone'         => ['nullable', 'string', 'max:30'],
                 'email'             => ['nullable', 'email', 'max:150'],
                 'adresse'           => ['nullable', 'string', 'max:255'],
-                'ncc'               => ['nullable', 'string', 'max:50'],
+                'ncc'               => ['required_if:type_facturation,B2B', 'nullable', 'string', 'max:50'],
                 'rccm'              => ['nullable', 'string', 'max:100'],
                 'regime_imposition' => ['nullable', 'string', 'max:100'],
                 'compte_comptable'  => [
@@ -150,11 +160,14 @@ class ClientControleur
                     'regex:/^411[0-9]*$/',
                     \Illuminate\Validation\Rule::unique('clients', 'numero_tiers')->ignore($client->id)->where('entreprise_id', $entreprise->id)
                 ],
+            ], [
+                'ncc.required_if' => 'Le NCC est obligatoire pour un client de type B2B.',
             ]);
 
-            $client->update($request->only([
-                'nom', 'telephone', 'email', 'adresse', 'ncc', 'rccm', 'regime_imposition', 'compte_comptable', 'numero_tiers'
-            ]));
+            $client->update(array_merge(
+                $request->only(['nom', 'type_facturation', 'telephone', 'email', 'adresse', 'rccm', 'regime_imposition', 'compte_comptable', 'numero_tiers']),
+                ['ncc' => ($request->input('type_facturation') === 'B2B') ? $request->input('ncc') : null]
+            ));
         }
 
         return back()->with('succes', 'Client modifié avec succès.');

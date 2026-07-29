@@ -18,6 +18,19 @@
         </div>
     @endif
 
+    @if(!$entreprise->estInscriptionComplete())
+    <div style="display:flex;align-items:center;justify-content:space-between;gap:16px;background:#FFFBEB;border:1px solid #FCD34D;border-radius:12px;padding:16px 20px;margin-bottom:22px;color:#92400E;flex-wrap:wrap;">
+        <div style="display:flex;align-items:center;gap:12px;">
+            <span style="font-size:18px;color:#D97706;"><i class="fas fa-triangle-exclamation"></i></span>
+            <div>
+                <h4 style="font-weight:700;font-size:14px;margin-bottom:2px;">Inscription incomplète</h4>
+                <p style="font-size:12px;color:#B45309;">Remplissez les champs marqués <span style="color:#DC2626;font-weight:700;">*</span> pour finaliser l'inscription et débloquer toutes les fonctionnalités.</p>
+            </div>
+        </div>
+        <span style="background:#FCD34D;color:#92400E;padding:4px 12px;border-radius:20px;font-size:11px;font-weight:700;">{{ $entreprise->nom === '[PENDING_ONBOARDING]' ? 'Démarrage' : 'En cours' }}</span>
+    </div>
+    @endif
+
     <form method="POST" action="{{ route('admin.entreprise.parametres.enregistrer') }}" enctype="multipart/form-data">
         @csrf
         @method('PUT')
@@ -34,30 +47,43 @@
                         <i class="fas fa-info-circle" style="color:var(--primary);"></i> Informations générales
                     </div>
                     <div style="display:flex;flex-direction:column;gap:14px;">
+                        @php
+                            $user = Auth::user();
+                            // Si l'entreprise vient d'être créée via Google, vider le nom temporaire
+                            $nomEntreprise = ($entreprise->nom === '[PENDING_ONBOARDING]') ? '' : $entreprise->nom;
+                        @endphp
                         <div class="form-group">
                             <label class="form-label">Nom de l'entreprise <span style="color:var(--danger)">*</span></label>
-                            <input type="text" name="nom" class="form-control" value="{{ old('nom', $entreprise->nom) }}"
-                                required>
+                            <input type="text" name="nom" class="form-control" value="{{ old('nom', $nomEntreprise) }}"
+                                required placeholder="Ex: Commerce Général Ivoirien SARL">
                         </div>
 
-                        {{-- Informations Gérant --}}
+                        {{-- Informations Gérant — pré-remplies depuis les infos de connexion --}}
                         <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
                             <div class="form-group" style="margin-bottom:0;">
-                                <label class="form-label">Nom du Gérant / Représentant</label>
+                                <label class="form-label">Nom du Gérant / Représentant <span style="color:var(--danger)">*</span></label>
                                 <input type="text" name="gerant_nom" class="form-control"
-                                    value="{{ old('gerant_nom', $entreprise->gerant_nom) }}" placeholder="Ex: Dupont">
+                                    value="{{ old('gerant_nom', $entreprise->gerant_nom ?: $user->nom) }}" placeholder="Ex: Koné">
                             </div>
                             <div class="form-group" style="margin-bottom:0;">
-                                <label class="form-label">Prénom du Gérant</label>
+                                <label class="form-label">Prénom du Gérant <span style="color:var(--danger)">*</span></label>
                                 <input type="text" name="gerant_prenom" class="form-control"
-                                    value="{{ old('gerant_prenom', $entreprise->gerant_prenom) }}" placeholder="Ex: Jean">
+                                    value="{{ old('gerant_prenom', $entreprise->gerant_prenom ?: $user->prenom) }}" placeholder="Ex: Mamadou">
                             </div>
                         </div>
-                        <div class="form-group">
-                            <label class="form-label">Fonction du Gérant</label>
-                            <input type="text" name="gerant_fonction" class="form-control"
-                                value="{{ old('gerant_fonction', $entreprise->gerant_fonction) }}"
-                                placeholder="Ex: Directeur Général / Gérant">
+                        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+                            <div class="form-group" style="margin-bottom:0;">
+                                <label class="form-label">Fonction du Gérant <span style="color:var(--danger)">*</span></label>
+                                <input type="text" name="gerant_fonction" class="form-control"
+                                    value="{{ old('gerant_fonction', $entreprise->gerant_fonction) }}"
+                                    placeholder="Ex: Directeur Général / Gérant">
+                            </div>
+                            <div class="form-group" style="margin-bottom:0;">
+                                <label class="form-label">E-mail du gérant</label>
+                                <input type="email" class="form-control"
+                                    value="{{ $user->email }}"
+                                    disabled style="background:var(--bg3);cursor:not-allowed;" title="Email du compte connecté">
+                            </div>
                         </div>
 
                         <div class="form-group">
@@ -81,11 +107,12 @@
                             </div>
                         </div>
                         <div class="form-group">
-                            <label class="form-label">RCCM (Lecture seule · Contacter le support pour modifier)</label>
-                            <input type="text" class="form-control" value="{{ $entreprise->rccm }}"
-                                placeholder="Ex: CI-ABJ-03-2021-B13-05438" disabled
-                                style="background:var(--bg2); cursor:not-allowed;">
-                            <input type="hidden" name="rccm" value="{{ $entreprise->rccm }}">
+                            <label class="form-label">
+                                RCCM <span style="color:var(--danger)">*</span>
+                                <span style="font-size:10px;color:var(--text-3);font-weight:400;"> — Registre du Commerce et du Crédit Mobilier</span>
+                            </label>
+                            <input type="text" name="rccm" class="form-control" value="{{ old('rccm', $entreprise->rccm) }}"
+                                placeholder="Ex: CI-ABJ-03-2021-B13-05438">
                         </div>
                     </div>
                 </div>
@@ -100,38 +127,36 @@
                     <div style="display:flex;flex-direction:column;gap:14px;">
                         <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
                             <div class="form-group" style="margin-bottom:0;">
-                                <label class="form-label">NCC (Nº Compte Contribuable)</label>
-                                <input type="text" class="form-control" value="{{ $entreprise->ncc }}"
-                                    placeholder="Ex: 2169728N" disabled style="background:var(--bg2); cursor:not-allowed;">
-                                <input type="hidden" name="ncc" value="{{ $entreprise->ncc }}">
+                                <label class="form-label">NCC — N° Compte Contribuable <span style="color:var(--danger)">*</span></label>
+                                <input type="text" name="ncc" class="form-control" value="{{ old('ncc', $entreprise->ncc) }}"
+                                    placeholder="Ex: 2169728N">
                             </div>
                             <div class="form-group" style="margin-bottom:0;">
-                                <label class="form-label">Régime d'imposition</label>
-                                <input type="text" class="form-control"
-                                    value="{{ $entreprise->regime_imposition ?: 'Non renseigné' }}" disabled
-                                    style="background:var(--bg2); cursor:not-allowed;">
-                                <input type="hidden" name="regime_imposition" value="{{ $entreprise->regime_imposition }}">
+                                <label class="form-label">Régime d'imposition <span style="color:var(--danger)">*</span></label>
+                                <select name="regime_imposition" class="form-control">
+                                    <option value="">— Choisir un régime —</option>
+                                    <option value="TEE" {{ old('regime_imposition', $entreprise->regime_imposition) === 'TEE' ? 'selected' : '' }}>TEE — Taxe sur Entreprise Existante</option>
+                                    <option value="RNE" {{ old('regime_imposition', $entreprise->regime_imposition) === 'RNE' ? 'selected' : '' }}>RNE — Régime du Négoce et de l'Exportation</option>
+                                    <option value="RSI" {{ old('regime_imposition', $entreprise->regime_imposition) === 'RSI' ? 'selected' : '' }}>RSI — Régime Simplifié d'Imposition</option>
+                                    <option value="RNI" {{ old('regime_imposition', $entreprise->regime_imposition) === 'RNI' ? 'selected' : '' }}>RNI — Régime Normal d'Imposition</option>
+                                </select>
                             </div>
                         </div>
                         <div class="form-group">
-                            <label class="form-label">Centre des impôts</label>
-                            <input type="text" class="form-control" value="{{ $entreprise->centre_impots }}"
-                                placeholder="Ex: 807 Impôts de Cocody" disabled
-                                style="background:var(--bg2); cursor:not-allowed;">
-                            <input type="hidden" name="centre_impots" value="{{ $entreprise->centre_impots }}">
+                            <label class="form-label">Centre des impôts <span style="color:var(--danger)">*</span></label>
+                            <input type="text" name="centre_impots" class="form-control" value="{{ old('centre_impots', $entreprise->centre_impots) }}"
+                                placeholder="Ex: 2 PLATEAUX 3">
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">N° Compte Contribuable (CC) <span style="color:var(--danger)">*</span></label>
+                            <input type="text" name="compte_contribuable" class="form-control" value="{{ old('compte_contribuable', $entreprise->compte_contribuable) }}"
+                                placeholder="Ex: 1864699 A">
                         </div>
                         <div class="form-group">
                             <label class="form-label">Références bancaires</label>
                             <textarea name="ref_bancaire" class="form-control" rows="3"
                                 placeholder="Ex: Établissement : SGBCI — N° compte : 00123456789">{{ old('ref_bancaire', $entreprise->ref_bancaire) }}</textarea>
-                            <small style="color:var(--text-3);font-size:11px;">Ces informations apparaîtront en bas de vos
-                                factures.</small>
-                        </div>
-                        <div class="form-group">
-                            <label class="form-label">N° Compte Contribuable (CC)</label>
-                            <input type="text" class="form-control" value="{{ $entreprise->compte_contribuable }}"
-                                placeholder="Ex: 1234567890123" disabled style="background:var(--bg2); cursor:not-allowed;">
-                            <input type="hidden" name="compte_contribuable" value="{{ $entreprise->compte_contribuable }}">
+                            <small style="color:var(--text-3);font-size:11px;">Ces informations apparaîtront en bas de vos factures.</small>
                         </div>
                         {{-- === LIAISON COMPTAFLOW === --}}
                         <div
@@ -202,9 +227,146 @@
                         </div>
                     </div>
                 </div>
-            </div>
 
-            {{-- Colonne droite --}}
+                {{-- ── Section DGI & Local ── --}}
+                <div class="card" style="padding:24px;">
+                    <div style="font-size:12px;font-weight:700;color:var(--text-2);text-transform:uppercase;letter-spacing:.5px;margin-bottom:16px;display:flex;align-items:center;gap:8px;">
+                        <i class="fas fa-map-marker-alt" style="color:var(--primary);"></i> DGI & Local professionnel
+                    </div>
+                    <div style="display:flex;flex-direction:column;gap:14px;">
+
+                        <div class="form-group">
+                            <label class="form-label">
+                                IDU — Identifiant Unique DGI <span style="color:#E53E3E">*</span>
+                            </label>
+                            <input type="text" name="idu" class="form-control"
+                                value="{{ old('idu', $entreprise->idu) }}"
+                                placeholder="Ex: CI-001-2025-A123456">
+                            <small style="color:var(--text-3);font-size:11px;">Cet identifiant apparaît sur chaque facture normalisée FNE.</small>
+                        </div>
+
+                        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+                            <div class="form-group" style="margin-bottom:0;">
+                                <label class="form-label">Commune</label>
+                                <input type="text" name="commune" class="form-control"
+                                    value="{{ old('commune', $entreprise->commune) }}"
+                                    placeholder="Ex: COCODY">
+                            </div>
+                            <div class="form-group" style="margin-bottom:0;">
+                                <label class="form-label">Quartier</label>
+                                <input type="text" name="quartier" class="form-control"
+                                    value="{{ old('quartier', $entreprise->quartier) }}"
+                                    placeholder="Ex: Angré 8ème Tranche">
+                            </div>
+                        </div>
+
+                        <div class="form-group">
+                            <label class="form-label">Référence Cadastrale</label>
+                            <input type="text" name="reference_cadastrale" class="form-control"
+                                value="{{ old('reference_cadastrale', $entreprise->reference_cadastrale) }}"
+                                placeholder="Ex: Section B, Parcelle 042">
+                        </div>
+
+                        <div class="form-group">
+                            <label class="form-label">Propriétaire du local professionnel</label>
+                            <input type="text" name="proprietaire_local" class="form-control"
+                                value="{{ old('proprietaire_local', $entreprise->proprietaire_local) }}"
+                                placeholder="Ex: SCI IMMOBILIERE COCODY">
+                        </div>
+
+                        <div class="form-group">
+                            <label class="form-label">
+                                Seuil d'alerte stickers <span style="color:#E53E3E">*</span>
+                            </label>
+                            <div style="display:flex;align-items:center;gap:10px;">
+                                <input type="number" name="sticker_solde_alerte" class="form-control"
+                                    value="{{ old('sticker_solde_alerte', $entreprise->sticker_solde_alerte ?? 5) }}"
+                                    min="1" max="9999" style="max-width:120px;">
+                                <small style="color:var(--text-3);font-size:12px;">sticker(s) restants → notification d'alerte</small>
+                            </div>
+                        </div>
+
+                    </div>
+                </div>
+
+                {{-- ── Options fiscales ── --}}
+                <div class="card" style="padding:24px;">
+                    <div style="font-size:12px;font-weight:700;color:var(--text-2);text-transform:uppercase;letter-spacing:.5px;margin-bottom:16px;display:flex;align-items:center;gap:8px;">
+                        <i class="fas fa-check-square" style="color:var(--primary);"></i> Options fiscales
+                    </div>
+                    <div style="display:flex;flex-direction:column;gap:14px;">
+
+                        <label style="display:flex;align-items:flex-start;gap:12px;cursor:pointer;padding:14px;background:var(--bg3);border-radius:10px;border:1px solid var(--border);">
+                            <input type="checkbox" name="timbre_quittance" value="1"
+                                {{ old('timbre_quittance', $entreprise->timbre_quittance) ? 'checked' : '' }}
+                                style="margin-top:3px;width:16px;height:16px;cursor:pointer;">
+                            <div>
+                                <div style="font-weight:600;font-size:13px;color:var(--text);">Timbre de quittance</div>
+                                <div style="font-size:12px;color:var(--text-3);margin-top:2px;">Applique le droit de timbre (TDT 1,5%) sur les paiements en espèces supérieurs à 5 000 FCFA.</div>
+                            </div>
+                        </label>
+
+                        <label style="display:flex;align-items:flex-start;gap:12px;cursor:pointer;padding:14px;background:var(--bg3);border-radius:10px;border:1px solid var(--border);">
+                            <input type="checkbox" name="bapa" value="1"
+                                {{ old('bapa', $entreprise->bapa) ? 'checked' : '' }}
+                                style="margin-top:3px;width:16px;height:16px;cursor:pointer;">
+                            <div>
+                                <div style="font-weight:600;font-size:13px;color:var(--text);">Bordereau d'Achat de Produits Agricoles (BAPA)</div>
+                                <div style="font-size:12px;color:var(--text-3);margin-top:2px;">Activez cette option si votre entreprise réalise des achats de produits agricoles auprès de producteurs locaux.</div>
+                            </div>
+                        </label>
+
+                    </div>
+                </div>
+
+                {{-- ── Impression des factures ── --}}
+                <div class="card" style="padding:24px;">
+                    <div style="font-size:12px;font-weight:700;color:var(--text-2);text-transform:uppercase;letter-spacing:.5px;margin-bottom:16px;display:flex;align-items:center;gap:8px;">
+                        <i class="fas fa-print" style="color:var(--primary);"></i> Impression des factures
+                    </div>
+                    <div style="display:flex;flex-direction:column;gap:14px;">
+                        <div class="form-group">
+                            <label class="form-label">Pied de page des factures</label>
+                            <textarea name="pied_de_page_facture" class="form-control" rows="3"
+                                placeholder="Ex: Merci pour votre confiance. Paiement à 30 jours. Pénalités de retard : 1,5% / mois.">{{ old('pied_de_page_facture', $entreprise->pied_de_page_facture) }}</textarea>
+                            <small style="color:var(--text-3);font-size:11px;">Ce texte apparaît en bas de chaque facture imprimée.</small>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Autres mentions légales</label>
+                            <textarea name="facture_autres_mentions" class="form-control" rows="3"
+                                placeholder="Ex: Capital social : 1 000 000 FCFA — Forme juridique : SARL">{{ old('facture_autres_mentions', $entreprise->facture_autres_mentions) }}</textarea>
+                            <small style="color:var(--text-3);font-size:11px;">Mentions additionnelles : capital social, forme juridique, etc.</small>
+                        </div>
+                    </div>
+                </div>
+
+                {{-- ── Secteurs d'activité ── --}}
+                <div class="card" style="padding:24px;">
+                    <div style="font-size:12px;font-weight:700;color:var(--text-2);text-transform:uppercase;letter-spacing:.5px;margin-bottom:16px;display:flex;align-items:center;gap:8px;">
+                        <i class="fas fa-briefcase" style="color:var(--primary);"></i> Secteurs d'activité <span style="color:var(--danger);">*</span>
+                    </div>
+                    <p style="font-size:12px;color:var(--text-3);margin-bottom:14px;">Sélectionnez tous les secteurs qui correspondent à votre activité principale.</p>
+                    @php
+                        $secteursDispo = ['Commercial', 'Industriel', 'Services', 'Agricole', 'Artisanat', 'BTP / Construction', 'Restauration / Hôtellerie', 'Santé', 'Transport / Logistique', 'Technologies / Numérique', 'Éducation / Formation', 'Autre'];
+                        $secteursActifs = $entreprise->secteur_activite ?? [];
+                    @endphp
+                    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+                        @foreach($secteursDispo as $secteur)
+                        <label style="display:flex;align-items:center;gap:8px;padding:9px 12px;background:var(--bg3);border-radius:8px;cursor:pointer;font-size:13px;border:1px solid var(--border);transition:all .15s;"
+                            onmouseover="this.style.borderColor='var(--primary)';this.style.background='#EBF2FC'"
+                            onmouseout="this.style.borderColor='var(--border)';this.style.background='var(--bg3)'">
+                            <input type="checkbox" name="secteurs_activite[]" value="{{ $secteur }}"
+                                {{ in_array($secteur, old('secteurs_activite', $secteursActifs)) ? 'checked' : '' }}
+                                style="width:15px;height:15px;cursor:pointer;accent-color:var(--primary);">
+                            <span>{{ $secteur }}</span>
+                        </label>
+                        @endforeach
+                    </div>
+                    @error('secteurs_activite') <small style="color:var(--danger);margin-top:6px;display:block;">{{ $message }}</small> @enderror
+                </div>
+
+            </div>{{-- /colonne gauche --}}
+
             <div style="display:flex;flex-direction:column;gap:20px;">
 
                 {{-- Logos --}}

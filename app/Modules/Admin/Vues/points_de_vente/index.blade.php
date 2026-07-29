@@ -8,11 +8,16 @@
         <h1><i class="fas fa-store"></i> Points de vente</h1>
         <p>{{ $pointsDeVente->count() }} / {{ $quotaMax }} points de vente utilisés</p>
     </div>
-    @if($pointsDeVente->count() < $quotaMax)
-    <button class="btn btn-primary" data-modal-open="modalNouveauPdv">
-        <i class="fas fa-plus"></i> Nouveau point de vente
-    </button>
-    @endif
+    <div style="display:flex;gap:10px;align-items:center;">
+        <button class="btn btn-outline" onclick="ouvrirImport('modalImportPdv')" style="font-size:13px;">
+            <i class="fas fa-file-import"></i> Importer CSV
+        </button>
+        @if($pointsDeVente->count() < $quotaMax)
+        <button class="btn btn-primary" data-modal-open="modalNouveauPdv">
+            <i class="fas fa-plus"></i> Nouveau point de vente
+        </button>
+        @endif
+    </div>
 </div>
 
 {{-- Barre de progression quota --}}
@@ -141,4 +146,5 @@
         </form>
     </div>
 </div>
+@include('admin::composants.modal-import', ['type' => 'points-de-vente', 'label' => 'Points de vente', 'id' => 'modalImportPdv'])
 @endsection

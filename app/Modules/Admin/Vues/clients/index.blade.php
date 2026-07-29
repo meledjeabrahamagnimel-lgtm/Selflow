@@ -20,6 +20,9 @@
                 <i class="fas fa-sync"></i> COMPTAFLOW ({{ $clientsComptaflow->total() }})
             </button>
         </div>
+        <button class="btn btn-outline" onclick="ouvrirImport('modalImportClients')" style="font-size:13px;">
+            <i class="fas fa-file-import"></i> Importer CSV
+        </button>
         <button id="btn-nouveau-client" class="btn btn-primary" data-modal-open="modalNouveauClient">
             <i class="fas fa-plus"></i> Ajouter un client
         </button>
@@ -62,6 +65,7 @@
                 <thead>
                     <tr>
                         <th>Nom &amp; Prénom</th>
+                        <th>Type</th>
                         <th>N° tiers</th>
                         <th>NCC</th>
                         <th>RCCM</th>
@@ -79,6 +83,17 @@
                     @forelse($clients as $c)
                     <tr>
                         <td style="font-weight:600; color:var(--text);">{{ $c->nom }}</td>
+                        <td>
+                            @if($c->type_facturation)
+                                @php $tf = $c->type_facturation; @endphp
+                                <span style="display:inline-flex;align-items:center;gap:4px;padding:2px 8px;border-radius:20px;font-size:11px;font-weight:700;
+                                    background:{{ $tf==='B2B' ? '#eff6ff' : ($tf==='B2C' ? '#f0fdf4' : ($tf==='B2G' ? '#fffbeb' : '#faf5ff')) }};
+                                    color:{{ $tf==='B2B' ? '#1d4ed8' : ($tf==='B2C' ? '#15803d' : ($tf==='B2G' ? '#b45309' : '#7c3aed')) }};
+                                    border:1px solid {{ $tf==='B2B' ? '#bfdbfe' : ($tf==='B2C' ? '#bbf7d0' : ($tf==='B2G' ? '#fde68a' : '#ddd6fe')) }};">{{ $tf }}</span>
+                            @else
+                                <span style="color:var(--text-3);font-size:12px;">—</span>
+                            @endif
+                        </td>
                         <td style="font-family: monospace; font-weight: 700; color: var(--primary);">
                             {{ $c->numero_tiers ?? '—' }}
                             @if(!empty($c->numero_original))
@@ -112,6 +127,7 @@
                             <button class="btn btn-outline btn-sm btn-modifier-client"
                                 data-id="{{ $c->id }}"
                                 data-nom="{{ $c->nom }}"
+                                data-type="{{ $c->type_facturation }}"
                                 data-telephone="{{ $c->telephone }}"
                                 data-email="{{ $c->email }}"
                                 data-adresse="{{ $c->adresse }}"
@@ -282,27 +298,31 @@
                     <label class="form-label">Nom &amp; Prénom <span style="color:var(--danger)">*</span></label>
                     <input type="text" name="nom" class="form-control" placeholder="Ex: Koffi Amos" required>
                 </div>
-                <div class="form-group">
-                    <label class="form-label">Téléphone</label>
-                    <input type="text" name="telephone" class="form-control" placeholder="Ex: +225 07 00 00 00">
-                </div>
-                <div class="form-group">
-                    <label class="form-label">Adresse E-mail</label>
-                    <input type="email" name="email" class="form-control" placeholder="Ex: koffi@mail.com">
-                </div>
+                {{-- Type de facturation --}}
                 <div class="form-group" style="grid-column:1/-1;">
-                    <label class="form-label">Adresse physique</label>
-                    <input type="text" name="adresse" class="form-control" placeholder="Ex: Cocody, Abidjan">
+                    <label class="form-label">Type de facturation <span style="color:#E53E3E">*</span></label>
+                    <select name="type_facturation" id="new_type_facturation" class="form-control" onchange="toggleNccClient('new')">
+                        <option value="">— Sélectionner le type —</option>
+                        <option value="B2C">B2C — Entreprise à Particulier</option>
+                        <option value="B2B">B2B — Entreprise à Entreprise (NCC requis)</option>
+                        <option value="B2G">B2G — Entreprise à État / Collectivité</option>
+                        <option value="B2F">B2F — Entreprise à International</option>
+                    </select>
+                    <small style="color:var(--text-3);font-size:11px;">Détermine si le NCC est obligatoire et le type de facture DGI.</small>
                 </div>
+                <div class="form-group" style="grid-column:1/-1;"></div>
+                <div class="form-group"><label class="form-label">Téléphone</label><input type="text" name="telephone" class="form-control" placeholder="Ex: +225 07 00 00 00"></div>
+                <div class="form-group"><label class="form-label">Adresse E-mail</label><input type="email" name="email" class="form-control" placeholder="Ex: koffi@mail.com"></div>
+                <div class="form-group" style="grid-column:1/-1;"><label class="form-label">Adresse physique</label><input type="text" name="adresse" class="form-control" placeholder="Ex: Cocody, Abidjan"></div>
                 {{-- Informations fiscales & Comptables --}}
                 <div style="grid-column:1/-1; padding:12px 14px; background:var(--bg3); border-radius:8px; border:1px solid var(--border); margin-top:4px;">
                     <div style="font-size:11px;font-weight:700;color:var(--text-2);text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px;">
                         <i class="fas fa-file-invoice" style="margin-right:6px;"></i>Informations fiscales &amp; comptables
                     </div>
                     <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
-                        <div class="form-group" style="margin-bottom:0;">
-                            <label class="form-label">NCC (Nº Compte Contribuable)</label>
-                            <input type="text" name="ncc" class="form-control" placeholder="Ex: 2302178R">
+                        <div class="form-group" style="margin-bottom:0;" id="new_ncc_group">
+                            <label class="form-label" id="new_ncc_label">NCC (Nº Compte Contribuable)</label>
+                            <input type="text" name="ncc" id="new_ncc_input" class="form-control" placeholder="Ex: 2302178R">
                         </div>
                         <div class="form-group" style="margin-bottom:0;">
                             <label class="form-label">RCCM (Registre de commerce)</label>
@@ -365,26 +385,29 @@
                     <label class="form-label">Nom &amp; Prénom <span style="color:var(--danger)">*</span></label>
                     <input type="text" name="nom" id="edit_nom" class="form-control" placeholder="Ex: Koffi Amos" required>
                 </div>
-                <div class="form-group">
-                    <label class="form-label">Téléphone</label>
-                    <input type="text" name="telephone" id="edit_telephone" class="form-control" placeholder="Ex: +225 07 00 00 00">
-                </div>
-                <div class="form-group">
-                    <label class="form-label">Adresse E-mail</label>
-                    <input type="email" name="email" id="edit_email" class="form-control" placeholder="Ex: koffi@mail.com">
-                </div>
+                {{-- Type de facturation --}}
                 <div class="form-group" style="grid-column:1/-1;">
-                    <label class="form-label">Adresse physique</label>
-                    <input type="text" name="adresse" id="edit_adresse" class="form-control" placeholder="Ex: Cocody, Abidjan">
+                    <label class="form-label">Type de facturation <span style="color:#E53E3E">*</span></label>
+                    <select name="type_facturation" id="edit_type_facturation" class="form-control" onchange="toggleNccClient('edit')">
+                        <option value="">— Sélectionner le type —</option>
+                        <option value="B2C">B2C — Entreprise à Particulier</option>
+                        <option value="B2B">B2B — Entreprise à Entreprise (NCC requis)</option>
+                        <option value="B2G">B2G — Entreprise à État / Collectivité</option>
+                        <option value="B2F">B2F — Entreprise à International</option>
+                    </select>
                 </div>
+                <div class="form-group" style="grid-column:1/-1;"></div>
+                <div class="form-group"><label class="form-label">Téléphone</label><input type="text" name="telephone" id="edit_telephone" class="form-control" placeholder="Ex: +225 07 00 00 00"></div>
+                <div class="form-group"><label class="form-label">Adresse E-mail</label><input type="email" name="email" id="edit_email" class="form-control" placeholder="Ex: koffi@mail.com"></div>
+                <div class="form-group" style="grid-column:1/-1;"><label class="form-label">Adresse physique</label><input type="text" name="adresse" id="edit_adresse" class="form-control" placeholder="Ex: Cocody, Abidjan"></div>
                 {{-- Informations fiscales & Comptables --}}
                 <div style="grid-column:1/-1; padding:12px 14px; background:var(--bg3); border-radius:8px; border:1px solid var(--border); margin-top:4px;">
                     <div style="font-size:11px;font-weight:700;color:var(--text-2);text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px;">
                         <i class="fas fa-file-invoice" style="margin-right:6px;"></i>Informations fiscales &amp; comptables
                     </div>
                     <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
-                        <div class="form-group" style="margin-bottom:0;">
-                            <label class="form-label">NCC (Nº Compte Contribuable)</label>
+                        <div class="form-group" style="margin-bottom:0;" id="edit_ncc_group">
+                            <label class="form-label" id="edit_ncc_label">NCC (Nº Compte Contribuable)</label>
                             <input type="text" name="ncc" id="edit_ncc" class="form-control" placeholder="Ex: 2302178R">
                         </div>
                         <div class="form-group" style="margin-bottom:0;">
@@ -473,6 +496,28 @@ function switchVue(mode) {
     }
 }
 
+// ── NCC show/hide selon type de facturation ──
+function toggleNccClient(prefix) {
+    const select   = document.getElementById(prefix + '_type_facturation') || document.getElementById('edit_type_facturation') || document.getElementById('new_type_facturation');
+    const nccGroup = document.getElementById(prefix === 'new' ? 'new_ncc_group' : 'edit_ncc_group');
+    const nccLabel = document.getElementById(prefix === 'new' ? 'new_ncc_label' : 'edit_ncc_label');
+    const nccInput = document.getElementById(prefix === 'new' ? 'new_ncc_input' : 'edit_ncc');
+    if (!select || !nccGroup) return;
+    const isB2B = select.value === 'B2B';
+    nccGroup.style.opacity = isB2B ? '1' : '0.45';
+    if (nccLabel) {
+        nccLabel.innerHTML = isB2B
+            ? 'NCC (Nº Compte Contribuable) <span style="color:#E53E3E">*</span>'
+            : 'NCC (Nº Compte Contribuable)';
+    }
+    if (nccInput) {
+        nccInput.required = isB2B;
+        if (!isB2B) nccInput.value = '';
+        nccInput.placeholder = isB2B ? 'Obligatoire pour B2B — Ex: 2302178R' : 'Ex: 2302178R (facultatif)';
+        nccInput.style.border = isB2B ? '1.5px solid #E53E3E' : '';
+    }
+}
+
 // Boutons Modifier via data-* attributes (pas de json_encode dans onclick)
 document.querySelectorAll('.btn-modifier-client').forEach(function(btn) {
     btn.addEventListener('click', function() {
@@ -493,6 +538,9 @@ document.querySelectorAll('.btn-modifier-client').forEach(function(btn) {
         document.getElementById('edit_ncc').value             = data.ncc     || '';
         document.getElementById('edit_rccm').value            = data.rccm    || '';
         document.getElementById('edit_numero_tiers').value    = data.numero  || '';
+
+        const selectType = document.getElementById('edit_type_facturation');
+        if (selectType) { selectType.value = data.type || ''; toggleNccClient('edit'); }
 
         const selectRegime = document.getElementById('edit_regime_imposition');
         if (selectRegime) selectRegime.value = data.regime || '';
@@ -560,4 +608,5 @@ function lancerSyncComptaflow() {
     });
 }
 </script>
+@include('admin::composants.modal-import', ['type' => 'clients', 'label' => 'Clients', 'id' => 'modalImportClients'])
 @endsection

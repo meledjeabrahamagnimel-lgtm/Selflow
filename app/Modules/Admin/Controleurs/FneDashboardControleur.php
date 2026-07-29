@@ -9,6 +9,7 @@ use App\Modules\Admin\Modeles\TresorerieJournal;
 use App\Modules\Admin\Modeles\OrdreProduction;
 use App\Modules\Admin\Modeles\TransfertStock;
 use App\Modules\Admin\Modeles\EcritureComptable;
+use App\Modules\Admin\Modeles\TaxConfiguration;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Auth;
@@ -45,13 +46,15 @@ class FneDashboardControleur
 
     public function gestion(Request $request): View
     {
-        $entreprise = Auth::user()->entreprise;
+        $entreprise    = Auth::user()->entreprise;
         $pointsDeVente = PointDeVente::where('entreprise_id', $entreprise->id)->orderBy('nom')->get();
+        $taxConfig     = TaxConfiguration::where('entreprise_id', $entreprise->id)->first();
 
         return view('admin::fne.gestion', [
-            'entreprise' => $entreprise,
+            'entreprise'    => $entreprise,
             'pointsDeVente' => $pointsDeVente,
-            'kpis' => $this->calculerKpisGestionFne($request, $entreprise->id),
+            'taxConfig'     => $taxConfig,
+            'kpis'          => $this->calculerKpisGestionFne($request, $entreprise->id),
         ]);
     }
 
@@ -98,30 +101,111 @@ class FneDashboardControleur
 
             // Indicateurs propres à la plateforme DGI — non disponibles sans
             // appel API dédié (non implémenté). Affichés à 0 par choix validé.
-            'stickers_solde' => 0,
-            'stickers_achats' => 0,
-            'stickers_consommes' => 0,
-            'timbre_quittance' => 0,
+            'stickers_solde'    => 0,
+            'stickers_achats'   => 0,
+            'stickers_consommes'=> 0,
+            'timbre_quittance'  => 0,
 
             'ventes' => [
                 'factures' => ['nombre' => (clone $facturesVente)->count(), 'montant' => (clone $facturesVente)->sum('montant_ttc')],
-                'avoirs'   => ['nombre' => (clone $avoirsVente)->count(), 'montant' => (clone $avoirsVente)->sum('montant_ttc')],
-                'recus'    => ['nombre' => (clone $recusVente)->count(), 'montant' => (clone $recusVente)->sum('montant_ttc')],
-                'proforma' => ['nombre' => 0, 'montant' => 0], // Non applicable : Selflow ne gère pas de proforma vente
-                'total_ht' => $totalHtVente,
-                'total_tva' => $totalTvaVente,
-                'total_ttc' => $totalTtcVente,
+                'avoirs'   => ['nombre' => (clone $avoirsVente)->count(),   'montant' => (clone $avoirsVente)->sum('montant_ttc')],
+                'recus'    => ['nombre' => (clone $recusVente)->count(),     'montant' => (clone $recusVente)->sum('montant_ttc')],
+                'proforma' => ['nombre' => 0, 'montant' => 0],
+                'total_ht'      => $totalHtVente,
+                'total_tva'     => $totalTvaVente,
+                'total_ttc'     => $totalTtcVente,
                 'total_remises' => $totalRemiseVente,
             ],
 
             'achats' => [
-                'factures' => ['nombre' => (clone $facturesAchat)->count(), 'montant' => (clone $facturesAchat)->sum('montant_ttc')],
-                'avoirs'   => ['nombre' => (clone $avoirsAchat)->count(), 'montant' => (clone $avoirsAchat)->sum('montant_ttc')],
-                'total_ht' => (clone $achatsQuery)->where('type_facture', '!=', 'avoir')->sum('montant_ht'),
-                'total_tva_deductible' => (clone $achatsQuery)->where('type_facture', '!=', 'avoir')->sum('montant_tva'),
-                'total_ttc' => (clone $achatsQuery)->where('type_facture', '!=', 'avoir')->sum('montant_ttc'),
+                'factures'           => ['nombre' => (clone $facturesAchat)->count(), 'montant' => (clone $facturesAchat)->sum('montant_ttc')],
+                'avoirs'             => ['nombre' => (clone $avoirsAchat)->count(),   'montant' => (clone $avoirsAchat)->sum('montant_ttc')],
+                'total_ht'           => (clone $achatsQuery)->where('type_facture', '!=', 'avoir')->sum('montant_ht'),
+                'total_tva_deductible'=> (clone $achatsQuery)->where('type_facture', '!=', 'avoir')->sum('montant_tva'),
+                'total_ttc'          => (clone $achatsQuery)->where('type_facture', '!=', 'avoir')->sum('montant_ttc'),
+                'ca_ht'              => (clone $achatsQuery)->where('type_facture', '!=', 'avoir')->sum('montant_ht'),
+                'ca_ttc'             => (clone $achatsQuery)->where('type_facture', '!=', 'avoir')->sum('montant_ttc'),
             ],
         ];
+    }
+
+    // ─────────────────────────────────────────────────────────────────
+    // CONFIGURATION FISCALE (TSE / TDT / TVA)
+    // ─────────────────────────────────────────────────────────────────
+
+    /**
+     * Retourner la configuration fiscale courante en JSON.
+     */
+    public function obtenirConfig(): JsonResponse
+    {
+        $entreprise = Auth::user()->entreprise;
+        $config     = TaxConfiguration::where('entreprise_id', $entreprise->id)->first();
+
+        $regime    = $config?->regime     ?? $entreprise->regime_imposition;
+        $categorie = TaxConfiguration::categorieDepuisRegime($regime);
+
+        return response()->json([
+            'regime'     => $regime,
+            'categorie'  => $categorie,
+            'label_categorie' => $categorie === 'CAS_A' ? 'CAS A — Assujetti TVA (RNI / RSI)' : 'CAS B — Non-assujetti (TEE / RNE)',
+            'tva_active' => $config?->tva_active ?? false,
+            'tva_taux'   => $config?->tva_taux   ?? 18.00,
+            'tse_active' => $config?->tse_active ?? false,
+            'tse_taux'   => $config?->tse_taux   ?? 0.10,
+            'tdt_active' => $config?->tdt_active ?? false,
+            'tdt_taux'   => $config?->tdt_taux   ?? 1.50,
+            'tdt_seuil'  => $config?->tdt_seuil  ?? 5000.00,
+        ]);
+    }
+
+    /**
+     * Sauvegarder la configuration fiscale (POST AJAX).
+     */
+    public function sauvegarderConfig(Request $request): JsonResponse
+    {
+        $entreprise = Auth::user()->entreprise;
+
+        $validated = $request->validate([
+            'tva_active' => ['boolean'],
+            'tva_taux'   => ['numeric', 'min:0', 'max:100'],
+            'tse_active' => ['boolean'],
+            'tse_taux'   => ['numeric', 'min:0', 'max:100'],
+            'tdt_active' => ['boolean'],
+            'tdt_taux'   => ['numeric', 'min:0', 'max:100'],
+            'tdt_seuil'  => ['numeric', 'min:0'],
+        ]);
+
+        $regime    = $entreprise->regime_imposition;
+        $categorie = TaxConfiguration::categorieDepuisRegime($regime);
+
+        // Règle métier : TSE interdite en CAS B (TEE / RNE)
+        if ($categorie === 'CAS_B') {
+            $validated['tse_active'] = false;
+        }
+
+        // Règle métier : TVA masquée en CAS B
+        if ($categorie === 'CAS_B') {
+            $validated['tva_active'] = false;
+        }
+
+        $config = TaxConfiguration::updateOrCreate(
+            ['entreprise_id' => $entreprise->id],
+            array_merge($validated, [
+                'regime'    => $regime,
+                'categorie' => $categorie,
+            ])
+        );
+
+        return response()->json([
+            'success'   => true,
+            'message'   => 'Configuration fiscale enregistrée avec succès.',
+            'categorie' => $categorie,
+            'config'    => [
+                'tva_active' => $config->tva_active,
+                'tse_active' => $config->tse_active,
+                'tdt_active' => $config->tdt_active,
+            ],
+        ]);
     }
 
     // ─────────────────────────────────────────────────────────────────

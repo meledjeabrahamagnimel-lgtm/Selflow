@@ -19,7 +19,9 @@
 
 <form method="POST" action="{{ route('admin.mon_profil.enregistrer') }}" enctype="multipart/form-data">
     @csrf
+    @method('PUT')
     <div style="display:grid; grid-template-columns: 1fr 2fr; gap:24px; align-items:start;">
+
         
         {{-- Partie gauche : Avatar & Informations système --}}
         <div class="card" style="padding:24px; text-align:center; display:flex; flex-direction:column; align-items:center; gap:16px;">

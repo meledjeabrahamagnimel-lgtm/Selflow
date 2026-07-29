@@ -29,7 +29,7 @@ Route::prefix('admin')
         Route::get('/general', [AdminControleur::class, 'tableauDeBordGeneral'])->name('tableau_de_bord_general');
 
         // ── Ventes ──
-        Route::prefix('ventes')->name('ventes.')->middleware('modules:ventes')->group(function () {
+        Route::prefix('ventes')->name('ventes.')->middleware(['modules:ventes', 'inscription.complete'])->group(function () {
             Route::get('/nouvelle',        [VenteControleur::class, 'nouvelle'])->name('nouvelle');
             Route::post('/enregistrer',    [VenteControleur::class, 'enregistrer'])->name('enregistrer');
             Route::get('/factures',        [VenteControleur::class, 'factures'])->name('factures');
@@ -61,7 +61,8 @@ Route::prefix('admin')
         });
 
         // ── Achats ──
-        Route::prefix('achats')->name('achats.')->middleware('modules:achats')->group(function () {
+        Route::prefix('achats')->name('achats.')->middleware(['modules:achats', 'inscription.complete'])->group(function () {
+
             Route::get('/nouveau',         [AchatControleur::class, 'nouveau'])->name('nouveau');
             Route::post('/enregistrer',    [AchatControleur::class, 'enregistrer'])->name('enregistrer');
             Route::get('/factures',        [AchatControleur::class, 'factures'])->name('factures');
@@ -137,6 +138,12 @@ Route::prefix('admin')
             Route::get('/situation/donnees',[\App\Modules\Admin\Controleurs\FneDashboardControleur::class, 'situationJson'])->name('situation.donnees');
             Route::get('/factures',        [\App\Modules\Admin\Controleurs\FneDashboardControleur::class, 'factures'])->name('factures');
             Route::get('/factures/donnees',[\App\Modules\Admin\Controleurs\FneDashboardControleur::class, 'facturesJson'])->name('factures.donnees');
+            // ── Gestion des Stickers ──
+            Route::get('/stickers',         [\App\Modules\Admin\Controleurs\StickerControleur::class, 'index'])->name('stickers');
+            Route::post('/stickers/acheter',[\App\Modules\Admin\Controleurs\StickerControleur::class, 'acheter'])->name('stickers.acheter');
+            // ── Configuration Fiscale (TVA / TSE / TDT) ──
+            Route::get('/config',           [\App\Modules\Admin\Controleurs\FneDashboardControleur::class, 'obtenirConfig'])->name('config');
+            Route::post('/config',          [\App\Modules\Admin\Controleurs\FneDashboardControleur::class, 'sauvegarderConfig'])->name('config.sauvegarder');
         });
 
         // ── Points de vente ──
@@ -146,6 +153,13 @@ Route::prefix('admin')
             Route::post('/activer/{pdv}',       [PointDeVenteControleur::class, 'activerSession'])->name('activer');
             Route::post('/activer-apercu/{pdv}', [PointDeVenteControleur::class, 'activerApercu'])->name('activer_apercu');
             Route::post('/desactiver-apercu',    [PointDeVenteControleur::class, 'desactiverApercu'])->name('desactiver_apercu');
+        });
+
+        // ── Import CSV (4 modules) ──
+        Route::prefix('import')->name('import.')->group(function () {
+            Route::get('/{type}/exemple',  [\App\Modules\Admin\Controleurs\ImportControleur::class, 'telechargerExemple'])->name('exemple');
+            Route::post('/{type}/preview', [\App\Modules\Admin\Controleurs\ImportControleur::class, 'preview'])->name('preview');
+            Route::post('/{type}',         [\App\Modules\Admin\Controleurs\ImportControleur::class, 'importer'])->name('importer');
         });
 
         // ── Gestion Personnel ──
@@ -220,7 +234,8 @@ Route::prefix('admin')
 
         // ── Profil utilisateur ──
         Route::get('/mon-profil', [AdminControleur::class, 'monProfil'])->name('mon_profil');
-        Route::put('/mon-profil', [AdminControleur::class, 'enregistrerProfil'])->name('mon_profil.enregistrer');
+        Route::match(['post', 'put'], '/mon-profil', [AdminControleur::class, 'enregistrerProfil'])->name('mon_profil.enregistrer');
+
 
         // ── Paramètres entreprise ──
         Route::get('/entreprise/parametres', [EntrepriseControleur::class, 'parametres'])->name('entreprise.parametres');
@@ -228,6 +243,8 @@ Route::prefix('admin')
         Route::post('/entreprise/fne/tester-connexion', [EntrepriseControleur::class, 'testerConnexionFne'])->name('entreprise.fne.tester_connexion');
         Route::post('/entreprise/comptaflow/sync-simulation', [EntrepriseControleur::class, 'simulerSyncComptaflow'])->name('entreprise.comptaflow.sync');
         Route::post('/entreprise/comptaflow/sync', [EntrepriseControleur::class, 'synchroniserComptaflow'])->name('entreprise.comptaflow.sync_real');
+        Route::post('/entreprise/onboarding/entreprise-nom', [EntrepriseControleur::class, 'enregistrerNomOnboarding'])->name('onboarding.entreprise_nom');
+
 
 
         // ── Périodes / Exercices ──

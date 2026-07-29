@@ -23,7 +23,9 @@ return Application::configure(basePath: dirname(__DIR__))
             'forcer.mdp'      => \App\Modules\Authentification\Middleware\ForcerChangementMotDePasse::class,
             'hub.token'       => \App\Modules\Authentification\Middleware\VerifierJetonHub::class,
             'verify.hub.token'   => \App\Http\Middleware\VerifyHubToken::class,
+            'inscription.complete' => \App\Modules\Authentification\Middleware\VerifierInscriptionComplete::class,
         ]);
+
 
         // En-têtes de sécurité HTTP sur toutes les réponses web (Section 17.11)
         $middleware->appendToGroup('web', \App\Http\Middleware\AjouterEntetesSecurite::class);

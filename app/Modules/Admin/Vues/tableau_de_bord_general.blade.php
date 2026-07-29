@@ -6,7 +6,7 @@
 @section('contenu')
 
 {{-- ── EN-TÊTE ─────────────────────────────────────────────────────────── --}}
-<div class="page-header" style="margin-bottom:20px;">
+<div class="page-header" style="margin-bottom:12px;">
     <div>
         <h1 style="font-size:22px; font-weight:800; display:flex; align-items:center; gap:10px;">
             <span style="width:40px;height:40px;border-radius:12px;background:linear-gradient(135deg,#002B5C,#0ea5e9);display:inline-flex;align-items:center;justify-content:center;color:#fff;font-size:18px;">
@@ -34,6 +34,60 @@
         @endif
     </div>
 </div>
+
+{{-- ── FILTRES TEMPORELS PERSISTANTS ─────────────────────────────────────── --}}
+<div id="tdb-filtres-bar" style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;background:var(--bg-card,#fff);border:1px solid var(--border,#E5E7EB);border-radius:12px;padding:12px 16px;margin-bottom:18px;box-shadow:0 1px 4px rgba(0,0,0,.05);">
+    <span style="font-size:12px;font-weight:700;color:var(--text-3,#9CA3AF);text-transform:uppercase;letter-spacing:.5px;white-space:nowrap;">
+        <i class="fas fa-filter" style="margin-right:4px;"></i> Filtrer par
+    </span>
+
+    <select id="filtre-mois" style="padding:7px 12px;border:1.5px solid #E5E7EB;border-radius:8px;font-size:13px;font-family:inherit;color:#374151;background:#fff;cursor:pointer;outline:none;" onchange="appliquerFiltresTdb()">
+        <option value="tous">— Tous les mois —</option>
+        @foreach(['Janvier','Février','Mars','Avril','Mai','Juin','Juillet','Août','Septembre','Octobre','Novembre','Décembre'] as $i => $m)
+            <option value="{{ $i + 1 }}">{{ $m }}</option>
+        @endforeach
+    </select>
+
+    <select id="filtre-semaine" style="padding:7px 12px;border:1.5px solid #E5E7EB;border-radius:8px;font-size:13px;font-family:inherit;color:#374151;background:#fff;cursor:pointer;outline:none;" onchange="appliquerFiltresTdb()">
+        <option value="tous">— Toutes les semaines —</option>
+        @for($s = 1; $s <= 53; $s++)
+            <option value="{{ $s }}">Semaine {{ $s }}</option>
+        @endfor
+    </select>
+
+    <select id="filtre-jour" style="padding:7px 12px;border:1.5px solid #E5E7EB;border-radius:8px;font-size:13px;font-family:inherit;color:#374151;background:#fff;cursor:pointer;outline:none;" onchange="appliquerFiltresTdb()">
+        <option value="tous">— Tous les jours —</option>
+        @for($j = 1; $j <= 31; $j++)
+            <option value="{{ $j }}">Jour {{ $j }}</option>
+        @endfor
+    </select>
+
+    <button onclick="reinitialiserFiltresTdb()" style="padding:7px 14px;border-radius:8px;background:none;border:1.5px solid #E5E7EB;color:#6B7280;font-size:12.5px;font-weight:600;cursor:pointer;font-family:inherit;" title="Réinitialiser">
+        <i class="fas fa-rotate-left"></i> Reset
+    </button>
+
+    <span id="tdb-filtre-badge" style="display:none;background:#EFF6FF;color:#1D4ED8;font-size:11px;font-weight:700;padding:4px 10px;border-radius:20px;border:1px solid #BFDBFE;">
+        <i class="fas fa-circle-dot" style="font-size:8px;margin-right:4px;"></i>
+        <span id="tdb-filtre-label"></span>
+    </span>
+</div>
+
+@if(Auth::check() && Auth::user()->entreprise && !Auth::user()->entreprise->estInscriptionComplete())
+<div class="alert alert-warning" style="display:flex; align-items:center; justify-content:space-between; gap:16px; background:#FFFBEB; border:1px solid #FCD34D; border-radius:12px; padding:16px 20px; margin-bottom:20px; color:#92400E; box-shadow:0 1px 3px rgba(0,0,0,0.05); flex-wrap:wrap;">
+    <div style="display:flex; align-items:center; gap:12px; min-width:280px; flex:1;">
+        <span style="font-size:20px; color:#D97706; display:flex; align-items:center; justify-content:center; flex-shrink:0;"><i class="fas fa-triangle-exclamation"></i></span>
+        <div>
+            <h4 style="font-weight:700; font-size:14px; margin-bottom:2px;">Finalisation de l'inscription requise</h4>
+            <p style="font-size:13px; color:#B45309; line-height:1.4;">Finaliser l'inscription complète pour pouvoir exécuter des actions concrètes et profiter au mieux de l'application.</p>
+        </div>
+    </div>
+    <a href="{{ route('admin.entreprise.parametres') }}" style="white-space:nowrap; background:#D97706; color:#ffffff; border:none; padding:8px 14px; border-radius:8px; font-weight:600; text-decoration:none; display:inline-flex; align-items:center; gap:6px; font-size:12.5px; transition: background .15s;" onmouseover="this.style.background='#B45309'" onmouseout="this.style.background='#D97706'">
+        <i class="fas fa-pen-to-square"></i> Compléter l'inscription complète
+    </a>
+</div>
+@endif
+
+
 
 {{-- ── KPI LIGNE 1 : AUJOURD'HUI ──────────────────────────────────────── --}}
 <div style="margin-bottom:8px; font-size:10.5px; font-weight:700; color:var(--text-3); text-transform:uppercase; letter-spacing:1px;">
@@ -419,6 +473,90 @@ if (caPdv.length) {
         }
     });
 }
+</script>
+
+<script>
+// ── FILTRES TDB GÉNÉRAL PERSISTANTS (localStorage) ──────────────────────────
+const TDB_KEY = 'selflow_tdb_filtres_general';
+
+function appliquerFiltresTdb() {
+    const mois    = document.getElementById('filtre-mois').value;
+    const semaine = document.getElementById('filtre-semaine').value;
+    const jour    = document.getElementById('filtre-jour').value;
+
+    localStorage.setItem(TDB_KEY, JSON.stringify({ mois, semaine, jour }));
+
+    const actifs = [];
+    if (mois    !== 'tous') actifs.push(document.getElementById('filtre-mois').options[document.getElementById('filtre-mois').selectedIndex].text);
+    if (semaine !== 'tous') actifs.push(document.getElementById('filtre-semaine').options[document.getElementById('filtre-semaine').selectedIndex].text);
+    if (jour    !== 'tous') actifs.push('Jour ' + jour);
+    afficherBadge(actifs);
+
+    const url = new URL(window.location.href);
+    url.searchParams.set('filtre_mois',    mois);
+    url.searchParams.set('filtre_semaine', semaine);
+    url.searchParams.set('filtre_jour',    jour);
+    window.location.href = url.toString();
+}
+
+function reinitialiserFiltresTdb() {
+    localStorage.removeItem(TDB_KEY);
+    document.getElementById('filtre-mois').value    = 'tous';
+    document.getElementById('filtre-semaine').value = 'tous';
+    document.getElementById('filtre-jour').value    = 'tous';
+    afficherBadge([]);
+
+    const url = new URL(window.location.href);
+    url.searchParams.delete('filtre_mois');
+    url.searchParams.delete('filtre_semaine');
+    url.searchParams.delete('filtre_jour');
+    window.location.href = url.toString();
+}
+
+function afficherBadge(actifs) {
+    const badge = document.getElementById('tdb-filtre-badge');
+    const label = document.getElementById('tdb-filtre-label');
+    if (actifs.length > 0) {
+        label.textContent = actifs.join(' · ');
+        badge.style.display = 'inline-flex';
+        badge.style.alignItems = 'center';
+    } else {
+        badge.style.display = 'none';
+    }
+}
+
+(function restaurerFiltres() {
+    const urlParams  = new URLSearchParams(window.location.search);
+    const moisUrl    = urlParams.get('filtre_mois');
+    const semaineUrl = urlParams.get('filtre_semaine');
+    const jourUrl    = urlParams.get('filtre_jour');
+
+    if (moisUrl || semaineUrl || jourUrl) {
+        if (moisUrl)    document.getElementById('filtre-mois').value    = moisUrl;
+        if (semaineUrl) document.getElementById('filtre-semaine').value = semaineUrl;
+        if (jourUrl)    document.getElementById('filtre-jour').value    = jourUrl;
+        const actifs = [];
+        if (moisUrl    && moisUrl !== 'tous')    actifs.push(document.getElementById('filtre-mois').options[document.getElementById('filtre-mois').selectedIndex].text);
+        if (semaineUrl && semaineUrl !== 'tous') actifs.push('Semaine ' + semaineUrl);
+        if (jourUrl    && jourUrl !== 'tous')    actifs.push('Jour ' + jourUrl);
+        afficherBadge(actifs);
+        return;
+    }
+
+    const saved = localStorage.getItem(TDB_KEY);
+    if (!saved) return;
+    try {
+        const { mois, semaine, jour } = JSON.parse(saved);
+        if (mois)    document.getElementById('filtre-mois').value    = mois;
+        if (semaine) document.getElementById('filtre-semaine').value = semaine;
+        if (jour)    document.getElementById('filtre-jour').value    = jour;
+        const actifs = [];
+        if (mois    && mois !== 'tous')    actifs.push(document.getElementById('filtre-mois').options[document.getElementById('filtre-mois').selectedIndex]?.text ?? mois);
+        if (semaine && semaine !== 'tous') actifs.push('Semaine ' + semaine);
+        if (jour    && jour !== 'tous')    actifs.push('Jour ' + jour);
+        afficherBadge(actifs);
+    } catch(e) { localStorage.removeItem(TDB_KEY); }
+})();
 </script>
 
 @endsection

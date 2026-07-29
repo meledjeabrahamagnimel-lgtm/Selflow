@@ -45,23 +45,52 @@ class EntrepriseControleur
         $entreprise = Auth::user()->entreprise;
 
         $request->validate([
-            'nom'               => ['required', 'string', 'max:150'],
-            'gerant_nom'        => ['nullable', 'string', 'max:100'],
-            'gerant_prenom'     => ['nullable', 'string', 'max:150'],
-            'gerant_fonction'   => ['nullable', 'string', 'max:150'],
-            'adresse'           => ['nullable', 'string', 'max:255'],
-            'telephone'         => ['nullable', 'string', 'max:30'],
-            'email'             => ['nullable', 'email', 'max:150'],
-            'ref_bancaire'      => ['nullable', 'string', 'max:1000'],
-            'logo'              => ['nullable', 'image', 'mimes:png,jpg,jpeg,svg,webp', 'max:2048'],
-            'logo_fne'          => ['nullable', 'image', 'mimes:png,jpg,jpeg,svg,webp', 'max:2048'],
-            'comptaflow_sync_key'=> ['nullable', 'string', 'max:255'],
+            'nom'                    => ['required', 'string', 'max:150'],
+            'gerant_nom'             => ['nullable', 'string', 'max:100'],
+            'gerant_prenom'          => ['nullable', 'string', 'max:150'],
+            'gerant_fonction'        => ['nullable', 'string', 'max:150'],
+            'adresse'                => ['nullable', 'string', 'max:255'],
+            'telephone'              => ['nullable', 'string', 'max:30'],
+            'email'                  => ['nullable', 'email', 'max:150'],
+            'ref_bancaire'           => ['nullable', 'string', 'max:1000'],
+            'logo'                   => ['nullable', 'image', 'mimes:png,jpg,jpeg,svg,webp', 'max:2048'],
+            'logo_fne'               => ['nullable', 'image', 'mimes:png,jpg,jpeg,svg,webp', 'max:2048'],
+            'comptaflow_sync_key'    => ['nullable', 'string', 'max:255'],
+            // Nouveaux champs d'inscription complète dégrisés
+            'rccm'                   => ['nullable', 'string', 'max:100'],
+            'ncc'                    => ['nullable', 'string', 'max:100'],
+            'regime_imposition'      => ['nullable', 'string', 'in:TEE,RNE,RSI,RNI'],
+            'centre_impots'          => ['nullable', 'string', 'max:100'],
+            'compte_contribuable'    => ['nullable', 'string', 'max:100'],
+            'secteurs_activite'      => ['nullable', 'array'],
+            'secteurs_activite.*'    => ['nullable', 'string', 'max:60'],
+            // Champs DGI
+            'idu'                    => ['nullable', 'string', 'max:50'],
+            'reference_cadastrale'   => ['nullable', 'string', 'max:100'],
+            'proprietaire_local'     => ['nullable', 'string', 'max:150'],
+            'commune'                => ['nullable', 'string', 'max:100'],
+            'quartier'               => ['nullable', 'string', 'max:100'],
+            'sticker_solde_alerte'   => ['nullable', 'integer', 'min:1', 'max:9999'],
+            'pied_de_page_facture'   => ['nullable', 'string', 'max:1000'],
+            'facture_autres_mentions'=> ['nullable', 'string', 'max:1000'],
         ]);
 
         $data = $request->only([
             'nom', 'gerant_nom', 'gerant_prenom', 'gerant_fonction',
             'adresse', 'telephone', 'email', 'ref_bancaire', 'comptaflow_sync_key',
+            'rccm', 'ncc', 'regime_imposition', 'centre_impots', 'compte_contribuable',
+            // Champs DGI
+            'idu', 'reference_cadastrale', 'proprietaire_local', 'commune', 'quartier',
+            'sticker_solde_alerte', 'pied_de_page_facture', 'facture_autres_mentions',
         ]);
+
+        // Secteurs d'activité
+        $data['secteur_activite'] = $request->secteurs_activite ?? [];
+
+
+        // Checkboxes (non transmises si non cochées)
+        $data['timbre_quittance'] = $request->boolean('timbre_quittance');
+        $data['bapa']             = $request->boolean('bapa');
 
         $syncKeyChanged = $request->filled('comptaflow_sync_key') && ($request->comptaflow_sync_key !== $entreprise->comptaflow_sync_key);
 
@@ -284,4 +313,34 @@ class EntrepriseControleur
 
         return response()->json(['success' => $resultat === 'succes', 'message' => $message]);
     }
+
+    /**
+     * Enregistrer rapidement le nom de l'entreprise (onboarding Google).
+     */
+    public function enregistrerNomOnboarding(Request $request): RedirectResponse
+    {
+        $request->validate([
+            'nom_entreprise' => ['required', 'string', 'max:150'],
+        ], [
+            'nom_entreprise.required' => 'Le nom de votre entreprise est obligatoire.',
+        ]);
+
+        $user = Auth::user();
+        if ($user && $user->entreprise) {
+            $user->entreprise->update([
+                'nom' => trim($request->nom_entreprise)
+            ]);
+            
+            // Log de l'action
+            $this->journaliser('onboarding_entreprise_nom', 'Entreprise', $user->entreprise->id, null, [
+                'nouveau_nom'   => trim($request->nom_entreprise)
+            ]);
+
+
+            return redirect()->back()->with('succes', 'Le nom de votre entreprise a été enregistré avec succès !');
+        }
+
+        return redirect()->back()->withErrors(['nom_entreprise' => 'Action impossible.']);
+    }
 }
+

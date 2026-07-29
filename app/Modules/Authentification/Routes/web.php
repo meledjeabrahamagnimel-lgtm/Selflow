@@ -13,6 +13,26 @@ Route::middleware('guest')->group(function () {
     Route::post('/connexion', [ConnexionControleur::class, 'connecter'])
         ->name('connexion.traitement');
 
+    // ── Inscription ──
+    Route::get('/inscription', [\App\Modules\Authentification\Controleurs\InscriptionControleur::class, 'afficher'])
+        ->name('inscription');
+
+    Route::post('/inscription', [\App\Modules\Authentification\Controleurs\InscriptionControleur::class, 'inscrire'])
+        ->name('inscription.traitement');
+
+    // ── Google OAuth (Socialite) ──
+    // Redirection vers Google
+    Route::get('/auth/google', [\App\Modules\Authentification\Controleurs\GoogleAuthControleur::class, 'rediriger'])
+        ->name('auth.google');
+
+    // Callback local dev : http://127.0.0.1:8003/auth/google/callback
+    Route::get('/auth/google/callback', [\App\Modules\Authentification\Controleurs\GoogleAuthControleur::class, 'callback'])
+        ->name('auth.google.callback');
+
+    // Callback production : https://selflow.dc-knowing.com/auth/callback
+    Route::get('/auth/callback', [\App\Modules\Authentification\Controleurs\GoogleAuthControleur::class, 'callback'])
+        ->name('auth.callback');
+
     // Page de contact & documentation d'informations DC-KNOWING
     Route::get('/contact', [ConnexionControleur::class, 'contact'])
         ->name('contact.info');

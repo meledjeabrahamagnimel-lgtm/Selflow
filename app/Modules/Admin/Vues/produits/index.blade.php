@@ -22,6 +22,9 @@
                 <i class="fas fa-th"></i>
             </button>
         </div>
+        <button class="btn btn-outline" onclick="ouvrirImport('modalImportProduits')" style="font-size:13px;">
+            <i class="fas fa-file-import"></i> Importer CSV
+        </button>
         <button class="btn btn-primary" data-modal-open="modalNouveauProduit">
             <i class="fas fa-plus"></i> Ajouter un produit
         </button>
@@ -723,4 +726,5 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 });
 </script>
+@include('admin::composants.modal-import', ['type' => 'produits', 'label' => 'Produits', 'id' => 'modalImportProduits'])
 @endsection

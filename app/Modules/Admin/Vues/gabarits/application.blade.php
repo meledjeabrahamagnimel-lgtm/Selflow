@@ -945,6 +945,99 @@
     });
     @endif
 </script>
+
+{{-- ── MODAL 1 : ONBOARDING NOM DE L'ENTREPRISE (Google OAuth) ── --}}
+@if(Auth::check() && Auth::user()->entreprise && Auth::user()->entreprise->nom === '[PENDING_ONBOARDING]')
+<div id="onboarding-nom-modal" style="position:fixed; top:0; left:0; width:100vw; height:100vh; background:rgba(0,0,0,0.5); backdrop-filter:blur(10px); z-index:99999; display:flex; align-items:center; justify-content:center; padding:20px;">
+    <div style="background:#ffffff; border-radius:16px; width:100%; max-width:480px; box-shadow:0 25px 50px -12px rgba(0,0,0,0.25); padding:36px; border:1px solid rgba(226,232,240,0.8); text-align:center; animation: onboardingScaleUp 0.3s ease-out;">
+        <div style="width:60px; height:60px; border-radius:14px; background:#EFF6FF; color:#1D4ED8; display:inline-flex; align-items:center; justify-content:center; font-size:26px; margin-bottom:20px; box-shadow:0 4px 10px rgba(29,78,216,0.15);">
+            <i class="fas fa-building"></i>
+        </div>
+        <h2 style="font-size:22px; font-weight:800; color:#1E293B; margin-bottom:8px; font-family:'Inter', sans-serif;">Bienvenue sur Selflow 👋</h2>
+        <p style="color:#64748B; font-size:14px; line-height:1.5; margin-bottom:26px; font-family:'Inter', sans-serif;">Pour commencer à explorer votre espace et visualiser l'application, veuillez renseigner le nom de votre entreprise.</p>
+        
+        <form action="{{ route('admin.onboarding.entreprise_nom') }}" method="POST" style="text-align:left;">
+            @csrf
+            <div style="margin-bottom:24px;">
+                <label style="display:block; font-size:11px; font-weight:700; color:#64748B; text-transform:uppercase; margin-bottom:8px; letter-spacing:0.8px; font-family:'Inter', sans-serif;">Nom de votre entreprise</label>
+                <input type="text" name="nom_entreprise" required placeholder="Ex: Commerce Général Ivoirien SARL" style="width:100%; padding:12px 16px; border:1.5px solid #E2E8F0; border-radius:10px; font-size:14px; font-family:inherit; color:#1E293B; outline:none; transition:all 0.2s;" onfocus="this.style.borderColor='#1D4ED8'; this.style.boxShadow='0 0 0 3px rgba(29,78,216,0.1)'" onblur="this.style.borderColor='#E2E8F0'; this.style.boxShadow='none'">
+            </div>
+            <button type="submit" style="width:100%; padding:13px; background:#002B5C; color:#ffffff; font-weight:600; border:none; border-radius:10px; font-size:14px; cursor:pointer; transition:all 0.2s; font-family:'Inter', sans-serif; display:flex; align-items:center; justify-content:center; gap:8px;" onmouseover="this.style.background='#001F42'" onmouseout="this.style.background='#002B5C'">
+                Accéder à l'application <i class="fas fa-arrow-right"></i>
+            </button>
+        </form>
+    </div>
+</div>
+<style>
+@keyframes onboardingScaleUp {
+    from { transform: scale(0.95); opacity: 0; }
+    to { transform: scale(1); opacity: 1; }
+}
+</style>
+@endif
+
+{{-- ── MODAL 2 : INSCRIPTION INCOMPLÈTE (Bloquant Ventes/Achats/Devis) ── --}}
+<div id="incomplete-registration-modal" style="position:fixed; top:0; left:0; width:100vw; height:100vh; background:rgba(0,0,0,0.5); backdrop-filter:blur(6px); z-index:99998; display:none; align-items:center; justify-content:center; padding:20px;">
+    <div style="background:#ffffff; border-radius:16px; width:100%; max-width:480px; box-shadow:0 25px 50px -12px rgba(0,0,0,0.25); padding:36px; border:1px solid rgba(226,232,240,0.8); text-align:center; animation: onboardingScaleUp 0.25s ease-out;">
+        <div style="width:60px; height:60px; border-radius:14px; background:#FEF3C7; color:#D97706; display:inline-flex; align-items:center; justify-content:center; font-size:26px; margin-bottom:20px;">
+            <i class="fas fa-triangle-exclamation"></i>
+        </div>
+        <h2 style="font-size:20px; font-weight:800; color:#1E293B; margin-bottom:10px; font-family:'Inter', sans-serif;">Inscription incomplète</h2>
+        <p style="color:#64748B; font-size:14px; line-height:1.5; margin-bottom:28px; font-family:'Inter', sans-serif;">
+            Terminer votre inscription avant de continuer. Vous devez renseigner toutes les informations réglementaires de votre entreprise pour effectuer des ventes, achats ou devis.
+        </p>
+        
+        <div style="display:flex; gap:12px; justify-content:center;">
+            <button onclick="fermerModalIncomplet()" style="flex:1; padding:12px; background:#F1F5F9; color:#475569; font-weight:600; border:none; border-radius:10px; font-size:14px; cursor:pointer; transition:all 0.15s; font-family:'Inter', sans-serif;" onmouseover="this.style.background='#E2E8F0'" onmouseout="this.style.background='#F1F5F9'">
+                Annuler
+            </button>
+            <a href="{{ route('admin.entreprise.parametres') }}" style="flex:1; padding:12px; background:#002B5C; color:#ffffff; font-weight:600; border:none; border-radius:10px; font-size:14px; cursor:pointer; text-decoration:none; display:inline-flex; align-items:center; justify-content:center; transition:all 0.15s; font-family:'Inter', sans-serif;" onmouseover="this.style.background='#001F42'" onmouseout="this.style.background='#002B5C'">
+                Continuer
+            </a>
+        </div>
+    </div>
+</div>
+
+<script>
+function fermerModalIncomplet() {
+    document.getElementById('incomplete-registration-modal').style.display = 'none';
+}
+
+function ouvrirModalIncomplet() {
+    document.getElementById('incomplete-registration-modal').style.display = 'flex';
+}
+
+// Ouvrir automatiquement si la session le demande
+@if(session('ouvrir_modale_incomplet'))
+document.addEventListener('DOMContentLoaded', () => {
+    ouvrirModalIncomplet();
+});
+@endif
+
+// Intercepter également au clic côté client si l'inscription est incomplète
+@if(Auth::check() && Auth::user()->entreprise && !Auth::user()->entreprise->estInscriptionComplete())
+document.addEventListener('DOMContentLoaded', () => {
+    // Cibler tous les liens ou boutons pointant vers les ventes ou achats
+    document.querySelectorAll('a, button').forEach(el => {
+        const href = el.getAttribute('href');
+        const onclick = el.getAttribute('onclick');
+        
+        if (href && (href.includes('/ventes') || href.includes('/achats') || href.includes('ventes.') || href.includes('achats.'))) {
+            // Ignorer les boutons de la barre latérale si l'utilisateur veut juste naviguer
+            // Mais bloquer la création/édition active (ex: /nouvelle, /nouveau)
+            if (href.includes('/nouvelle') || href.includes('/nouveau') || href.includes('/creer') || href.includes('/enregistrer')) {
+                el.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    ouvrirModalIncomplet();
+                });
+            }
+        }
+    });
+});
+@endif
+</script>
+
 @yield('scripts')
 </body>
 </html>
+

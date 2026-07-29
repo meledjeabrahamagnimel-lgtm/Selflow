@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="fr">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -223,6 +224,7 @@
         }
     </style>
 </head>
+
 <body>
 
     <div class="header">
@@ -231,17 +233,21 @@
     </div>
 
     <div class="container">
-        
+
         {{-- Partie gauche : Présentation & Documentation --}}
         <div>
             <div class="card">
                 <h2 class="card-title"><i class="ti ti-info-circle"></i> À propos de Selflow</h2>
                 <p style="font-size:14px; color:var(--text-2); margin-bottom:15px;">
-                    Selflow est un progiciel de gestion intégré (ERP) moderne développé par <strong>DC-KNOWING</strong>, spécialement conçu pour les entreprises de la zone OHADA. Il propose une facturation normalisée directement interfacée avec l'API FNE de la DGI en Côte d'Ivoire, une gestion complète des stocks multi-sites et un module de production industrielle.
+                    Selflow est un progiciel de gestion intégré (ERP) moderne développé par <strong>DC-KNOWING</strong>,
+                    spécialement conçu pour les entreprises de la zone OHADA. Il propose une facturation normalisée
+                    directement interfacée avec l'API FNE de la DGI en Côte d'Ivoire, une gestion complète des stocks
+                    multi-sites et un module de production industrielle.
                 </p>
                 <div class="app-list" style="margin-top:25px;">
-                    <h3 style="font-size:14px; font-weight:700; color:var(--navy); margin-bottom:10px;">Notre suite logicielle</h3>
-                    
+                    <h3 style="font-size:14px; font-weight:700; color:var(--navy); margin-bottom:10px;">Notre suite
+                        logicielle</h3>
+
                     <div class="app-item">
                         <div class="app-logo"><i class="ti ti-calculator"></i></div>
                         <div class="app-info">
@@ -249,11 +255,11 @@
                             <p>Application comptable certifiée SYSCOHADA révisé avec déversement en ligne.</p>
                         </div>
                     </div>
-                    
+
                     <div class="app-item">
                         <div class="app-logo"><i class="ti ti-users"></i></div>
                         <div class="app-info">
-                            <h4>HR-KNOWING</h4>
+                            <h4>RH-FLOW</h4>
                             <p>Gestion des ressources humaines, paie et administration du personnel.</p>
                         </div>
                     </div>
@@ -264,15 +270,19 @@
                 <h2 class="card-title"><i class="ti ti-file-text"></i> Conditions Générales d'Utilisation</h2>
                 <div class="doc-section">
                     <p>
-                        L'utilisation des services applicatifs DC-KNOWING implique l'acceptation pleine et entière des conditions d'utilisation décrites ci-après. Les licences d'utilisation sont accordées sous forme d'abonnements mensuels ou annuels.
+                        L'utilisation des services applicatifs DC-KNOWING implique l'acceptation pleine et entière des
+                        conditions d'utilisation décrites ci-après. Les licences d'utilisation sont accordées sous forme
+                        d'abonnements mensuels ou annuels.
                     </p>
                     <h3>1. Utilisation du service</h3>
                     <p>
-                        L'utilisateur s'engage à utiliser l'application conformément aux réglementations fiscales en vigueur dans son pays d'exploitation (notamment la normalisation de facturation de la DGI).
+                        L'utilisateur s'engage à utiliser l'application conformément aux réglementations fiscales en
+                        vigueur dans son pays d'exploitation (notamment la normalisation de facturation de la DGI).
                     </p>
                     <h3>2. Responsabilité de la normalisation fiscale</h3>
                     <p>
-                        Selflow est un transmetteur certifié FNE. Les données transmises restent sous la responsabilité légale exclusive de l'entreprise émettrice.
+                        Selflow est un transmetteur certifié FNE. Les données transmises restent sous la responsabilité
+                        légale exclusive de l'entreprise émettrice.
                     </p>
                 </div>
             </div>
@@ -281,15 +291,18 @@
                 <h2 class="card-title"><i class="ti ti-shield-lock"></i> Politique de confidentialité</h2>
                 <div class="doc-section">
                     <p>
-                        DC-KNOWING accorde une importance primordiale à la sécurité et à la confidentialité de vos données financières et commerciales.
+                        DC-KNOWING accorde une importance primordiale à la sécurité et à la confidentialité de vos
+                        données financières et commerciales.
                     </p>
                     <h3>1. Hébergement et Sécurité</h3>
                     <p>
-                        Vos données d'exploitation sont hébergées sur des serveurs sécurisés bénéficiant de sauvegardes quotidiennes redondantes et d'un chiffrement des flux en SSL/TLS (HTTPS).
+                        Vos données d'exploitation sont hébergées sur des serveurs sécurisés bénéficiant de sauvegardes
+                        quotidiennes redondantes et d'un chiffrement des flux en SSL/TLS (HTTPS).
                     </p>
                     <h3>2. Accès aux Données</h3>
                     <p>
-                        Aucun membre du personnel DC-KNOWING n'accède à vos informations comptables ou fichiers clients sans votre demande d'assistance explicite et temporaire.
+                        Aucun membre du personnel DC-KNOWING n'accède à vos informations comptables ou fichiers clients
+                        sans votre demande d'assistance explicite et temporaire.
                     </p>
                 </div>
             </div>
@@ -300,14 +313,16 @@
             <div class="card" style="position: sticky; top: 20px;">
                 <h2 class="card-title"><i class="ti ti-headset"></i> Service Client & Ventes</h2>
                 <p style="font-size:13px; color:var(--text-2); margin-bottom:20px;">
-                    Pour toute demande de souscription, création de compte d'entreprise, assistance ou intégration avec notre suite comptable, contactez notre équipe :
+                    Pour toute demande de souscription, création de compte d'entreprise, assistance ou intégration avec
+                    notre suite comptable, contactez notre équipe :
                 </p>
 
                 <div class="contact-item">
                     <div class="contact-icon"><i class="ti ti-mail"></i></div>
                     <div class="contact-details">
                         <h4>Email professionnel</h4>
-                        <p><a href="mailto:contact@dc-knowing.ci" style="color:inherit; text-decoration:none;">contact@dc-knowing.ci</a></p>
+                        <p><a href="mailto:contact@dc-knowing.ci"
+                                style="color:inherit; text-decoration:none;">contact@dc-knowing.ci</a></p>
                     </div>
                 </div>
 
@@ -328,14 +343,13 @@
                 </div>
 
                 <div style="margin-top:30px;">
-                    <a href="https://wa.me/2250708091011?text=Bonjour%20DC-KNOWING,%20je%20souhaite%20des%20informations%20sur%20Selflow." 
-                       target="_blank" 
-                       class="btn btn-whatsapp">
+                    <a href="https://wa.me/2250708091011?text=Bonjour%20DC-KNOWING,%20je%20souhaite%20des%20informations%20sur%20Selflow."
+                        target="_blank" class="btn btn-whatsapp">
                         <i class="ti ti-brand-whatsapp"></i> Envoyer un message WhatsApp
                     </a>
-                    
-                    <a href="mailto:contact@dc-knowing.ci?subject=Demande%20d%27informations%20Selflow" 
-                       class="btn btn-mail">
+
+                    <a href="mailto:contact@dc-knowing.ci?subject=Demande%20d%27informations%20Selflow"
+                        class="btn btn-mail">
                         <i class="ti ti-mail"></i> Nous écrire par Email
                     </a>
 
@@ -349,4 +363,5 @@
     </div>
 
 </body>
+
 </html>

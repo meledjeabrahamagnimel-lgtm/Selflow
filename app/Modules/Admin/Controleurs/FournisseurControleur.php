@@ -53,11 +53,12 @@ class FournisseurControleur
 
         $request->validate([
             'nom'               => ['required', 'string', 'max:150'],
+            'type_facturation'  => ['nullable', 'in:B2B,B2C,B2G,B2F'],
             'telephone'         => ['nullable', 'string', 'max:30'],
             'email'             => ['nullable', 'email', 'max:150'],
             'adresse'           => ['nullable', 'string', 'max:255'],
             'secteur'           => ['nullable', 'string', 'max:100'],
-            'ncc'               => ['nullable', 'string', 'max:50'],
+            'ncc'               => ['required_if:type_facturation,B2B', 'nullable', 'string', 'max:50'],
             'rccm'              => ['nullable', 'string', 'max:100'],
             'regime_imposition' => ['nullable', 'string', 'max:100'],
             'compte_comptable'  => [
@@ -67,6 +68,8 @@ class FournisseurControleur
                     $q->whereNull('entreprise_id')->orWhere('entreprise_id', $entreprise->id);
                 })
             ],
+        ], [
+            'ncc.required_if' => 'Le NCC est obligatoire pour un fournisseur de type B2B (Entreprise à Entreprise).',
         ]);
 
         $autoNumero = $request->boolean('auto_numero_tiers');
@@ -100,10 +103,11 @@ class FournisseurControleur
         }
 
         Fournisseur::create(array_merge(
-            $request->only(['nom', 'telephone', 'email', 'adresse', 'secteur', 'ncc', 'rccm', 'regime_imposition', 'compte_comptable']),
+            $request->only(['nom', 'type_facturation', 'telephone', 'email', 'adresse', 'secteur', 'rccm', 'regime_imposition', 'compte_comptable']),
             [
                 'entreprise_id' => $entreprise->id,
-                'numero_tiers' => $numeroTiers,
+                'numero_tiers'  => $numeroTiers,
+                'ncc'           => ($request->input('type_facturation') === 'B2B') ? $request->input('ncc') : null,
             ]
         ));
 
@@ -116,29 +120,32 @@ class FournisseurControleur
         abort_unless($fournisseur->entreprise_id === $entreprise->id, 403);
 
         if ($fournisseur->source === 'comptaflow') {
-            // Uniquement les champs spécifiques à Selflow
             $request->validate([
+                'type_facturation'  => ['nullable', 'in:B2B,B2C,B2G,B2F'],
                 'telephone'         => ['nullable', 'string', 'max:30'],
                 'email'             => ['nullable', 'email', 'max:150'],
                 'adresse'           => ['nullable', 'string', 'max:255'],
                 'secteur'           => ['nullable', 'string', 'max:100'],
-                'ncc'               => ['nullable', 'string', 'max:50'],
+                'ncc'               => ['required_if:type_facturation,B2B', 'nullable', 'string', 'max:50'],
                 'rccm'              => ['nullable', 'string', 'max:100'],
                 'regime_imposition' => ['nullable', 'string', 'max:100'],
+            ], [
+                'ncc.required_if' => 'Le NCC est obligatoire pour un fournisseur de type B2B.',
             ]);
 
-            $fournisseur->update($request->only([
-                'telephone', 'email', 'adresse', 'secteur', 'ncc', 'rccm', 'regime_imposition'
-            ]));
+            $fournisseur->update(array_merge(
+                $request->only(['type_facturation', 'telephone', 'email', 'adresse', 'secteur', 'rccm', 'regime_imposition']),
+                ['ncc' => ($request->input('type_facturation') === 'B2B') ? $request->input('ncc') : null]
+            ));
         } else {
-            // Tous les champs
             $request->validate([
                 'nom'               => ['required', 'string', 'max:150'],
+                'type_facturation'  => ['nullable', 'in:B2B,B2C,B2G,B2F'],
                 'telephone'         => ['nullable', 'string', 'max:30'],
                 'email'             => ['nullable', 'email', 'max:150'],
                 'adresse'           => ['nullable', 'string', 'max:255'],
                 'secteur'           => ['nullable', 'string', 'max:100'],
-                'ncc'               => ['nullable', 'string', 'max:50'],
+                'ncc'               => ['required_if:type_facturation,B2B', 'nullable', 'string', 'max:50'],
                 'rccm'              => ['nullable', 'string', 'max:100'],
                 'regime_imposition' => ['nullable', 'string', 'max:100'],
                 'compte_comptable'  => [
@@ -154,11 +161,14 @@ class FournisseurControleur
                     'regex:/^401[0-9]*$/',
                     \Illuminate\Validation\Rule::unique('fournisseurs', 'numero_tiers')->ignore($fournisseur->id)->where('entreprise_id', $entreprise->id)
                 ],
+            ], [
+                'ncc.required_if' => 'Le NCC est obligatoire pour un fournisseur de type B2B.',
             ]);
 
-            $fournisseur->update($request->only([
-                'nom', 'telephone', 'email', 'adresse', 'secteur', 'ncc', 'rccm', 'regime_imposition', 'compte_comptable', 'numero_tiers'
-            ]));
+            $fournisseur->update(array_merge(
+                $request->only(['nom', 'type_facturation', 'telephone', 'email', 'adresse', 'secteur', 'rccm', 'regime_imposition', 'compte_comptable', 'numero_tiers']),
+                ['ncc' => ($request->input('type_facturation') === 'B2B') ? $request->input('ncc') : null]
+            ));
         }
 
         return back()->with('succes', 'Fournisseur modifié avec succès.');

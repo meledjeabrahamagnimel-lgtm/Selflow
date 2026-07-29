@@ -35,11 +35,25 @@ class Entreprise extends Model
         'comptaflow_sync_status',
         'comptaflow_last_sync_at',
         'comptaflow_company_id',
+        // Champs DGI / Fiscal
+        'idu',
+        'reference_cadastrale',
+        'proprietaire_local',
+        'commune',
+        'quartier',
+        'sticker_solde_alerte',
+        'timbre_quittance',
+        'bapa',
+        'pied_de_page_facture',
+        'facture_autres_mentions',
     ];
 
     protected $casts = [
-        'secteur_activite' => 'array',
-        'modules_actifs' => 'array',
+        'secteur_activite'   => 'array',
+        'modules_actifs'     => 'array',
+        'timbre_quittance'   => 'boolean',
+        'bapa'               => 'boolean',
+        'sticker_solde_alerte' => 'integer',
     ];
 
     public function pointsDeVente(): HasMany
@@ -71,4 +85,24 @@ class Entreprise extends Model
     {
         return $this->hasOne(FneCredential::class, 'entreprise_id');
     }
+
+    /**
+     * Vérifie si toutes les informations requises pour l'inscription complète sont présentes.
+     */
+    public function estInscriptionComplete(): bool
+    {
+        // Nom ne doit pas être temporaire
+        if ($this->nom === '[PENDING_ONBOARDING]') {
+            return false;
+        }
+
+        return !empty($this->regime_imposition)
+            && !empty($this->adresse)
+            && !empty($this->rccm)
+            && !empty($this->compte_contribuable)
+            && !empty($this->gerant_fonction)
+            && is_array($this->secteur_activite)
+            && count($this->secteur_activite) > 0;
+    }
 }
+
