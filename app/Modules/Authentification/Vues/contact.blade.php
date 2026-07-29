@@ -343,7 +343,7 @@
                 </div>
 
                 <div style="margin-top:30px;">
-                    <a href="https://wa.me/2250708091011?text=Bonjour%20DC-KNOWING,%20je%20souhaite%20des%20informations%20sur%20Selflow."
+                    <a href="https://wa.me/2250767131993?text=Bonjour%20DC-KNOWING,%20je%20souhaite%20des%20informations%20sur%20Selflow."
                         target="_blank" class="btn btn-whatsapp">
                         <i class="ti ti-brand-whatsapp"></i> Envoyer un message WhatsApp
                     </a>
