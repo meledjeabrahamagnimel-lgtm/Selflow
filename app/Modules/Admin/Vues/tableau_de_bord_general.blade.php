@@ -89,24 +89,25 @@
 
 
 
-{{-- ── KPI LIGNE 1 : AUJOURD'HUI ──────────────────────────────────────── --}}
+{{-- ── KPI LIGNE 1 : FILTRÉ ── --}}
 <div style="margin-bottom:8px; font-size:10.5px; font-weight:700; color:var(--text-3); text-transform:uppercase; letter-spacing:1px;">
-    <i class="fas fa-sun"></i> Aujourd'hui
+    <i class="fas fa-calendar"></i> Période : {{ $periodeLabel }}
 </div>
 <div style="display:grid; grid-template-columns: repeat(4,1fr); gap:14px; margin-bottom:20px;">
     <div class="tdb-kpi tdb-kpi-blue">
         <div class="tdb-kpi-icon"><i class="fas fa-arrow-trend-up"></i></div>
         <div>
             <div class="tdb-kpi-val">{{ number_format($montantVentesJour, 0, ',', ' ') }} <span>FCFA</span></div>
-            <div class="tdb-kpi-lbl">CA global du jour</div>
-            <div class="tdb-kpi-sub">{{ $nbVentesJour }} vente{{ $nbVentesJour > 1 ? 's' : '' }}</div>
+            <div class="tdb-kpi-lbl">CA global</div>
+            <div class="tdb-kpi-sub">{{ $nbVentesJour }} vente{{ $nbVentesJour > 1 ? 's' : '' }} · {{ $periodeLabel }}</div>
         </div>
     </div>
     <div class="tdb-kpi tdb-kpi-red">
         <div class="tdb-kpi-icon"><i class="fas fa-cart-shopping"></i></div>
         <div>
             <div class="tdb-kpi-val">{{ number_format($montantAchatsJour, 0, ',', ' ') }} <span>FCFA</span></div>
-            <div class="tdb-kpi-lbl">Achats du jour</div>
+            <div class="tdb-kpi-lbl">Achats</div>
+            <div class="tdb-kpi-sub">{{ $periodeLabel }}</div>
         </div>
     </div>
     <div class="tdb-kpi {{ $solde >= 0 ? 'tdb-kpi-green' : 'tdb-kpi-danger' }}">
@@ -479,7 +480,49 @@ if (caPdv.length) {
 // ── FILTRES TDB GÉNÉRAL PERSISTANTS (localStorage) ──────────────────────────
 const TDB_KEY = 'selflow_tdb_filtres_general';
 
+function updateWeeksSelect() {
+    const moisSelect = document.getElementById('filtre-mois');
+    const semaineSelect = document.getElementById('filtre-semaine');
+    if (!moisSelect || !semaineSelect) return;
+
+    const moisVal = moisSelect.value;
+    const selectedWeek = semaineSelect.value;
+
+    semaineSelect.innerHTML = '<option value="tous">— Toutes les semaines —</option>';
+
+    if (moisVal === 'tous') {
+        for (let s = 1; s <= 53; s++) {
+            semaineSelect.innerHTML += `<option value="${s}">Semaine ${s}</option>`;
+        }
+    } else {
+        const year = new Date().getFullYear();
+        const m = parseInt(moisVal) - 1;
+        const weeks = new Set();
+        const firstDay = new Date(year, m, 1);
+        const lastDay = new Date(year, m + 1, 0);
+
+        for (let d = new Date(firstDay); d <= lastDay; d.setDate(d.getDate() + 1)) {
+            const tempDate = new Date(d.valueOf());
+            tempDate.setDate(tempDate.getDate() + 4 - (tempDate.getDay() || 7));
+            const yearStart = new Date(tempDate.getFullYear(), 0, 1);
+            const weekNo = Math.ceil((((tempDate - yearStart) / 86400000) + 1) / 7);
+            weeks.add(weekNo);
+        }
+
+        Array.from(weeks).sort((a,b) => a - b).forEach(s => {
+            semaineSelect.innerHTML += `<option value="${s}">Semaine ${s}</option>`;
+        });
+    }
+
+    if (semaineSelect.querySelector(`option[value="${selectedWeek}"]`)) {
+        semaineSelect.value = selectedWeek;
+    } else {
+        semaineSelect.value = 'tous';
+    }
+}
+
 function appliquerFiltresTdb() {
+    updateWeeksSelect();
     const mois    = document.getElementById('filtre-mois').value;
     const semaine = document.getElementById('filtre-semaine').value;
     const jour    = document.getElementById('filtre-jour').value;
@@ -488,7 +531,7 @@ function appliquerFiltresTdb() {
 
     const actifs = [];
     if (mois    !== 'tous') actifs.push(document.getElementById('filtre-mois').options[document.getElementById('filtre-mois').selectedIndex].text);
-    if (semaine !== 'tous') actifs.push(document.getElementById('filtre-semaine').options[document.getElementById('filtre-semaine').selectedIndex].text);
+    if (semaine !== 'tous') actifs.push('Semaine ' + semaine);
     if (jour    !== 'tous') actifs.push('Jour ' + jour);
     afficherBadge(actifs);
 
@@ -533,6 +576,7 @@ function afficherBadge(actifs) {
 
     if (moisUrl || semaineUrl || jourUrl) {
         if (moisUrl)    document.getElementById('filtre-mois').value    = moisUrl;
+        updateWeeksSelect();
         if (semaineUrl) document.getElementById('filtre-semaine').value = semaineUrl;
         if (jourUrl)    document.getElementById('filtre-jour').value    = jourUrl;
         const actifs = [];
@@ -544,10 +588,14 @@ function afficherBadge(actifs) {
     }
 
     const saved = localStorage.getItem(TDB_KEY);
-    if (!saved) return;
+    if (!saved) {
+        updateWeeksSelect();
+        return;
+    }
     try {
         const { mois, semaine, jour } = JSON.parse(saved);
         if (mois)    document.getElementById('filtre-mois').value    = mois;
+        updateWeeksSelect();
         if (semaine) document.getElementById('filtre-semaine').value = semaine;
         if (jour)    document.getElementById('filtre-jour').value    = jour;
         const actifs = [];
@@ -555,7 +603,7 @@ function afficherBadge(actifs) {
         if (semaine && semaine !== 'tous') actifs.push('Semaine ' + semaine);
         if (jour    && jour !== 'tous')    actifs.push('Jour ' + jour);
         afficherBadge(actifs);
-    } catch(e) { localStorage.removeItem(TDB_KEY); }
+    } catch(e) { localStorage.removeItem(TDB_KEY); updateWeeksSelect(); }
 })();
 </script>
 

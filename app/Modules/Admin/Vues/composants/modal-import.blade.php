@@ -48,11 +48,15 @@
 
             {{-- Info + lien exemple --}}
             <div style="display:flex;align-items:center;gap:10px;padding:12px 16px;background:#eff6ff;border-radius:10px;border:1px solid #bfdbfe;margin-bottom:18px;">
-                <i class="fas fa-info-circle" style="color:#1d4ed8;font-size:16px;"></i>
-                <div style="font-size:13px;color:#1e40af;">
-                    Téléchargez d'abord le fichier modèle, complétez-le, puis importez-le ici.
-                    <a href="{{ $routeExemple }}" style="font-weight:700;text-decoration:underline;margin-left:6px;" download>
-                        <i class="fas fa-download"></i> Télécharger le fichier CSV d'exemple
+                <i class="fas fa-info-circle" style="color:#1d4ed8;font-size:16px;flex-shrink:0;"></i>
+                <div style="font-size:13px;color:#1e40af;line-height:1.4;">
+                    Téléchargez le fichier modèle à compléter :
+                    <a href="{{ $routeExemple }}" style="font-weight:700;text-decoration:underline;margin:0 4px;" download>
+                        <i class="fas fa-download"></i> Modèle CSV
+                    </a>
+                    ou 
+                    <a href="{{ $routeExemple }}?format=excel" style="font-weight:700;text-decoration:underline;margin-left:4px;" download>
+                        <i class="fas fa-file-excel"></i> Modèle Excel (.xlsx)
                     </a>
                 </div>
             </div>
@@ -64,10 +68,10 @@
                 ondragleave="this.classList.remove('dragover')"
                 ondrop="gererDrop(event, '{{ $modalId }}', '{{ $routePreview }}')">
                 <i class="fas fa-cloud-upload-alt"></i>
-                <p><strong>Glissez votre fichier CSV ici</strong> ou cliquez pour choisir</p>
-                <p style="margin-top:6px;font-size:11px;">Format accepté : CSV (séparateur ; ou ,) — Max 5 Mo</p>
+                <p><strong>Glissez votre fichier CSV ou Excel ici</strong> ou cliquez pour choisir</p>
+                <p style="margin-top:6px;font-size:11px;">Formats acceptés : CSV (séparateur ; ou ,) — Excel (.xlsx, .xls) — Max 5 Mo</p>
             </div>
-            <input type="file" id="{{ $modalId }}-file" accept=".csv,.txt" style="display:none"
+            <input type="file" id="{{ $modalId }}-file" accept=".csv,.txt,.xlsx,.xls" style="display:none"
                 onchange="previsualiserFichier(this, '{{ $modalId }}', '{{ $routePreview }}')">
 
             {{-- Nom du fichier sélectionné --}}

@@ -321,8 +321,8 @@
                     <div class="contact-icon"><i class="ti ti-mail"></i></div>
                     <div class="contact-details">
                         <h4>Email professionnel</h4>
-                        <p><a href="mailto:contact@dc-knowing.ci"
-                                style="color:inherit; text-decoration:none;">contact@dc-knowing.ci</a></p>
+                        <p><a href="mailto:[it.dcknowing@gmail.com]"
+                                style="color:inherit; text-decoration:none;">[EMAIL_ADDRESS]</a></p>
                     </div>
                 </div>
 
@@ -330,7 +330,7 @@
                     <div class="contact-icon"><i class="ti ti-phone"></i></div>
                     <div class="contact-details">
                         <h4>Téléphone Fixe / Ventes</h4>
-                        <p>+225 27 22 40 50 60</p>
+                        <p>+225 27 22 42 14 43 </p>
                     </div>
                 </div>
 
@@ -338,7 +338,7 @@
                     <div class="contact-icon"><i class="ti ti-brand-whatsapp"></i></div>
                     <div class="contact-details">
                         <h4>WhatsApp Support</h4>
-                        <p>+225 07 08 09 10 11</p>
+                        <p>+225 07 67 13 19 93</p>
                     </div>
                 </div>
 
@@ -348,7 +348,7 @@
                         <i class="ti ti-brand-whatsapp"></i> Envoyer un message WhatsApp
                     </a>
 
-                    <a href="mailto:contact@dc-knowing.ci?subject=Demande%20d%27informations%20Selflow"
+                    <a href="mailto:[it.dcknowing@gmail.com]?subject=Demande%20d%27informations%20Selflow"
                         class="btn btn-mail">
                         <i class="ti ti-mail"></i> Nous écrire par Email
                     </a>

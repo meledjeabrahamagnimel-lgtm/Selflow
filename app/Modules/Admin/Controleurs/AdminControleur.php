@@ -26,19 +26,53 @@ class AdminControleur
         $pointDeVenteId = session('point_de_vente_actif_id');
         $aujourd_hui    = now()->toDateString();
 
-        // ── Ventes du jour personnelles ──────────────────────────────────────
-        $qVentes = Vente::where('utilisateur_id', $utilisateur->id)
-            ->whereDate('date_vente', $aujourd_hui);
-        if ($pointDeVenteId) $qVentes->where('point_de_vente_id', $pointDeVenteId);
+        $filtreMois    = $request->query('filtre_mois', 'tous');
+        $filtreSemaine = $request->query('filtre_semaine', 'tous');
+        $filtreJour    = $request->query('filtre_jour', 'tous');
+
+        $periodeLabel = "aujourd'hui";
+
+        // ── Ventes personnelles ──────────────────────────────────────
+        $qVentes = Vente::where('utilisateur_id', $utilisateur->id);
+        // ── Achats personnels ─────────────────────────────────────────
+        $qAchats = Achat::where('utilisateur_id', $utilisateur->id);
+
+        if ($filtreMois !== 'tous' || $filtreSemaine !== 'tous' || $filtreJour !== 'tous') {
+            $debutPeriode = session('active_periode_debut');
+            $annee = $debutPeriode ? date('Y', strtotime($debutPeriode)) : date('Y');
+
+            if ($filtreMois !== 'tous') {
+                $qVentes->whereMonth('date_vente', $filtreMois);
+                $qAchats->whereMonth('date_achat', $filtreMois);
+                $moisNoms = ['Janvier','Février','Mars','Avril','Mai','Juin','Juillet','Août','Septembre','Octobre','Novembre','Décembre'];
+                $periodeLabel = $moisNoms[$filtreMois - 1] ?? 'Mois ' . $filtreMois;
+            }
+            if ($filtreJour !== 'tous') {
+                $qVentes->whereDay('date_vente', $filtreJour);
+                $qAchats->whereDay('date_achat', $filtreJour);
+                $periodeLabel = $filtreMois !== 'tous' ? $filtreJour . ' ' . $periodeLabel : 'Jour ' . $filtreJour;
+            }
+            if ($filtreSemaine !== 'tous') {
+                $qVentes->whereRaw('WEEK(date_vente, 1) = ?', [$filtreSemaine]);
+                $qAchats->whereRaw('WEEK(date_achat, 1) = ?', [$filtreSemaine]);
+                $periodeLabel = "Semaine " . $filtreSemaine;
+            }
+
+            $qVentes->whereYear('date_vente', $annee);
+            $qAchats->whereYear('date_achat', $annee);
+        } else {
+            $qVentes->whereDate('date_vente', $aujourd_hui);
+            $qAchats->whereDate('date_achat', $aujourd_hui);
+        }
+
+        if ($pointDeVenteId) {
+            $qVentes->where('point_de_vente_id', $pointDeVenteId);
+            $qAchats->where('point_de_vente_id', $pointDeVenteId);
+        }
 
         $ventesAujourdhui  = $qVentes->get();
         $montantVentesJour = $ventesAujourdhui->sum('montant_ttc');
         $nbVentesJour      = $ventesAujourdhui->count();
-
-        // ── Achats du jour personnels ─────────────────────────────────────────
-        $qAchats = Achat::where('utilisateur_id', $utilisateur->id)
-            ->whereDate('date_achat', $aujourd_hui);
-        if ($pointDeVenteId) $qAchats->where('point_de_vente_id', $pointDeVenteId);
         $montantAchatsJour = $qAchats->sum('montant_ttc');
 
         // ── Ventes de la période (via PeriodeScope) ───────────────────────────
@@ -107,7 +141,7 @@ class AdminControleur
             'entreprise', 'montantVentesJour', 'montantAchatsJour',
             'nbVentesJour', 'totalVentesPeriode', 'nbVentesPeriode',
             'produitsEnAlerte', 'solde', 'dernieresVentes',
-            'pointDeVenteId', 'jours7', 'meilleurProduit'
+            'pointDeVenteId', 'jours7', 'meilleurProduit', 'periodeLabel'
         ));
     }
 
@@ -123,15 +157,53 @@ class AdminControleur
 
         $pdvIds = $entreprise->pointsDeVente()->pluck('id');
 
-        // ── CA global du jour ─────────────────────────────────────────────────
-        $qVentes = Vente::whereIn('point_de_vente_id', $pdvIds)->whereDate('date_vente', $aujourd_hui);
-        if ($pointDeVenteId) $qVentes->where('point_de_vente_id', $pointDeVenteId);
-        $montantVentesJour = $qVentes->sum('montant_ttc');
-        $nbVentesJour      = $qVentes->count();
+        $filtreMois    = $request->query('filtre_mois', 'tous');
+        $filtreSemaine = $request->query('filtre_semaine', 'tous');
+        $filtreJour    = $request->query('filtre_jour', 'tous');
 
-        // ── Achats globaux du jour ────────────────────────────────────────────
-        $qAchats = Achat::whereIn('point_de_vente_id', $pdvIds)->whereDate('date_achat', $aujourd_hui);
-        if ($pointDeVenteId) $qAchats->where('point_de_vente_id', $pointDeVenteId);
+        $periodeLabel = "aujourd'hui";
+
+        // ── CA global ─────────────────────────────────────────────────
+        $qVentes = Vente::whereIn('point_de_vente_id', $pdvIds);
+        // ── Achats globaux ────────────────────────────────────────────
+        $qAchats = Achat::whereIn('point_de_vente_id', $pdvIds);
+
+        if ($filtreMois !== 'tous' || $filtreSemaine !== 'tous' || $filtreJour !== 'tous') {
+            $debutPeriode = session('active_periode_debut');
+            $annee = $debutPeriode ? date('Y', strtotime($debutPeriode)) : date('Y');
+
+            if ($filtreMois !== 'tous') {
+                $qVentes->whereMonth('date_vente', $filtreMois);
+                $qAchats->whereMonth('date_achat', $filtreMois);
+                $moisNoms = ['Janvier','Février','Mars','Avril','Mai','Juin','Juillet','Août','Septembre','Octobre','Novembre','Décembre'];
+                $periodeLabel = $moisNoms[$filtreMois - 1] ?? 'Mois ' . $filtreMois;
+            }
+            if ($filtreJour !== 'tous') {
+                $qVentes->whereDay('date_vente', $filtreJour);
+                $qAchats->whereDay('date_achat', $filtreJour);
+                $periodeLabel = $filtreMois !== 'tous' ? $filtreJour . ' ' . $periodeLabel : 'Jour ' . $filtreJour;
+            }
+            if ($filtreSemaine !== 'tous') {
+                $qVentes->whereRaw('WEEK(date_vente, 1) = ?', [$filtreSemaine]);
+                $qAchats->whereRaw('WEEK(date_achat, 1) = ?', [$filtreSemaine]);
+                $periodeLabel = "Semaine " . $filtreSemaine;
+            }
+
+            $qVentes->whereYear('date_vente', $annee);
+            $qAchats->whereYear('date_achat', $annee);
+        } else {
+            $qVentes->whereDate('date_vente', $aujourd_hui);
+            $qAchats->whereDate('date_achat', $aujourd_hui);
+        }
+
+        if ($pointDeVenteId) {
+            $qVentes->where('point_de_vente_id', $pointDeVenteId);
+            $qAchats->where('point_de_vente_id', $pointDeVenteId);
+        }
+
+        $ventesAujourdhui  = $qVentes->get();
+        $montantVentesJour = $ventesAujourdhui->sum('montant_ttc');
+        $nbVentesJour      = $ventesAujourdhui->count();
         $montantAchatsJour = $qAchats->sum('montant_ttc');
 
         // ── CA global de la période (via PeriodeScope) ────────────────────────
@@ -234,7 +306,7 @@ class AdminControleur
             'totalAchatsPeriode', 'margeBrutePeriode', 'tauxMargePeriode',
             'produitsEnAlerte', 'solde', 'totalEncaissements', 'totalDecaissements',
             'dernieresVentes', 'pointsDeVente', 'pointDeVenteId',
-            'jours7', 'topVendeurs', 'caPdvPeriode'
+            'jours7', 'topVendeurs', 'caPdvPeriode', 'periodeLabel'
         ));
     }
 

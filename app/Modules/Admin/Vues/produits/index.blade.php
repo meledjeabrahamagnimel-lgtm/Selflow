@@ -230,10 +230,6 @@
                         <form method="POST" action="{{ route('admin.produits.modifier', $p) }}">
                             @csrf @method('PUT')
                             <div class="form-grid-2">
-                                <div class="form-group" style="grid-column:1/-1;">
-                                    <label class="form-label">Nom</label>
-                                    <input type="text" name="nom" class="form-control" value="{{ $p->nom }}" required>
-                                </div>
                                 <div class="form-group">
                                     <label class="form-label">Type d'article</label>
                                     <select name="type" id="type_select_{{ $p->id }}" class="form-control" onchange="toggleStockFields('{{ $p->id }}')" required>
@@ -241,6 +237,10 @@
                                             <option value="{{ $val }}" {{ $p->type === $val ? 'selected' : '' }}>{{ $libelle }}</option>
                                         @endforeach
                                     </select>
+                                </div>
+                                <div class="form-group">
+                                    <label class="form-label">Nom produit <span style="color:var(--danger)">*</span></label>
+                                    <input type="text" name="nom" class="form-control" value="{{ $p->nom }}" required>
                                 </div>
                                 <div class="form-group">
                                     <label class="form-label">Catégorie <span style="color:var(--danger)">*</span></label>
@@ -348,7 +348,7 @@
                                     </select>
                                 </div>
                                 @endif
-                                <div class="form-group">
+                                <div class="form-group" id="group-prix-achat-container-{{ $p->id }}">
                                     <label class="form-label">Prix achat</label>
                                     <input type="number" name="prix_achat" class="form-control" value="{{ $p->prix_achat }}" min="0" required>
                                 </div>
@@ -394,14 +394,6 @@
             @csrf
             <div class="form-grid-2">
                                 <div class="form-group">
-                                    <label class="form-label">Référence</label>
-                                    <input type="text" class="form-control" placeholder="(Générée automatiquement)" disabled style="background:var(--bg2);">
-                                </div>
-                                <div class="form-group">
-                                    <label class="form-label">Nom produit <span style="color:var(--danger)">*</span></label>
-                                    <input type="text" name="nom" class="form-control" placeholder="Huile Dinor 1L" required>
-                                </div>
-                                <div class="form-group">
                                     <label class="form-label">Type d'article <span style="color:var(--danger)">*</span></label>
                                     <select name="type" id="type_select_nouveau" class="form-control" onchange="toggleStockFields('nouveau')" required>
                                         @foreach(\App\Modules\Admin\Modeles\Produit::TYPES as $val => $libelle)
@@ -411,13 +403,27 @@
                                 </div>
                                 <div class="form-group">
                                     <label class="form-label">Catégorie <span style="color:var(--danger)">*</span></label>
-                                    <select name="categorie_id" id="categorie_select_nouveau" class="form-control" onchange="toggleCategorieInput('nouveau')" required>
+                                    <select name="categorie_id" id="categorie_select_nouveau" class="form-control" onchange="toggleCategorieInput('nouveau'); calculerReferenceDynamique('nouveau')" required>
                                         <option value="">-- Choisir une catégorie --</option>
                                         @foreach($categories as $cat)
                                             <option value="{{ $cat->id }}">{{ $cat->nom }} ({{ $cat->prefixe }})</option>
                                         @endforeach
                                         <option value="nouvelle">+ Créer une nouvelle catégorie...</option>
                                     </select>
+                                </div>
+                                <div class="form-group">
+                                    <label class="form-label">Nom produit <span style="color:var(--danger)">*</span></label>
+                                    <input type="text" name="nom" class="form-control" placeholder="Huile Dinor 1L" required>
+                                </div>
+                                <div class="form-group" style="grid-column: 1/-1;">
+                                    <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:4px;">
+                                        <label class="form-label" style="margin-bottom:0;">Référence du produit</label>
+                                        <label style="display:inline-flex; align-items:center; gap:6px; font-size:12px; font-weight:600; cursor:pointer; color:var(--primary);">
+                                            <input type="checkbox" id="reference_auto_nouveau" name="reference_auto" value="1" checked onchange="toggleReferenceManual('nouveau')">
+                                            Génération automatique
+                                        </label>
+                                    </div>
+                                    <input type="text" id="reference_input_nouveau" class="form-control" placeholder="(Sélectionnez une catégorie...)" readonly style="background:var(--bg2);">
                                 </div>
                                 <div class="form-group" id="nouvelle_categorie_container_nouveau" style="display:none; grid-column: 1/-1;">
                                     <div style="display:grid; grid-template-columns: 2fr 1fr; gap:10px; background:var(--bg3); padding:10px; border-radius:8px; border:1px dashed var(--border);">
@@ -507,7 +513,7 @@
                     </select>
                 </div>
                 @endif
-                <div class="form-group">
+                <div class="form-group" id="group-prix-achat-container-nouveau">
                     <label class="form-label">Prix d'achat (FCFA) <span style="color:var(--danger)">*</span></label>
                     <input type="number" name="prix_achat" class="form-control" min="0" required>
                 </div>
@@ -538,20 +544,30 @@ const categoriesData = @json($categories);
 function toggleStockFields(id) {
     const typeSelect = document.getElementById('type_select_' + id);
     const stockFields = document.querySelectorAll('.group-stock-input-' + id);
-    
-    if (typeSelect && stockFields.length > 0) {
-        const displayStyle = (typeSelect.value === 'service' || typeSelect.value === 'consommable_non_stockable') ? 'none' : 'block';
-        stockFields.forEach(field => {
-            field.style.display = displayStyle;
-            const input = field.querySelector('input');
-            if (input) {
-                if (displayStyle === 'none') {
-                    input.removeAttribute('required');
-                } else {
-                    input.setAttribute('required', 'required');
-                }
-            }
-        });
+    const prixAchatContainer = document.getElementById('group-prix-achat-container-' + id);
+
+    if (!typeSelect) return;
+    const isService = (typeSelect.value === 'service');
+    const isNoStock = (isService || typeSelect.value === 'consommable_non_stockable');
+
+    // Masquer/afficher champs de stock
+    stockFields.forEach(field => {
+        field.style.display = isNoStock ? 'none' : 'block';
+        const input = field.querySelector('input');
+        if (input) {
+            if (isNoStock) input.removeAttribute('required');
+            else input.setAttribute('required', 'required');
+        }
+    });
+
+    // Masquer prix d'achat pour les services
+    if (prixAchatContainer) {
+        prixAchatContainer.style.display = isService ? 'none' : 'block';
+        const prixInput = prixAchatContainer.querySelector('input');
+        if (prixInput) {
+            if (isService) prixInput.removeAttribute('required');
+            else prixInput.setAttribute('required', 'required');
+        }
     }
 }
 
@@ -591,6 +607,63 @@ function toggleSousCategorieInput(id) {
     } else if (container) {
         container.style.display = 'none';
     }
+}
+
+// ─── Référence automatique / manuelle ───────────────────────────────────────
+
+function toggleReferenceManual(id) {
+    const checkbox = document.getElementById('reference_auto_' + id);
+    const input    = document.getElementById('reference_input_' + id);
+    if (!checkbox || !input) return;
+    if (checkbox.checked) {
+        // Mode auto : champ readonly, recalculer
+        input.removeAttribute('name');
+        input.setAttribute('readonly', true);
+        input.style.background = 'var(--bg2)';
+        calculerReferenceDynamique(id);
+    } else {
+        // Mode manuel : champ éditable
+        input.setAttribute('name', 'reference');
+        input.removeAttribute('readonly');
+        input.style.background = '';
+        input.placeholder = 'Saisir une référence unique...';
+        input.value = '';
+        input.focus();
+    }
+}
+
+function calculerReferenceDynamique(id) {
+    const checkbox    = document.getElementById('reference_auto_' + id);
+    const input       = document.getElementById('reference_input_' + id);
+    const catSelect   = document.getElementById('categorie_select_' + id);
+    if (!checkbox || !checkbox.checked || !input || !catSelect) return;
+
+    const catId = catSelect.value;
+    if (!catId || catId === 'nouvelle') {
+        input.value = '';
+        input.placeholder = '(Sélectionnez une catégorie...)';
+        return;
+    }
+
+    // Trouver le préfixe dans categoriesData
+    const catData = categoriesData.find(c => String(c.id) === String(catId));
+    const prefixe = catData ? catData.prefixe : 'REF';
+
+    input.placeholder = 'Calcul en cours...';
+    fetch('/admin/produits/calculer-reference?categorie_id=' + catId, {
+        headers: { 'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content }
+    })
+        .then(r => r.json())
+        .then(data => {
+            if (data && data.reference) {
+                input.value = data.reference;
+            } else {
+                input.value = prefixe + '-001';
+            }
+        })
+        .catch(() => {
+            input.value = prefixe + '-001';
+        });
 }
 
 function toggleCustomCompta(id) {
@@ -718,6 +791,9 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // Initialiser le masquage des champs de stock selon le type pour la création
     toggleStockFields('nouveau');
+
+    // Initialiser le champ référence (mode auto par défaut)
+    toggleReferenceManual('nouveau');
 
     // Initialiser pour chaque produit de la page
     document.querySelectorAll('[id^="type_select_"]').forEach(select => {

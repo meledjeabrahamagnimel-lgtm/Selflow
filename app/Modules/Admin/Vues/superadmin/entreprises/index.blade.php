@@ -61,15 +61,13 @@
                                 $secteurs = [$secteurs];
                             }
                         @endphp
-                        @foreach($secteurs as $secteur)
-                            @if($secteur === 'Commercial')
-                                <span class="badge badge-blue" style="margin-bottom: 2px; display: inline-block;"><i class="fas fa-tag"></i> Commercial</span>
-                            @elseif($secteur === 'Industriel')
-                                <span class="badge badge-dark" style="margin-bottom: 2px; display: inline-block;"><i class="fas fa-industry"></i> Industriel</span>
-                            @else
-                                <span class="badge badge-success" style="margin-bottom: 2px; display: inline-block;"><i class="fas fa-hand-holding-hand"></i> Services</span>
-                            @endif
-                        @endforeach
+                        @forelse($secteurs as $secteur)
+                            <span class="badge badge-blue" style="margin-bottom: 2px; display: inline-block; font-size: 11px; font-weight:600; background: rgba(26,115,232,0.08); color: var(--primary); border: 1px solid rgba(0,43,92,0.12); padding: 4px 8px; border-radius: 4px;">
+                                {{ $secteur }}
+                            </span>
+                        @empty
+                            <span style="font-size: 11.5px; color: var(--text-3); font-style: italic;">Non renseigné</span>
+                        @endforelse
                     </td>
                     <td>
                         <span style="font-size: 11.5px; color: var(--text-2);">

@@ -5,8 +5,8 @@
 @section('contenu')
 <div class="page-header">
     <div>
-        <h1><i class="fas fa-store-slash" style="color:var(--primary); margin-right:8px;"></i> Demandes de Prix Reçues</h1>
-        <p>Gérez et négociez les offres tarifaires avec vos clients B2B.</p>
+        <h1><i class="fas fa-store-slash" style="color:var(--primary); margin-right:8px;"></i> Demandes B2B Reçues</h1>
+        <p>Gérez vos demandes de devis et vos bons de commande reçus de clients B2B.</p>
     </div>
 </div>
 
@@ -22,85 +22,165 @@
     </div>
 @endif
 
+{{-- Tabs --}}
+<div style="display:flex; gap:4px; margin-bottom:16px; border-bottom:2px solid var(--border); padding-bottom:0;">
+    <a href="{{ request()->fullUrlWithQuery(['tab' => 'devis']) }}"
+       style="padding:10px 20px; font-weight:700; font-size:13px; text-decoration:none; border-bottom:3px solid {{ $tab === 'devis' ? 'var(--primary)' : 'transparent' }}; color:{{ $tab === 'devis' ? 'var(--primary)' : 'var(--text-2)' }}; display:inline-flex; align-items:center; gap:7px; transition:all .15s;">
+        <i class="fas fa-file-alt"></i> Devis reçus
+        <span style="background:{{ $tab === 'devis' ? 'var(--primary)' : 'var(--border)' }}; color:{{ $tab === 'devis' ? '#fff' : 'var(--text-2)' }}; border-radius:20px; padding:1px 8px; font-size:11px;">{{ $devis->total() }}</span>
+    </a>
+    <a href="{{ request()->fullUrlWithQuery(['tab' => 'commandes']) }}"
+       style="padding:10px 20px; font-weight:700; font-size:13px; text-decoration:none; border-bottom:3px solid {{ $tab === 'commandes' ? 'var(--primary)' : 'transparent' }}; color:{{ $tab === 'commandes' ? 'var(--primary)' : 'var(--text-2)' }}; display:inline-flex; align-items:center; gap:7px; transition:all .15s;">
+        <i class="fas fa-file-invoice"></i> Bons de commande reçus
+        <span style="background:{{ $tab === 'commandes' ? 'var(--primary)' : 'var(--border)' }}; color:{{ $tab === 'commandes' ? '#fff' : 'var(--text-2)' }}; border-radius:20px; padding:1px 8px; font-size:11px;">{{ $commandes->total() }}</span>
+    </a>
+</div>
+
 <div class="card">
     <div class="table-wrap">
-        @if($negociations->isEmpty())
-            <div style="padding:60px; text-align:center; color:var(--text-3);">
-                <i class="fas fa-comments-dollar" style="font-size:48px; display:block; margin-bottom:16px; opacity:.3;"></i>
-                Aucune demande de prix reçue pour le moment.
-            </div>
+        @if($tab === 'commandes')
+        {{-- TABLE BONS DE COMMANDE --}}
+        <table>
+            <thead>
+                <tr>
+                    <th style="width:22%;">Client B2B</th>
+                    <th style="width:18%;">Réf. commande</th>
+                    <th style="width:25%;">Produits commandés</th>
+                    <th style="width:15%; text-align:center;">Statut</th>
+                    <th style="width:10%; text-align:right;">Montant</th>
+                    <th style="width:10%; text-align:right;">Action</th>
+                </tr>
+            </thead>
+            <tbody>
+                @forelse($commandes as $neg)
+                <tr>
+                    <td style="font-weight:600;">
+                        <div style="display:flex; align-items:center; gap:8px;">
+                            <div style="width:28px; height:28px; border-radius:50%; background:var(--success); color:#fff; display:flex; align-items:center; justify-content:center; font-size:11px; font-weight:800;">{{ substr($neg->entrepriseClient->nom, 0, 2) }}</div>
+                            <div>
+                                {{ $neg->entrepriseClient->nom }}
+                                <div style="font-size:10px; color:var(--text-3);">NCC: {{ $neg->entrepriseClient->ncc }}</div>
+                            </div>
+                        </div>
+                    </td>
+                    <td style="font-weight:700; color:var(--primary); font-size:12px;">{{ $neg->reference_commande ?? '#' . $neg->id }}</td>
+                    <td style="font-size:12px; color:var(--text-2);">
+                        @php $noms = collect($neg->produits_demandes)->pluck('nom')->join(', '); @endphp
+                        {{ Str::limit($noms, 45) }}
+                    </td>
+                    <td style="text-align:center;">
+                        @if($neg->statut === 'Termine')
+                            <span class="badge" style="background:#e6fdf5; color:#059669; padding:4px 10px; border-radius:20px; font-weight:700;">Traité</span>
+                        @elseif($neg->statut === 'Refuse')
+                            <span class="badge badge-danger">Refusé</span>
+                        @else
+                            <span class="badge" style="background:#fff7ed; color:#ea580c; padding:4px 10px; border-radius:20px; font-weight:700; border:1px solid rgba(234,88,12,.2);">Nouveau</span>
+                        @endif
+                    </td>
+                    <td style="text-align:right; font-weight:800;">{{ $neg->prix_final ? number_format($neg->prix_final, 0, ',', ' ') . ' F' : '—' }}</td>
+                    <td style="text-align:right;">
+                        @if(in_array($neg->statut, ['Termine','Refuse']))
+                            <span style="font-size:11px; color:var(--text-3);"><i class="fas fa-check"></i> Clôturé</span>
+                        @else
+                            <div style="display:inline-flex; gap:5px;">
+                                <button type="button" class="btn btn-outline btn-sm" onclick="ouvrirModalNegociation({{ json_encode($neg) }})">
+                                    <i class="fas fa-comments-dollar"></i> Négocier
+                                </button>
+                                <button type="button" class="btn btn-success btn-sm" style="font-size:11px;" onclick="ouvrirModalFinalisation({{ json_encode($neg) }})">
+                                    <i class="fas fa-file-invoice"></i> Finaliser
+                                </button>
+                            </div>
+                        @endif
+                    </td>
+                </tr>
+                @empty
+                <tr>
+                    <td colspan="6" style="text-align:center; padding:48px; color:var(--text-3);">
+                        <i class="fas fa-file-invoice" style="font-size:40px; display:block; margin-bottom:12px; opacity:.2;"></i>
+                        Aucun bon de commande reçu pour le moment.
+                    </td>
+                </tr>
+                @endforelse
+            </tbody>
+        </table>
+        <div style="padding:10px 16px;">{{ $commandes->links() }}</div>
+
         @else
-            <table>
-                <thead>
+        {{-- TABLE DEVIS / RFQ --}}
+        <table>
+            <thead>
+                <tr>
+                    <th style="width: 25%;">Client B2B</th>
+                    <th style="width: 25%;">Produits demandés</th>
+                    <th style="width: 15%; text-align: center;">Statut</th>
+                    <th style="width: 15%; text-align: right;">Prix final</th>
+                    <th style="width: 20%; text-align: right;">Action</th>
+                </tr>
+            </thead>
+            <tbody>
+                @forelse($devis as $neg)
                     <tr>
-                        <th style="width: 25%;">Client B2B</th>
-                        <th style="width: 25%;">Produits demandés</th>
-                        <th style="width: 15%; text-align: center;">Statut</th>
-                        <th style="width: 15%; text-align: right;">Prix final</th>
-                        <th style="width: 20%; text-align: right;">Action</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    @foreach($negociations as $neg)
-                        <tr>
-                            <td style="font-weight:600;">
-                                <div style="display:flex; align-items:center; gap:8px;">
-                                    <div style="width:30px; height:30px; border-radius:50%; background:var(--success); color:#fff; display:flex; align-items:center; justify-content:center; font-size:12px; font-weight:800;">
-                                        {{ substr($neg->entrepriseClient->nom, 0, 2) }}
-                                    </div>
-                                    <div>
-                                        {{ $neg->entrepriseClient->nom }}
-                                        <div style="font-size:10px; color:var(--text-3); margin-top:2px;">NCC: {{ $neg->entrepriseClient->ncc }}</div>
-                                    </div>
+                        <td style="font-weight:600;">
+                            <div style="display:flex; align-items:center; gap:8px;">
+                                <div style="width:30px; height:30px; border-radius:50%; background:var(--success); color:#fff; display:flex; align-items:center; justify-content:center; font-size:12px; font-weight:800;">
+                                    {{ substr($neg->entrepriseClient->nom, 0, 2) }}
                                 </div>
-                            </td>
-                            <td style="font-size:12.5px; color:var(--text-2);">
-                                @php
-                                    $noms = collect($neg->produits_demandes)->pluck('nom')->join(', ');
-                                @endphp
-                                {{ Str::limit($noms, 50) }}
-                            </td>
-                            <td style="text-align: center;">
-                                @if($neg->statut === 'RFQ')
-                                    <span class="badge" style="background:#fff7ed; color:#ea580c; padding:4px 10px; border-radius:20px; font-weight:700; border:1px solid rgba(234,88,12,0.2);">Nouveau RFQ</span>
-                                @elseif($neg->statut === 'Negociation_Client')
-                                    <span class="badge" style="background:#eff6ff; color:#2563eb; padding:4px 10px; border-radius:20px; font-weight:700;">Proposition Client</span>
-                                @elseif($neg->statut === 'Negociation_Fournisseur')
-                                    <span class="badge" style="background:#f8fafc; color:#64748b; padding:4px 10px; border-radius:20px; font-weight:700;">En attente Client</span>
-                                @elseif($neg->statut === 'Termine')
-                                    <span class="badge" style="background:#e6fdf5; color:#059669; padding:4px 10px; border-radius:20px; font-weight:700;">Terminé / Facturé</span>
-                                @elseif($neg->statut === 'Refuse')
-                                    <span class="badge badge-danger">Refusé</span>
-                                @else
-                                    <span class="badge badge-gray">{{ $neg->statut }}</span>
-                                @endif
-                            </td>
-                            <td style="text-align: right; font-weight:800; color:var(--text);">
-                                {{ $neg->prix_final ? number_format($neg->prix_final, 0, ',', ' ') . ' F' : '—' }}
-                            </td>
-                            <td style="text-align: right;">
-                                @if($neg->statut === 'Termine')
-                                    <span style="font-size:12px; color:var(--success); font-weight:700;"><i class="fas fa-check-circle"></i> Complété</span>
-                                @elseif($neg->statut === 'Refuse')
-                                    <span style="font-size:12px; color:var(--danger); font-weight:700;"><i class="fas fa-ban"></i> Annulé</span>
-                                @else
-                                    <div style="display:inline-flex; gap:6px;">
-                                        <button type="button" class="btn btn-outline btn-sm" onclick="ouvrirModalNegociation({{ json_encode($neg) }})">
-                                            <i class="fas fa-comments-dollar"></i> Négocier
-                                        </button>
-                                        <button type="button" class="btn btn-success btn-sm" style="font-weight:700; font-size:11px;" onclick="ouvrirModalFinalisation({{ json_encode($neg) }})">
-                                            <i class="fas fa-file-invoice"></i> Finaliser
-                                        </button>
-                                    </div>
-                                @endif
-                            </td>
-                        </tr>
-                    @endforeach
-                </tbody>
-            </table>
-            <div style="padding: 10px 16px;">
-                {{ $negociations->links() }}
-            </div>
+                                <div>
+                                    {{ $neg->entrepriseClient->nom }}
+                                    <div style="font-size:10px; color:var(--text-3); margin-top:2px;">NCC: {{ $neg->entrepriseClient->ncc }}</div>
+                                </div>
+                            </div>
+                        </td>
+                        <td style="font-size:12.5px; color:var(--text-2);">
+                            @php $noms = collect($neg->produits_demandes)->pluck('nom')->join(', '); @endphp
+                            {{ Str::limit($noms, 50) }}
+                        </td>
+                        <td style="text-align: center;">
+                            @if($neg->statut === 'RFQ')
+                                <span class="badge" style="background:#fff7ed; color:#ea580c; padding:4px 10px; border-radius:20px; font-weight:700; border:1px solid rgba(234,88,12,0.2);">Nouveau RFQ</span>
+                            @elseif($neg->statut === 'Negociation_Client')
+                                <span class="badge" style="background:#eff6ff; color:#2563eb; padding:4px 10px; border-radius:20px; font-weight:700;">Proposition Client</span>
+                            @elseif($neg->statut === 'Negociation_Fournisseur')
+                                <span class="badge" style="background:#f8fafc; color:#64748b; padding:4px 10px; border-radius:20px; font-weight:700;">En attente Client</span>
+                            @elseif($neg->statut === 'Termine')
+                                <span class="badge" style="background:#e6fdf5; color:#059669; padding:4px 10px; border-radius:20px; font-weight:700;">Terminé / Facturé</span>
+                            @elseif($neg->statut === 'Refuse')
+                                <span class="badge badge-danger">Refusé</span>
+                            @else
+                                <span class="badge badge-gray">{{ $neg->statut }}</span>
+                            @endif
+                        </td>
+                        <td style="text-align: right; font-weight:800; color:var(--text);">
+                            {{ $neg->prix_final ? number_format($neg->prix_final, 0, ',', ' ') . ' F' : '—' }}
+                        </td>
+                        <td style="text-align: right;">
+                            @if($neg->statut === 'Termine')
+                                <span style="font-size:12px; color:var(--success); font-weight:700;"><i class="fas fa-check-circle"></i> Complété</span>
+                            @elseif($neg->statut === 'Refuse')
+                                <span style="font-size:12px; color:var(--danger); font-weight:700;"><i class="fas fa-ban"></i> Annulé</span>
+                            @else
+                                <div style="display:inline-flex; gap:6px;">
+                                    <button type="button" class="btn btn-outline btn-sm" onclick="ouvrirModalNegociation({{ json_encode($neg) }})">
+                                        <i class="fas fa-comments-dollar"></i> Négocier
+                                    </button>
+                                    <button type="button" class="btn btn-success btn-sm" style="font-weight:700; font-size:11px;" onclick="ouvrirModalFinalisation({{ json_encode($neg) }})">
+                                        <i class="fas fa-file-invoice"></i> Finaliser
+                                    </button>
+                                </div>
+                            @endif
+                        </td>
+                    </tr>
+                @empty
+                    <tr>
+                        <td colspan="5" style="text-align:center; padding:48px; color:var(--text-3);">
+                            <i class="fas fa-comments-dollar" style="font-size:40px; display:block; margin-bottom:12px; opacity:.2;"></i>
+                            Aucune demande de prix (RFQ) reçue pour le moment.
+                        </td>
+                    </tr>
+                @endforelse
+            </tbody>
+        </table>
+        <div style="padding: 10px 16px;">{{ $devis->links() }}</div>
         @endif
     </div>
 </div>

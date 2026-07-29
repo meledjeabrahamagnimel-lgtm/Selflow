@@ -513,6 +513,11 @@
             <a href="{{ route('superadmin.utilisateurs') }}" class="nav-item {{ request()->routeIs('superadmin.utilisateurs*') ? 'active' : '' }}">
                 <i class="fas fa-users-gear"></i> Habilitations &amp; Accès
             </a>
+             @if(auth()->user()->aHabilitation('administration_interne'))
+            <a href="{{ route('superadmin.admins.index') }}" class="nav-item {{ request()->routeIs('superadmin.admins*') ? 'active' : '' }}">
+                <i class="fas fa-user-shield"></i> Admins Internes
+            </a>
+            @endif
 
             <div class="nav-section"><span>INTÉGRATIONS</span></div>
             <a href="{{ route('superadmin.liaisons.index') }}" class="nav-item {{ request()->routeIs('superadmin.liaisons*') ? 'active' : '' }}">
@@ -521,6 +526,13 @@
             <a href="{{ route('superadmin.fne.index') }}" class="nav-item {{ request()->routeIs('superadmin.fne*') ? 'active' : '' }}">
                 <i class="fas fa-key"></i> Gestion FNE
             </a>
+
+            @if(auth()->user()->aHabilitation('gestion_secteurs_modules'))
+            <div class="nav-section"><span>CONFIGURATION</span></div>
+            <a href="{{ route('superadmin.secteurs_modules.index') }}" class="nav-item {{ request()->routeIs('superadmin.secteurs_modules*') ? 'active' : '' }}">
+                <i class="fas fa-cubes"></i> Secteurs &amp; Modules
+            </a>
+            @endif
         @elseif(request()->routeIs('caissier.*'))
             <!-- ── CAISSIER SIDEBAR ── -->
             <div class="nav-section"><span>Caisse</span></div>
@@ -607,7 +619,7 @@
             @endif
 
             <!-- 4. Stock -->
-            @if(in_array('stock', $modulesActifs) && (in_array('Commercial', $secteurActivite) || in_array('Industriel', $secteurActivite)) && (auth()->user()->aHabilitation('stock_articles') || auth()->user()->aHabilitation('stock_mouvements')))
+            @if(in_array('stock', $modulesActifs) && (auth()->user()->aHabilitation('stock_articles') || auth()->user()->aHabilitation('stock_mouvements')))
             <div class="nav-section"><span>Stock</span></div>
             @if(auth()->user()->aHabilitation('stock_articles'))
             <a href="{{ route('admin.stock.index') }}" class="nav-item {{ request()->routeIs('admin.stock.index') ? 'active' : '' }}">
@@ -621,7 +633,7 @@
             @endif
             @endif
             <!-- 5. Production -->
-            @if((in_array('production', $modulesActifs) || in_array('Industriel', $secteurActivite)) && (auth()->user()->aHabilitation('catalogue_produits') || auth()->user()->aHabilitation('stock_articles')))
+            @if(in_array('production', $modulesActifs) && (auth()->user()->aHabilitation('catalogue_produits') || auth()->user()->aHabilitation('stock_articles')))
             <div class="nav-section"><span>Production</span></div>
             @if(auth()->user()->aHabilitation('catalogue_produits'))
             <a href="{{ route('admin.production.fiches_techniques.index') }}" class="nav-item {{ request()->routeIs('admin.production.fiches_techniques*') ? 'active' : '' }}">
@@ -687,6 +699,9 @@
             <a href="{{ route('admin.fne.factures') }}" class="nav-item {{ request()->routeIs('admin.fne.factures') ? 'active' : '' }}">
                 <i class="fas fa-receipt"></i> Factures &amp; Reçus émis/reçus
             </a>
+            <a href="{{ route('admin.fne.stickers') }}" class="nav-item {{ request()->routeIs('admin.fne.stickers') ? 'active' : '' }}">
+                <i class="fas fa-ticket"></i> Gestion des stickers
+            </a>
             @endif
 
             <!-- 6. Points de vente (Inclus Personnel & Habilitations) -->
@@ -709,16 +724,16 @@
             @endif
             @endif
 
-            <!-- 7. Produits -->
-            @if(in_array('produits', $modulesActifs) && auth()->user()->aHabilitation('catalogue_produits'))
+            <!-- 7. Produits (catalogue) -->
+            @if((in_array('ventes', $modulesActifs) || in_array('achats', $modulesActifs) || in_array('stock', $modulesActifs)) && auth()->user()->aHabilitation('catalogue_produits'))
             <div class="nav-section"><span>Produits</span></div>
             <a href="{{ route('admin.produits.index') }}" class="nav-item {{ request()->routeIs('admin.produits.index') ? 'active' : '' }}">
-                <i class="fas fa-barcode"></i> Produits
+                <i class="fas fa-barcode"></i> Catalogue produits
             </a>
             @endif
 
-            <!-- 8. Tiers -->
-            @if(in_array('tiers', $modulesActifs) && (auth()->user()->aHabilitation('tiers_clients') || auth()->user()->aHabilitation('tiers_fournisseurs')))
+            <!-- 8. Tiers (Clients & Fournisseurs) -->
+            @if((in_array('ventes', $modulesActifs) || in_array('achats', $modulesActifs)) && (auth()->user()->aHabilitation('tiers_clients') || auth()->user()->aHabilitation('tiers_fournisseurs')))
             <div class="nav-section"><span>Tiers</span></div>
             @if(auth()->user()->aHabilitation('tiers_clients'))
             <a href="{{ route('admin.clients.index') }}" class="nav-item {{ request()->routeIs('admin.clients.index') ? 'active' : '' }}">
@@ -733,7 +748,7 @@
             @endif
 
             <!-- 9. Rapports -->
-            @if(in_array('rapports', $modulesActifs) && auth()->user()->aHabilitation('rapports_analyse'))
+            @if(in_array('principal', $modulesActifs) && auth()->user()->aHabilitation('rapports_analyse'))
             <div class="nav-section"><span>Rapports</span></div>
             <a href="{{ route('admin.rapports.analyse_activite') }}" class="nav-item {{ request()->routeIs('admin.rapports.analyse_activite') ? 'active' : '' }}">
                 <i class="fas fa-chart-line"></i> Analyse d'activité
@@ -1002,6 +1017,23 @@
 function fermerModalIncomplet() {
     document.getElementById('incomplete-registration-modal').style.display = 'none';
 }
+
+// Retenir la position du scroll de la sidebar
+document.addEventListener('DOMContentLoaded', () => {
+    const sidebar = document.querySelector('.sidebar');
+    if (sidebar) {
+        const savedScroll = localStorage.getItem('selflow_sidebar_scroll');
+        if (savedScroll) {
+            sidebar.scrollTop = parseInt(savedScroll);
+        }
+        sidebar.addEventListener('scroll', () => {
+            localStorage.setItem('selflow_sidebar_scroll', sidebar.scrollTop);
+        });
+        window.addEventListener('beforeunload', () => {
+            localStorage.setItem('selflow_sidebar_scroll', sidebar.scrollTop);
+        });
+    }
+});
 
 function ouvrirModalIncomplet() {
     document.getElementById('incomplete-registration-modal').style.display = 'flex';

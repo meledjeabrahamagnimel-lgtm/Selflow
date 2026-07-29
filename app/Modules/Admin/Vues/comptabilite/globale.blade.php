@@ -104,13 +104,35 @@
 </div>
 
 {{-- FILTRE --}}
-<form method="GET" action="{{ route('admin.comptabilite.globale') }}" class="filter-card">
+<form method="GET" action="{{ route('admin.comptabilite.globale') }}" class="filter-card" id="formGlobale">
     <input type="hidden" name="mode" value="{{ $mode }}">
-    
+
+    {{-- Recherche --}}
+    <div class="filter-group" style="flex:1; min-width:220px;">
+        <span class="filter-label">Recherche</span>
+        <div style="position:relative;">
+            <i class="fas fa-search" style="position:absolute; left:10px; top:50%; transform:translateY(-50%); color:var(--text-3); font-size:12px;"></i>
+            <input type="text" name="search" id="inputSearch" value="{{ $search }}" placeholder="Référence, libellé, compte…" class="form-control" style="padding-left:32px; height:40px;"
+                   oninput="clearTimeout(window._globaleTimer); window._globaleTimer = setTimeout(() => document.getElementById('formGlobale').submit(), 500);">
+        </div>
+    </div>
+
+    @if($mode === 'operations')
+    {{-- Filtre Type (Entrée / Sortie) --}}
+    <div class="filter-group" style="min-width:170px;">
+        <span class="filter-label">Type d'opération</span>
+        <select name="type_operation" class="form-control" style="height:40px;" onchange="this.form.submit()">
+            <option value="">— Tous —</option>
+            <option value="recette" {{ $typeOp === 'recette' ? 'selected' : '' }}>Entrée (Recette)</option>
+            <option value="depense" {{ $typeOp === 'depense' ? 'selected' : '' }}>Sortie (Dépense)</option>
+        </select>
+    </div>
+    @endif
+
     @if($isAdmin)
     <div class="filter-group" style="min-width: 240px;">
         <span class="filter-label">Point de vente</span>
-        <select name="point_de_vente_id" class="form-control" onchange="this.form.submit()">
+        <select name="point_de_vente_id" class="form-control" style="height:40px;" onchange="this.form.submit()">
             <option value="">— Tous les points de vente —</option>
             @foreach($pointsDeVente as $pdv)
             <option value="{{ $pdv->id }}" {{ $pdvFilter == $pdv->id ? 'selected' : '' }}>
@@ -122,13 +144,20 @@
     @else
     <div class="filter-group">
         <span class="filter-label">Point de vente</span>
-        <input type="text" class="form-control" value="{{ Auth::user()->pointDeVente?->nom ?? 'Siège' }}" readonly style="background:var(--bg); max-width: 240px;">
+        <input type="text" class="form-control" value="{{ Auth::user()->pointDeVente?->nom ?? 'Siège' }}" readonly style="background:var(--bg); max-width: 240px; height:40px;">
     </div>
     @endif
 
-    <button type="submit" class="btn btn-primary" style="padding: 10px 20px;">
-        <i class="fas fa-filter"></i> Filtrer
-    </button>
+    <div class="filter-group" style="justify-content:flex-end; align-self:flex-end;">
+        <button type="submit" class="btn btn-primary" style="height:40px; padding: 0 20px;">
+            <i class="fas fa-filter"></i> Filtrer
+        </button>
+        @if($search || $typeOp || $pdvFilter)
+        <a href="{{ route('admin.comptabilite.globale', ['mode' => $mode]) }}" class="btn btn-outline" style="height:40px; padding:0 14px; color:var(--danger); border-color:var(--danger); margin-top:4px;">
+            <i class="fas fa-times"></i> Réinitialiser
+        </a>
+        @endif
+    </div>
 </form>
 
 <div class="card">
@@ -177,11 +206,11 @@
                             <td>
                                 @if($op->type_operation === 'recette')
                                     <span style="background:#ecfdf5; color:#065f46; padding:2px 8px; border-radius:20px; font-size:11px; font-weight:700;">
-                                        <i class="fas fa-arrow-down"></i> Recette
+                                        <i class="fas fa-circle-plus"></i> Entrée
                                     </span>
                                 @else
                                     <span style="background:#fef2f2; color:#991b1b; padding:2px 8px; border-radius:20px; font-size:11px; font-weight:700;">
-                                        <i class="fas fa-arrow-up"></i> Dépense
+                                        <i class="fas fa-circle-minus"></i> Sortie
                                     </span>
                                 @endif
                             </td>
@@ -452,5 +481,14 @@ function fermerModalEcriture() {
     const modal = document.getElementById('modalEcritureManuelle');
     modal.style.display = 'none';
 }
+
+// Restaurer le focus sur le champ de recherche après auto-submit
+document.addEventListener('DOMContentLoaded', () => {
+    const inp = document.getElementById('inputSearch');
+    if (inp && inp.value) {
+        inp.focus();
+        inp.setSelectionRange(inp.value.length, inp.value.length);
+    }
+});
 </script>
 @endsection

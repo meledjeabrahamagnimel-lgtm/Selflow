@@ -266,14 +266,14 @@
                     <div class="champ" style="margin-bottom:0">
                         <label for="nom">Nom <span class="req">*</span></label>
                         <input type="text" id="nom" name="nom"
-                            placeholder="Ex: KOFFI"
+                            placeholder="Agnimel"
                             value="{{ old('nom') }}" required
                             class="{{ $errors->has('nom') ? 'erreur' : '' }}">
                     </div>
                     <div class="champ" style="margin-bottom:0">
                         <label for="prenom">Prénom <span class="req">*</span></label>
                         <input type="text" id="prenom" name="prenom"
-                            placeholder="Ex: Amos"
+                            placeholder="Meledje Abraham"
                             value="{{ old('prenom') }}" required
                             class="{{ $errors->has('prenom') ? 'erreur' : '' }}">
                     </div>

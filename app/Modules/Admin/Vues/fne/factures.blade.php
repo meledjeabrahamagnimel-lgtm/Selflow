@@ -189,7 +189,7 @@ function rafraichirFactures() {
                         </td>
                         <td>${doc.pdv ?? '—'}</td>
                         <td style="text-align:center;">
-                            <a href="${doc.telechargement_url}" target="_blank" class="btn btn-outline" style="padding:5px 10px; font-size:12px;" title="${doc.normalise ? 'Télécharger le PDF officiel DGI' : 'Voir la facture d\\'origine Selflow'}">
+                            <a href="${doc.telechargement_url}" target="_blank" class="btn btn-outline" style="padding:5px 10px; font-size:12px;" title="${doc.normalise ? 'Télécharger le PDF officiel DGI' : 'Voir la facture originale Selflow'}">
                                 <i class="fas fa-download"></i>
                             </a>
                         </td>

@@ -71,7 +71,7 @@ class InscriptionControleur
                 'gerant_nom'          => trim($request->nom),
                 'gerant_prenom'       => trim($request->prenom),
                 'gerant_fonction'     => trim($request->fonction_gerant ?? ''),
-                'modules_actifs'      => ['ventes', 'achats', 'stocks', 'tresorerie'],
+                'modules_actifs'      => ['principal', 'ventes', 'achats', 'stock', 'production', 'comptabilite', 'points_de_vente', 'personnel', 'b2b', 'fne'],
                 'statut'              => 'actif',
                 'quota_points_de_vente' => 5,
                 'plan_abonnement'     => 'Starter',

@@ -48,13 +48,22 @@ class B2bControleur extends Controller
     public function negociationsFournisseur(Request $request): View
     {
         $entrepriseId = Auth::user()->entreprise_id;
+        $tab = $request->input('tab', 'devis'); // 'devis' ou 'commandes'
 
-        $negociations = B2bNegotiation::with(['entrepriseClient'])
+        $baseQuery = B2bNegotiation::with(['entrepriseClient'])
             ->where('entreprise_fournisseur_id', $entrepriseId)
-            ->latest()
-            ->paginate(15);
+            ->latest();
 
-        return view('admin::b2b.negociations_fournisseur', compact('negociations'));
+        // Devis reçus (RFQ = type_demande rfq ou statut RFQ)
+        $devis = (clone $baseQuery)->where('type_demande', 'rfq')->paginate(15, ['*'], 'page_devis');
+
+        // Bons de commande reçus
+        $commandes = (clone $baseQuery)->where('type_demande', 'commande')->paginate(15, ['*'], 'page_cmd');
+
+        // Rétro-compat : $negociations pointe sur la collection active
+        $negociations = $tab === 'commandes' ? $commandes : $devis;
+
+        return view('admin::b2b.negociations_fournisseur', compact('negociations', 'devis', 'commandes', 'tab'));
     }
 
     /**

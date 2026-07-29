@@ -20,8 +20,63 @@ class VerifierHabilitationRoute
 
         $utilisateur = Auth::user();
 
-        // Les administrateurs et super-administrateurs possèdent toutes les habilitations par défaut
-        if ($utilisateur->estAdmin() || $utilisateur->estSuperAdmin()) {
+        // Le superadmin principal a accès à tout
+        if ($utilisateur->email === 'superadmin@gmail.com') {
+            return $next($request);
+        }
+
+        $nomRoute = $request->route()->getName();
+
+        // Vérification pour le Superadmin
+        if ($utilisateur->estSuperAdmin()) {
+            // Dictionnaire des habilitations superadmin
+            $correspondancesSuperadmin = [
+                'superadmin.tableau_de_bord'                  => 'tableau_de_bord_superadmin',
+                'superadmin.entreprises'                      => 'gestion_entreprises',
+                'superadmin.entreprises.creer'                => 'gestion_entreprises',
+                'superadmin.entreprises.creer.enregistrer'    => 'gestion_entreprises',
+                'superadmin.entreprises.modifier'             => 'gestion_entreprises',
+                'superadmin.entreprises.modifier.enregistrer' => 'gestion_entreprises',
+                'superadmin.entreprises.toggle_status'        => 'gestion_entreprises',
+                'superadmin.entreprises.supprimer'            => 'gestion_entreprises',
+                'superadmin.utilisateurs'                     => 'gestion_entreprises',
+                'superadmin.utilisateurs.modifier'            => 'gestion_entreprises',
+                
+                'superadmin.liaisons.index'                   => 'gestion_comptaflow',
+                'superadmin.liaisons.lier'                    => 'gestion_comptaflow',
+                'superadmin.liaisons.delierEntreprise'        => 'gestion_comptaflow',
+                'superadmin.liaisons.creerComptaflow'         => 'gestion_comptaflow',
+                'superadmin.liaisons.verifier'                => 'gestion_comptaflow',
+                
+                'superadmin.fne.index'                        => 'gestion_fne',
+                'superadmin.fne.cle_test'                     => 'gestion_fne',
+                'superadmin.fne.cle_reelle'                   => 'gestion_fne',
+                'superadmin.fne.voir_cle'                     => 'gestion_fne',
+                'superadmin.fne.supprimer_cle'                => 'gestion_fne',
+                'superadmin.fne.notes'                        => 'gestion_fne',
+                
+                'superadmin.admins.index'                     => 'administration_interne',
+                'superadmin.admins.creer'                     => 'administration_interne',
+                'superadmin.admins.enregistrer'               => 'administration_interne',
+                'superadmin.admins.modifier'                  => 'administration_interne',
+                'superadmin.admins.mettre_a_jour'             => 'administration_interne',
+                'superadmin.admins.supprimer'                 => 'administration_interne',
+
+                'superadmin.secteurs_modules.index'           => 'gestion_secteurs_modules',
+                'superadmin.secteurs_modules.sauvegarder'     => 'gestion_secteurs_modules',
+            ];
+
+            if (str_starts_with($nomRoute, 'superadmin.')) {
+                $cleRequise = $correspondancesSuperadmin[$nomRoute] ?? null;
+                if ($cleRequise && (!is_array($utilisateur->habilitations) || !in_array($cleRequise, $utilisateur->habilitations))) {
+                    abort(403, "Accès refusé. Vous n'avez pas l'habilitation requise pour accéder à cette fonctionnalité d'administration.");
+                }
+            }
+            return $next($request);
+        }
+
+        // Les administrateurs d'entreprise possèdent toutes les habilitations par défaut
+        if ($utilisateur->estAdmin()) {
             return $next($request);
         }
 

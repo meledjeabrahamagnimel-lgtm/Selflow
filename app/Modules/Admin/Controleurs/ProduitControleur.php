@@ -62,7 +62,7 @@ class ProduitControleur
             'nouvelle_categorie' => ['nullable', 'string', 'max:100'],
             'prefixe_categorie' => ['nullable', 'string', 'max:5'],
             'nouvelle_sous_categorie' => ['nullable', 'string', 'max:100'],
-            'prix_achat'    => ['required', 'numeric', 'min:0'],
+            'prix_achat'    => [$request->input('type') === 'service' ? 'nullable' : 'required', 'numeric', 'min:0'],
             'prix_vente'    => ['required', 'numeric', 'min:0'],
             'taux_tva'      => ['required', 'numeric', 'min:0'],
             'compte_vente'  => [
@@ -81,10 +81,25 @@ class ProduitControleur
                     $q->whereNull('entreprise_id')->orWhere('entreprise_id', $entreprise->id);
                 })
             ],
-            'stock_actuel'  => ['required', 'integer', 'min:0'],
-            'stock_minimum' => ['required', 'integer', 'min:0'],
+            'stock_actuel'  => [in_array($request->input('type'), ['service', 'consommable_non_stockable']) ? 'nullable' : 'required', 'integer', 'min:0'],
+            'stock_minimum' => [in_array($request->input('type'), ['service', 'consommable_non_stockable']) ? 'nullable' : 'required', 'integer', 'min:0'],
             'unite'         => ['nullable', 'string', 'max:20'],
         ]);
+
+        $reference = null;
+        if ($request->input('reference_auto') === '0' || $request->input('reference_auto') === 0 || $request->input('reference_auto') === 'false') {
+            $request->validate([
+                'reference' => [
+                    'required',
+                    'string',
+                    'max:100',
+                    \Illuminate\Validation\Rule::unique('produits')->where(function ($q) use ($entreprise) {
+                        $q->where('entreprise_id', $entreprise->id);
+                    })
+                ]
+            ]);
+            $reference = trim($request->input('reference'));
+        }
 
         $categorieId = $request->input('categorie_id');
         if ($categorieId === 'nouvelle' && $request->filled('nouvelle_categorie')) {
@@ -125,11 +140,12 @@ class ProduitControleur
 
         $produit = Produit::create([
             'entreprise_id'     => $entreprise->id,
+            'reference'         => $reference,
             'nom'               => $request->nom,
             'type'              => $request->type,
             'categorie_id'      => $categorieId ?: null,
             'sous_categorie_id' => $sousCategorieId ?: null,
-            'prix_achat'        => $request->prix_achat,
+            'prix_achat'        => $request->input('type') === 'service' ? 0 : $request->prix_achat,
             'prix_vente'        => $request->prix_vente,
             'taux_tva'          => $request->taux_tva,
             'compte_vente'      => $request->compte_vente,
@@ -387,5 +403,13 @@ class ProduitControleur
         $detail->delete();
 
         return back()->with('succes', 'Détail supprimé.');
+    }
+
+    public function calculerReference(Request $request): JsonResponse
+    {
+        $entrepriseId = Auth::user()->entreprise_id;
+        $categorieId  = $request->input('categorie_id');
+        $reference    = \App\Modules\Admin\Modeles\Produit::genererReference($entrepriseId, $categorieId);
+        return response()->json(['reference' => $reference]);
     }
 }

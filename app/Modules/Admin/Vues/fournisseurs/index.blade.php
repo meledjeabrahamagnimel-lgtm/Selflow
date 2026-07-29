@@ -1,4 +1,4 @@
-@extends('admin::gabarits.application')
+﻿@extends('admin::gabarits.application')
 @section('titre', 'Gestion fournisseurs')
 @section('topbar_titre', 'Catalogue — Fournisseurs')
 

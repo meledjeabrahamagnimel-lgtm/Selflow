@@ -13,6 +13,8 @@ use App\Modules\Admin\Modeles\VenteDetail;
 use App\Modules\Admin\Modeles\Banque;
 use App\Modules\Admin\Modeles\CodeJournal;
 use App\Modules\Admin\Modeles\BonLivraison;
+use App\Modules\Admin\Modeles\B2bNegotiation;
+use App\Modules\Admin\Modeles\Entreprise;
 use App\Modules\Admin\Traits\JournaliseActions;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -334,7 +336,43 @@ class VenteControleur
             }
 
             $venteId = $vente->id;
-        });
+        }); // fin DB::transaction
+
+        // ── Envoi B2B automatique pour "Bon de commande" ───────────────────────
+        // Si le client a un NCC qui correspond à une entreprise enregistrée dans
+        // Selflow, on crée automatiquement un bon de commande dans son espace B2B.
+        if (isset($etape) && $etape === 'Bon de commande' && isset($vente)) {
+            $clientNcc = null;
+            if ($vente->client_id) {
+                $clientNcc = Client::where('id', $vente->client_id)->value('ncc');
+            }
+            if ($clientNcc) {
+                $entrepriseDestinataire = Entreprise::where('ncc', $clientNcc)->first();
+                if ($entrepriseDestinataire && $entrepriseDestinataire->id !== Auth::user()->entreprise_id) {
+                    // Charger les détails avec les produits
+                    $vente->load('details.produit');
+                    $produitsDemandes = $vente->details->map(function ($d) {
+                        return [
+                            'nom'          => $d->produit?->nom ?? 'Produit #' . $d->produit_id,
+                            'quantite'     => $d->quantite,
+                            'unite'        => $d->unite ?? $d->produit?->unite ?? 'pcs',
+                            'prix_propose' => $d->prix_unitaire,
+                        ];
+                    })->values()->all();
+
+                    B2bNegotiation::create([
+                        'entreprise_client_id'     => Auth::user()->entreprise_id,
+                        'entreprise_fournisseur_id' => $entrepriseDestinataire->id,
+                        'statut'                   => 'RFQ',
+                        'type_demande'             => 'commande',
+                        'reference_commande'       => $vente->numero_facture,
+                        'produits_demandes'        => $produitsDemandes,
+                        'prix_final'               => $vente->montant_ttc,
+                        'historique_discussions'   => [],
+                    ]);
+                }
+            }
+        }
 
         // Journaliser la création de la vente
         $this->journaliser('creation_vente', 'Vente', $venteId ?? null);

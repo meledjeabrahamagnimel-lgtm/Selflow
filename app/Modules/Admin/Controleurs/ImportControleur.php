@@ -70,7 +70,30 @@ class ImportControleur
         $config = self::COLONNES[$type] ?? null;
         abort_if(!$config, 404, "Module d'import inconnu : {$type}");
 
-        $rows   = [$config['headers'], ...$config['exemple']];
+        $rows = [$config['headers'], ...$config['exemple']];
+
+        if (request('format') === 'excel') {
+            $spreadsheet = new \PhpOffice\PhpSpreadsheet\Spreadsheet();
+            $sheet       = $spreadsheet->getActiveSheet();
+
+            foreach ($rows as $rowIndex => $row) {
+                foreach ($row as $colIndex => $value) {
+                    $colLetter = \PhpOffice\PhpSpreadsheet\Cell\Coordinate::stringFromColumnIndex($colIndex + 1);
+                    $sheet->setCellValue($colLetter . ($rowIndex + 1), $value);
+                }
+            }
+
+            $writer = new \PhpOffice\PhpSpreadsheet\Writer\Xlsx($spreadsheet);
+            ob_start();
+            $writer->save('php://output');
+            $content = ob_get_clean();
+
+            return response($content, 200, [
+                'Content-Type'        => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+                'Content-Disposition' => 'attachment; filename="import_' . $type . '_exemple.xlsx"',
+            ]);
+        }
+
         $output = '';
         foreach ($rows as $row) {
             $output .= implode(';', array_map(fn($v) => '"' . str_replace('"', '""', $v) . '"', $row)) . "\r\n";
@@ -91,7 +114,7 @@ class ImportControleur
         $config = self::COLONNES[$type] ?? null;
         if (!$config) return response()->json(['success' => false, 'message' => 'Module inconnu.'], 400);
 
-        $request->validate(['fichier' => ['required', 'file', 'mimes:csv,txt,xlsx', 'max:5120']]);
+        $request->validate(['fichier' => ['required', 'file', 'mimes:csv,txt,xlsx,xls', 'max:5120']]);
 
         try {
             $lignes = $this->lireFichier($request->file('fichier'));
@@ -123,7 +146,7 @@ class ImportControleur
         $config = self::COLONNES[$type] ?? null;
         if (!$config) return response()->json(['success' => false, 'message' => 'Module inconnu.'], 400);
 
-        $request->validate(['fichier' => ['required', 'file', 'mimes:csv,txt,xlsx', 'max:5120']]);
+        $request->validate(['fichier' => ['required', 'file', 'mimes:csv,txt,xlsx,xls', 'max:5120']]);
 
         $entreprise = Auth::user()->entreprise;
         $lignes     = $this->lireFichier($request->file('fichier'));
@@ -173,17 +196,31 @@ class ImportControleur
     {
         $ext = strtolower($fichier->getClientOriginalExtension());
 
-        if ($ext === 'xlsx') {
-            // Lecture XLSX sans dépendance : on le refuse avec un message clair
-            // (maatwebsite/excel non installé dans ce projet)
-            throw new \RuntimeException('Le format XLSX n\'est pas supporté. Veuillez utiliser le format CSV (séparateur point-virgule).');
+        if (in_array($ext, ['xlsx', 'xls'])) {
+            try {
+                $spreadsheet = \PhpOffice\PhpSpreadsheet\IOFactory::load($fichier->getRealPath());
+                $worksheet   = $spreadsheet->getActiveSheet();
+                $rows        = [];
+                foreach ($worksheet->getRowIterator() as $row) {
+                    $cellIterator = $row->getCellIterator();
+                    $cellIterator->setIterateOnlyExistingCells(false);
+                    $rowData = [];
+                    foreach ($cellIterator as $cell) {
+                        $rowData[] = $cell->getValue();
+                    }
+                    if (count(array_filter($rowData, fn($v) => !is_null($v) && trim((string)$v) !== '')) > 0) {
+                        $rows[] = $rowData;
+                    }
+                }
+                return $rows;
+            } catch (\Exception $e) {
+                throw new \RuntimeException('Erreur lors de la lecture du fichier Excel : ' . $e->getMessage());
+            }
         }
 
         // CSV (utf-8 ou latin-1 avec BOM)
         $contenu = file_get_contents($fichier->getRealPath());
-        // Supprimer BOM UTF-8 éventuel
         $contenu = ltrim($contenu, "\xEF\xBB\xBF");
-        // Détecter encoding et convertir si besoin
         if (!mb_detect_encoding($contenu, 'UTF-8', true)) {
             $contenu = mb_convert_encoding($contenu, 'UTF-8', 'ISO-8859-1');
         }
@@ -192,7 +229,6 @@ class ImportControleur
         foreach (explode("\n", str_replace("\r\n", "\n", $contenu)) as $line) {
             $line = trim($line);
             if ($line === '') continue;
-            // Délimiteur auto : point-virgule ou virgule
             $delim  = substr_count($line, ';') >= substr_count($line, ',') ? ';' : ',';
             $lignes[] = str_getcsv($line, $delim);
         }

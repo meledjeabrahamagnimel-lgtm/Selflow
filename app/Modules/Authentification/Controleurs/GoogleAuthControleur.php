@@ -62,7 +62,7 @@ class GoogleAuthControleur
             $entreprise = Entreprise::create([
                 'nom'                 => '[PENDING_ONBOARDING]',
                 'email'               => $googleUser->getEmail(),
-                'modules_actifs'      => ['ventes', 'achats', 'stocks', 'tresorerie'],
+                'modules_actifs'      => ['principal', 'ventes', 'achats', 'stock', 'production', 'comptabilite', 'points_de_vente', 'personnel', 'b2b', 'fne'],
                 'secteur_activite'    => [],
                 'quota_points_de_vente' => 5,
                 'plan_abonnement'     => 'Starter',

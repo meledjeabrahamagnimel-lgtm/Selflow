@@ -1,4 +1,4 @@
-@extends('admin::gabarits.application')
+﻿@extends('admin::gabarits.application')
 @section('titre', 'Gestion clients')
 @section('topbar_titre', 'Catalogue — Clients')
 
@@ -296,7 +296,7 @@
             <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;">
                 <div class="form-group" style="grid-column:1/-1;">
                     <label class="form-label">Nom &amp; Prénom <span style="color:var(--danger)">*</span></label>
-                    <input type="text" name="nom" class="form-control" placeholder="Ex: Koffi Amos" required>
+                    <input type="text" name="nom" class="form-control" placeholder="Agnimel" required>
                 </div>
                 {{-- Type de facturation --}}
                 <div class="form-group" style="grid-column:1/-1;">
@@ -383,7 +383,7 @@
             <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;">
                 <div class="form-group" style="grid-column:1/-1;">
                     <label class="form-label">Nom &amp; Prénom <span style="color:var(--danger)">*</span></label>
-                    <input type="text" name="nom" id="edit_nom" class="form-control" placeholder="Ex: Koffi Amos" required>
+                    <input type="text" name="nom" id="edit_nom" class="form-control" placeholder="Agnimel" required>
                 </div>
                 {{-- Type de facturation --}}
                 <div class="form-group" style="grid-column:1/-1;">

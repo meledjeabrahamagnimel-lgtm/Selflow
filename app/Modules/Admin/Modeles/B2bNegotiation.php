@@ -13,6 +13,8 @@ class B2bNegotiation extends Model
         'entreprise_client_id',
         'entreprise_fournisseur_id',
         'statut',
+        'type_demande',
+        'reference_commande',
         'produits_demandes',
         'prix_final',
         'type_facturation',

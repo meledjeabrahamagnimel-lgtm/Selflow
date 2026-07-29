@@ -22,80 +22,80 @@
 
 <div class="card">
     <div class="table-wrap">
-        @if($negociations->isEmpty())
-            <div style="padding:60px; text-align:center; color:var(--text-3);">
-                <i class="fas fa-comments-dollar" style="font-size:48px; display:block; margin-bottom:16px; opacity:.3;"></i>
-                Aucune négociation B2B en cours.<br>
-                Lancez une demande de prix (RFQ) depuis le module <strong>Nouvel Achat</strong>.
-            </div>
-        @else
-            <table>
-                <thead>
+        <table>
+            <thead>
+                <tr>
+                    <th style="width: 25%;">Fournisseur B2B</th>
+                    <th style="width: 25%;">Produits demandés</th>
+                    <th style="width: 15%; text-align: center;">Statut</th>
+                    <th style="width: 15%; text-align: right;">Prix final</th>
+                    <th style="width: 20%; text-align: right;">Action</th>
+                </tr>
+            </thead>
+            <tbody>
+                @forelse($negociations as $neg)
                     <tr>
-                        <th style="width: 25%;">Fournisseur B2B</th>
-                        <th style="width: 25%;">Produits demandés</th>
-                        <th style="width: 15%; text-align: center;">Statut</th>
-                        <th style="width: 15%; text-align: right;">Prix final</th>
-                        <th style="width: 20%; text-align: right;">Action</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    @foreach($negociations as $neg)
-                        <tr>
-                            <td style="font-weight:600;">
-                                <div style="display:flex; align-items:center; gap:8px;">
-                                    <div style="width:30px; height:30px; border-radius:50%; background:var(--primary); color:#fff; display:flex; align-items:center; justify-content:center; font-size:12px; font-weight:800;">
-                                        {{ substr($neg->entrepriseFournisseur->nom, 0, 2) }}
-                                    </div>
-                                    <div>
-                                        {{ $neg->entrepriseFournisseur->nom }}
-                                        <div style="font-size:10px; color:var(--text-3); margin-top:2px;">NCC: {{ $neg->entrepriseFournisseur->ncc }}</div>
-                                    </div>
+                        <td style="font-weight:600;">
+                            <div style="display:flex; align-items:center; gap:8px;">
+                                <div style="width:30px; height:30px; border-radius:50%; background:var(--primary); color:#fff; display:flex; align-items:center; justify-content:center; font-size:12px; font-weight:800;">
+                                    {{ substr($neg->entrepriseFournisseur->nom, 0, 2) }}
                                 </div>
-                            </td>
-                            <td style="font-size:12.5px; color:var(--text-2);">
-                                @php
-                                    $noms = collect($neg->produits_demandes)->pluck('nom')->join(', ');
-                                @endphp
-                                {{ Str::limit($noms, 50) }}
-                            </td>
-                            <td style="text-align: center;">
-                                @if($neg->statut === 'RFQ')
-                                    <span class="badge" style="background:#eff6ff; color:#2563eb; padding:4px 10px; border-radius:20px; font-weight:700;">RFQ Envoyé</span>
-                                @elseif($neg->statut === 'Negociation_Fournisseur')
-                                    <span class="badge" style="background:#fff7ed; color:#ea580c; padding:4px 10px; border-radius:20px; font-weight:700; border: 1px solid rgba(234,88,12,0.2);">Proposition Reçue</span>
-                                @elseif($neg->statut === 'Negociation_Client')
-                                    <span class="badge" style="background:#f8fafc; color:#64748b; padding:4px 10px; border-radius:20px; font-weight:700;">En attente Fournisseur</span>
-                                @elseif($neg->statut === 'Termine')
-                                    <span class="badge" style="background:#e6fdf5; color:#059669; padding:4px 10px; border-radius:20px; font-weight:700;">Terminé / Facturé</span>
-                                @elseif($neg->statut === 'Refuse')
-                                    <span class="badge badge-danger">Refusé</span>
-                                @else
-                                    <span class="badge badge-gray">{{ $neg->statut }}</span>
-                                @endif
-                            </td>
-                            <td style="text-align: right; font-weight:800; color:var(--text);">
-                                {{ $neg->prix_final ? number_format($neg->prix_final, 0, ',', ' ') . ' F' : '—' }}
-                            </td>
-                            <td style="text-align: right;">
-                                @if($neg->statut === 'Termine')
-                                    <span style="font-size:12px; color:var(--success); font-weight:700;"><i class="fas fa-check-circle"></i> Complété</span>
-                                @elseif($neg->statut === 'Refuse')
-                                    <span style="font-size:12px; color:var(--danger); font-weight:700;"><i class="fas fa-ban"></i> Annulé</span>
-                                @else
-                                    <button type="button" class="btn btn-primary btn-sm" onclick="ouvrirModalNegociation({{ json_encode($neg) }})">
-                                        <i class="fas fa-comments-dollar"></i> Négocier
-                                    </button>
-                                @endif
-                            </td>
-                        </tr>
-                    @endforeach
-                </tbody>
-            </table>
-            <div style="padding: 10px 16px;">
-                {{ $negociations->links() }}
-            </div>
-        @endif
+                                <div>
+                                    {{ $neg->entrepriseFournisseur->nom }}
+                                    <div style="font-size:10px; color:var(--text-3); margin-top:2px;">NCC: {{ $neg->entrepriseFournisseur->ncc }}</div>
+                                </div>
+                            </div>
+                        </td>
+                        <td style="font-size:12.5px; color:var(--text-2);">
+                            @php
+                                $noms = collect($neg->produits_demandes)->pluck('nom')->join(', ');
+                            @endphp
+                            {{ Str::limit($noms, 50) }}
+                        </td>
+                        <td style="text-align: center;">
+                            @if($neg->statut === 'RFQ')
+                                <span class="badge" style="background:#eff6ff; color:#2563eb; padding:4px 10px; border-radius:20px; font-weight:700;">RFQ Envoyé</span>
+                            @elseif($neg->statut === 'Negociation_Fournisseur')
+                                <span class="badge" style="background:#fff7ed; color:#ea580c; padding:4px 10px; border-radius:20px; font-weight:700; border: 1px solid rgba(234,88,12,0.2);">Proposition Reçue</span>
+                            @elseif($neg->statut === 'Negociation_Client')
+                                <span class="badge" style="background:#f8fafc; color:#64748b; padding:4px 10px; border-radius:20px; font-weight:700;">En attente Fournisseur</span>
+                            @elseif($neg->statut === 'Termine')
+                                <span class="badge" style="background:#e6fdf5; color:#059669; padding:4px 10px; border-radius:20px; font-weight:700;">Terminé / Facturé</span>
+                            @elseif($neg->statut === 'Refuse')
+                                <span class="badge badge-danger">Refusé</span>
+                            @else
+                                <span class="badge badge-gray">{{ $neg->statut }}</span>
+                            @endif
+                        </td>
+                        <td style="text-align: right; font-weight:800; color:var(--text);">
+                            {{ $neg->prix_final ? number_format($neg->prix_final, 0, ',', ' ') . ' F' : '—' }}
+                        </td>
+                        <td style="text-align: right;">
+                            @if($neg->statut === 'Termine')
+                                <span style="font-size:12px; color:var(--success); font-weight:700;"><i class="fas fa-check-circle"></i> Complété</span>
+                            @elseif($neg->statut === 'Refuse')
+                                <span style="font-size:12px; color:var(--danger); font-weight:700;"><i class="fas fa-ban"></i> Annulé</span>
+                            @else
+                                <button type="button" class="btn btn-primary btn-sm" onclick="ouvrirModalNegociation({{ json_encode($neg) }})">
+                                    <i class="fas fa-comments-dollar"></i> Négocier
+                                </button>
+                            @endif
+                        </td>
+                    </tr>
+                @empty
+                    <tr>
+                        <td colspan="5" style="text-align:center; padding:48px 20px; color:var(--text-3);">
+                            <i class="fas fa-comments-dollar" style="font-size:40px; display:block; margin-bottom:12px; opacity:.2;"></i>
+                            Aucune négociation B2B en cours.<br>
+                            <span style="font-size:12px;">Lancez une demande de prix (RFQ) depuis le module <strong>Nouvel Achat</strong>.</span>
+                        </td>
+                    </tr>
+                @endforelse
+            </tbody>
+        </table>
+        <div style="padding: 10px 16px;">
+            {{ $negociations->links() }}
+        </div>
     </div>
 </div>
 

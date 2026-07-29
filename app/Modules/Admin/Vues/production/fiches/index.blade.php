@@ -27,10 +27,11 @@
 
 <div class="card" style="margin-bottom: 24px;">
     <div class="card-body" style="padding: 16px 20px;">
-        <form method="GET" action="{{ route('admin.production.fiches_techniques.index') }}" style="display:flex; gap:12px; align-items:center;">
+        <form method="GET" action="{{ route('admin.production.fiches_techniques.index') }}" id="formRechercheFiches" style="display:flex; gap:12px; align-items:center;">
             <div style="flex:1; position:relative;">
-                <i class="fas fa-search" style="position:absolute; left:12px; top:50%; transform:translateY(-50%); color:var(--text-3);"></i>
-                <input type="text" name="recherche" value="{{ request('recherche') }}" placeholder="Rechercher par nom ou référence de produit..." class="form-control" style="padding-left:36px; height:40px;">
+                <i class="fas fa-search" style="position:absolute; left:12px; top:50%; transform:translateY(-50%); color:var(--text-3); font-size:13px;"></i>
+                <input type="text" name="recherche" value="{{ request('recherche') }}" placeholder="Rechercher par nom ou référence de produit..." class="form-control" style="padding-left:36px; height:40px;"
+                       oninput="clearTimeout(window._rechercheFichesTimer); window._rechercheFichesTimer = setTimeout(() => document.getElementById('formRechercheFiches').submit(), 500);">
             </div>
             <button type="submit" class="btn btn-outline" style="height:40px;">
                 <i class="fas fa-filter"></i> Filtrer
@@ -109,4 +110,16 @@
         @endif
     </div>
 </div>
+@endsection
+
+@section('scripts')
+<script>
+    document.addEventListener('DOMContentLoaded', () => {
+        const champ = document.querySelector('#formRechercheFiches input[name="recherche"]');
+        if (champ && champ.value) {
+            champ.focus();
+            champ.setSelectionRange(champ.value.length, champ.value.length);
+        }
+    });
+</script>
 @endsection

@@ -38,7 +38,9 @@ class ComptabiliteControleur
             $pdvFilter = session('point_de_vente_actif_id') ?? Auth::user()->point_de_vente_id;
         }
 
-        $mode = $request->input('mode', 'operations'); // operations ou ecritures
+        $mode          = $request->input('mode', 'operations'); // operations ou ecritures
+        $search        = trim($request->input('search', ''));
+        $typeOp        = $request->input('type_operation', '');
         $minIds = [];
         $tresoMap = [];
         $venteMap = [];
@@ -51,6 +53,15 @@ class ComptabiliteControleur
 
             if (!empty($pdvFilter)) {
                 $query->where('point_de_vente_id', $pdvFilter);
+            }
+
+            if (!empty($search)) {
+                $query->where(function ($q) use ($search) {
+                    $q->where('reference_document', 'like', '%' . $search . '%')
+                      ->orWhere('libelle', 'like', '%' . $search . '%')
+                      ->orWhere('compte_debit', 'like', '%' . $search . '%')
+                      ->orWhere('compte_credit', 'like', '%' . $search . '%');
+                });
             }
 
             $ecritures = $query->orderBy('date_ecriture', 'desc')->orderBy('id', 'desc')->paginate(30);
@@ -68,6 +79,17 @@ class ComptabiliteControleur
 
             if (!empty($pdvFilter)) {
                 $query->where('point_de_vente_id', $pdvFilter);
+            }
+
+            if (!empty($typeOp)) {
+                $query->where('type_operation', $typeOp);
+            }
+
+            if (!empty($search)) {
+                $query->where(function ($q) use ($search) {
+                    $q->where('reference_document', 'like', '%' . $search . '%')
+                      ->orWhere('libelle', 'like', '%' . $search . '%');
+                });
             }
 
             $operations = $query->orderBy('date_operation', 'desc')->orderBy('id', 'desc')->paginate(30);
@@ -152,7 +174,7 @@ class ComptabiliteControleur
         // Récupérer les codes journaux de l'entreprise avec priorité COMPTAFLOW
         $codesJournaux = \App\Modules\Admin\Modeles\CodeJournal::obtenirJournauxPrioritaires($entreprise->id);
 
-        return view('admin::comptabilite.globale', compact('pointsDeVente', 'pdvFilter', 'mode', 'operations', 'ecritures', 'isAdmin', 'minIds', 'tresoMap', 'venteMap', 'achatMap', 'codesJournaux'));
+        return view('admin::comptabilite.globale', compact('pointsDeVente', 'pdvFilter', 'mode', 'operations', 'ecritures', 'isAdmin', 'minIds', 'tresoMap', 'venteMap', 'achatMap', 'codesJournaux', 'search', 'typeOp'));
     }
 
     /**

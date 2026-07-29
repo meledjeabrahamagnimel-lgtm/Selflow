@@ -444,7 +444,7 @@ function selectionnerEtapeVente(btn) {
     } else {
         blocPaiement.style.display = 'none';
         infoEtape.textContent = 'Aucun paiement requis pour un bon de commande';
-        labelBtn.textContent = 'Enregistrer le bon de commande';
+        labelBtn.textContent = 'Enregistrer & Envoyer le bon de commande';
         montantPayeInput.setAttribute('disabled', '');
     }
 }

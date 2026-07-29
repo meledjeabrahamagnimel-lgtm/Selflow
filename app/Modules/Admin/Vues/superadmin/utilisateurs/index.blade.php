@@ -20,15 +20,17 @@
 
 {{-- ── BLOC DE FILTRES RECHERCHE ── --}}
 <div class="card" style="padding: 20px; margin-bottom: 20px; background: var(--bg2); border: 1px solid var(--border);">
-    <form method="GET" action="{{ route('superadmin.utilisateurs') }}" style="display: grid; grid-template-columns: 1fr 1fr auto; gap: 16px; align-items: flex-end;">
+    <form method="GET" action="{{ route('superadmin.utilisateurs') }}" id="formRechercheUtilisateurs" style="display: grid; grid-template-columns: 1fr 1fr auto; gap: 16px; align-items: flex-end;">
         <div class="form-group" style="margin-bottom: 0;">
             <label class="form-label" style="font-weight: 600; margin-bottom: 6px; display: block; font-size: 12.5px;">Rechercher une entreprise</label>
-            <input type="text" name="recherche_entreprise" value="{{ request('recherche_entreprise') }}" class="form-control" placeholder="Ex: Maison Dupont..." style="border-radius: 8px;">
+            <input type="text" name="recherche_entreprise" value="{{ request('recherche_entreprise') }}" class="form-control" placeholder="Ex: Maison Dupont..." style="border-radius: 8px;"
+                   oninput="clearTimeout(window._rechercheUtilisateursTimer); window._rechercheUtilisateursTimer = setTimeout(() => { localStorage.setItem('selflow_user_active_focus', 'recherche_entreprise'); document.getElementById('formRechercheUtilisateurs').submit(); }, 500);">
         </div>
         
         <div class="form-group" style="margin-bottom: 0;">
             <label class="form-label" style="font-weight: 600; margin-bottom: 6px; display: block; font-size: 12.5px;">Rechercher un utilisateur</label>
-            <input type="text" name="recherche_utilisateur" value="{{ request('recherche_utilisateur') }}" class="form-control" placeholder="Ex: Nom, prénom ou e-mail..." style="border-radius: 8px;">
+            <input type="text" name="recherche_utilisateur" value="{{ request('recherche_utilisateur') }}" class="form-control" placeholder="Ex: Nom, prénom ou e-mail..." style="border-radius: 8px;"
+                   oninput="clearTimeout(window._rechercheUtilisateursTimer); window._rechercheUtilisateursTimer = setTimeout(() => { localStorage.setItem('selflow_user_active_focus', 'recherche_utilisateur'); document.getElementById('formRechercheUtilisateurs').submit(); }, 500);">
         </div>
 
         <div style="display: flex; gap: 10px;">
@@ -304,6 +306,18 @@
         const backdrop = document.getElementById('modalPermissionsBackdrop');
         if (e.target === backdrop) {
             fermerModalPermissions();
+        }
+    });
+
+    document.addEventListener('DOMContentLoaded', () => {
+        const activeFocusKey = localStorage.getItem('selflow_user_active_focus');
+        if (activeFocusKey) {
+            const input = document.querySelector(`#formRechercheUtilisateurs input[name="${activeFocusKey}"]`);
+            if (input && input.value) {
+                input.focus();
+                input.setSelectionRange(input.value.length, input.value.length);
+            }
+            localStorage.removeItem('selflow_user_active_focus');
         }
     });
 </script>

@@ -174,6 +174,7 @@ Route::prefix('admin')
 
         // ── Gestion catalogue ──
         Route::prefix('produits')->name('produits.')->group(function () {
+            Route::get('/calculer-reference',        [ProduitControleur::class, 'calculerReference'])->name('calculer_reference');
             Route::get('/',                          [ProduitControleur::class, 'index'])->name('index');
             Route::post('/',                         [ProduitControleur::class, 'creer'])->name('creer');
             Route::get('/{produit}/fiche',           [ProduitControleur::class, 'fiche'])->name('fiche');
@@ -262,7 +263,7 @@ Route::prefix('admin')
 // Routes pour l'interface SuperAdmin
 // ───────────────────────────────────────────────────────────────────────
 Route::prefix('superadmin')
-    ->middleware(['auth', 'role:superadmin'])
+    ->middleware(['auth', 'role:superadmin', 'habilitation'])
     ->name('superadmin.')
     ->group(function () {
         Route::get('/', [\App\Modules\Admin\Controleurs\SuperadminControleur::class, 'tableauDeBord'])->name('tableau_de_bord');
@@ -275,6 +276,16 @@ Route::prefix('superadmin')
         Route::delete('/entreprises/{entreprise}', [\App\Modules\Admin\Controleurs\SuperadminControleur::class, 'supprimer'])->name('entreprises.supprimer');
         Route::get('/utilisateurs', [\App\Modules\Admin\Controleurs\SuperadminControleur::class, 'utilisateurs'])->name('utilisateurs');
         Route::put('/utilisateurs/{utilisateur}', [\App\Modules\Admin\Controleurs\SuperadminControleur::class, 'modifierUtilisateur'])->name('utilisateurs.modifier');
+
+        // ── Administration interne (Superadmins) ──
+        Route::prefix('admins')->name('admins.')->group(function () {
+            Route::get('/',                       [\App\Modules\Admin\Controleurs\SuperadminControleur::class, 'admins'])->name('index');
+            Route::get('/creer',                  [\App\Modules\Admin\Controleurs\SuperadminControleur::class, 'creerAdmin'])->name('creer');
+            Route::post('/creer',                 [\App\Modules\Admin\Controleurs\SuperadminControleur::class, 'enregistrerAdmin'])->name('enregistrer');
+            Route::get('/{utilisateur}/modifier', [\App\Modules\Admin\Controleurs\SuperadminControleur::class, 'modifierAdmin'])->name('modifier');
+            Route::put('/{utilisateur}/modifier', [\App\Modules\Admin\Controleurs\SuperadminControleur::class, 'mettreAJourAdmin'])->name('mettre_a_jour');
+            Route::delete('/{utilisateur}',       [\App\Modules\Admin\Controleurs\SuperadminControleur::class, 'supprimerAdmin'])->name('supprimer');
+        });
 
         // ── Liaisons SELFLOW ↔ COMPTAFLOW ──
         Route::prefix('liaisons')->name('liaisons.')->group(function () {
@@ -293,6 +304,12 @@ Route::prefix('superadmin')
             Route::post('/{entreprise}/voir-cle',                 [\App\Modules\Admin\Controleurs\SuperadminFneControleur::class, 'voirCle'])->name('voir_cle');
             Route::delete('/{entreprise}/cle',                    [\App\Modules\Admin\Controleurs\SuperadminFneControleur::class, 'supprimerCle'])->name('supprimer_cle');
             Route::post('/{entreprise}/notes',                    [\App\Modules\Admin\Controleurs\SuperadminFneControleur::class, 'mettreAJourNotes'])->name('notes');
+        });
+
+        // ── Secteurs & Modules (Configuration plateforme) ──
+        Route::prefix('secteurs-modules')->name('secteurs_modules.')->group(function () {
+            Route::get('/',    [\App\Modules\Admin\Controleurs\SuperadminControleur::class, 'secteursModules'])->name('index');
+            Route::post('/',   [\App\Modules\Admin\Controleurs\SuperadminControleur::class, 'sauvegarderSecteursModules'])->name('sauvegarder');
         });
     });
 

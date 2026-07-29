@@ -1,4 +1,4 @@
-@extends('admin::gabarits.application')
+﻿@extends('admin::gabarits.application')
 @section('titre', 'Personnels & Accès')
 @section('topbar_titre', 'Points de vente — Personnels & Accès')
 
@@ -22,9 +22,14 @@
         <h1><i class="fas fa-users-gear"></i> Gestion des Personnels & Accès</h1>
         <p>Gérez les comptes des administrateurs et des caissiers, leurs contrats, notes et habilitations.</p>
     </div>
-    <button class="btn btn-primary" data-modal-open="modalNouveauPersonnel">
-        <i class="fas fa-user-plus"></i> Créer un accès
-    </button>
+    <div style="display:flex; gap:10px; align-items:center;">
+        <button class="btn btn-outline" onclick="ouvrirImport('modalImportPersonnel')" style="font-size:13px;">
+            <i class="fas fa-file-import"></i> Importer CSV
+        </button>
+        <button class="btn btn-primary" data-modal-open="modalNouveauPersonnel">
+            <i class="fas fa-user-plus"></i> Créer un accès
+        </button>
+    </div>
 </div>
 
 {{-- Onglets de navigation --}}
@@ -233,11 +238,11 @@
             <div style="display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-bottom: 14px;">
                 <div class="form-group">
                     <label class="form-label">Nom <span style="color:var(--danger)">*</span></label>
-                    <input type="text" name="nom" class="form-control" placeholder="Ex: Diomandé" required>
+                    <input type="text" name="nom" class="form-control" placeholder="Agnimel" required>
                 </div>
                 <div class="form-group">
                     <label class="form-label">Prénom <span style="color:var(--danger)">*</span></label>
-                    <input type="text" name="prenom" class="form-control" placeholder="Ex: Kouamé" required>
+                    <input type="text" name="prenom" class="form-control" placeholder="Meledje Abraham" required>
                 </div>
             </div>
 
@@ -481,4 +486,5 @@
         verifierRoleChange();
     });
 </script>
+@include('admin::composants.modal-import', ['type' => 'utilisateurs', 'label' => 'Personnel', 'id' => 'modalImportPersonnel'])
 @endsection

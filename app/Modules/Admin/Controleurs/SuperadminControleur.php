@@ -130,14 +130,16 @@ class SuperadminControleur
             'quota_points_de_vente'   => ['required', 'integer', 'min:1'],
             'plan_abonnement'         => ['required', 'string'],
             'secteur_activite'        => ['required', 'array'],
-            'secteur_activite.*'      => ['required', 'string', 'in:Commercial,Industriel,Services'],
+            'secteur_activite.*'      => ['required', 'string', 'in:Commercial,Industriel,Services,Agricole,Artisanat,BTP / Construction,Restauration / Hôtellerie,Santé,Transport / Logistique,Technologies / Numérique,Éducation / Formation,Autre'],
             'modules_actifs'          => ['required', 'array'],
             // Champs COMPTAFLOW conditionnels
             'comptaflow_password'     => [$request->boolean('creer_compte_comptaflow') ? 'required' : 'nullable', 'string', 'min:8', 'confirmed'],
         ]);
 
-        // Assurer l'activation automatique de b2b et fne
-        $modules = array_unique(array_merge($request->modules_actifs, ['b2b', 'fne']));
+        // Tous les modules sont activés par défaut — l'admin peut en désactiver dans les paramètres
+        $tousModules = ['principal', 'ventes', 'achats', 'stock', 'production', 'comptabilite', 'points_de_vente', 'personnel', 'b2b', 'fne'];
+        $modulesChoisis = is_array($request->modules_actifs) ? $request->modules_actifs : [];
+        $modules = array_unique(array_merge($tousModules, $modulesChoisis));
 
         // Créer l'entreprise
         $entreprise = Entreprise::create([
@@ -240,11 +242,14 @@ class SuperadminControleur
             'quota_points_de_vente'   => ['required', 'integer', 'min:1'],
             'plan_abonnement'         => ['required', 'string'],
             'secteur_activite'        => ['required', 'array'],
-            'secteur_activite.*'      => ['required', 'string', 'in:Commercial,Industriel,Services'],
+            'secteur_activite.*'      => ['required', 'string', 'in:Commercial,Industriel,Services,Agricole,Artisanat,BTP / Construction,Restauration / Hôtellerie,Santé,Transport / Logistique,Technologies / Numérique,Éducation / Formation,Autre'],
             'modules_actifs'          => ['required', 'array'],
         ]);
 
-        $modules = array_unique(array_merge($request->modules_actifs, ['b2b', 'fne']));
+        // Conserver tous les modules activés par défaut même lors d'une mise à jour
+        $tousModules = ['principal', 'ventes', 'achats', 'stock', 'production', 'comptabilite', 'points_de_vente', 'personnel', 'b2b', 'fne'];
+        $modulesChoisis = is_array($request->modules_actifs) ? $request->modules_actifs : [];
+        $modules = array_unique(array_merge($tousModules, $modulesChoisis));
 
         $entreprise->update([
             'nom'                    => $request->nom,
@@ -343,5 +348,199 @@ class SuperadminControleur
         $utilisateur->update($data);
 
         return redirect()->back()->with('succes', "L'utilisateur « {$utilisateur->nom} {$utilisateur->prenom} » a été mis à jour avec succès.");
+    }
+
+    // ─────────────────────────────────────────────────────────────
+    // ADMINISTRATION INTERNE (SUPERADMINS CRUD)
+    // ─────────────────────────────────────────────────────────────
+
+    public function admins(Request $request): View
+    {
+        $query = Utilisateur::where('role', 'superadmin');
+
+        if ($request->filled('search')) {
+            $search = $request->search;
+            $query->where(function($q) use ($search) {
+                $q->where('nom', 'like', "%{$search}%")
+                  ->orWhere('prenom', 'like', "%{$search}%")
+                  ->orWhere('email', 'like', "%{$search}%");
+            });
+        }
+
+        $admins = $query->orderBy('created_at', 'desc')->paginate(15);
+        return view('admin::superadmin.admins.index', compact('admins'));
+    }
+
+    public function creerAdmin(): View
+    {
+        return view('admin::superadmin.admins.creer');
+    }
+
+    public function enregistrerAdmin(Request $request): RedirectResponse
+    {
+        $request->validate([
+            'nom'           => ['required', 'string', 'max:100'],
+            'prenom'        => ['required', 'string', 'max:150'],
+            'email'         => ['required', 'email', 'max:150', 'unique:utilisateurs,email'],
+            'password'      => ['required', 'string', 'min:8', 'confirmed'],
+            'habilitations' => ['nullable', 'array'],
+            'statut'        => ['required', 'string', 'in:actif,inactif'],
+        ]);
+
+        Utilisateur::create([
+            'entreprise_id'         => null,
+            'nom'                   => trim($request->nom),
+            'prenom'                => trim($request->prenom),
+            'email'                 => trim($request->email),
+            'password'              => \Illuminate\Support\Facades\Hash::make($request->password),
+            'role'                  => 'superadmin',
+            'statut'                => $request->statut,
+            'habilitations'         => $request->habilitations ?? [],
+            'doit_changer_password' => false,
+        ]);
+
+        return redirect()->route('superadmin.admins.index')->with('succes', 'Administrateur interne créé avec succès.');
+    }
+
+    public function modifierAdmin(Utilisateur $utilisateur): View
+    {
+        return view('admin::superadmin.admins.modifier', compact('utilisateur'));
+    }
+
+    public function mettreAJourAdmin(Request $request, Utilisateur $utilisateur): RedirectResponse
+    {
+        $request->validate([
+            'nom'           => ['required', 'string', 'max:100'],
+            'prenom'        => ['required', 'string', 'max:150'],
+            'email'         => ['required', 'email', 'max:150', 'unique:utilisateurs,email,' . $utilisateur->id],
+            'password'      => ['nullable', 'string', 'min:8', 'confirmed'],
+            'habilitations' => ['nullable', 'array'],
+            'statut'        => ['required', 'string', 'in:actif,inactif'],
+        ]);
+
+        $data = [
+            'nom'           => trim($request->nom),
+            'prenom'        => trim($request->prenom),
+            'email'         => trim($request->email),
+            'statut'        => $request->statut,
+            'habilitations' => $request->habilitations ?? [],
+        ];
+
+        if ($utilisateur->email === 'superadmin@gmail.com') {
+            $data['habilitations'] = [];
+        }
+
+        if ($request->filled('password')) {
+            $data['password'] = \Illuminate\Support\Facades\Hash::make($request->password);
+        }
+
+        $utilisateur->update($data);
+
+        return redirect()->route('superadmin.admins.index')->with('succes', 'Administrateur interne mis à jour avec succès.');
+    }
+
+    public function supprimerAdmin(Utilisateur $utilisateur): RedirectResponse
+    {
+        if ($utilisateur->id === Auth::id()) {
+            return redirect()->back()->with('erreur', 'Vous ne pouvez pas vous supprimer vous-même.');
+        }
+
+        if ($utilisateur->email === 'superadmin@gmail.com') {
+            return redirect()->back()->with('erreur', 'Le super-administrateur principal ne peut pas être supprimé.');
+        }
+
+        $utilisateur->delete();
+
+        return redirect()->route('superadmin.admins.index')->with('succes', 'Administrateur interne supprimé avec succès.');
+    }
+
+    // ─────────────────────────────────────────────────────────────
+    // CONFIGURATION PLATEFORME — SECTEURS ↔ MODULES
+    // ─────────────────────────────────────────────────────────────
+
+    /** Définition des 10 modules de la plateforme */
+    public static function tousLesModules(): array
+    {
+        return [
+            'principal'      => ['label' => 'Tableau de bord',     'icone' => 'fa-chart-pie',          'par_defaut' => true,  'desactivable' => true],
+            'ventes'         => ['label' => 'Ventes & Facturation', 'icone' => 'fa-cash-register',      'par_defaut' => true,  'desactivable' => true],
+            'achats'         => ['label' => 'Achats',               'icone' => 'fa-cart-plus',          'par_defaut' => true,  'desactivable' => true],
+            'stock'          => ['label' => 'Stock',                'icone' => 'fa-boxes-stacked',      'par_defaut' => true,  'desactivable' => true],
+            'production'     => ['label' => 'Production',           'icone' => 'fa-industry',           'par_defaut' => true,  'desactivable' => true],
+            'comptabilite'   => ['label' => 'Comptabilité & FNE',   'icone' => 'fa-book',               'par_defaut' => true,  'desactivable' => true],
+            'points_de_vente'=> ['label' => 'Points de vente',      'icone' => 'fa-store',              'par_defaut' => true,  'desactivable' => true],
+            'personnel'      => ['label' => 'Personnels & Accès',   'icone' => 'fa-users-gear',         'par_defaut' => true,  'desactivable' => true],
+            'b2b'            => ['label' => 'Communication B2B',    'icone' => 'fa-handshake',          'par_defaut' => true,  'desactivable' => true],
+            'fne'            => ['label' => 'Fiscalité DGI',        'icone' => 'fa-file-invoice-dollar','par_defaut' => true,  'desactivable' => true],
+        ];
+    }
+
+    /** Définition des 12 secteurs d'activité */
+    public static function tousLesSecteurs(): array
+    {
+        return [
+            'Commercial'         => ['icone' => 'fa-tag',           'couleur' => '#3b82f6'],
+            'Industriel'         => ['icone' => 'fa-industry',      'couleur' => '#6366f1'],
+            'Services'           => ['icone' => 'fa-handshake',     'couleur' => '#10b981'],
+            'Agricole'           => ['icone' => 'fa-seedling',      'couleur' => '#84cc16'],
+            'Artisanat'          => ['icone' => 'fa-hammer',        'couleur' => '#f59e0b'],
+            'BTP / Construction' => ['icone' => 'fa-helmet-safety', 'couleur' => '#f97316'],
+            'Restauration / Hôtellerie' => ['icone' => 'fa-utensils', 'couleur' => '#ef4444'],
+            'Santé'              => ['icone' => 'fa-stethoscope',   'couleur' => '#ec4899'],
+            'Transport / Logistique'    => ['icone' => 'fa-truck',  'couleur' => '#8b5cf6'],
+            'Technologies / Numérique'  => ['icone' => 'fa-microchip', 'couleur' => '#06b6d4'],
+            'Éducation / Formation'     => ['icone' => 'fa-graduation-cap', 'couleur' => '#0ea5e9'],
+            'Autre'              => ['icone' => 'fa-circle-dot',    'couleur' => '#94a3b8'],
+        ];
+    }
+
+    /** Chemin du fichier de config JSON */
+    private function cheminConfig(): string
+    {
+        return storage_path('app/secteurs_modules.json');
+    }
+
+    /** Charger la configuration courante */
+    private function chargerConfig(): array
+    {
+        $chemin = $this->cheminConfig();
+        if (!file_exists($chemin)) {
+            // Config par défaut : tous les modules actifs pour tous les secteurs
+            $tousModules = array_keys(self::tousLesModules());
+            $defaut = [];
+            foreach (array_keys(self::tousLesSecteurs()) as $secteur) {
+                $defaut[$secteur] = $tousModules;
+            }
+            $defaut['__defaut__'] = $tousModules; // modules activés pour une entreprise sans secteur
+            return $defaut;
+        }
+        return json_decode(file_get_contents($chemin), true) ?? [];
+    }
+
+    public function secteursModules(): View
+    {
+        $modules = self::tousLesModules();
+        $secteurs = self::tousLesSecteurs();
+        $config = $this->chargerConfig();
+
+        return view('admin::superadmin.secteurs_modules.index', compact('modules', 'secteurs', 'config'));
+    }
+
+    public function sauvegarderSecteursModules(Request $request): RedirectResponse
+    {
+        $tousModules = array_keys(self::tousLesModules());
+        $tousSecteurs = array_merge(['__defaut__'], array_keys(self::tousLesSecteurs()));
+
+        $config = [];
+        foreach ($tousSecteurs as $secteur) {
+            $cle = str_replace(['/', ' '], '_', $secteur);
+            $modulesCoches = $request->input('modules_' . $cle, []);
+            // Filtrer pour ne garder que des modules valides
+            $config[$secteur] = array_values(array_intersect($modulesCoches, $tousModules));
+        }
+
+        file_put_contents($this->cheminConfig(), json_encode($config, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));
+
+        return redirect()->route('superadmin.secteurs_modules.index')->with('succes', 'Configuration Secteurs ↔ Modules sauvegardée avec succès.');
     }
 }
