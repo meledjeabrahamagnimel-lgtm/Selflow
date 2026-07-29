@@ -322,7 +322,7 @@
                     <div class="contact-details">
                         <h4>Email professionnel</h4>
                         <p><a href="mailto:[it.dcknowing@gmail.com]"
-                                style="color:inherit; text-decoration:none;">[EMAIL_ADDRESS]</a></p>
+                                style="color:inherit; text-decoration:none;">it.dcknowing@gmail.com</a></p>
                     </div>
                 </div>
 
