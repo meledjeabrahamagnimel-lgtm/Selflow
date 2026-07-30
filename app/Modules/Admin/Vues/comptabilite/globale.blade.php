@@ -177,11 +177,9 @@
                             <th>N° Saisie</th>
                             <th>Référence</th>
                             <th>Libellé</th>
-                            <th>Type</th>
                             <th>Mode paiement</th>
                             <th style="text-align: right; color:var(--success);">Entrée</th>
                             <th style="text-align: right; color:var(--danger);">Sortie</th>
-                            <th style="text-align: right;">Solde</th>
                             <th>Tiers</th>
                             <th>PDV</th>
                         </tr>
@@ -203,17 +201,6 @@
                             </td>
                             <td style="font-weight: 600; color:var(--text-2);">{{ $op->reference_document ?? '—' }}</td>
                             <td style="white-space: normal; min-width: 200px;">{{ $op->libelle }}</td>
-                            <td>
-                                @if($op->type_operation === 'recette')
-                                    <span style="background:#ecfdf5; color:#065f46; padding:2px 8px; border-radius:20px; font-size:11px; font-weight:700;">
-                                        <i class="fas fa-circle-plus"></i> Entrée
-                                    </span>
-                                @else
-                                    <span style="background:#fef2f2; color:#991b1b; padding:2px 8px; border-radius:20px; font-size:11px; font-weight:700;">
-                                        <i class="fas fa-circle-minus"></i> Sortie
-                                    </span>
-                                @endif
-                            </td>
                             <td>
                                 <span style="font-size:12px;">
                                     @php
@@ -240,12 +227,6 @@
                                 @else
                                     <span style="color:var(--text-3);">—</span>
                                 @endif
-                            </td>
-                            <td style="text-align: right; font-weight: 700; white-space:nowrap;">
-                                @php $s = floatval($op->solde_resultat); @endphp
-                                <span style="color: {{ $s >= 0 ? 'var(--success)' : 'var(--danger)' }}">
-                                    {{ number_format($s, 0, ',', ' ') }} F
-                                </span>
                             </td>
                             <td style="font-weight: 500;">{{ $op->tier_nom }}</td>
                             <td><span style="background:var(--bg3); color:var(--primary); padding:3px 8px; border-radius:6px; font-weight:600; font-size:12px;">{{ $op->pointDeVente->nom }}</span></td>

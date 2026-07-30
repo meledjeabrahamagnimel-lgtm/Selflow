@@ -156,13 +156,20 @@
                     <button type="submit" id="btnValiderAchat" class="btn btn-primary" style="width:100%;justify-content:center;" disabled>
                         <i class="fas fa-check-circle"></i> <span id="labelBtnValider">Enregistrer le bon de commande</span>
                     </button>
-                    <label style="display:flex; align-items:center; gap:8px; font-size:12px; font-weight:600; color:var(--text-2); margin-top:8px; margin-bottom:4px; cursor:pointer;">
-                        <input type="checkbox" name="masquer_prix_conseilles" value="1" id="chkMasquerPrix">
-                        Masquer les prix suggérés (RFQ sans prix)
-                    </label>
-                    <button type="button" onclick="soumettreRfqB2b(event)" class="btn btn-outline" id="btnRfqB2b" style="width:100%;justify-content:center;border-color:var(--primary);color:var(--primary);" disabled>
-                        <i class="fas fa-paper-plane"></i> Envoyer en RFQ B2B (Inter-Entreprise)
-                    </button>
+
+                    <div style="border-top:1px solid var(--border); padding-top:10px; margin-top:10px;">
+                        <label style="display:flex; align-items:center; gap:8px; font-size:12.5px; font-weight:700; color:var(--text-2); margin-bottom:6px; cursor:pointer;">
+                            <input type="checkbox" name="envoyer_rfq_b2b" value="1" id="chkEnvoyerB2b" onchange="toggleB2bOptions()">
+                            <i class="fas fa-paper-plane" style="color:var(--primary);"></i> Transmettre en B2B (Inter-Entreprise)
+                        </label>
+                        
+                        <div id="optionsB2b" style="display:none; padding-left:22px; margin-top:4px; margin-bottom:8px;">
+                            <label style="display:flex; align-items:center; gap:8px; font-size:12px; font-weight:600; color:var(--text-3); cursor:pointer;">
+                                <input type="checkbox" name="masquer_prix_conseilles" value="1" id="chkMasquerPrix">
+                                Masquer les prix suggérés (RFQ sans prix)
+                            </label>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
@@ -359,23 +366,14 @@ function recalculer() {
     document.getElementById('totTtc').textContent = fmt(ht);
     const noItems = document.querySelectorAll('.ligne').length === 0;
     document.getElementById('btnValiderAchat').disabled = noItems;
-    document.getElementById('btnRfqB2b').disabled = noItems;
 }
 
-function soumettreRfqB2b(e) {
-    e.preventDefault();
-    const form = document.getElementById('formAchat');
-    
-    // Validation minimale des champs requis
-    const fournisseurSelect = form.querySelector('select[name="fournisseur_id"]');
-    if (!fournisseurSelect.value) {
-        alert("Veuillez sélectionner un fournisseur.");
-        fournisseurSelect.focus();
-        return;
+function toggleB2bOptions() {
+    const chkEnvoyer = document.getElementById('chkEnvoyerB2b');
+    const optionsDiv = document.getElementById('optionsB2b');
+    if (chkEnvoyer && optionsDiv) {
+        optionsDiv.style.display = chkEnvoyer.checked ? 'block' : 'none';
     }
-    
-    form.action = "{{ route('admin.b2b.rfq.creer') }}";
-    form.submit();
 }
 
 // Lot F : sélectionner l'étape du document

@@ -55,7 +55,25 @@ class AdminControleur
             if ($filtreSemaine !== 'tous') {
                 $qVentes->whereRaw('WEEK(date_vente, 1) = ?', [$filtreSemaine]);
                 $qAchats->whereRaw('WEEK(date_achat, 1) = ?', [$filtreSemaine]);
-                $periodeLabel = "Semaine " . $filtreSemaine;
+                
+                if ($filtreMois !== 'tous') {
+                    $weeks = [];
+                    $firstDay = new \DateTime("$annee-$filtreMois-01");
+                    $lastDay = (clone $firstDay)->modify('last day of this month');
+                    for ($d = clone $firstDay; $d <= $lastDay; $d->modify('+1 day')) {
+                        $tempDate = clone $d;
+                        $tempDate->modify('this Monday');
+                        $weekNo = (int)$tempDate->format('W');
+                        if (!in_array($weekNo, $weeks)) {
+                            $weeks[] = $weekNo;
+                        }
+                    }
+                    sort($weeks);
+                    $relativeIdx = array_search((int)$filtreSemaine, $weeks);
+                    $periodeLabel = "Semaine " . ($relativeIdx !== false ? ($relativeIdx + 1) : $filtreSemaine);
+                } else {
+                    $periodeLabel = "Semaine " . $filtreSemaine;
+                }
             }
 
             $qVentes->whereYear('date_vente', $annee);
@@ -186,7 +204,25 @@ class AdminControleur
             if ($filtreSemaine !== 'tous') {
                 $qVentes->whereRaw('WEEK(date_vente, 1) = ?', [$filtreSemaine]);
                 $qAchats->whereRaw('WEEK(date_achat, 1) = ?', [$filtreSemaine]);
-                $periodeLabel = "Semaine " . $filtreSemaine;
+                
+                if ($filtreMois !== 'tous') {
+                    $weeks = [];
+                    $firstDay = new \DateTime("$annee-$filtreMois-01");
+                    $lastDay = (clone $firstDay)->modify('last day of this month');
+                    for ($d = clone $firstDay; $d <= $lastDay; $d->modify('+1 day')) {
+                        $tempDate = clone $d;
+                        $tempDate->modify('this Monday');
+                        $weekNo = (int)$tempDate->format('W');
+                        if (!in_array($weekNo, $weeks)) {
+                            $weeks[] = $weekNo;
+                        }
+                    }
+                    sort($weeks);
+                    $relativeIdx = array_search((int)$filtreSemaine, $weeks);
+                    $periodeLabel = "Semaine " . ($relativeIdx !== false ? ($relativeIdx + 1) : $filtreSemaine);
+                } else {
+                    $periodeLabel = "Semaine " . $filtreSemaine;
+                }
             }
 
             $qVentes->whereYear('date_vente', $annee);

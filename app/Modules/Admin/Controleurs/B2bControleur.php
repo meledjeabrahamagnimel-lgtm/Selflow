@@ -33,13 +33,21 @@ class B2bControleur extends Controller
     public function negociationsClient(Request $request): View
     {
         $entrepriseId = Auth::user()->entreprise_id;
+        $tab = $request->input('tab', 'devis'); // 'devis' ou 'commandes'
 
-        $negociations = B2bNegotiation::with(['entrepriseFournisseur'])
+        $baseQuery = B2bNegotiation::with(['entrepriseFournisseur'])
             ->where('entreprise_client_id', $entrepriseId)
-            ->latest()
-            ->paginate(15);
+            ->latest();
 
-        return view('admin::b2b.negociations_client', compact('negociations'));
+        // Devis demandés
+        $devis = (clone $baseQuery)->where('type_demande', 'rfq')->paginate(15, ['*'], 'page_devis');
+
+        // Commandes demandées
+        $commandes = (clone $baseQuery)->where('type_demande', 'commande')->paginate(15, ['*'], 'page_cmd');
+
+        $negociations = $tab === 'commandes' ? $commandes : $devis;
+
+        return view('admin::b2b.negociations_client', compact('negociations', 'devis', 'commandes', 'tab'));
     }
 
     /**
@@ -78,7 +86,8 @@ class B2bControleur extends Controller
             'articles'       => ['required', 'array', 'min:1'],
             'articles.*.produit_id' => ['required', 'integer', 'exists:produits,id'],
             'articles.*.quantite'   => ['required', 'numeric', 'min:0.0001'],
-            'articles.*.prix'       => ['required', 'numeric', 'min:0'],
+            'articles.*.prix'       => ['nullable', 'numeric', 'min:0'],
+            'articles.*.prix_unitaire' => ['nullable', 'numeric', 'min:0'],
         ]);
 
         $fournisseur = Fournisseur::where('entreprise_id', $entreprise->id)->findOrFail($request->fournisseur_id);
@@ -103,12 +112,13 @@ class B2bControleur extends Controller
         $produitsDemandes = [];
         foreach ($request->articles as $art) {
             $produit = Produit::findOrFail($art['produit_id']);
+            $prixUnitaire = isset($art['prix_unitaire']) ? $art['prix_unitaire'] : (isset($art['prix']) ? $art['prix'] : 0.0);
             $produitsDemandes[] = [
                 'produit_id_client' => $produit->id,
                 'reference'         => $produit->reference,
                 'nom'               => $produit->nom,
                 'quantite'          => (float)$art['quantite'],
-                'prix_propose'      => $masquerPrix ? 0.0 : (float)$art['prix'],
+                'prix_propose'      => $masquerPrix ? 0.0 : (float)$prixUnitaire,
                 'unite'             => $produit->unite ?? 'Unité'
             ];
         }

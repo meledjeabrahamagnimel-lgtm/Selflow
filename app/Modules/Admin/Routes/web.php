@@ -78,6 +78,7 @@ Route::prefix('admin')
             Route::post('/{achat}/avoir',     [AchatControleur::class, 'creerAvoir'])->name('avoir');
             Route::post('/{achat}/normaliser', [AchatControleur::class, 'normaliser'])->name('normaliser');
             Route::post('/{achat}/fne',        [\App\Modules\Admin\Controleurs\FneControleur::class, 'attacherFneAchat'])->name('fne.attacher');
+            Route::post('/{achat}/transmettre-b2b', [AchatControleur::class, 'transmettreB2b'])->name('transmettre_b2b');
         });
 
         // ── FNE / DGI Stub (Lot I) ──

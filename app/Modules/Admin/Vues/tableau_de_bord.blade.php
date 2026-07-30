@@ -390,8 +390,8 @@ function updateWeeksSelect() {
             weeks.add(weekNo);
         }
 
-        Array.from(weeks).sort((a,b) => a - b).forEach(s => {
-            semaineSelect.innerHTML += `<option value="${s}">Semaine ${s}</option>`;
+        Array.from(weeks).sort((a,b) => a - b).forEach((s, idx) => {
+            semaineSelect.innerHTML += `<option value="${s}">Semaine ${idx + 1}</option>`;
         });
     }
 
@@ -404,17 +404,24 @@ function updateWeeksSelect() {
 
 function appliquerFiltresTdb() {
     updateWeeksSelect();
-    const mois    = document.getElementById('filtre-mois').value;
-    const semaine = document.getElementById('filtre-semaine').value;
-    const jour    = document.getElementById('filtre-jour').value;
+    const moisSelect = document.getElementById('filtre-mois');
+    const semaineSelect = document.getElementById('filtre-semaine');
+    const jourSelect = document.getElementById('filtre-jour');
+
+    const mois    = moisSelect.value;
+    const semaine = semaineSelect.value;
+    const jour    = jourSelect.value;
 
     // Sauvegarder dans localStorage
     localStorage.setItem(TDB_KEY, JSON.stringify({ mois, semaine, jour }));
 
     // Mettre à jour le badge
     const actifs = [];
-    if (mois    !== 'tous') actifs.push(document.getElementById('filtre-mois').options[document.getElementById('filtre-mois').selectedIndex].text);
-    if (semaine !== 'tous') actifs.push('Semaine ' + semaine);
+    if (mois    !== 'tous') actifs.push(moisSelect.options[moisSelect.selectedIndex].text);
+    if (semaine !== 'tous') {
+        const semaineText = semaineSelect.options[semaineSelect.selectedIndex].text;
+        actifs.push(semaineText);
+    }
     if (jour    !== 'tous') actifs.push('Jour ' + jour);
     afficherBadge(actifs);
 

@@ -199,6 +199,22 @@
                                     </button>
                                 </form>
                             @endif
+
+                            @if(in_array($achat->etape, ['Demande de prix', 'Bon de commande']) && !empty($achat->fournisseur?->ncc))
+                                @php
+                                    $dejaEnvoyeB2b = \App\Modules\Admin\Modeles\B2bNegotiation::where('reference_commande', $achat->numero_facture)->exists();
+                                @endphp
+                                @if(!$dejaEnvoyeB2b)
+                                    <form method="POST" action="{{ route('admin.achats.transmettre_b2b', $achat) }}" style="display:inline; margin:0;">
+                                        @csrf
+                                        <button type="submit" class="btn btn-outline btn-sm" style="font-size:11px; padding:4px 8px; border-color:var(--primary); color:var(--primary);" title="Transmettre cette demande en B2B (Inter-Entreprise)">
+                                            <i class="fas fa-paper-plane"></i> Transmettre B2B
+                                        </button>
+                                    </form>
+                                @else
+                                    <span style="font-size:11px; color:var(--success); font-weight:700;"><i class="fas fa-check-circle"></i> B2B Envoyé</span>
+                                @endif
+                            @endif
                         </div>
                     </td>
                 </tr>

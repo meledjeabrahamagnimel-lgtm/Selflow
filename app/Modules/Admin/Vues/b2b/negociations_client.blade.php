@@ -20,8 +20,84 @@
     </div>
 @endif
 
+{{-- Tabs --}}
+<div style="display:flex; gap:4px; margin-bottom:16px; border-bottom:2px solid var(--border); padding-bottom:0;">
+    <a href="{{ request()->fullUrlWithQuery(['tab' => 'devis']) }}"
+       style="padding:10px 20px; font-weight:700; font-size:13px; text-decoration:none; border-bottom:3px solid {{ $tab === 'devis' ? 'var(--primary)' : 'transparent' }}; color:{{ $tab === 'devis' ? 'var(--primary)' : 'var(--text-2)' }}; display:inline-flex; align-items:center; gap:7px; transition:all .15s;">
+        <i class="fas fa-file-alt"></i> Devis demandés
+        <span style="background:{{ $tab === 'devis' ? 'var(--primary)' : 'var(--border)' }}; color:{{ $tab === 'devis' ? '#fff' : 'var(--text-2)' }}; border-radius:20px; padding:1px 8px; font-size:11px;">{{ $devis->total() }}</span>
+    </a>
+    <a href="{{ request()->fullUrlWithQuery(['tab' => 'commandes']) }}"
+       style="padding:10px 20px; font-weight:700; font-size:13px; text-decoration:none; border-bottom:3px solid {{ $tab === 'commandes' ? 'var(--primary)' : 'transparent' }}; color:{{ $tab === 'commandes' ? 'var(--primary)' : 'var(--text-2)' }}; display:inline-flex; align-items:center; gap:7px; transition:all .15s;">
+        <i class="fas fa-file-invoice"></i> Commandes demandées
+        <span style="background:{{ $tab === 'commandes' ? 'var(--primary)' : 'var(--border)' }}; color:{{ $tab === 'commandes' ? '#fff' : 'var(--text-2)' }}; border-radius:20px; padding:1px 8px; font-size:11px;">{{ $commandes->total() }}</span>
+    </a>
+</div>
+
 <div class="card">
     <div class="table-wrap">
+        @if($tab === 'commandes')
+        {{-- TABLEAU COMMANDES DEMANDÉES --}}
+        <table>
+            <thead>
+                <tr>
+                    <th style="width: 25%;">Fournisseur B2B</th>
+                    <th style="width: 20%;">Réf. commande</th>
+                    <th style="width: 25%;">Produits commandés</th>
+                    <th style="width: 15%; text-align: center;">Statut</th>
+                    <th style="width: 15%; text-align: right;">Prix final</th>
+                </tr>
+            </thead>
+            <tbody>
+                @forelse($commandes as $neg)
+                    <tr>
+                        <td style="font-weight:600;">
+                            <div style="display:flex; align-items:center; gap:8px;">
+                                <div style="width:30px; height:30px; border-radius:50%; background:var(--primary); color:#fff; display:flex; align-items:center; justify-content:center; font-size:12px; font-weight:800;">
+                                    {{ substr($neg->entrepriseFournisseur->nom, 0, 2) }}
+                                </div>
+                                <div>
+                                    {{ $neg->entrepriseFournisseur->nom }}
+                                    <div style="font-size:10px; color:var(--text-3); margin-top:2px;">NCC: {{ $neg->entrepriseFournisseur->ncc }}</div>
+                                </div>
+                            </div>
+                        </td>
+                        <td style="font-weight:700; color:var(--primary); font-size:12px;">{{ $neg->reference_commande ?? '#' . $neg->id }}</td>
+                        <td style="font-size:12.5px; color:var(--text-2);">
+                            @php
+                                $noms = collect($neg->produits_demandes)->pluck('nom')->join(', ');
+                            @endphp
+                            {{ Str::limit($noms, 50) }}
+                        </td>
+                        <td style="text-align: center;">
+                            @if($neg->statut === 'Termine')
+                                <span class="badge" style="background:#e6fdf5; color:#059669; padding:4px 10px; border-radius:20px; font-weight:700;">Traité / Facturé</span>
+                            @elseif($neg->statut === 'Refuse')
+                                <span class="badge badge-danger">Refusé</span>
+                            @else
+                                <span class="badge" style="background:#eff6ff; color:#2563eb; padding:4px 10px; border-radius:20px; font-weight:700;">Commandé</span>
+                            @endif
+                        </td>
+                        <td style="text-align: right; font-weight:800; color:var(--text);">
+                            {{ $neg->prix_final ? number_format($neg->prix_final, 0, ',', ' ') . ' F' : '—' }}
+                        </td>
+                    </tr>
+                @empty
+                    <tr>
+                        <td colspan="5" style="text-align:center; padding:48px 20px; color:var(--text-3);">
+                            <i class="fas fa-file-invoice" style="font-size:40px; display:block; margin-bottom:12px; opacity:.2;"></i>
+                            Aucune commande demandée.
+                        </td>
+                    </tr>
+                @endforelse
+            </tbody>
+        </table>
+        <div style="padding: 10px 16px;">
+            {{ $commandes->links() }}
+        </div>
+
+        @else
+        {{-- TABLEAU DEVIS DEMANDÉS (RFQ) --}}
         <table>
             <thead>
                 <tr>
@@ -33,7 +109,7 @@
                 </tr>
             </thead>
             <tbody>
-                @forelse($negociations as $neg)
+                @forelse($devis as $neg)
                     <tr>
                         <td style="font-weight:600;">
                             <div style="display:flex; align-items:center; gap:8px;">
@@ -86,16 +162,16 @@
                     <tr>
                         <td colspan="5" style="text-align:center; padding:48px 20px; color:var(--text-3);">
                             <i class="fas fa-comments-dollar" style="font-size:40px; display:block; margin-bottom:12px; opacity:.2;"></i>
-                            Aucune négociation B2B en cours.<br>
-                            <span style="font-size:12px;">Lancez une demande de prix (RFQ) depuis le module <strong>Nouvel Achat</strong>.</span>
+                            Aucun devis demandé (RFQ).
                         </td>
                     </tr>
                 @endforelse
             </tbody>
         </table>
         <div style="padding: 10px 16px;">
-            {{ $negociations->links() }}
+            {{ $devis->links() }}
         </div>
+        @endif
     </div>
 </div>
 

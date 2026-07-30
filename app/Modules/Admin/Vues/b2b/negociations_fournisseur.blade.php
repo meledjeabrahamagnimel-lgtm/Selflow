@@ -295,11 +295,20 @@
         neg.produits_demandes.forEach((p, idx) => {
             const div = document.createElement('div');
             div.style.marginBottom = '12px';
+            const aPropose = parseFloat(p.prix_propose) > 0;
+            const prixAffiche = aPropose
+                ? `<span style="color:var(--text); font-weight:700;">${new Intl.NumberFormat('fr-FR').format(p.prix_propose)} F</span>`
+                : `<span style="color:var(--danger); font-weight:700;"><i class="fas fa-eye-slash"></i> Masqué</span>`;
             div.innerHTML = `
                 <div style="font-weight:700; font-size:12.5px; color:var(--text);">${p.nom}</div>
-                <div style="font-size:11px; color:var(--text-2); margin-top:2px; margin-bottom:6px;">Demande : ${p.quantite} ${p.unite}</div>
+                <div style="display:flex; justify-content:space-between; font-size:11px; color:var(--text-2); margin-top:2px; margin-bottom:6px;">
+                    <span>Demande : <strong>${p.quantite} ${p.unite}</strong></span>
+                    <span>Prix suggéré : ${prixAffiche}</span>
+                </div>
                 <div class="form-group" style="margin-bottom:0;">
-                    <input type="number" name="prix[${idx}]" value="${p.prix_propose}" class="form-control" style="height:36px; padding:6px 10px;" required>
+                    <input type="number" name="prix[${idx}]" value="${aPropose ? p.prix_propose : ''}"
+                           class="form-control" style="height:36px; padding:6px 10px;"
+                           placeholder="${aPropose ? '' : 'Saisir votre prix de vente...'}" required>
                 </div>
             `;
             pContainer.appendChild(div);
