@@ -170,7 +170,7 @@
 
 <p style="font-size:11px;color:var(--text-3);margin-top:12px;">
     <i class="fas fa-info-circle"></i>
-    Prix unitaire : <strong>10 FCFA / sticker</strong>.
+    Prix unitaire : <strong>20 FCFA / sticker</strong>.
     Le statut passe de <em>En attente</em> à <em>Succès</em> après confirmation de paiement Mobile Money.
 </p>
 
@@ -187,7 +187,7 @@
         {{-- Info prix --}}
         <div style="display:flex;align-items:center;gap:10px;padding:12px 16px;background:#eff6ff;border-radius:10px;border:1px solid #bfdbfe;margin-bottom:20px;">
             <i class="fas fa-info-circle" style="color:#1d4ed8;font-size:16px;"></i>
-            <span style="font-size:13px;color:#1e40af;font-weight:500;">Prix unitaire : <strong>10 FCFA / sticker</strong></span>
+            <span style="font-size:13px;color:#1e40af;font-weight:500;">Prix unitaire : <strong>20 FCFA / sticker</strong></span>
         </div>
 
         <form id="formAchatSticker" onsubmit="soumettreAchatSticker(event)">
@@ -269,7 +269,7 @@ function selectOperateur(op) {
 function calculerMontant() {
     const nb = parseInt(document.getElementById('input-nombre').value) || 0;
     document.getElementById('display-montant').value = nb > 0
-        ? new Intl.NumberFormat('fr-FR').format(nb * 10) + ' FCFA'
+        ? new Intl.NumberFormat('fr-FR').format(nb * 20) + ' FCFA'
         : '—';
 }
 

@@ -57,7 +57,7 @@ class StickerControleur
             'nombre_stickers.min'      => 'Vous devez acheter au minimum 1 sticker.',
         ]);
 
-        $montant = $validated['nombre_stickers'] * 10; // 10 FCFA par sticker
+        $montant = $validated['nombre_stickers'] * 20; // 20 FCFA par sticker
 
         $transaction = StickerTransaction::create([
             'entreprise_id'  => $entreprise->id,
