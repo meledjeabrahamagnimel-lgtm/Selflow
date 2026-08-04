@@ -353,6 +353,10 @@
                     <th style="white-space: nowrap; text-align: center;">Normalisée (DGI)</th>
                     @endif
                     <th style="white-space: nowrap;">Fichier DGI</th>
+                    @if(!$estDevisOuBC)
+                    <th style="white-space: nowrap;">Reçu lié</th>
+                    <th style="white-space: nowrap;">Fichier reçu</th>
+                    @endif
                     <th style="white-space: nowrap;">Actions</th>
                 </tr>
             </thead>
@@ -446,6 +450,45 @@
                         </div>
                     </td>
 
+                    @if(!$estDevisOuBC)
+                    {{-- Pièce d'origine : le reçu dont la facture est issue, ou
+                         la facture issue de ce reçu. --}}
+                    <td style="white-space: nowrap;">
+                        @if($vente->pieceLiee)
+                            <a href="{{ $isCaissier ? route('caissier.ventes.imprimer', $vente->pieceLiee) : route('admin.ventes.imprimer', $vente->pieceLiee) }}"
+                               style="font-weight:600;" title="{{ $vente->pieceLiee->libelleTypeDocument() }}">
+                                {{ $vente->pieceLiee->numero_facture }}
+                            </a>
+                        @else
+                            <span style="color:var(--text-3);">—</span>
+                        @endif
+                    </td>
+
+                    {{-- Fichier du reçu : celui de la pièce si c'est un reçu,
+                         sinon celui du reçu dont elle est issue. --}}
+                    <td>
+                        @php
+                            $recuAssocie = $vente->estRecu() ? $vente : ($vente->pieceLiee?->estRecu() ? $vente->pieceLiee : null);
+                            $urlRecu = $recuAssocie
+                                ? ($isCaissier ? route('caissier.ventes.ticket', $recuAssocie) : route('admin.ventes.ticket', $recuAssocie))
+                                : null;
+                        @endphp
+                        <div style="display:flex; gap:6px; align-items:center;">
+                            @if($urlRecu)
+                                <a href="{{ $urlRecu }}" target="_blank" class="btn btn-outline btn-sm" style="padding:4px 8px; font-size:11px;" title="Voir le reçu">
+                                    <i class="fas fa-eye"></i>
+                                </a>
+                                <button type="button" onclick="telechargerDirectement('{{ $urlRecu }}?print=1')"
+                                        class="btn btn-outline btn-sm" style="padding:4px 8px; font-size:11px;" title="Télécharger le reçu">
+                                    <i class="fas fa-download"></i>
+                                </button>
+                            @else
+                                <span style="color:var(--text-3);">—</span>
+                            @endif
+                        </div>
+                    </td>
+                    @endif
+
                     {{-- Colonne Actions --}}
                     <td style="white-space: nowrap;">
                         <div style="display:flex; gap:6px; align-items:center; flex-wrap:wrap;">
@@ -523,9 +566,28 @@
                                     </button>
                                 @else
                                     <a href="{{ $isCaissier ? route('caissier.ventes.ticket', $vente) : route('admin.ventes.ticket', $vente) }}"
-                                       class="btn btn-outline btn-sm" style="padding:4px 8px; font-size:11px; border-color:var(--success); color:var(--success);" title="Imprimer le Ticket RNE">
-                                        <i class="fas fa-print"></i> Ticket
+                                       class="btn btn-outline btn-sm" style="padding:4px 8px; font-size:11px; border-color:var(--success); color:var(--success);" title="{{ $vente->estRecu() ? 'Imprimer le reçu' : 'Aperçu du reçu' }}">
+                                        <i class="fas fa-receipt"></i> Reçu
                                     </a>
+
+                                    {{-- Etablir la contrepartie : une facture depuis un recu,
+                                         un recu depuis une facture. --}}
+                                    @if($vente->pieceLiee)
+                                        <a href="{{ $isCaissier ? route('caissier.ventes.imprimer', $vente->pieceLiee) : route('admin.ventes.imprimer', $vente->pieceLiee) }}"
+                                           class="btn btn-sm" style="background:#eef2ff; color:#4338ca; border:0.5px solid #c7d2fe; font-weight:700; font-size:11px; padding:4px 8px;"
+                                           title="{{ $vente->pieceLiee->libelleTypeDocument() }} liée : {{ $vente->pieceLiee->numero_facture }}">
+                                            <i class="fas fa-link"></i> {{ $vente->pieceLiee->numero_facture }}
+                                        </a>
+                                    @else
+                                        <form method="POST" action="{{ $isCaissier ? route('caissier.ventes.convertir_piece', $vente) : route('admin.ventes.convertir_piece', $vente) }}" style="display:inline; margin:0;">
+                                            @csrf
+                                            <button type="submit" class="btn btn-sm"
+                                                    style="background:#eef2ff; color:#4338ca; border:0.5px solid #c7d2fe; font-weight:700; font-size:11px; padding:4px 8px;"
+                                                    title="{{ $vente->estRecu() ? 'Établir la facture correspondant à ce reçu, en reprenant ses informations' : 'Établir le reçu correspondant à cette facture' }}">
+                                                <i class="fas fa-right-left"></i> &rarr; {{ $vente->estRecu() ? 'Facture' : 'Reçu' }}
+                                            </button>
+                                        </form>
+                                    @endif
                                     <button type="button" onclick="telechargerDirectement('{{ $routeImprimer }}?download=1')"
                                             class="btn btn-outline btn-sm" style="padding:4px 8px; font-size:11px;" title="Télécharger le PDF">
                                         <i class="fas fa-download"></i>

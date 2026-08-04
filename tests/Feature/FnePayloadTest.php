@@ -453,6 +453,37 @@ class FnePayloadTest extends TestCase
         $this->assertSame($facture->id, $recu->fresh()->pieceLiee->id);
     }
 
+    public function test_un_recu_n_est_pas_transmis_a_la_fne(): void
+    {
+        Http::fake();
+
+        $recu = $this->venteMinimale(['type_piece' => Vente::TYPE_RECU]);
+
+        $resultat = FneService::normaliserFacture($recu);
+
+        $this->assertFalse($resultat['success']);
+        $this->assertArrayHasKey('rne_mapping', $resultat['errors']);
+        Http::assertNothingSent();
+    }
+
+    public function test_les_ventes_validees_portent_une_etape_facture_et_jamais_le_statut_facturee(): void
+    {
+        // Les tableaux de bord filtraient sur un statut « Facturée » qui
+        // n'existe pas : les compteurs et graphiques restaient donc a zero.
+        $vente = $this->venteMinimale(['statut' => 'Payé']);
+
+        $this->assertSame('Facture', $vente->etape);
+        $this->assertNotSame('Facturée', $vente->statut);
+        $this->assertSame(
+            1,
+            Vente::withoutGlobalScopes()->where('etape', 'Facture')->where('id', $vente->id)->count()
+        );
+        $this->assertSame(
+            0,
+            Vente::withoutGlobalScopes()->where('statut', 'Facturée')->count()
+        );
+    }
+
     /**
      * Vente d'une ligne, sans client ni remise : le socle des cas ci-dessus.
      */

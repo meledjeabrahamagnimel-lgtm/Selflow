@@ -266,6 +266,13 @@
                             </button>
                         </div>
                         <small id="infoEtapeVente" style="color:var(--text-3); font-size:11px;">Mode facturation avec règlement</small>
+                        <div id="avertissementRne" style="display:none; margin-top:8px; padding:10px 12px; background:#fffbeb; border:1px solid #fcd34d; border-radius:8px; font-size:11px; color:#92400e; line-height:1.5;">
+                            <i class="fas fa-triangle-exclamation"></i>
+                            <strong>Normalisation RNE en attente.</strong>
+                            Le reçu sera enregistré et imprimable, mais sa certification auprès de la DGI
+                            reste suspendue tant que la FNE n'a pas fourni les champs de mappage du reçu
+                            normalisé électronique. Il pourra être normalisé rétroactivement.
+                        </div>
                     </div>
 
                     {{-- Mode de paiement style buttons --}}
@@ -562,9 +569,15 @@ function selectionnerEtapeVente(btn) {
     const labelBtn = document.getElementById('labelBtnValiderVente');
     const montantPayeInput = document.getElementById('montantPayeInput');
 
+    // Le reçu est bien enregistré comme tel : il ne bascule pas en facture.
+    // Sa certification RNE reste en revanche suspendue tant que la FNE n'a pas
+    // communiqué les champs de mappage du reçu normalisé électronique.
+    const avertissement = document.getElementById('avertissementRne');
+    if (avertissement) avertissement.style.display = estRecu ? 'block' : 'none';
+
     if (estRecu) {
         blocPaiement.style.display = 'block';
-        infoEtape.textContent = 'Reçu encaissé, normalisable auprès de la DGI';
+        infoEtape.textContent = 'Reçu encaissé — normalisation RNE en attente des champs de mappage FNE';
         labelBtn.textContent = 'Valider et émettre le reçu';
         montantPayeInput.removeAttribute('disabled');
     } else if (etape === 'Facture') {
@@ -1342,4 +1355,23 @@ function toggleSaisieTvaCustom() {
     }
 }
 </script>
+
+{{-- Bornage immediat de tout taux saisi : aucune remise ni taxe ne peut sortir
+     de l'intervalle 0-100 %, regle imposee par la DGI. La validation serveur
+     reste la garantie ; ce script evite seulement a l'utilisateur de saisir une
+     valeur qui sera refusee. --}}
+<script>
+document.addEventListener('input', function (e) {
+    const champ = e.target;
+    if (champ.tagName !== 'INPUT' || champ.type !== 'number') return;
+    if (champ.max !== '100') return;
+
+    const valeur = parseFloat(champ.value);
+    if (isNaN(valeur)) return;
+
+    if (valeur > 100) champ.value = 100;
+    if (valeur < parseFloat(champ.min || 0)) champ.value = champ.min || 0;
+});
+</script>
+
 @endsection

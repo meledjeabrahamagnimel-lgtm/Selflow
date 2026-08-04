@@ -320,8 +320,13 @@ class VenteControleur
                 // Si pas de client enregistré ou client divers -> RNE (Reçu), sinon EV (Facture)
                 $estRne = empty($request->client_id) || ($request->client_id == 'divers');
 
-                // Normalisation FNE en arrière-plan (Section 18.5) — n'attendons pas la réponse HTTP
-                NormaliserFactureFne::dispatch($vente, $estRne);
+                // Un reçu n'est pas transmis à la FNE : la certification du reçu
+                // normalisé électronique attend les champs de mappage de la
+                // DGI. Il reste enregistré et normalisable rétroactivement.
+                if (!$vente->estRecu()) {
+                    // Normalisation FNE en arrière-plan (Section 18.5) — n'attendons pas la réponse HTTP
+                    NormaliserFactureFne::dispatch($vente, $estRne);
+                }
 
                 // Écritures de facturation (+ règlement immédiat le cas échéant).
                 // genererEcrituresVente() décide seule si la vente est comptant
@@ -472,7 +477,7 @@ class VenteControleur
             }
             $ventes = $blQuery->latest()->paginate(20);
         } else {
-            $baseQuery = Vente::with(['client', 'pointDeVente', 'details.produit']);
+            $baseQuery = Vente::with(['client', 'pointDeVente', 'details.produit', 'pieceLiee']);
 
             if ($type === 'avoir') {
                 $baseQuery->where('type_facture', 'avoir');

@@ -855,4 +855,23 @@ document.getElementById('formAchat').addEventListener('submit', function() {
 // Charger le panier au chargement
 loadPanier();
 </script>
+
+{{-- Bornage immediat de tout taux saisi : aucune remise ni taxe ne peut sortir
+     de l'intervalle 0-100 %, regle imposee par la DGI. La validation serveur
+     reste la garantie ; ce script evite seulement a l'utilisateur de saisir une
+     valeur qui sera refusee. --}}
+<script>
+document.addEventListener('input', function (e) {
+    const champ = e.target;
+    if (champ.tagName !== 'INPUT' || champ.type !== 'number') return;
+    if (champ.max !== '100') return;
+
+    const valeur = parseFloat(champ.value);
+    if (isNaN(valeur)) return;
+
+    if (valeur > 100) champ.value = 100;
+    if (valeur < parseFloat(champ.min || 0)) champ.value = champ.min || 0;
+});
+</script>
+
 @endsection
