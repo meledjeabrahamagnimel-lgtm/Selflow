@@ -167,16 +167,12 @@
                             <div style="width:80px; height:80px; display:flex; align-items:center; justify-content:center;">
                                 <img src="/dgi-stamp.png" style="max-height:100%; max-width:100%; object-fit:contain;" alt="Visuel FNE">
                             </div>
-                            {{-- Code de vérification : la DGI exige le QR code sur le
-                                 document certifié, il n'y figurait pas. --}}
-                            @if($achat->qr_code_data)
-                                <img src="{{ \App\Modules\Admin\Services\QrCodeService::dataUri($achat->qr_code_data, 160) }}"
-                                     style="width:80px; height:80px;" alt="Code de vérification FNE">
-                            @endif
                         </div>
                         <div style="font-size:9px; color:#000; text-align:right; margin-top:8px; font-family:monospace; line-height:1.4;">
-                            N° BAPA/FNE : <strong>{{ $achat->numero_fne }}</strong><br>
-                            Signature DGI : <strong>{{ substr($achat->signature_dgi, 0, 16) }}...</strong>
+                            N° BAPA/FNE : <strong>{{ $achat->numero_fne }}</strong>
+                            @if($achat->qr_code_data)
+                                <br>Vérification : <strong style="word-break:break-all;">{{ $achat->qr_code_data }}</strong>
+                            @endif
                         </div>
                     @endif
                 </div>
