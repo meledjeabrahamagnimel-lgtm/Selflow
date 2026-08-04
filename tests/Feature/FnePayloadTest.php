@@ -12,7 +12,6 @@ use App\Modules\Admin\Modeles\Produit;
 use App\Modules\Admin\Modeles\Vente;
 use App\Modules\Admin\Modeles\VenteDetail;
 use App\Modules\Admin\Services\FneService;
-use App\Modules\Admin\Services\QrCodeService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;
 use Tests\TestCase;
@@ -507,33 +506,6 @@ class FnePayloadTest extends TestCase
         $this->assertContains(
             $recu->id,
             Vente::withoutGlobalScopes()->sansDoublonRecu()->pluck('id')
-        );
-    }
-
-    // ─── Code de vérification DGI ────────────────────────────────────────
-
-    public function test_le_qr_code_est_genere_localement_sans_appel_reseau(): void
-    {
-        // Le code passait par un service en ligne : l'image ne s'affichait donc
-        // ni sur les factures ni dans les PDF sans acces a ce service.
-        Http::fake();
-
-        $svg = QrCodeService::svg('http://54.247.95.108/fr/verification/019465c1-3f61', 160);
-
-        $this->assertStringStartsWith('<svg', $svg);
-        $this->assertStringContainsString('width="160"', $svg);
-        $this->assertStringContainsString('<rect', $svg);
-        Http::assertNothingSent();
-    }
-
-    public function test_le_qr_code_est_exposable_en_data_uri(): void
-    {
-        $uri = QrCodeService::dataUri('https://fne.test/verification/abc', 120);
-
-        $this->assertStringStartsWith('data:image/svg+xml;base64,', $uri);
-        $this->assertStringContainsString(
-            '<svg',
-            base64_decode(substr($uri, strlen('data:image/svg+xml;base64,')))
         );
     }
 

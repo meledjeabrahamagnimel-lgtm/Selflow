@@ -530,9 +530,6 @@ var DATA = {
         parent_fne: {!! json_encode($vente->parent ? $vente->parent->numero_fne : null) !!},
         raison_avoir: {!! json_encode($vente->raison_avoir) !!},
         qr_code_data: {!! json_encode($vente->qr_code_data) !!},
-        qr_code_image: {!! json_encode($vente->qr_code_data
-            ? \App\Modules\Admin\Services\QrCodeService::dataUri($vente->qr_code_data, 220)
-            : null) !!},
         numero_fne: {!! json_encode($vente->numero_fne) !!},
         signature_dgi: {!! json_encode($vente->signature_dgi) !!},
         moyen_bancaire: {!! json_encode($vente->moyen_bancaire) !!},
@@ -889,27 +886,20 @@ function fiscalLinesClient(c, sep) {
 /**
  * Signature électronique exigée par la DGI sur toute pièce certifiée.
  *
- * La réforme impose trois éléments indissociables (Procédure d'interfaçage,
- * § I) : le QR code de vérification, le visuel FNE et le numéro normalisé.
- * Ils étaient transmis à la vue sans jamais être affichés : aucune facture
- * certifiée ne portait sa preuve de certification.
+ * Seules les données renvoyées par la plateforme sont reproduites : le numéro
+ * normalisé et l'adresse de vérification. Aucun visuel n'est fabriqué ici — un
+ * code produit par nos soins ne certifierait rien.
  */
 function blocCertificationFne(d) {
     if (!d.normalise || !d.numero_fne) return '';
 
-    var qr = d.qr_code_image
-        ? `<img src="${d.qr_code_image}" style="width:92px;height:92px;" alt="Code de vérification FNE">`
-        : '';
-
     return `
     <div style="display:flex; align-items:center; gap:14px; border:1px solid var(--border); border-radius:8px; padding:12px 14px; margin-top:16px; background:#fff;">
-        ${qr}
         <img src="/logo-FNE.png" style="height:52px; object-fit:contain;" alt="Facture normalisée électronique">
-        <div style="font-size:10px; line-height:1.6; color:var(--tx);">
+        <div style="font-size:10px; line-height:1.6; color:var(--tx); word-break:break-all;">
             <div style="font-weight:800; text-transform:uppercase; letter-spacing:.04em;">Facture normalisée électronique</div>
             <div>N° FNE : <strong style="font-family:monospace;">${d.numero_fne}</strong></div>
-            ${d.signature_dgi ? `<div>Signature DGI : <span style="font-family:monospace;">${String(d.signature_dgi).substring(0, 24)}…</span></div>` : ''}
-            ${d.qr_code_data ? `<div style="color:var(--mu);">Vérifiable en scannant le code ci-contre.</div>` : ''}
+            ${d.qr_code_data ? `<div>Vérification : <span style="font-family:monospace;">${d.qr_code_data}</span></div>` : ''}
         </div>
     </div>`;
 }
