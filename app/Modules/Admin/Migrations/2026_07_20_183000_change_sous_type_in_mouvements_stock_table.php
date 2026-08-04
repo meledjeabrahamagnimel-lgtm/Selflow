@@ -9,13 +9,24 @@ return new class extends Migration
 {
     public function up(): void
     {
-        // Alter enum column to varchar to allow all kinds of sub_types without DB restriction
-        DB::statement("ALTER TABLE mouvements_stock MODIFY COLUMN sous_type VARCHAR(255) NULL");
+        // Passer la colonne enum en varchar pour accepter tout sous-type.
+        // `MODIFY COLUMN` est propre a MySQL ; sur les autres moteurs, le
+        // Schema Builder produit l'equivalent.
+        if (Schema::getConnection()->getDriverName() === 'mysql') {
+            DB::statement("ALTER TABLE mouvements_stock MODIFY COLUMN sous_type VARCHAR(255) NULL");
+
+            return;
+        }
+
+        Schema::table('mouvements_stock', function (Blueprint $table) {
+            $table->string('sous_type', 255)->nullable()->change();
+        });
     }
 
     public function down(): void
     {
-        // Revert to enum
-        DB::statement("ALTER TABLE mouvements_stock MODIFY COLUMN sous_type ENUM('Reception', 'Livraison', 'Transfert', 'Rebut', 'Ajustement', 'Production') NULL");
+        if (Schema::getConnection()->getDriverName() === 'mysql') {
+            DB::statement("ALTER TABLE mouvements_stock MODIFY COLUMN sous_type ENUM('Reception', 'Livraison', 'Transfert', 'Rebut', 'Ajustement', 'Production') NULL");
+        }
     }
 };
