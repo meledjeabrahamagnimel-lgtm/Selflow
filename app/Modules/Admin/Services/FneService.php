@@ -477,12 +477,15 @@ class FneService
     private static function codeTaxeLigne($detail, ?string $regimeImposition): string
     {
         $produit = $detail->produit ?? null;
+        $tauxLigne = self::tauxTvaDeLaLigne($detail);
 
-        if ($produit) {
+        // Un choix manuel sur la fiche produit fait foi, mais seulement tant que
+        // la ligne applique bien le taux du catalogue : une vente peut relever
+        // d'un régime différent, auquel cas le code suit le taux réellement
+        // appliqué.
+        if ($produit && $produit->code_tva_manuel && abs($tauxLigne - (float) $produit->taux_tva) < 0.01) {
             return $produit->codeTvaFne($regimeImposition);
         }
-
-        $tauxLigne = self::tauxTvaDeLaLigne($detail);
 
         return \App\Modules\Admin\Modeles\Produit::deduireCodeTva($tauxLigne, $regimeImposition);
     }
@@ -493,7 +496,8 @@ class FneService
      */
     private static function tauxTvaDeLaLigne($detail): float
     {
-        $ht = floatval($detail->quantite ?? 0) * floatval($detail->prix_unitaire ?? 0);
+        $remiseLigne = (float) ($detail->remise_taux ?? 0);
+        $ht = floatval($detail->quantite ?? 0) * floatval($detail->prix_unitaire ?? 0) * (1 - $remiseLigne / 100);
         if ($ht <= 0) {
             return 0.0;
         }

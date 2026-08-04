@@ -247,7 +247,7 @@
 
 @if($estNormalise && $vente->qr_code_data)
 <div class="qr-container">
-    <img class="qr-code" src="https://api.qrserver.com/v1/create-qr-code/?size=150x150&data={{ urlencode($vente->qr_code_data) }}" alt="Code de vérification FNE">
+    <img class="qr-code" src="{{ \App\Modules\Admin\Services\QrCodeService::dataUri($vente->qr_code_data, 150) }}" alt="Code de vérification FNE">
     @if($vente->signature_dgi)
         <span style="font-size: 8px; font-weight: bold;">SIGNATURE DGI</span>
         <span style="font-size: 8px; word-break: break-all;" class="text-center">{{ substr($vente->signature_dgi, 0, 16) }}</span>
