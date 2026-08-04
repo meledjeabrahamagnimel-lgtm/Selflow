@@ -15,12 +15,12 @@ class FneService
      * Normaliser la facture de vente auprès de la DGI (API FNE).
      *
      * @param Vente $vente
-     * @param bool  $emissionRecuDePassage Vente sans client identifié : Selflow
-     *        en fait un reçu (`type_facture = 'RNE'`) et imprime un ticket.
-     *        ATTENTION : cette notion interne n'a rien à voir avec le champ
-     *        `isRne` de la DGI, qui signifie « cette facture est rattachée à un
-     *        reçu normalisé déjà émis » et provient de la case cochée à la
-     *        saisie (`ventes.est_rne`).
+     * @param bool  $emissionRecuDePassage Conservé pour compatibilité avec les
+     *        appels existants. La nature du document (facture ou reçu) est
+     *        portée par `ventes.type_piece`, choisie à la saisie. Elle n'a rien
+     *        à voir avec le champ `isRne` de la DGI, qui signifie « cette
+     *        facture est rattachée à un reçu normalisé déjà émis » et provient
+     *        de la case cochée à la saisie (`ventes.est_rne`).
      * @return array
      */
     public static function normaliserFacture(Vente $vente, bool $emissionRecuDePassage = false): array
@@ -247,6 +247,7 @@ class FneService
                 'pdf_url'        => $data['document_url'] ?? $data['pdf_url'] ?? $data['fichier_pdf'] ?? $tokenData,
                 'invoice_id'     => $invoiceId,
                 'fne_item_ids'   => $fneItemIds,
+                'retours_fne'    => self::extraireRetoursFne($data),
             ];
         } catch (\Exception $e) {
             Log::error("FNE API Exception: " . $e->getMessage());
@@ -378,6 +379,7 @@ class FneService
                 'signature'    => $tokenData,
                 'qr_code_data' => $tokenData,
                 'pdf_url'      => $data['document_url'] ?? $data['pdf_url'] ?? $data['fichier_pdf'] ?? $tokenData,
+                'retours_fne'  => self::extraireRetoursFne($data),
             ];
         } catch (\Exception $e) {
             Log::error("FNE BAPA API Exception: " . $e->getMessage());
@@ -386,6 +388,45 @@ class FneService
                 'message' => 'Exception lors de l\'appel API FNE BAPA : ' . $e->getMessage(),
             ];
         }
+    }
+
+    /**
+     * Donnees de la reponse de certification que Selflow conserve pour le
+     * suivi : alerte de stock de stickers, montants retenus par la DGI, timbre
+     * fiscal applique et horodatage de la certification.
+     */
+    /**
+     * Colonnes a enregistrer sur la piece a partir des retours de la
+     * plateforme, pretes a etre passees a un update().
+     */
+    public static function colonnesRetoursFne(array $resultat): array
+    {
+        $retours = $resultat['retours_fne'] ?? [];
+
+        if (empty($retours)) {
+            return [];
+        }
+
+        return array_filter([
+            'fne_alerte_stickers' => $retours['alerte_stickers'] ?? false,
+            'fne_montant_ttc'     => $retours['montant_ttc'] ?? null,
+            'fne_montant_tva'     => $retours['montant_tva'] ?? null,
+            'fne_timbre_fiscal'   => $retours['timbre_fiscal'] ?? null,
+            'fne_certifie_at'     => $retours['certifie_at'] ?? null,
+        ], fn ($valeur) => $valeur !== null);
+    }
+
+    private static function extraireRetoursFne(array $data): array
+    {
+        $facture = $data['invoice'] ?? [];
+
+        return [
+            'alerte_stickers' => !empty($data['warning']),
+            'montant_ttc'     => isset($facture['amount']) ? floatval($facture['amount']) : null,
+            'montant_tva'     => isset($facture['vatAmount']) ? floatval($facture['vatAmount']) : null,
+            'timbre_fiscal'   => isset($facture['fiscalStamp']) ? floatval($facture['fiscalStamp']) : null,
+            'certifie_at'     => $facture['date'] ?? $facture['createdAt'] ?? null,
+        ];
     }
 
     private static function mapperModePaiement(string $modePaiement): string

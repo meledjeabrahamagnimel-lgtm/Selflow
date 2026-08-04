@@ -36,6 +36,12 @@ class Achat extends Model
         'signature_dgi',
         'qr_code_data',
         'fichier_fne_pdf_url',
+        // Donnees renvoyees par la plateforme FNE lors de la certification
+        'fne_alerte_stickers',
+        'fne_montant_ttc',
+        'fne_montant_tva',
+        'fne_timbre_fiscal',
+        'fne_certifie_at',
         'type_facture',
         'archived',
         'parent_id',
@@ -68,6 +74,11 @@ class Achat extends Model
             'remise'      => 'decimal:2',
             'remise_taux' => 'decimal:2',
             'est_rne'     => 'boolean',
+            'fne_alerte_stickers' => 'boolean',
+            'fne_montant_ttc'     => 'decimal:2',
+            'fne_montant_tva'     => 'decimal:2',
+            'fne_timbre_fiscal'   => 'decimal:2',
+            'fne_certifie_at'     => 'datetime',
             'archived'    => 'boolean',
         ];
     }

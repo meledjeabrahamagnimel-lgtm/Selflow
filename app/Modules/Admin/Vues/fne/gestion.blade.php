@@ -108,8 +108,26 @@
     <div class="kpi-card"><div class="lbl">Factures</div><div class="val" id="k-v-factures-n">0</div><div class="sub" id="k-v-factures-m">0 F</div></div>
     <div class="kpi-card"><div class="lbl">Reçus</div><div class="val" id="k-v-recus-n">0</div><div class="sub" id="k-v-recus-m">0 F</div></div>
     <div class="kpi-card"><div class="lbl">Avoirs clients</div><div class="val" id="k-v-avoirs-n">0</div><div class="sub" id="k-v-avoirs-m">0 F</div></div>
-    <div class="kpi-card"><div class="lbl">Proforma</div><div class="val">0</div><div class="sub">Non applicable dans Selflow</div></div>
+    <div class="kpi-card"><div class="lbl">Proforma</div><div class="val" id="k-v-proforma-n">0</div><div class="sub" id="k-v-proforma-m">0 F</div></div>
 </div>
+<div class="kpi-grid" style="grid-template-columns:repeat(3,1fr);">
+    <div class="kpi-card">
+        <div class="lbl">Alertes stock de stickers</div>
+        <div class="val" id="k-alertes-stickers">0</div>
+        <div class="sub">Pièces certifiées avec une alerte renvoyée par la DGI</div>
+    </div>
+    <div class="kpi-card">
+        <div class="lbl">Écart TVA vs DGI</div>
+        <div class="val" id="k-ecart-tva">0 F</div>
+        <div class="sub" id="k-ecart-tva-sub">Comparaison de nos montants à ceux retenus par la plateforme</div>
+    </div>
+    <div class="kpi-card">
+        <div class="lbl">Écart TTC vs DGI</div>
+        <div class="val" id="k-ecart-ttc">0 F</div>
+        <div class="sub" id="k-ecart-ttc-sub">—</div>
+    </div>
+</div>
+
 <div class="kpi-grid" style="grid-template-columns:repeat(4,1fr);">
     <div class="kpi-card"><div class="lbl">Total HT</div><div class="val" id="k-v-ht">0 F</div></div>
     <div class="kpi-card"><div class="lbl">TVA collectée</div><div class="val" id="k-v-tva">0 F</div></div>
@@ -253,7 +271,9 @@ function appliquerKpis(d) {
 
     // Timbre de quittance
     document.getElementById('k-timbre').textContent = formatF(d.timbre_quittance);
-    document.getElementById('k-timbre-sub').textContent = `${d.timbre_quantite} timbre(s) de quittance collecté(s) (${formatF(d.timbre_quittance)})`;
+    document.getElementById('k-timbre-sub').textContent = d.timbre_source === 'dgi'
+        ? `${d.timbre_quantite} timbre(s) réellement appliqué(s) par la DGI`
+        : `${d.timbre_quantite} timbre(s) estimé(s) selon votre configuration fiscale`;
 
     document.getElementById('k-v-factures-n').textContent = d.ventes.factures.nombre;
     document.getElementById('k-v-factures-m').textContent = formatF(d.ventes.factures.montant);
@@ -261,6 +281,27 @@ function appliquerKpis(d) {
     document.getElementById('k-v-recus-m').textContent = formatF(d.ventes.recus.montant);
     document.getElementById('k-v-avoirs-n').textContent = d.ventes.avoirs.nombre;
     document.getElementById('k-v-avoirs-m').textContent = formatF(d.ventes.avoirs.montant);
+    document.getElementById('k-v-proforma-n').textContent = d.ventes.proforma.nombre;
+    document.getElementById('k-v-proforma-m').textContent = formatF(d.ventes.proforma.montant);
+
+    // Indicateurs issus des reponses de certification
+    document.getElementById('k-alertes-stickers').textContent = d.alertes_stickers ?? 0;
+
+    const controlees = d.pieces_controlees ?? 0;
+    const ecartTva = d.ecart_tva_dgi ?? 0;
+    const ecartTtc = d.ecart_ttc_dgi ?? 0;
+
+    document.getElementById('k-ecart-tva').textContent = formatF(ecartTva);
+    document.getElementById('k-ecart-tva').style.color = Math.abs(ecartTva) > 1 ? '#dc2626' : '';
+    document.getElementById('k-ecart-tva-sub').textContent = controlees > 0
+        ? `${controlees} pièce(s) comparée(s) aux montants de la DGI`
+        : 'Aucune pièce certifiée ne remonte encore ses montants';
+
+    document.getElementById('k-ecart-ttc').textContent = formatF(ecartTtc);
+    document.getElementById('k-ecart-ttc').style.color = Math.abs(ecartTtc) > 1 ? '#dc2626' : '';
+    document.getElementById('k-ecart-ttc-sub').textContent = Math.abs(ecartTtc) > 1
+        ? 'Un écart signale une divergence de calcul à corriger'
+        : 'Nos montants concordent avec ceux de la plateforme';
     document.getElementById('k-v-ht').textContent = formatF(d.ventes.total_ht);
     document.getElementById('k-v-tva').textContent = formatF(d.ventes.total_tva);
     document.getElementById('k-v-ttc').textContent = formatF(d.ventes.total_ttc);

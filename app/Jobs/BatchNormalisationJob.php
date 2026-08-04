@@ -129,6 +129,8 @@ class BatchNormalisationJob implements ShouldQueue
                             $updateData['fne_invoice_id'] = $fneResult['invoice_id'];
                         }
 
+                        $updateData += FneService::colonnesRetoursFne($fneResult);
+
                         $invoice->update($updateData);
 
                         if (!empty($fneResult['fne_item_ids']) && is_array($fneResult['fne_item_ids'])) {

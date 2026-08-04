@@ -90,6 +90,9 @@ class NormaliserFactureFne implements ShouldQueue
                         $updateData['fne_invoice_id'] = $fneResult['invoice_id'];
                     }
 
+                    // Montants, timbre et alerte de stock renvoyes par la DGI
+                    $updateData += FneService::colonnesRetoursFne($fneResult);
+
                     $vente->update($updateData);
 
                     if (!empty($fneResult['fne_item_ids']) && is_array($fneResult['fne_item_ids'])) {

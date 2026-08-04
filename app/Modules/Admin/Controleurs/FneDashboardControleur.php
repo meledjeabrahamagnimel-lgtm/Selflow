@@ -104,7 +104,14 @@ class FneDashboardControleur
             ->where('normalise', true);
         if ($pdvId && $pdvId !== 'tous') $achatsQuery->where('point_de_vente_id', $pdvId);
 
-        // 4. Calculer le Timbre de quittance pour la période sélectionnée
+        // 4. Timbre de quittance de la période.
+        //    Le timbre réellement appliqué est celui que la plateforme renvoie
+        //    dans `invoice.fiscalStamp` ; l'estimation locale ne sert que pour
+        //    les pièces certifiées avant que ce retour ne soit conservé.
+        $timbreDgi = (clone $ventesQuery)->whereNotNull('fne_timbre_fiscal');
+        $timbre_montant_dgi  = (float) (clone $timbreDgi)->sum('fne_timbre_fiscal');
+        $timbre_quantite_dgi = (clone $timbreDgi)->where('fne_timbre_fiscal', '>', 0)->count();
+
         $timbre_montant = 0;
         $timbre_quantite = 0;
         if ($taxConfig && $taxConfig->tdt_active) {
@@ -119,12 +126,21 @@ class FneDashboardControleur
             });
         }
 
-        // Ventes normalisées, hors avoirs / reçus (facture + client identifié)
+        // La distinction facture / reçu vient de `type_piece`. Elle était
+        // auparavant deduite de la presence d'un client, si bien qu'une vente
+        // au comptant gonflait le compteur des reçus.
         $facturesVente = (clone $ventesQuery)->where(function($q) { $q->whereNull('type_facture')->orWhere('type_facture', '!=', 'avoir'); })
-            ->whereNotNull('client_id');
+            ->where('type_piece', '!=', Vente::TYPE_RECU);
         $recusVente = (clone $ventesQuery)->where(function($q) { $q->whereNull('type_facture')->orWhere('type_facture', '!=', 'avoir'); })
-            ->whereNull('client_id');
+            ->where('type_piece', Vente::TYPE_RECU);
         $avoirsVente = (clone $ventesQuery)->where('type_facture', 'avoir');
+
+        // Proforma : devis et bons de commande de la periode. Ils ne sont pas
+        // normalises, donc hors de $ventesQuery ; le compteur restait a zero.
+        $proformaVente = Vente::whereHas('pointDeVente', fn($q) => $q->where('entreprise_id', $entrepriseId))
+            ->whereBetween('date_vente', [$debut, $fin])
+            ->whereIn('etape', ['Devis', 'Bon de commande']);
+        if ($pdvId && $pdvId !== 'tous') $proformaVente->where('point_de_vente_id', $pdvId);
 
         $facturesAchat = (clone $achatsQuery)->where(function($q) { $q->whereNull('type_facture')->orWhereNotIn('type_facture', ['avoir', 'bapa']); });
         $avoirsAchat = (clone $achatsQuery)->where('type_facture', 'avoir');
@@ -141,14 +157,30 @@ class FneDashboardControleur
             'stickers_solde'    => $stickers_solde,
             'stickers_achats'   => $stickers_achats,
             'stickers_consommes'=> $stickers_consommes,
-            'timbre_quittance'  => $timbre_montant,
-            'timbre_quantite'   => $timbre_quantite,
+            'timbre_quittance'  => $timbre_montant_dgi > 0 ? $timbre_montant_dgi : $timbre_montant,
+            'timbre_quantite'   => $timbre_quantite_dgi > 0 ? $timbre_quantite_dgi : $timbre_quantite,
+            'timbre_source'     => $timbre_montant_dgi > 0 ? 'dgi' : 'estimation',
+
+            // Indicateurs tires des reponses de certification
+            'alertes_stickers'  => (clone $ventesQuery)->where('fne_alerte_stickers', true)->count()
+                                   + (clone $achatsQuery)->where('fne_alerte_stickers', true)->count(),
+            'ecart_tva_dgi'     => round(
+                (float) (clone $ventesQuery)->whereNotNull('fne_montant_tva')->sum('fne_montant_tva')
+                - (float) (clone $ventesQuery)->whereNotNull('fne_montant_tva')->sum('montant_tva'),
+                2
+            ),
+            'ecart_ttc_dgi'     => round(
+                (float) (clone $ventesQuery)->whereNotNull('fne_montant_ttc')->sum('fne_montant_ttc')
+                - (float) (clone $ventesQuery)->whereNotNull('fne_montant_ttc')->sum('montant_ttc'),
+                2
+            ),
+            'pieces_controlees' => (clone $ventesQuery)->whereNotNull('fne_montant_ttc')->count(),
 
             'ventes' => [
                 'factures' => ['nombre' => (clone $facturesVente)->count(), 'montant' => (clone $facturesVente)->sum('montant_ttc')],
                 'avoirs'   => ['nombre' => (clone $avoirsVente)->count(),   'montant' => (clone $avoirsVente)->sum('montant_ttc')],
                 'recus'    => ['nombre' => (clone $recusVente)->count(),     'montant' => (clone $recusVente)->sum('montant_ttc')],
-                'proforma' => ['nombre' => 0, 'montant' => 0],
+                'proforma' => ['nombre' => (clone $proformaVente)->count(), 'montant' => (clone $proformaVente)->sum('montant_ttc')],
                 'total_ht'      => $totalHtVente,
                 'total_tva'     => $totalTvaVente,
                 'total_ttc'     => $totalTtcVente,
@@ -601,6 +633,8 @@ class FneDashboardControleur
                         if (!empty($fneResult['invoice_id'])) {
                             $updateData['fne_invoice_id'] = $fneResult['invoice_id'];
                         }
+
+                        $updateData += \App\Modules\Admin\Services\FneService::colonnesRetoursFne($fneResult);
 
                         $vente->update($updateData);
 
