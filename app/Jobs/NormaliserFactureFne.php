@@ -44,9 +44,15 @@ class NormaliserFactureFne implements ShouldQueue
      */
     public int $timeout = 30;
 
+    /**
+     * @param bool $emissionRecuDePassage Vente sans client identifié : Selflow
+     *        la marque comme reçu (`type_facture = 'RNE'`). Cette notion
+     *        interne est distincte du champ DGI `isRne` (facture rattachée à un
+     *        reçu déjà émis), qui provient de `ventes.est_rne`.
+     */
     public function __construct(
         public readonly Vente $vente,
-        public readonly bool $estRne = false,
+        public readonly bool $emissionRecuDePassage = false,
     ) {}
 
     /**
@@ -57,7 +63,7 @@ class NormaliserFactureFne implements ShouldQueue
         try {
             Log::info("NormaliserFactureFne: Début normalisation async - Vente #{$this->vente->id} / Facture: {$this->vente->numero_facture}");
 
-            $fneResult = FneService::normaliserFacture($this->vente, $this->estRne);
+            $fneResult = FneService::normaliserFacture($this->vente, $this->emissionRecuDePassage);
 
             if ($fneResult['success']) {
                 // Recharger la vente pour éviter les conflicts de version
@@ -72,7 +78,7 @@ class NormaliserFactureFne implements ShouldQueue
                         'fichier_fne_pdf_url' => $fneResult['pdf_url'] ?? null,
                     ];
 
-                    if ($this->estRne) {
+                    if ($this->emissionRecuDePassage) {
                         $updateData['type_facture'] = 'RNE';
                     } elseif ($vente->type_facture !== 'avoir') {
                         $updateData['type_facture'] = 'normale';

@@ -24,9 +24,14 @@ class Vente extends Model
         'montant_ht',
         'montant_tva',
         'montant_ttc',
-        'remise',
+        'remise',          // montant de la remise globale, en francs
+        'remise_taux',     // taux de la remise globale, en % → champ `discount` FNE
         'statut',
         'type_facture',
+        'est_rne',         // → champ `isRne` FNE
+        'numero_rne',      // → champ `rne` FNE
+        'pied_de_page',    // → champ `footer` FNE
+        'autres_mentions', // → champ `commercialMessage` FNE
         'normalise',
         'qr_code_data',
         'fichier_fne_pdf_url',
@@ -62,6 +67,8 @@ class Vente extends Model
             'montant_tva'   => 'decimal:2',
             'montant_ttc'   => 'decimal:2',
             'remise'        => 'decimal:2',
+            'remise_taux'   => 'decimal:2',
+            'est_rne'       => 'boolean',
             'normalise'     => 'boolean',
             'archived'      => 'boolean',
         ];
@@ -87,6 +94,14 @@ class Vente extends Model
     public function details(): HasMany
     {
         return $this->hasMany(VenteDetail::class, 'vente_id');
+    }
+
+    /**
+     * Taxes sur le total TTC (→ `customTaxes` à la racine du payload FNE).
+     */
+    public function taxesPersonnalisees(): HasMany
+    {
+        return $this->hasMany(VenteTaxe::class, 'vente_id');
     }
 
     public function paiements(): HasMany
