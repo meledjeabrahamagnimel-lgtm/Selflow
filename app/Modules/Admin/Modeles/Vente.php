@@ -28,6 +28,8 @@ class Vente extends Model
         'remise_taux',     // taux de la remise globale, en % → champ `discount` FNE
         'statut',
         'type_facture',
+        'type_piece',      // 'facture' ou 'recu' — nature du document commercial
+        'piece_liee_id',   // reçu <-> facture issue l'un de l'autre
         'est_rne',         // → champ `isRne` FNE
         'numero_rne',      // → champ `rne` FNE
         'pied_de_page',    // → champ `footer` FNE
@@ -36,6 +38,12 @@ class Vente extends Model
         'qr_code_data',
         'fichier_fne_pdf_url',
         'signature_dgi',
+        // Donnees renvoyees par la plateforme FNE lors de la certification
+        'fne_alerte_stickers',
+        'fne_montant_ttc',
+        'fne_montant_tva',
+        'fne_timbre_fiscal',
+        'fne_certifie_at',
         'fne_invoice_id',
         'etape',
         'archived',
@@ -69,6 +77,11 @@ class Vente extends Model
             'remise'        => 'decimal:2',
             'remise_taux'   => 'decimal:2',
             'est_rne'       => 'boolean',
+            'fne_alerte_stickers' => 'boolean',
+            'fne_montant_ttc'     => 'decimal:2',
+            'fne_montant_tva'     => 'decimal:2',
+            'fne_timbre_fiscal'   => 'decimal:2',
+            'fne_certifie_at'     => 'datetime',
             'normalise'     => 'boolean',
             'archived'      => 'boolean',
         ];
@@ -134,6 +147,38 @@ class Vente extends Model
     public function parent(): BelongsTo
     {
         return $this->belongsTo(Vente::class, 'parent_id');
+    }
+
+    /**
+     * Natures possibles d'une pièce de vente.
+     */
+    public const TYPE_FACTURE = 'facture';
+    public const TYPE_RECU    = 'recu';
+
+    public function estRecu(): bool
+    {
+        return $this->type_piece === self::TYPE_RECU;
+    }
+
+    /**
+     * Reçu dont cette facture est issue, ou facture issue de ce reçu.
+     * Le lien est symétrique : les deux pièces se pointent mutuellement.
+     */
+    public function pieceLiee(): BelongsTo
+    {
+        return $this->belongsTo(Vente::class, 'piece_liee_id');
+    }
+
+    /**
+     * Libellé de la pièce, tel qu'affiché dans les registres.
+     */
+    public function libelleTypeDocument(): string
+    {
+        if ($this->type_facture === 'avoir') {
+            return 'Facture d\'avoir';
+        }
+
+        return $this->estRecu() ? 'Reçu' : 'Facture';
     }
 
     public function avoirs(): HasMany

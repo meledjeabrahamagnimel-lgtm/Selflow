@@ -416,6 +416,43 @@ class FnePayloadTest extends TestCase
         ], $payload['items']);
     }
 
+    // ─── Nature des pièces : facture vs reçu ─────────────────────────────
+
+    public function test_une_vente_au_comptant_sans_client_reste_une_facture(): void
+    {
+        // Le registre classait toute vente sans client comme un « Reçu ».
+        $vente = $this->venteMinimale(['mode_paiement' => 'Caisse']);
+
+        $this->assertSame(Vente::TYPE_FACTURE, $vente->type_piece);
+        $this->assertFalse($vente->estRecu());
+        $this->assertSame('Facture', $vente->libelleTypeDocument());
+    }
+
+    public function test_un_recu_est_marque_comme_tel(): void
+    {
+        $recu = $this->venteMinimale(['type_piece' => Vente::TYPE_RECU]);
+
+        $this->assertTrue($recu->estRecu());
+        $this->assertSame('Reçu', $recu->libelleTypeDocument());
+    }
+
+    public function test_un_avoir_garde_son_libelle_propre(): void
+    {
+        $avoir = $this->venteMinimale(['type_facture' => 'avoir']);
+
+        $this->assertSame('Facture d\'avoir', $avoir->libelleTypeDocument());
+    }
+
+    public function test_les_deux_pieces_converties_se_pointent_mutuellement(): void
+    {
+        $recu    = $this->venteMinimale(['type_piece' => Vente::TYPE_RECU]);
+        $facture = $this->venteMinimale(['piece_liee_id' => $recu->id]);
+        $recu->update(['piece_liee_id' => $facture->id]);
+
+        $this->assertTrue($facture->fresh()->pieceLiee->estRecu());
+        $this->assertSame($facture->id, $recu->fresh()->pieceLiee->id);
+    }
+
     /**
      * Vente d'une ligne, sans client ni remise : le socle des cas ci-dessus.
      */

@@ -118,6 +118,21 @@
         padding: 8px 10px;
     }
 
+    /* Etat applique le temps de la capture PDF (voir telechargerPdf) */
+    .invoice.mode-export {
+        width: 794px !important;
+        max-width: 794px !important;
+        margin: 0 !important;
+        border: none !important;
+        border-radius: 0 !important;
+        box-shadow: none !important;
+    }
+
+    @page {
+        size: A4 portrait;
+        margin: 10mm;
+    }
+
     /* CSS Impression */
     @media print {
         * {
@@ -353,24 +368,46 @@ function toggleReceiptMode() {
     render();
 }
 
+/**
+ * Export PDF du seul document, en qualite « photocopie » : PNG sans perte,
+ * largeur figee a une page A4 (794 px a 96 dpi) et effets d'ecran neutralises.
+ * Voir le meme traitement dans factures/vente.blade.php.
+ */
 function telechargerPdf() {
     var controls = document.querySelector('.controls-card');
     if (controls) controls.style.display = 'none';
 
     var element = document.querySelector('.invoice');
+    element.classList.add('mode-export');
+
+    var echelle = Math.min(3, Math.max(2, window.devicePixelRatio || 1) + 1);
+
     var opt = {
-        margin:       [5, 5, 5, 5],
+        margin:       [8, 8, 8, 8],
         filename:     (isReceiptMode ? 'BR_' : 'Achat_') + DATA.achat.num + '.pdf',
-        image:        { type: 'jpeg', quality: 0.98 },
-        html2canvas:  { scale: 2.5, useCORS: true, logging: false },
-        jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' },
-        pagebreak:    { mode: 'avoid-all' }
+        image:        { type: 'png' },
+        html2canvas:  {
+            scale: echelle,
+            useCORS: true,
+            logging: false,
+            backgroundColor: '#ffffff',
+            letterRendering: true,
+            scrollX: 0,
+            scrollY: 0,
+            windowWidth: 794,
+            width: 794
+        },
+        jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait', compress: true },
+        pagebreak:    { mode: ['css', 'legacy'] }
     };
-    
-    html2pdf().set(opt).from(element).save().then(function() {
+
+    function restaurer() {
+        element.classList.remove('mode-export');
         if (controls) controls.style.display = '';
-    }).catch(function(err) {
-        if (controls) controls.style.display = '';
+    }
+
+    html2pdf().set(opt).from(element).save().then(restaurer).catch(function(err) {
+        restaurer();
         console.error(err);
     });
 }

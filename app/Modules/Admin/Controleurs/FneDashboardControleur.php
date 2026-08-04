@@ -104,7 +104,14 @@ class FneDashboardControleur
             ->where('normalise', true);
         if ($pdvId && $pdvId !== 'tous') $achatsQuery->where('point_de_vente_id', $pdvId);
 
-        // 4. Calculer le Timbre de quittance pour la période sélectionnée
+        // 4. Timbre de quittance de la période.
+        //    Le timbre réellement appliqué est celui que la plateforme renvoie
+        //    dans `invoice.fiscalStamp` ; l'estimation locale ne sert que pour
+        //    les pièces certifiées avant que ce retour ne soit conservé.
+        $timbreDgi = (clone $ventesQuery)->whereNotNull('fne_timbre_fiscal');
+        $timbre_montant_dgi  = (float) (clone $timbreDgi)->sum('fne_timbre_fiscal');
+        $timbre_quantite_dgi = (clone $timbreDgi)->where('fne_timbre_fiscal', '>', 0)->count();
+
         $timbre_montant = 0;
         $timbre_quantite = 0;
         if ($taxConfig && $taxConfig->tdt_active) {
@@ -119,12 +126,21 @@ class FneDashboardControleur
             });
         }
 
-        // Ventes normalisées, hors avoirs / reçus (facture + client identifié)
+        // La distinction facture / reçu vient de `type_piece`. Elle était
+        // auparavant deduite de la presence d'un client, si bien qu'une vente
+        // au comptant gonflait le compteur des reçus.
         $facturesVente = (clone $ventesQuery)->where(function($q) { $q->whereNull('type_facture')->orWhere('type_facture', '!=', 'avoir'); })
-            ->whereNotNull('client_id');
+            ->where('type_piece', '!=', Vente::TYPE_RECU);
         $recusVente = (clone $ventesQuery)->where(function($q) { $q->whereNull('type_facture')->orWhere('type_facture', '!=', 'avoir'); })
-            ->whereNull('client_id');
+            ->where('type_piece', Vente::TYPE_RECU);
         $avoirsVente = (clone $ventesQuery)->where('type_facture', 'avoir');
+
+        // Proforma : devis et bons de commande de la periode. Ils ne sont pas
+        // normalises, donc hors de $ventesQuery ; le compteur restait a zero.
+        $proformaVente = Vente::whereHas('pointDeVente', fn($q) => $q->where('entreprise_id', $entrepriseId))
+            ->whereBetween('date_vente', [$debut, $fin])
+            ->whereIn('etape', ['Devis', 'Bon de commande']);
+        if ($pdvId && $pdvId !== 'tous') $proformaVente->where('point_de_vente_id', $pdvId);
 
         $facturesAchat = (clone $achatsQuery)->where(function($q) { $q->whereNull('type_facture')->orWhereNotIn('type_facture', ['avoir', 'bapa']); });
         $avoirsAchat = (clone $achatsQuery)->where('type_facture', 'avoir');
@@ -141,14 +157,30 @@ class FneDashboardControleur
             'stickers_solde'    => $stickers_solde,
             'stickers_achats'   => $stickers_achats,
             'stickers_consommes'=> $stickers_consommes,
-            'timbre_quittance'  => $timbre_montant,
-            'timbre_quantite'   => $timbre_quantite,
+            'timbre_quittance'  => $timbre_montant_dgi > 0 ? $timbre_montant_dgi : $timbre_montant,
+            'timbre_quantite'   => $timbre_quantite_dgi > 0 ? $timbre_quantite_dgi : $timbre_quantite,
+            'timbre_source'     => $timbre_montant_dgi > 0 ? 'dgi' : 'estimation',
+
+            // Indicateurs tires des reponses de certification
+            'alertes_stickers'  => (clone $ventesQuery)->where('fne_alerte_stickers', true)->count()
+                                   + (clone $achatsQuery)->where('fne_alerte_stickers', true)->count(),
+            'ecart_tva_dgi'     => round(
+                (float) (clone $ventesQuery)->whereNotNull('fne_montant_tva')->sum('fne_montant_tva')
+                - (float) (clone $ventesQuery)->whereNotNull('fne_montant_tva')->sum('montant_tva'),
+                2
+            ),
+            'ecart_ttc_dgi'     => round(
+                (float) (clone $ventesQuery)->whereNotNull('fne_montant_ttc')->sum('fne_montant_ttc')
+                - (float) (clone $ventesQuery)->whereNotNull('fne_montant_ttc')->sum('montant_ttc'),
+                2
+            ),
+            'pieces_controlees' => (clone $ventesQuery)->whereNotNull('fne_montant_ttc')->count(),
 
             'ventes' => [
                 'factures' => ['nombre' => (clone $facturesVente)->count(), 'montant' => (clone $facturesVente)->sum('montant_ttc')],
                 'avoirs'   => ['nombre' => (clone $avoirsVente)->count(),   'montant' => (clone $avoirsVente)->sum('montant_ttc')],
                 'recus'    => ['nombre' => (clone $recusVente)->count(),     'montant' => (clone $recusVente)->sum('montant_ttc')],
-                'proforma' => ['nombre' => 0, 'montant' => 0],
+                'proforma' => ['nombre' => (clone $proformaVente)->count(), 'montant' => (clone $proformaVente)->sum('montant_ttc')],
                 'total_ht'      => $totalHtVente,
                 'total_tva'     => $totalTvaVente,
                 'total_ttc'     => $totalTtcVente,
@@ -392,15 +424,20 @@ class FneDashboardControleur
         $parPage = 20;
 
         if ($flux === 'ventes') {
-            $query = Vente::with(['client', 'pointDeVente', 'parent'])
+            $query = Vente::with(['client', 'pointDeVente', 'parent', 'pieceLiee'])
                 ->whereHas('pointDeVente', fn($q) => $q->where('entreprise_id', $entreprise->id))
                 ->whereBetween('date_vente', [$debut, $fin])
                 ->where('etape', 'Facture');
 
+            // La nature du document vient de `type_piece`, choisie a la saisie.
+            // Auparavant elle etait deduite de l'absence de client, si bien
+            // qu'une vente au comptant apparaissait a tort comme un recu.
             $query = match ($categorie) {
                 'avoir_client' => $query->where('type_facture', 'avoir'),
-                'recu_recu'    => $query->where(function($q) { $q->whereNull('type_facture')->orWhere('type_facture', '!=', 'avoir'); })->whereNull('client_id'),
-                default        => $query->where(function($q) { $q->whereNull('type_facture')->orWhere('type_facture', '!=', 'avoir'); })->whereNotNull('client_id'),
+                'recu_recu'    => $query->where(function ($q) { $q->whereNull('type_facture')->orWhere('type_facture', '!=', 'avoir'); })
+                                        ->where('type_piece', Vente::TYPE_RECU),
+                default        => $query->where(function ($q) { $q->whereNull('type_facture')->orWhere('type_facture', '!=', 'avoir'); })
+                                        ->where('type_piece', '!=', Vente::TYPE_RECU),
             };
 
             if ($pdvId && $pdvId !== 'tous') $query->where('point_de_vente_id', $pdvId);
@@ -419,8 +456,16 @@ class FneDashboardControleur
 
                 return [
                     'id' => $v->id,
-                    'type_doc' => $v->type_facture === 'avoir' ? 'Facture Avoir' : ($v->client_id ? 'Facture' : 'Reçu'),
-                    'is_recu' => !$v->client_id,
+                    'type_doc' => $v->libelleTypeDocument(),
+                    'is_recu' => $v->estRecu(),
+                    // Reçu dont la facture est issue, ou facture issue du reçu
+                    'recu_lie' => $v->pieceLiee?->estRecu() ? $v->pieceLiee->numero_facture : null,
+                    'recu_lie_url' => $v->pieceLiee?->estRecu()
+                        ? route('admin.ventes.ticket', $v->pieceLiee->id)
+                        : null,
+                    'fichier_recu_url' => $v->estRecu()
+                        ? route('admin.ventes.ticket', $v->id)
+                        : null,
                     'num_piece' => $v->numero_facture,
                     'num_fne' => $v->numero_fne,
                     'tiers' => $v->client?->nom ?? 'Client de passage',
@@ -570,8 +615,7 @@ class FneDashboardControleur
                         continue;
                     }
 
-                    $estRne = ($vente->type_facture === 'RNE');
-                    $fneResult = \App\Modules\Admin\Services\FneService::normaliserFacture($vente, $estRne);
+                    $fneResult = \App\Modules\Admin\Services\FneService::normaliserFacture($vente);
 
                     if ($fneResult['success']) {
                         $updateData = [
@@ -582,15 +626,15 @@ class FneDashboardControleur
                             'fichier_fne_pdf_url' => $fneResult['pdf_url'] ?? null,
                         ];
 
-                        if ($estRne) {
-                            $updateData['type_facture'] = 'RNE';
-                        } elseif ($vente->type_facture !== 'avoir') {
+                        if ($vente->type_facture !== 'avoir') {
                             $updateData['type_facture'] = 'normale';
                         }
 
                         if (!empty($fneResult['invoice_id'])) {
                             $updateData['fne_invoice_id'] = $fneResult['invoice_id'];
                         }
+
+                        $updateData += \App\Modules\Admin\Services\FneService::colonnesRetoursFne($fneResult);
 
                         $vente->update($updateData);
 
@@ -668,6 +712,48 @@ class FneDashboardControleur
             $batchSize = 15;
         }
 
+        // Compter tout de suite les pièces éligibles : autant le dire à
+        // l'utilisateur avant de lancer quoi que ce soit. `withoutGlobalScopes`
+        // neutralise le filtre de période stocké en session, qui restreindrait
+        // la plage de dates saisie dans le formulaire.
+        $eligibles = $flux === 'ventes'
+            ? Vente::withoutGlobalScopes()
+                ->where('normalise', false)
+                ->where('etape', 'Facture')
+                ->whereHas('pointDeVente', fn ($q) => $q->where('entreprise_id', $entreprise->id))
+                ->whereBetween('date_vente', [$dateDebut . ' 00:00:00', $dateFin . ' 23:59:59'])
+                ->count()
+            : Achat::withoutGlobalScopes()
+                ->where('normalise', false)
+                ->where('type_facture', 'bapa')
+                ->where('etape', 'Facture')
+                ->whereHas('pointDeVente', fn ($q) => $q->where('entreprise_id', $entreprise->id))
+                ->whereBetween('date_achat', [$dateDebut . ' 00:00:00', $dateFin . ' 23:59:59'])
+                ->count();
+
+        if ($eligibles === 0) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Aucun document non normalisé sur cette période.',
+            ], 422);
+        }
+
+        // Le suivi est écrit AVANT la mise en file : sans cela, tant qu'aucun
+        // worker n'a pris le job, le fichier de statut n'existe pas et
+        // l'interface conclut « idle », donnant l'impression que le bouton ne
+        // fait rien.
+        $statusPath = storage_path("app/fne_batch_{$entreprise->id}.json");
+        file_put_contents($statusPath, json_encode([
+            'status'           => 'queued',
+            'flux'             => $flux,
+            'total_to_process' => min($eligibles, $batchSize),
+            'processed_count'  => 0,
+            'current_invoice'  => null,
+            'error'            => null,
+            'queued_at'        => now()->toDateTimeString(),
+            'last_updated'     => now()->toDateTimeString(),
+        ]));
+
         \App\Jobs\BatchNormalisationJob::dispatch(
             $entreprise->id,
             $flux,
@@ -678,6 +764,7 @@ class FneDashboardControleur
 
         return response()->json([
             'success' => true,
+            'total_to_process' => min($eligibles, $batchSize),
             'message' => 'La normalisation en arrière-plan a été lancée.'
         ]);
     }
@@ -691,9 +778,22 @@ class FneDashboardControleur
             if (file_exists($statusPath)) {
                 $data = json_decode(file_get_contents($statusPath), true);
                 $data['status'] = 'cancelled';
+                $data['last_updated'] = now()->toDateTimeString();
                 file_put_contents($statusPath, json_encode($data));
                 return response()->json(['success' => true, 'message' => 'Demande d\'annulation prise en compte.']);
             }
+
+            return response()->json(['success' => true, 'message' => 'Aucun traitement en cours.']);
+        }
+
+        // Purge du suivi : permet a l'interface de repartir d'un etat neutre
+        // apres un traitement termine, annule ou en echec.
+        if ($request->input('reset') === '1') {
+            if (file_exists($statusPath)) {
+                unlink($statusPath);
+            }
+
+            return response()->json(['status' => 'idle', 'processed_count' => 0, 'total_to_process' => 0]);
         }
 
         if (!file_exists($statusPath)) {
@@ -704,7 +804,22 @@ class FneDashboardControleur
             ]);
         }
 
-        $data = json_decode(file_get_contents($statusPath), true);
+        $data = json_decode(file_get_contents($statusPath), true) ?: [];
+
+        // Un lot qui reste « queued » signifie qu'aucun worker de file
+        // d'attente ne tourne : le job attendra indefiniment. On le dit
+        // clairement plutot que de laisser la barre de progression tourner.
+        if (($data['status'] ?? null) === 'queued' && !empty($data['queued_at'])) {
+            $attenteSecondes = now()->diffInSeconds(\Carbon\Carbon::parse($data['queued_at']));
+            $data['waiting_seconds'] = $attenteSecondes;
+
+            if ($attenteSecondes > 30 && config('queue.default') !== 'sync') {
+                $data['worker_missing'] = true;
+                $data['error'] = 'Le traitement est en file d\'attente mais aucun worker ne le consomme. '
+                    . 'Lancez « php artisan queue:work » sur le serveur, ou passez QUEUE_CONNECTION=sync.';
+            }
+        }
+
         return response()->json($data);
     }
 }

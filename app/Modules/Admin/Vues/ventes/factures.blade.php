@@ -1530,28 +1530,38 @@ function pollJobStatus() {
         const total = data.total_to_process ?? 0;
         const processed = data.processed_count ?? 0;
         const percent = total > 0 ? Math.round((processed / total) * 100) : 0;
-        
+
         document.getElementById('job-progress-bar').style.width = percent + '%';
-        document.getElementById('job-progress-text').textContent = `${processed} / ${total} facture(s) normalisée(s) (${percent}%)`;
+        document.getElementById('job-progress-text').textContent = data.status === 'queued'
+            ? `En attente de traitement — ${total} document(s) à normaliser`
+            : `${processed} / ${total} facture(s) normalisée(s) (${percent}%)`;
         document.getElementById('job-current-invoice').textContent = data.current_invoice ? `En cours : ${data.current_invoice}` : '';
-        
+
+        // Aucun worker ne consomme la file : inutile d'attendre davantage.
+        if (data.worker_missing) {
+            clearInterval(jobPollInterval);
+            document.getElementById('job-current-invoice').textContent = data.error;
+            alert(data.error);
+            return;
+        }
+
         if (data.status === 'completed') {
             clearInterval(jobPollInterval);
             setTimeout(() => {
                 alert("Normalisation en arrière-plan terminée avec succès !");
-                window.location.reload();
+                fetch("{{ route('admin.fne.batch_status') }}?reset=1").finally(() => window.location.reload());
             }, 1000);
         } else if (data.status === 'failed') {
             clearInterval(jobPollInterval);
             setTimeout(() => {
                 alert(`Normalisation en arrière-plan arrêtée en raison de l'erreur suivante :\n\n${data.error}`);
-                window.location.reload();
+                fetch("{{ route('admin.fne.batch_status') }}?reset=1").finally(() => window.location.reload());
             }, 1000);
         } else if (data.status === 'cancelled') {
             clearInterval(jobPollInterval);
             setTimeout(() => {
                 alert("Normalisation en arrière-plan annulée par l'utilisateur.");
-                window.location.reload();
+                fetch("{{ route('admin.fne.batch_status') }}?reset=1").finally(() => window.location.reload());
             }, 1000);
         }
     })
@@ -1576,7 +1586,7 @@ document.addEventListener('DOMContentLoaded', () => {
     fetch("{{ route('admin.fne.batch_status') }}")
     .then(r => r.json())
     .then(data => {
-        if (data && data.status === 'running') {
+        if (data && (data.status === 'running' || data.status === 'queued')) {
             startPollingJobStatus();
         }
     });

@@ -45,9 +45,10 @@ class NormaliserFactureFne implements ShouldQueue
     public int $timeout = 30;
 
     /**
-     * @param bool $emissionRecuDePassage Vente sans client identifié : Selflow
-     *        la marque comme reçu (`type_facture = 'RNE'`). Cette notion
-     *        interne est distincte du champ DGI `isRne` (facture rattachée à un
+     * @param bool $emissionRecuDePassage Conservé pour compatibilité avec les
+     *        appels existants. La nature du document (facture ou reçu) est
+     *        désormais portée par `ventes.type_piece`, choisie à la saisie, et
+     *        n'a rien à voir avec le champ DGI `isRne` (facture rattachée à un
      *        reçu déjà émis), qui provient de `ventes.est_rne`.
      */
     public function __construct(
@@ -78,15 +79,19 @@ class NormaliserFactureFne implements ShouldQueue
                         'fichier_fne_pdf_url' => $fneResult['pdf_url'] ?? null,
                     ];
 
-                    if ($this->emissionRecuDePassage) {
-                        $updateData['type_facture'] = 'RNE';
-                    } elseif ($vente->type_facture !== 'avoir') {
+                    // La nature du document (facture ou recu) est portee par
+                    // `type_piece`, choisie a la saisie. `type_facture` ne
+                    // decrit plus que l'etat de certification.
+                    if ($vente->type_facture !== 'avoir') {
                         $updateData['type_facture'] = 'normale';
                     }
 
                     if (!empty($fneResult['invoice_id'])) {
                         $updateData['fne_invoice_id'] = $fneResult['invoice_id'];
                     }
+
+                    // Montants, timbre et alerte de stock renvoyes par la DGI
+                    $updateData += FneService::colonnesRetoursFne($fneResult);
 
                     $vente->update($updateData);
 

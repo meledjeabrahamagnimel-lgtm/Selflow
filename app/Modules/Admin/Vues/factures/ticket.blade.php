@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Ticket RNE — {{ $vente->numero_facture }}</title>
+    <title>{{ isset($bl) ? 'Bon de livraison' : ($vente->normalise ? 'Reçu normalisé' : 'Reçu') }} — {{ $vente->numero_facture }}</title>
     <style>
         @page {
             size: 80mm auto;
@@ -132,24 +132,51 @@
 <body>
 
 <div class="no-print-bar">
-    <button class="btn-print" onclick="window.print()">Imprimer le Ticket (RNE)</button>
+    <button class="btn-print" onclick="window.print()">Imprimer</button>
     <button class="btn-print" style="background:#4b5563; margin-left:8px;" onclick="window.history.back()">Retour</button>
 </div>
 
+@php
+    // Un document ne porte les mentions de la DGI que s'il a réellement été
+    // certifié. Auparavant l'en-tête affichait des armoiries dessinées, le
+    // libellé « REÇU NORMALISÉ ÉLECTRONIQUE » et un numéro de repli
+    // « Simulation-FNE-DGI » sur tout ticket, normalisé ou non : autant de
+    // mentions officielles usurpées.
+    $entrepriseTicket = $vente->pointDeVente->entreprise;
+    $estNormalise = !isset($bl) && $vente->normalise && !empty($vente->numero_fne);
+    $logoTicket = $entrepriseTicket->logo_path;
+    if ($logoTicket && !\Illuminate\Support\Str::startsWith($logoTicket, ['http://', 'https://'])) {
+        $logoTicket = \Illuminate\Support\Facades\Storage::disk('public')->url($logoTicket);
+    }
+@endphp
+
 <div class="header">
     <div class="logo-box">
-        <svg class="logo-svg" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
-            <circle cx="50" cy="50" r="45" fill="none" stroke="black" stroke-width="4"/>
-            <path d="M 30,50 Q 50,20 70,50 T 30,50" fill="none" stroke="black" stroke-width="4"/>
-            <text x="50" y="80" font-family="sans-serif" font-size="20" font-weight="bold" text-anchor="middle">CI</text>
-        </svg>
+        @if($logoTicket)
+            <img class="logo-svg" src="{{ $logoTicket }}" alt="{{ $entrepriseTicket->nom }}" style="object-fit:contain;">
+        @endif
         <div class="rne-label">
-            {{ isset($bl) ? 'BON DE LIVRAISON' : 'REÇU NORMALISÉ' . "\n" . 'ÉLECTRONIQUE' }}
+            @if(isset($bl))
+                BON DE LIVRAISON
+            @elseif($estNormalise)
+                REÇU NORMALISÉ<br>ÉLECTRONIQUE
+            @else
+                REÇU
+            @endif
         </div>
     </div>
     <div class="text-center bold" style="font-size: 11px;">
-        {{ isset($bl) ? 'BL No: ' . $bl->numero_bl : 'RECU No: ' . ($vente->numero_fne ?? 'Simulation-FNE-DGI') }}
+        @if(isset($bl))
+            BL No: {{ $bl->numero_bl }}
+        @elseif($estNormalise)
+            RECU FNE No: {{ $vente->numero_fne }}
+        @else
+            RECU No: {{ $vente->numero_facture }}
+        @endif
     </div>
+    @if(!isset($bl) && !$estNormalise)
+        <div class="text-center" style="font-size:9px; margin-top:4px;">Document non normalisé auprès de la DGI</div>
+    @endif
 </div>
 
 <div class="divider"></div>
@@ -218,19 +245,31 @@
 
 <div class="divider"></div>
 
-@if(!isset($bl))
+@if($estNormalise && $vente->qr_code_data)
 <div class="qr-container">
-    @if($vente->qr_code_data)
-        <img class="qr-code" src="https://api.qrserver.com/v1/create-qr-code/?size=150x150&data={{ urlencode($vente->qr_code_data) }}" alt="QR Code DGI">
+    <img class="qr-code" src="https://api.qrserver.com/v1/create-qr-code/?size=150x150&data={{ urlencode($vente->qr_code_data) }}" alt="Code de vérification FNE">
+    @if($vente->signature_dgi)
+        <span style="font-size: 8px; font-weight: bold;">SIGNATURE DGI</span>
+        <span style="font-size: 8px; word-break: break-all;" class="text-center">{{ substr($vente->signature_dgi, 0, 16) }}</span>
     @endif
-    <span style="font-size: 8px; font-weight: bold;">SIGNATURE DGI</span>
-    <span style="font-size: 8px; word-break: break-all;" class="text-center">{{ substr($vente->signature_dgi, 0, 16) }}</span>
 </div>
 @endif
 
+@php
+    $mentionsTicket = $vente->autres_mentions ?: $entrepriseTicket->facture_autres_mentions;
+    $piedTicket     = $vente->pied_de_page ?: $entrepriseTicket->pied_de_page_facture;
+@endphp
+@if(!isset($bl) && $vente->est_rne && $vente->numero_rne)
+    <div class="footer-text bold">Rattaché au reçu n° {{ $vente->numero_rne }}</div>
+@endif
+@if($mentionsTicket)
+    <div class="footer-text">{{ $mentionsTicket }}</div>
+@endif
 <div class="footer-text">
-    {{ isset($bl) ? 'Merci pour votre confiance !' : 'Merci pour votre visite !' }}<br>
-    Selflow — Solution de gestion commerciale.
+    {{ isset($bl) ? 'Merci pour votre confiance !' : 'Merci pour votre visite !' }}
+    @if($piedTicket)
+        <br>{{ $piedTicket }}
+    @endif
 </div>
 
 <script>
