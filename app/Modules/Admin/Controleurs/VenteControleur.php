@@ -1251,6 +1251,10 @@ class VenteControleur
             'numero_facture' => $vente->numero_facture,
             'client_nom' => $vente->client ? $vente->client->nom : 'Client de passage',
             'montant_ttc' => $vente->montant_ttc,
+            'est_rne' => (bool) $vente->est_rne,
+            'numero_rne' => $vente->numero_rne,
+            'autres_mentions' => $vente->autres_mentions,
+            'pied_de_page' => $vente->pied_de_page,
             'details' => $vente->details->map(function($d) {
                 return [
                     'id' => $d->id,
@@ -1273,6 +1277,13 @@ class VenteControleur
             'parent_id' => ['required', 'exists:ventes,id'],
             'raison'    => ['required', 'string', 'max:255'],
             'items'     => ['required', 'array'],
+            // Mentions du document d'avoir (impression locale uniquement)
+            'est_rne'         => ['nullable', 'boolean'],
+            'numero_rne'      => ['nullable', 'required_if:est_rne,1', 'string', 'max:64'],
+            'autres_mentions' => ['nullable', 'string', 'max:' . self::$longueurMaxMention],
+            'pied_de_page'    => ['nullable', 'string', 'max:' . self::$longueurMaxMention],
+        ], [
+            'numero_rne.required_if' => 'Veuillez saisir le numéro du reçu auquel cet avoir est rattaché.',
         ]);
 
         $parent = Vente::findOrFail($request->parent_id);
@@ -1306,11 +1317,15 @@ class VenteControleur
                 'remise'            => 0,
                 'remise_taux'       => 0,
                 'montant_ttc'       => 0,
-                // Repris de la facture d'origine pour l'impression de l'avoir
-                'est_rne'           => $parent->est_rne,
-                'numero_rne'        => $parent->numero_rne,
-                'autres_mentions'   => $parent->autres_mentions,
-                'pied_de_page'      => $parent->pied_de_page,
+                // Saisi dans la modale, a defaut repris de la facture d'origine.
+                // Ces champs n'apparaissent que sur l'avoir imprime : l'API de
+                // remboursement de la FNE n'accepte que la liste des articles.
+                'est_rne'           => $request->boolean('est_rne'),
+                'numero_rne'        => $request->boolean('est_rne')
+                    ? trim((string) $request->input('numero_rne'))
+                    : $parent->numero_rne,
+                'autres_mentions'   => self::mentionBornee($request->input('autres_mentions')) ?? $parent->autres_mentions,
+                'pied_de_page'      => self::mentionBornee($request->input('pied_de_page')) ?? $parent->pied_de_page,
             ]);
 
             $totalHt = 0;

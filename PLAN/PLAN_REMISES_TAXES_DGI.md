@@ -336,16 +336,49 @@ et `factures/achat.blade.php` :
 
 ---
 
-## 7. POINTS À CONFIRMER AVANT CODAGE
+## 7. DÉCISIONS RETENUES
 
-1. **Limite du champ « Pied de page »** — la limite d'« Autres mentions » est claire :
-   la chaîne fournie fait **249** caractères, avant-dernier caractère ⇒ **248**.
-   La consigne pour le pied de page (« en comptant de `<` … `qui >`, arrête-toi à
-   `pied` ») est ambiguë. **Hypothèse retenue par défaut : 248 caractères également.**
-2. **TVAC vs TVAD** — les deux valent 0 %. Confirmer la règle : choix manuel sur la
-   fiche produit (hypothèse retenue) ou déduction automatique depuis le régime de
-   l'entreprise (TEE/RNE ⇒ TVAD).
-3. **Ordre d'application des remises** — hypothèse retenue, conforme au récapitulatif
-   FNE : remise ligne d'abord, puis remise globale sur le total HT net.
-4. **Remise globale : `ventes.remise` (F) conservée** en parallèle de `remise_taux` (%)
-   pour ne pas toucher aux écritures comptables déjà générées. À valider.
+1. **Limite des mentions : 248 caractères**, pour « Autres mentions » comme pour
+   « Pied de page » (validé).
+2. **TVAC vs TVAD : les deux modes cohabitent** (validé) — le code est déduit
+   automatiquement du taux et du régime (0 % + TEE/RNE ⇒ TVAD, sinon TVAC), et une
+   case « Choisir le code manuellement » sur la fiche produit rend la main à
+   l'utilisateur.
+3. **Ordre des remises** : remise de ligne d'abord, remise globale ensuite sur le
+   total HT obtenu — conforme au récapitulatif de la FNE.
+4. **`ventes.remise` (F) conservée** en parallèle de `remise_taux` (%) : le taux
+   alimente la DGI, le montant reste la base des écritures comptables.
+
+---
+
+## 8. ÉTAT DE LIVRAISON
+
+Les 9 lots sont implémentés. Ce qui a été livré au-delà du plan initial :
+
+- **Suppression du champ « Code FNE » des points de vente** — la DGI attend le
+  *nom* du point de vente dans `pointOfSale` ; le code technique n'avait pas lieu
+  d'être (migration de retrait + nettoyage du formulaire et du contrôleur).
+- **Calcul de TVA corrigé à l'impression** : les modèles appliquaient 18 % au
+  total dès qu'un article était taxé, y compris aux lignes exonérées. La TVA est
+  désormais calculée ligne par ligne au taux réel.
+- **Modèle 4** : le code TVA affiché était figé (`TVA (18%)` / `TVAD (0)`), il
+  reflète maintenant le code réel de chaque ligne.
+- **Pied de page du modèle standard** : un bloc codé en dur portait les
+  coordonnées d'une autre société ; il affiche désormais celles de l'entreprise
+  émettrice, suivies des mentions et du pied de page paramétrés.
+- **Migrations rendues exécutables hors MySQL** (retrait de contrainte par nom,
+  `SHOW INDEX`, `ALTER TABLE … MODIFY COLUMN`, index à supprimer avant sa
+  colonne) et `APP_KEY` de test ajoutée : la suite de tests ne pouvait pas
+  s'exécuter du tout auparavant.
+
+**Tests** : `tests/Feature/FnePayloadTest.php` — 16 tests, 61 assertions, tous au
+vert (suite complète : 18 tests).
+
+### Limites assumées
+
+- Sur la page **Avoir**, la case RNE, les mentions et le pied de page ne servent
+  qu'au document imprimé : l'endpoint `/refund` n'accepte que `items[]` (§4).
+- Les **taxes personnalisées ne sont pas ajoutées à `montant_ttc`** : ce montant
+  reste la base des écritures comptables et de la trésorerie existantes. Elles
+  sont stockées avec leur montant, affichées dans le « Net à payer » et
+  transmises à la FNE, qui les recalcule de son côté.
