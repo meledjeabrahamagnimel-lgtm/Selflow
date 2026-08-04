@@ -1,0 +1,186 @@
+modèle de demande a envoyé à la fne 
+
+{
+  "invoiceType": "sale",
+  "paymentMethod": "mobile-money",
+  "template": "B2B",
+  "clientNcc": "9502363N",
+  "clientCompanyName": "KPMG COTE D’VOIRE",
+  "clientPhone": "0709080765",
+  "clientEmail": "info@kpmg.ci",
+  "clientSellerName": "Ali Hassan",
+  "pointOfSale": "23",
+  "establishment": "Orange Riviera Mpouto",
+  "commercialMessage": "Soyez les bienvenus",
+  "footer": "Toujours la pour votre bonheur",
+  "foreignCurrency": "",
+  "foreignCurrencyRate": 0,
+  "items": [
+    {
+      "taxes": ["TVA"],
+      "customTaxes": [
+        {
+          "name": "GRA",
+          "amount": 5
+        }
+      ],
+      "reference": "ref009",
+      "description": "sac de riz Dinor 5 x 5",
+      "quantity": 30,
+      "amount": 20000,
+      "discount": 10,
+      "measurementUnit": "pcs"
+    },
+    {
+      "taxes": ["TVAC"],
+      "customTaxes": [
+        {
+          "name": "AIRSI",
+          "amount": 2
+        }
+      ],
+      "reference": "ref001",
+      "description": "Huile lesieur 5 litres",
+      "quantity": 20,
+      "amount": 12000,
+      "discount": 10,
+      "measurementUnit": "bidon"
+    }
+  ],
+  "customTaxes": [
+    {
+      "name": "DTD",
+      "amount": 5
+    }
+  ],
+  "discount": 10
+}
+
+
+réponse
+
+ {
+  "ncc": "9606123E",
+  "reference": "9606123E25000000019",
+  "token": "http://54.247.95.108/fr/verification/019465c1-3f61-766c-9652-706e32dfb436",
+  "warning": false,
+  "balance_sticker": 179,
+  "invoice": {
+    "id": "e2b2d8da-a532-4c08-9182-f5b428ca468d",
+    "parentId": null,
+    "parentReference": null,
+    "token": "019465c1-3f61-766c-9652-706e32dfb436",
+    "reference": "9606123E25000000019",
+    "type": "invoice",
+    "subtype": "normal",
+    "date": "2025-01-14T16:59:11.016Z",
+    "paymentMethod": "mobile-money",
+    "amount": 852660,
+    "vatAmount": 172260,
+    "fiscalStamp": 0,
+    "discount": 10,
+    "clientNcc": "9502363N",
+    "clientCompanyName": "KPMG FRANCE",
+    "clientPhone": "0709080765",
+    "clientEmail": "info@kpmg.ci",
+    "clientTerminal": "9090876543",
+    "clientMerchantName": null,
+    "clientRccm": "ci 083 abj 23 ",
+    "clientSellerName": "Ali Hassan",
+    "clientEstablishment": "Orange Riviera Mpouto",
+    "clientPointOfSale": "23",
+    "status": "paid",
+    "template": "B2F",
+    "description": "Soyez les bienvenus",
+    "footer": null,
+    "commercialMessage": "Toujours la pour votre bonheur",
+    "foreignCurrency": "Euro",
+    "foreignCurrencyRate": 655,
+    "isRne": false,
+    "rne": null,
+    "source": "api",
+    "createdAt": "2025-01-14T16:59:11.016Z",
+    "updatedAt": "2025-01-14T16:59:11.125Z",
+    "items": [
+      {
+        "id": "bf9cc241-9b5f-4d26-a570-aa8e682a759e",
+        "quantity": 30,
+        "reference": "ref009",
+        "description": "sac de riz Dinor 5 x 5",
+        "amount": 20000,
+        "discount": 10,
+        "measurementUnit": "pcs",
+        "createdAt": "2025-01-14T16:59:11.016Z",
+        "updatedAt": "2025-01-14T16:59:11.016Z",
+        "taxes": [
+          {
+            "invoiceItemId": "bf9cc241-9b5f-4d26-a570-aa8e682a759e",
+            "vatRateId": "cdb6c5b2-5f35-407d-b5f6-c712a0792451",
+            "amount": 18,
+            "name": "TVA normal - TVA sur HT 18,00% - A",
+            "shortName": "TVA",
+            "createdAt": "2025-01-14T16:59:11.016Z",
+            "updatedAt": "2025-01-14T16:59:11.016Z"
+          }
+        ],
+        "customTaxes": [
+          {
+            "id": "55349f9c-b1df-43d8-9277-33fc6f5ccc8d",
+            "invoiceItemId": "bf9cc241-9b5f-4d26-a570-aa8e682a759e",
+            "amount": 5,
+            "name": "GRA",
+            "createdAt": "2025-01-14T16:59:11.016Z",
+            "updatedAt": "2025-01-14T16:59:11.016Z"
+          }
+        ],
+        "invoiceId": "e2b2d8da-a532-4c08-9182-f5b428ca468d",
+        "parentId": null
+      },
+      {
+        "id": "50b5c9d9-e22d-4dce-ba3c-5d2519c3418f",
+        "quantity": 20,
+        "reference": "ref001",
+        "description": "Huile lesieur 5 litres",
+        "amount": 12000,
+        "discount": 10,
+        "measurementUnit": "bidon",
+        "createdAt": "2025-01-14T16:59:11.016Z",
+        "updatedAt": "2025-01-14T16:59:11.016Z",
+        "taxes": [
+          {
+            "invoiceItemId": "50b5c9d9-e22d-4dce-ba3c-5d2519c3418f",
+            "vatRateId": "26b4c615-0c23-4084-803a-722e946779c8",
+            "amount": 0,
+            "name": "TVA exo.conv - TVA sur HT 00,00% - C",
+            "shortName": "TVAC",
+            "createdAt": "2025-01-14T16:59:11.016Z",
+            "updatedAt": "2025-01-14T16:59:11.016Z"
+          }
+        ],
+        "customTaxes": [
+          {
+            "id": "96d84f25-4da9-44cf-a3b2-492471cbbb2b",
+            "invoiceItemId": "50b5c9d9-e22d-4dce-ba3c-5d2519c3418f",
+            "amount": 2,
+            "name": "AIRSI",
+            "createdAt": "2025-01-14T16:59:11.016Z",
+            "updatedAt": "2025-01-14T16:59:11.016Z"
+          }
+        ],
+        "invoiceId": "e2b2d8da-a532-4c08-9182-f5b428ca468d",
+        "parentId": null
+      }
+    ],
+    "customTaxes": [
+      {
+        "id": "7e8ef5cc-8ab1-4334-ad1c-dc9cdfc229aa",
+        "invoiceId": "e2b2d8da-a532-4c08-9182-f5b428ca468d",
+        "amount": 5,
+        "name": "DTD",
+        "createdAt": "2025-01-14T16:59:11.016Z",
+        "updatedAt": "2025-01-14T16:59:11.016Z"
+      }
+    ]
+  }
+}
+

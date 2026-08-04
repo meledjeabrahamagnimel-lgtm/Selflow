@@ -1,0 +1,108 @@
+jsons
+
+{
+  "invoiceType": "purchase",
+  "paymentMethod": "mobile-money",
+  "template": "B2B",
+  "clientCompanyName": "COOPERATION DU GRAND OUEST",
+  "clientPhone": "0709080765",
+  "clientEmail": "info@cgo.ci",
+  "clientSellerName": "Ali Hassan",
+  "pointOfSale": "23",
+  "establishment": "Orange Riviera Mpouto",
+  "commercialMessage": "Soyez les bienvenus",
+  "footer": "Toujours la pour votre bonheur",
+  "foreignCurrency": "",
+  "foreignCurrencyRate": "",
+  "items": [
+    {
+      "reference": "ref009",
+      "description": "sac de riz Dinor 5 x 5",
+      "quantity": 30,
+      "amount": 20000,
+      "discount": 10,
+      "measurementUnit": "pcs"
+    },
+    {
+      "reference": "ref001",
+      "description": "Cacao Brut premier choix",
+      "quantity": 2000,
+      "amount": 2200,
+      "discount": 10,
+      "measurementUnit": "bidon"
+    }
+  ],
+  "discount": 10
+}
+
+
+Réponse
+
+{
+  "ncc": "9606123E",
+  "reference": "9606123E25000000019",
+  "token": "http://54.247.95.108/fr/verification/019465c1-3f61-766c-9652-706e32dfb436",
+  "warning": false,
+  "balance_sticker": 179,
+  "invoice": {
+    "id": "e2b2d8da-a532-4c08-9182-f5b428ca468d",
+    "parentId": null,
+    "parentReference": null,
+    "token": "019465c1-3f61-766c-9652-706e32dfb436",
+    "reference": "9606123E25000000019",
+    "type": "invoice",
+    "subtype": "normal",
+    "date": "2025-01-14T16:59:11.016Z",
+    "paymentMethod": "mobile-money",
+    "amount": 852660,
+    "vatAmount": 172260,
+    "fiscalStamp": 0,
+    "discount": 10,
+    "clientNcc": "",
+    "clientCompanyName": "COOPERATIVE DU GRAND OUEST",
+    "clientPhone": "0709080765",
+    "clientEmail": "info@CGO.ci",
+    "clientTerminal": "9090876543",
+    "clientMerchantName": null,
+    "clientRccm": "ci 083 abj 23 ",
+    "clientSellerName": "Ali Hassan",
+    "clientEstablishment": "Orange Riviera Mpouto",
+    "clientPointOfSale": "23",
+    "status": "paid",
+    "template": "B2F",
+    "description": "Soyez les bienvenus",
+    "footer": null,
+    "commercialMessage": "Toujours la pour votre bonheur",
+    "foreignCurrency": "Euro",
+    "foreignCurrencyRate": 655,
+    "isRne": false,
+    "rne": null,
+    "source": "api",
+    "createdAt": "2025-01-14T16:59:11.016Z",
+    "updatedAt": "2025-01-14T16:59:11.125Z",
+    "items": [
+      {
+        "id": "bf9cc241-9b5f-4d26-a570-aa8e682a759e",
+        "quantity": 30,
+        "reference": "ref009",
+        "description": "sac de riz Dinor 5 x 5",
+        "amount": 20000,
+        "discount": 10,
+        "measurementUnit": "pcs",
+        "createdAt": "2025-01-14T16:59:11.016Z",
+        "updatedAt": "2025-01-14T16:59:11.016Z"
+      },
+      {
+        "id": "50b5c9d9-e22d-4dce-ba3c-5d2519c3418f",
+        "quantity": 20,
+        "reference": "ref001",
+        "description": "Huile lesieur 5 litres",
+        "amount": 12000,
+        "discount": 10,
+        "measurementUnit": "bidon",
+        "createdAt": "2025-01-14T16:59:11.016Z",
+        "updatedAt": "2025-01-14T16:59:11.016Z"
+      }
+    ]
+  }
+}

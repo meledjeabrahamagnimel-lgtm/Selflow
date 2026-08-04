@@ -1,0 +1,33 @@
+json avoir
+
+---------------------------
+
+
+curl --location 'http://54.247.95.108/ws/external/invoices/e2b2d8da-a532-4c08-9182-f5b428ca468d/refund' \
+--header 'Content-Type: application/json' \
+--header 'Accept: application/json' \
+--header 'Authorization: ••••••' \
+--data '{
+  "items": [
+    {
+      "id": "bf9cc241-9b5f-4d26-a570-aa8e682a759e",
+      "quantity": 20
+    },
+    {
+      "id": "50b5c9d9-e22d-4dce-ba3c-5d2519c3418f",
+      "quantity": 10
+    }
+  ]
+}'
+
+
+
+Response 
+
+{
+  "ncc": "9606123E",
+  "reference": "A9606123E2500000006",
+  "token": "http://54.247.95.108/fr/verification/019465ca-c27c-700e-ba3f-09d0759b9170",
+  "warning": false,
+  "balance_sticker": 178
+}

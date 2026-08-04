@@ -39,3 +39,11 @@ image2.png
 
 # Exception pour ce fichier spécifique
 !nv-MODULE.md
+!CONFIGURATION FNE
+!TABLEAU_CHAMPS_FACTURE_VENTE.md
+!TABLEAU_CHAMPS_FACTURE_AVOIR.md
+!Procedure_technique_integration_API.txt
+!json avoir.txt
+!INFO EN PLUS-URL.txt
+!exemple de json vente.txt
+!BAPA( déclaration des bordereau d'achat).txt

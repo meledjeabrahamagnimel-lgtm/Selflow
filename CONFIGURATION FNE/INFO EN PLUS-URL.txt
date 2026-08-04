@@ -1,0 +1,18 @@
+Voici les différents champs que nous utiliserons pour terminer la connexion de votre logiciel à celui de la FNE.
+
+ce sont des URL DE TEST ET DES API DE TEST 
+
+
+BASE_URL=http://54.247.95.108/ws
+
+API_ENDPOINT=/external/invoices/sign
+
+API_REFUND_ENDPOINT=/external/invoices
+
+exemple url facture de vente: http://54.247.95.108/ws/external/invoices/sign
+
+exemple url facture d'avoir : http://54.247.95.108/ws/external/invoices/{id de la facture de vente certifié)/refund
+
+
+-------------------------------------------------------------------------------------------------------------
+ 
