@@ -74,9 +74,6 @@
                 @if($pdv->telephone)
                 <div style="margin-top:4px;"><i class="fas fa-phone" style="width:16px;"></i> {{ $pdv->telephone }}</div>
                 @endif
-                @if($pdv->code_fne)
-                <div style="margin-top:4px;"><i class="fas fa-hashtag" style="width:16px;"></i> Code FNE : <strong>{{ $pdv->code_fne }}</strong></div>
-                @endif
             </div>
 
             @if($pdv->nom !== 'Siège')
@@ -146,11 +143,6 @@
                             <label class="form-label">Responsable</label>
                             <input type="text" name="responsable" class="form-control" value="{{ old('responsable', $pdv->responsable) }}">
                         </div>
-                        <div class="form-group" style="margin-top:12px;">
-                            <label class="form-label">Code FNE</label>
-                            <input type="text" name="code_fne" class="form-control" value="{{ old('code_fne', $pdv->code_fne) }}" placeholder="Ex: 23">
-                            <small class="text-muted">Valeur à utiliser dans le champ <code>pointOfSale</code> de la DGI.</small>
-                        </div>
                         <div style="display:flex; gap:10px; justify-content:flex-end; margin-top:16px;">
                             <button type="button" class="btn btn-outline" data-modal-close>Annuler</button>
                             <button type="submit" class="btn btn-primary"><i class="fas fa-check"></i> Enregistrer</button>
@@ -194,11 +186,10 @@
                 <label class="form-label">Responsable</label>
                 <input type="text" name="responsable" class="form-control" placeholder="Nom du responsable">
             </div>
-            <div class="form-group">
-                <label class="form-label">Code FNE</label>
-                <input type="text" name="code_fne" class="form-control" placeholder="Ex: 23">
-                <small class="text-muted">Valeur à envoyer à la DGI dans le champ <code>pointOfSale</code>.</small>
-            </div>
+            <small class="text-muted" style="display:block; margin-bottom:8px;">
+                Le <strong>nom du point de vente</strong> est la valeur transmise à la DGI dans le champ
+                <code>pointOfSale</code> : il doit correspondre exactement à celui déclaré dans votre espace FNE.
+            </small>
             <div style="display:flex; gap:10px; justify-content:flex-end; margin-top:8px;">
                 <button type="button" class="btn btn-outline" data-modal-close>Annuler</button>
                 <button type="submit" class="btn btn-primary"><i class="fas fa-check"></i> Créer</button>

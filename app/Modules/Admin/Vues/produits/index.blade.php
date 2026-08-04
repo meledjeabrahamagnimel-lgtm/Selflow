@@ -303,9 +303,15 @@
                                         <option value="custom" {{ $isCustomTva ? 'selected' : '' }}>Autre (Saisie libre)</option>
                                     </select>
                                     <div id="custom_tva_container_{{ $p->id }}" style="display: {{ $isCustomTva ? 'block' : 'none' }}; margin-top:8px;">
-                                        <input type="number" id="tva_input_{{ $p->id }}" name="taux_tva" class="form-control" placeholder="Entrez le taux (%)" step="0.01" min="0" max="100" value="{{ $p->taux_tva }}">
+                                        <input type="number" id="tva_input_{{ $p->id }}" name="taux_tva" class="form-control" placeholder="Entrez le taux (%)" step="0.01" min="0" max="100" oninput="rafraichirApercuCodeTva('{{ $p->id }}')" value="{{ $p->taux_tva }}">
                                     </div>
                                 </div>
+
+                                @include('admin::composants.champs_fne_produit', [
+                                    'cle'     => $p->id,
+                                    'produit' => $p,
+                                    'regime'  => Auth::user()->entreprise->regime_imposition ?? null,
+                                ])
                                 <div class="form-group">
                                     <label class="form-label">Nature de la vente (Compte de vente) <span style="color:var(--danger)">*</span></label>
                                     <select name="compte_vente" id="compte_vente_select_{{ $p->id }}" class="form-control" required>
@@ -464,13 +470,19 @@
                     <label class="form-label">Taux TVA par défaut <span style="color:var(--danger)">*</span></label>
                     <select id="tva_select_nouveau" class="form-control" onchange="toggleCustomTva('nouveau')" required>
                         <option value="18.00">18% (Taux normal)</option>
-                        <option value="0.00">0% (Exonéré / TVAD)</option>
+                        <option value="0.00">0% (Exonéré)</option>
                         <option value="custom">Autre (Saisie libre)</option>
                     </select>
                     <div id="custom_tva_container_nouveau" style="display:none; margin-top:8px;">
-                        <input type="number" id="tva_input_nouveau" name="taux_tva" class="form-control" placeholder="Entrez le taux (%)" step="0.01" min="0" max="100" value="18.00">
+                        <input type="number" id="tva_input_nouveau" name="taux_tva" class="form-control" placeholder="Entrez le taux (%)" step="0.01" min="0" max="100" oninput="rafraichirApercuCodeTva('nouveau')" value="18.00">
                     </div>
                 </div>
+
+                @include('admin::composants.champs_fne_produit', [
+                    'cle'     => 'nouveau',
+                    'produit' => null,
+                    'regime'  => Auth::user()->entreprise->regime_imposition ?? null,
+                ])
                 <div class="form-group">
                     <label class="form-label">Nature de la vente (Compte de vente) <span style="color:var(--danger)">*</span></label>
                     <select name="compte_vente" id="compte_vente_select_nouveau" class="form-control" required>
@@ -705,7 +717,99 @@ function toggleCustomTva(id) {
         container.style.display = 'none';
         input.value = select.value;
     }
+
+    rafraichirApercuCodeTva(id);
 }
+
+// ─── Champs FNE du produit : code TVA et autres taxes ────────────────────────
+
+const REGIME_ENTREPRISE = @json(Auth::user()->entreprise->regime_imposition ?? null);
+const REGIMES_EXONERATION_LEGALE = ['TEE', 'RNE'];
+
+/**
+ * Même règle de déduction que Produit::deduireCodeTva() côté serveur : un taux
+ * nul ne suffit pas à distinguer TVAC (exonération conventionnelle) de TVAD
+ * (exonération légale, réservée aux régimes TEE et RNE).
+ */
+function deduireCodeTva(taux) {
+    const t = Math.round(parseFloat(taux || 0) * 100) / 100;
+    if (t === 18) return 'TVA';
+    if (t === 9)  return 'TVAB';
+    if (t === 0)  return REGIMES_EXONERATION_LEGALE.includes(REGIME_ENTREPRISE) ? 'TVAD' : 'TVAC';
+    return 'TVA';
+}
+
+function rafraichirApercuCodeTva(cle) {
+    const apercu = document.getElementById('apercu_code_tva_' + cle);
+    if (!apercu) return;
+
+    const select = document.getElementById('tva_select_' + cle);
+    const input  = document.getElementById('tva_input_' + cle);
+    const taux   = (select && select.value !== 'custom') ? select.value : (input ? input.value : 0);
+
+    apercu.textContent = deduireCodeTva(taux);
+}
+
+function basculerCodeTva(cle) {
+    const manuel    = document.getElementById('code_tva_manuel_' + cle).checked;
+    const auto      = document.getElementById('code_tva_auto_' + cle);
+    const conteneur = document.getElementById('code_tva_manuel_container_' + cle);
+
+    if (auto)      auto.style.display      = manuel ? 'none' : 'block';
+    if (conteneur) conteneur.style.display = manuel ? 'block' : 'none';
+
+    if (!manuel) rafraichirApercuCodeTva(cle);
+}
+
+function ajouterTaxeProduit(cle, nom, taux) {
+    const conteneur = document.getElementById('taxes_produit_' + cle);
+    if (!conteneur) return;
+
+    const index = conteneur.children.length;
+    const ligne = document.createElement('div');
+    ligne.style.cssText = 'display:flex; gap:8px; align-items:center;';
+    ligne.innerHTML = `
+        <input type="text" name="taxes_produit[${index}][nom]" class="form-control"
+               placeholder="Nom de la taxe (ex : GRA)" maxlength="100"
+               value="${nom ? String(nom).replace(/"/g, '&quot;') : ''}" style="flex:2;">
+        <input type="number" name="taxes_produit[${index}][taux]" class="form-control"
+               placeholder="Taux (%)" step="0.01" min="0.01" max="100"
+               value="${taux !== undefined && taux !== null ? taux : ''}" style="flex:1;">
+        <button type="button" class="btn btn-outline" title="Supprimer cette taxe"
+                onclick="supprimerTaxeProduit(this, '${cle}')"
+                style="color:var(--danger); border-color:var(--danger); padding:6px 10px;">
+            <i class="fas fa-trash"></i>
+        </button>
+    `;
+    conteneur.appendChild(ligne);
+}
+
+function supprimerTaxeProduit(bouton, cle) {
+    bouton.closest('div').remove();
+    reindexerTaxesProduit(cle);
+}
+
+/**
+ * Les noms de champs doivent rester une suite continue d'index pour que
+ * Laravel reçoive bien un tableau après suppression d'une ligne.
+ */
+function reindexerTaxesProduit(cle) {
+    const conteneur = document.getElementById('taxes_produit_' + cle);
+    if (!conteneur) return;
+
+    Array.from(conteneur.children).forEach((ligne, index) => {
+        const champs = ligne.querySelectorAll('input');
+        if (champs[0]) champs[0].name = `taxes_produit[${index}][nom]`;
+        if (champs[1]) champs[1].name = `taxes_produit[${index}][taux]`;
+    });
+}
+
+document.addEventListener('DOMContentLoaded', function () {
+    Object.entries(window.taxesProduitInitiales || {}).forEach(([cle, taxes]) => {
+        (taxes || []).forEach(taxe => ajouterTaxeProduit(cle, taxe.nom, taxe.taux));
+        rafraichirApercuCodeTva(cle);
+    });
+});
 
 // ─── Toggle Vue Tableau / Cartes ────────────────────────────────────────────
 

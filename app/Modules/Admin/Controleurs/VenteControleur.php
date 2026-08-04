@@ -15,6 +15,7 @@ use App\Modules\Admin\Modeles\CodeJournal;
 use App\Modules\Admin\Modeles\BonLivraison;
 use App\Modules\Admin\Modeles\B2bNegotiation;
 use App\Modules\Admin\Modeles\Entreprise;
+use App\Modules\Admin\Traits\GereLesChampsFne;
 use App\Modules\Admin\Traits\JournaliseActions;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -25,6 +26,7 @@ use Illuminate\View\View;
 class VenteControleur
 {
     use JournaliseActions;
+    use GereLesChampsFne;
 
     public function nouvelle(): View
     {
@@ -44,6 +46,7 @@ class VenteControleur
                 ]))->id);
         $clients        = Client::obtenirClientsPrioritaires($entreprise->id);
         $produits       = Produit::where('entreprise_id', $entreprise->id)
+            ->with('taxes')
             ->orderBy('nom')
             ->get();
 
@@ -70,10 +73,9 @@ class VenteControleur
                     'statut'        => 'Ouvert',
                 ]))->id);
 
-        $request->validate([
+        $request->validate(array_merge([
             'client_id'      => ['nullable', 'integer', 'exists:clients,id'],
             'mode_paiement'  => ['required', 'string'],
-            'remise'         => ['nullable', 'numeric', 'min:0'],
             'articles'       => ['required', 'array', 'min:1'],
             'articles.*.produit_id'      => ['nullable', 'integer', 'exists:produits,id'],
             'articles.*.libelle_virtuel' => ['nullable', 'string', 'max:255'],
@@ -81,9 +83,9 @@ class VenteControleur
             'articles.*.unite'           => ['nullable', 'string', 'max:50'],
             'articles.*.prix_unitaire'   => ['nullable', 'numeric', 'min:0'],
             'articles.*.tva'             => ['nullable', 'numeric', 'min:0', 'max:100'],
-        ], [
+        ], self::reglesChampsFne()), array_merge([
             'articles.required' => 'Veuillez ajouter au moins un article au panier.',
-        ]);
+        ], self::messagesChampsFne()));
 
         if ($request->mode_paiement === 'Banque') {
             $request->validate([
@@ -133,10 +135,12 @@ class VenteControleur
 
         DB::transaction(function () use ($request, $pointDeVenteId, &$venteId, $entreprise) {
             $montantHt  = 0;
-            $remise = floatval($request->input('remise', 0));
+            $remiseTaux = self::tauxBorne($request->input('remise_taux', 0));
             $etape = $request->input('etape', 'Facture');
 
-            // 1. Précalcul du montant HT total
+            // 1. Précalcul du montant HT total, remises d'article déduites.
+            //    Ordre imposé par la FNE : remise de ligne d'abord, remise
+            //    globale ensuite sur le total ainsi obtenu.
             foreach ($request->articles as $article) {
                 if (!empty($article['produit_id'])) {
                     $produit = Produit::findOrFail($article['produit_id']);
@@ -145,10 +149,15 @@ class VenteControleur
                     $prix = floatval($article['prix_unitaire'] ?? 0);
                 }
 
-                $ht = $article['quantite'] * $prix;
+                $remiseLigne = self::tauxBorne($article['remise_taux'] ?? 0);
+                $ht = $article['quantite'] * $prix * (1 - $remiseLigne / 100);
                 $montantHt  += $ht;
             }
 
+            // La remise globale est saisie en pourcentage (format attendu par
+            // la DGI) ; son équivalent en francs reste stocké dans `remise`
+            // pour la comptabilité et les modèles d'impression.
+            $remise = round($montantHt * $remiseTaux / 100, 2);
             $montantHtNet = max(0, $montantHt - $remise);
             $ratio = $montantHt > 0 ? $montantHtNet / $montantHt : 0;
 
@@ -163,8 +172,9 @@ class VenteControleur
                     $tvaRate = floatval($article['tva'] ?? 18);
                     $prix = floatval($article['prix_unitaire'] ?? 0);
                 }
-                
-                $itemHt = $article['quantite'] * $prix;
+
+                $remiseLigne = self::tauxBorne($article['remise_taux'] ?? 0);
+                $itemHt = $article['quantite'] * $prix * (1 - $remiseLigne / 100);
                 $itemHtNet = $itemHt * $ratio;
                 $itemTva = $itemHtNet * ($tvaRate / 100);
                 $montantTva += $itemTva;
@@ -212,10 +222,18 @@ class VenteControleur
                 'montant_ht'              => $montantHt,
                 'montant_tva'             => $montantTva,
                 'remise'                  => $remise,
+                'remise_taux'             => $remiseTaux,
                 'montant_ttc'             => $montantTtc,
                 'statut'                  => $statutVente,
                 'etape'                   => $etape,
+                'est_rne'                 => $request->boolean('est_rne'),
+                'numero_rne'              => $request->boolean('est_rne') ? trim($request->input('numero_rne')) : null,
+                'autres_mentions'         => self::mentionBornee($request->input('autres_mentions')),
+                'pied_de_page'            => self::mentionBornee($request->input('pied_de_page')),
             ]);
+
+            // Taxes sur le total TTC (champ `customTaxes` de la FNE)
+            self::enregistrerTaxesSurTtc($vente, $request->input('taxes_ttc', []), $montantTtc);
 
             foreach ($request->articles as $article) {
                 if (!empty($article['produit_id'])) {
@@ -230,7 +248,8 @@ class VenteControleur
                     $tvaRate = floatval($article['tva'] ?? 18);
                 }
 
-                $ht = $article['quantite'] * $prix;
+                $remiseLigne = self::tauxBorne($article['remise_taux'] ?? 0);
+                $ht = $article['quantite'] * $prix * (1 - $remiseLigne / 100);
                 $tva = $ht * ($tvaRate / 100);
 
                 $detail = VenteDetail::create([
@@ -240,9 +259,13 @@ class VenteControleur
                     'quantite'        => $article['quantite'],
                     'unite'           => $article['unite'] ?? 'Unité',
                     'prix_unitaire'   => $prix,
+                    'remise_taux'     => $remiseLigne,
                     'montant_tva'     => $tva,
                     'montant_ttc'     => $ht + $tva,
                 ]);
+
+                // Instantané des taxes personnalisées du produit sur la ligne
+                self::copierTaxesProduitSurLigne($detail, $produit);
 
                 if ($produit && $etape === 'Facture' && $produit->estStockable()) {
                     $stockAvant = $produit->stockActuel($pointDeVenteId);
@@ -590,10 +613,9 @@ class VenteControleur
             abort(403, 'Cette facture a été normalisée et ne peut plus être modifiée.');
         }
 
-        $request->validate([
+        $request->validate(array_merge([
             'client_id'      => ['nullable', 'integer', 'exists:clients,id'],
             'mode_paiement'  => ['required', 'string'],
-            'remise'         => ['nullable', 'numeric', 'min:0'],
             'articles'       => ['required', 'array', 'min:1'],
             'articles.*.produit_id'      => ['nullable', 'integer', 'exists:produits,id'],
             'articles.*.libelle_virtuel' => ['nullable', 'string', 'max:255'],
@@ -601,9 +623,9 @@ class VenteControleur
             'articles.*.unite'           => ['nullable', 'string', 'max:50'],
             'articles.*.prix_unitaire'   => ['nullable', 'numeric', 'min:0'],
             'articles.*.tva'             => ['nullable', 'numeric', 'min:0', 'max:100'],
-        ], [
+        ], self::reglesChampsFne()), array_merge([
             'articles.required' => 'Veuillez ajouter au moins un article au panier.',
-        ]);
+        ], self::messagesChampsFne()));
 
         if ($request->mode_paiement === 'Banque') {
             $request->validate([
@@ -641,9 +663,9 @@ class VenteControleur
 
             // 3. Recalculer avec les nouveaux articles
             $montantHt  = 0;
-            $remise = floatval($request->input('remise', 0));
+            $remiseTaux = self::tauxBorne($request->input('remise_taux', 0));
 
-            // 3.1 Précalcul du montant HT total
+            // 3.1 Précalcul du montant HT total, remises d'article déduites
             foreach ($request->articles as $article) {
                 if (!empty($article['produit_id'])) {
                     $produit = Produit::findOrFail($article['produit_id']);
@@ -651,10 +673,12 @@ class VenteControleur
                 } else {
                     $prix = floatval($article['prix_unitaire'] ?? 0);
                 }
-                $ht = $article['quantite'] * $prix;
+                $remiseLigne = self::tauxBorne($article['remise_taux'] ?? 0);
+                $ht = $article['quantite'] * $prix * (1 - $remiseLigne / 100);
                 $montantHt  += $ht;
             }
 
+            $remise = round($montantHt * $remiseTaux / 100, 2);
             $montantHtNet = max(0, $montantHt - $remise);
             $ratio = $montantHt > 0 ? $montantHtNet / $montantHt : 0;
 
@@ -669,8 +693,9 @@ class VenteControleur
                     $tvaRate = floatval($article['tva'] ?? 18);
                     $prix = floatval($article['prix_unitaire'] ?? 0);
                 }
-                
-                $itemHt = $article['quantite'] * $prix;
+
+                $remiseLigne = self::tauxBorne($article['remise_taux'] ?? 0);
+                $itemHt = $article['quantite'] * $prix * (1 - $remiseLigne / 100);
                 $itemHtNet = $itemHt * $ratio;
                 $itemTva = $itemHtNet * ($tvaRate / 100);
                 $montantTva += $itemTva;
@@ -710,9 +735,16 @@ class VenteControleur
                 'montant_ht'        => $montantHt,
                 'montant_tva'       => $montantTva,
                 'remise'            => $remise,
+                'remise_taux'       => $remiseTaux,
                 'montant_ttc'       => $montantTtc,
                 'statut'            => $statutVente,
+                'est_rne'           => $request->boolean('est_rne'),
+                'numero_rne'        => $request->boolean('est_rne') ? trim($request->input('numero_rne')) : null,
+                'autres_mentions'   => self::mentionBornee($request->input('autres_mentions')),
+                'pied_de_page'      => self::mentionBornee($request->input('pied_de_page')),
             ]);
+
+            self::enregistrerTaxesSurTtc($vente, $request->input('taxes_ttc', []), $montantTtc);
 
             // Re-créer les détails et mouvements
             foreach ($request->articles as $article) {
@@ -728,10 +760,11 @@ class VenteControleur
                     $tvaRate = floatval($article['tva'] ?? 18);
                 }
 
-                $ht = $article['quantite'] * $prix;
+                $remiseLigne = self::tauxBorne($article['remise_taux'] ?? 0);
+                $ht = $article['quantite'] * $prix * (1 - $remiseLigne / 100);
                 $tva = $ht * ($tvaRate / 100);
 
-                VenteDetail::create([
+                $detail = VenteDetail::create([
                     'coupon_id'       => null,
                     'vente_id'        => $vente->id,
                     'produit_id'      => $produit ? $produit->id : null,
@@ -739,9 +772,12 @@ class VenteControleur
                     'quantite'        => $article['quantite'],
                     'unite'           => $article['unite'] ?? 'Unité',
                     'prix_unitaire'   => $prix,
+                    'remise_taux'     => $remiseLigne,
                     'montant_tva'     => $tva,
                     'montant_ttc'     => $ht + $tva,
                 ]);
+
+                self::copierTaxesProduitSurLigne($detail, $produit);
 
                 if ($produit && $etaitFacturee && $produit->estStockable()) {
                     $stockAvant = $produit->stockActuel($pointDeVenteId);
@@ -939,12 +975,20 @@ class VenteControleur
                 'montant_ht'        => $vente->montant_ht,
                 'montant_tva'       => $vente->montant_tva,
                 'remise'            => $vente->remise,
+                'remise_taux'       => $vente->remise_taux,
                 'montant_ttc'       => $vente->montant_ttc,
                 'statut'            => 'Payé',
                 'type_facture'      => 'avoir',
                 'etape'             => 'Facture',
                 'parent_id'         => $vente->id,
                 'raison_avoir'      => $request->raison,
+                // Repris de la facture d'origine pour l'impression de l'avoir.
+                // L'API de remboursement de la FNE n'accepte que la liste des
+                // articles : ces champs ne lui sont pas transmis.
+                'est_rne'           => $vente->est_rne,
+                'numero_rne'        => $vente->numero_rne,
+                'autres_mentions'   => $vente->autres_mentions,
+                'pied_de_page'      => $vente->pied_de_page,
             ]);
 
             // 2. Copie des détails et retour en stock
@@ -956,6 +1000,7 @@ class VenteControleur
                     'quantite'           => $detail->quantite,
                     'unite'              => $detail->unite,
                     'prix_unitaire'      => $detail->prix_unitaire,
+                    'remise_taux'        => $detail->remise_taux,
                     'montant_tva'        => $detail->montant_tva,
                     'montant_ttc'        => $detail->montant_ttc,
                     'fne_invoice_item_id'=> $detail->fne_invoice_item_id,
@@ -1259,7 +1304,13 @@ class VenteControleur
                 'montant_ht'        => 0,
                 'montant_tva'       => 0,
                 'remise'            => 0,
+                'remise_taux'       => 0,
                 'montant_ttc'       => 0,
+                // Repris de la facture d'origine pour l'impression de l'avoir
+                'est_rne'           => $parent->est_rne,
+                'numero_rne'        => $parent->numero_rne,
+                'autres_mentions'   => $parent->autres_mentions,
+                'pied_de_page'      => $parent->pied_de_page,
             ]);
 
             $totalHt = 0;

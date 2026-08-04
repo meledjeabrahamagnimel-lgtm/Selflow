@@ -141,6 +141,7 @@
                          data-cat="{{ $produit->categorie }}"
                          data-unite="{{ $produit->unite ?? 'Unité' }}"
                          data-tva="{{ $produit->taux_tva }}"
+                         data-remise="{{ $produit->remise_taux ?? 0 }}"
                          onclick="ajouterAuPanier(this)">
                         <div class="produit-cat">{{ $produit->categorie }}</div>
                         <div class="produit-nom">{{ $produit->nom }}</div>
@@ -182,20 +183,79 @@
 
                 {{-- Totaux --}}
                 <div class="total-box">
-                    <div class="total-row"><span>Sous-total HT</span><span id="totalHt">0 F</span></div>
+                    <div class="total-row"><span>Total HT</span><span id="totalHt">0 F</span></div>
                     <div class="total-row" style="align-items:center;">
-                        <span>Remise (F)</span>
-                        <input type="number" id="remiseInput" name="remise" class="form-control" value="0" min="0" oninput="calculerTotaux()" style="width: 100px; height: 28px; text-align: right; font-weight: 700; padding: 2px 8px; font-size: 13px; margin: 0;">
+                        <span>Remise (%)</span>
+                        <input type="number" id="remiseTauxInput" name="remise_taux" class="form-control" value="0" min="0" max="100" step="0.01" oninput="calculerTotaux()" style="width: 100px; height: 28px; text-align: right; font-weight: 700; padding: 2px 8px; font-size: 13px; margin: 0;">
                     </div>
+                    <div class="total-row" style="color:#dc2626;">
+                        <span>Montant de la remise sur le total HT</span>
+                        <span id="montantRemise">0 F</span>
+                    </div>
+                    <div class="total-row"><span>Total HT après remise</span><span id="totalHtNet">0 F</span></div>
                     <div class="total-row" style="align-items:center;">
-                        <span>TVA</span>
+                        <span>Total TVA</span>
                         <span id="totalTva">0 F</span>
                     </div>
-                    <div class="total-row grand"><span>Total TTC</span><span id="totalTtc">0 F</span></div>
+                    <div class="total-row"><span>Total TTC</span><span id="totalTtc">0 F</span></div>
+                    <div class="total-row"><span>Autres taxes</span><span id="totalAutresTaxes">0 F</span></div>
+                    <div class="total-row grand"><span>Net à payer</span><span id="netAPayer">0 F</span></div>
+                </div>
+
+                {{-- Taxes sur total TTC (champ `customTaxes` de la FNE) --}}
+                <div style="margin-top:14px; border:1px solid var(--border); border-radius:10px; padding:12px;">
+                    <div style="font-size:12px; font-weight:700; color:var(--text-2); margin-bottom:8px;">
+                        <i class="fas fa-percent" style="color:var(--primary);"></i> Taxes sur total TTC
+                    </div>
+                    <div id="taxesTtcConteneur" style="display:flex; flex-direction:column; gap:8px;"></div>
+                    <button type="button" class="btn btn-outline btn-sm" onclick="ajouterTaxeTtc()"
+                            style="width:100%; justify-content:center; margin-top:8px; border-style:dashed; font-size:12px;">
+                        <i class="fas fa-plus"></i> Ajouter une taxe
+                    </button>
                 </div>
 
                 {{-- Client & paiement --}}
                 <div style="margin-top: 18px;">
+
+                    {{-- Rattachement à un reçu normalisé déjà émis (champ `isRne` de la DGI) --}}
+                    @php $entrepriseCourante = Auth::user()->entreprise; @endphp
+                    <div class="form-group" style="background:var(--bg3); border:1px solid var(--border); border-radius:10px; padding:12px;">
+                        <label style="display:flex; align-items:center; gap:8px; font-size:13px; font-weight:700; cursor:pointer; margin:0;">
+                            <input type="checkbox" name="est_rne" value="1" id="estRneCheckbox"
+                                   onchange="basculerChampRne()"
+                                   style="width:16px; height:16px; cursor:pointer;">
+                            RNE
+                        </label>
+                        <small style="display:block; color:var(--text-3); font-size:11px; margin-top:4px;">
+                            À cocher si cette facture est émise en remplacement d'un reçu normalisé déjà délivré.
+                        </small>
+                        <div id="champRneContainer" style="display:none; margin-top:10px;">
+                            <label class="form-label" style="font-size:11px;">Numéro du reçu</label>
+                            <input type="text" name="numero_rne" id="numeroRneInput" class="form-control"
+                                   maxlength="64" placeholder="N° du reçu normalisé d'origine">
+                        </div>
+                    </div>
+
+                    {{-- Mentions transmises à la FNE (`commercialMessage` et `footer`) --}}
+                    <div class="form-group">
+                        <label class="form-label">Autres mentions</label>
+                        <textarea name="autres_mentions" id="autresMentionsInput" class="form-control" rows="2"
+                                  maxlength="248" oninput="majCompteurMention('autresMentions')"
+                                  placeholder="Message commercial affiché sur la facture">{{ old('autres_mentions', $entrepriseCourante->facture_autres_mentions) }}</textarea>
+                        <small style="color:var(--text-3); font-size:11px;">
+                            <span id="autresMentionsCompteur">0</span>/248 caractères — prérempli depuis les paramètres de l'entreprise.
+                        </small>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Pied de page</label>
+                        <textarea name="pied_de_page" id="piedDePageInput" class="form-control" rows="2"
+                                  maxlength="248" oninput="majCompteurMention('piedDePage')"
+                                  placeholder="Texte affiché en bas de la facture">{{ old('pied_de_page', $entrepriseCourante->pied_de_page_facture) }}</textarea>
+                        <small style="color:var(--text-3); font-size:11px;">
+                            <span id="piedDePageCompteur">0</span>/248 caractères.
+                        </small>
+                    </div>
+
                     <div class="form-group">
                         <label class="form-label">Client (optionnel)</label>
                         <select name="client_id" class="form-control">
@@ -683,7 +743,7 @@ function ajouterSaisieLibre(e, fermer = true) {
     const tva = parseFloat(tvaInput.value || 18);
     
     const id = 'v_' + Date.now();
-    panier[id] = { nom, prix, qte, stock: 99999, stock_minimum: 0, unite, tva, isVirtual: true };
+    panier[id] = { nom, prix, qte, stock: 99999, stock_minimum: 0, unite, tva, remise_taux: 0, isVirtual: true };
     
     if (fermer) {
         fermerSaisieLibre();
@@ -712,6 +772,8 @@ function ajouterAuPanier(card) {
     const stock_min = parseInt(card.dataset.stockMin || 5);
     const unite     = card.dataset.unite || 'Unité';
     const tva       = parseFloat(card.dataset.tva || 18);
+    // Remise par defaut du produit, reprise telle quelle sur la ligne
+    const remise    = parseFloat(card.dataset.remise || 0);
 
     if (panier[id]) {
         const nouvelleQte = panier[id].qte + 1;
@@ -725,9 +787,9 @@ function ajouterAuPanier(card) {
         }
     } else {
         if (stock <= 0) {
-            ouvrirModalRuptureVirtual(id, nom, prix, stock, stock_min, unite, tva);
+            ouvrirModalRuptureVirtual(id, nom, prix, stock, stock_min, unite, tva, remise);
         } else {
-            panier[id] = { nom, prix, qte: 1, stock, stock_minimum: stock_min, unite: unite, tva, isVirtual: false };
+            panier[id] = { nom, prix, qte: 1, stock, stock_minimum: stock_min, unite: unite, tva, remise_taux: remise, isVirtual: false };
             verifierLimiteMinimale(panier[id]);
             savePanier();
             renderPanier();
@@ -817,13 +879,13 @@ function ouvrirModalRupture(id, qte) {
 }
 
 // Ouvrir modal rupture virtuel
-function ouvrirModalRuptureVirtual(id, nom, prix, stock, stock_min, unite, tva) {
+function ouvrirModalRuptureVirtual(id, nom, prix, stock, stock_min, unite, tva, remise) {
     document.getElementById('ruptureNomProduit').textContent = nom;
     document.getElementById('ruptureQteDemandee').textContent = 1;
     document.getElementById('ruptureStockDispo').textContent = stock;
     
     document.getElementById('btnConfirmerRupture').onclick = function() {
-        panier[id] = { nom, prix, qte: 1, stock, stock_minimum: stock_min, unite: unite, tva, isVirtual: false };
+        panier[id] = { nom, prix, qte: 1, stock, stock_minimum: stock_min, unite: unite, tva, remise_taux: remise || 0, isVirtual: false };
         fermerModalRupture();
         savePanier();
         renderPanier();
@@ -906,15 +968,20 @@ function renderPanier() {
         const item = panier[id];
         const sousTotal = item.prix * item.qte;
 
+        const remiseLigne = parseFloat(item.remise_taux || 0);
+        const sousTotalNet = sousTotal * (1 - remiseLigne / 100);
+
         const div = document.createElement('div');
         div.className = 'panier-item';
         div.innerHTML = `
             <div style="flex:1;">
                 <div class="item-nom">${item.nom}</div>
-                <div class="item-prix">${formatFcfa(item.prix)} × ${item.qte} = <strong>${formatFcfa(sousTotal)}</strong></div>
+                <div class="item-prix">${formatFcfa(item.prix)} × ${item.qte} = <strong>${formatFcfa(sousTotalNet)}</strong>${remiseLigne > 0 ? ` <span style="color:#dc2626;">(−${remiseLigne}%)</span>` : ''}</div>
                 <div style="margin-top: 5px; display: flex; align-items: center; gap: 6px;">
                     <span style="font-size: 11px; color: var(--text-3);">Unité:</span>
                     <input type="text" class="form-control form-control-sm" value="${item.unite || 'Unité'}" onchange="saisirUnite('${id}', this.value)" style="width: 80px; height: 22px; font-size: 11px; padding: 2px 6px; display: inline-block;">
+                    <span style="font-size: 11px; color: var(--text-3);">Remise (%):</span>
+                    <input type="number" class="form-control form-control-sm" value="${remiseLigne}" min="0" max="100" step="0.01" onchange="saisirRemiseLigne('${id}', this.value)" style="width: 70px; height: 22px; font-size: 11px; padding: 2px 6px; display: inline-block;">
                 </div>
             </div>
             <div class="qte-ctrl">
@@ -929,11 +996,11 @@ function renderPanier() {
         container.appendChild(div);
 
         const form = document.getElementById('formVente');
-        ['produit_id', 'quantite', 'libelle_virtuel', 'prix_unitaire', 'unite', 'tva'].forEach(field => {
+        ['produit_id', 'quantite', 'libelle_virtuel', 'prix_unitaire', 'unite', 'tva', 'remise_taux'].forEach(field => {
             const input = document.createElement('input');
             input.type = 'hidden';
             input.name = `articles[${idx}][${field}]`;
-            
+
             if (field === 'produit_id') {
                 input.value = item.isVirtual ? '' : id;
             } else if (field === 'quantite') {
@@ -946,8 +1013,10 @@ function renderPanier() {
                 input.value = item.unite || 'Unité';
             } else if (field === 'tva') {
                 input.value = item.tva || 0;
+            } else if (field === 'remise_taux') {
+                input.value = item.remise_taux || 0;
             }
-            
+
             input.className = 'article-input';
             form.appendChild(input);
         });
@@ -967,37 +1036,131 @@ function saisirUnite(id, val) {
     }
 }
 
+function saisirRemiseLigne(id, val) {
+    if (!panier[id]) return;
+
+    let taux = parseFloat(val);
+    if (isNaN(taux) || taux < 0) taux = 0;
+    if (taux > 100) taux = 100;
+
+    panier[id].remise_taux = taux;
+    savePanier();
+    renderPanier();
+}
+
+// ─── Taxes sur total TTC (champ `customTaxes` de la FNE) ────────────────────
+
+function ajouterTaxeTtc(nom, taux) {
+    const conteneur = document.getElementById('taxesTtcConteneur');
+    if (!conteneur) return;
+
+    const index = conteneur.children.length;
+    const ligne = document.createElement('div');
+    ligne.style.cssText = 'display:flex; gap:6px; align-items:center;';
+    ligne.innerHTML = `
+        <input type="text" name="taxes_ttc[${index}][nom]" class="form-control form-control-sm"
+               placeholder="Nom (ex : DTD)" maxlength="100" value="${nom ? String(nom).replace(/"/g, '&quot;') : ''}"
+               style="flex:2; height:28px; font-size:12px;">
+        <input type="number" name="taxes_ttc[${index}][taux]" class="form-control form-control-sm"
+               placeholder="Taxe (%)" min="0.01" max="100" step="0.01" value="${taux !== undefined ? taux : ''}"
+               oninput="calculerTotaux()" style="flex:1; height:28px; font-size:12px;">
+        <span class="montant-taxe-ttc" style="flex:1; font-size:12px; font-weight:700; text-align:right; white-space:nowrap;">0 F</span>
+        <button type="button" class="remove-btn" title="Supprimer cette taxe" onclick="supprimerTaxeTtc(this)">
+            <i class="fas fa-trash"></i>
+        </button>
+    `;
+    conteneur.appendChild(ligne);
+    calculerTotaux();
+}
+
+function supprimerTaxeTtc(bouton) {
+    bouton.closest('div').remove();
+
+    // Réindexer pour que Laravel reçoive bien un tableau continu
+    const conteneur = document.getElementById('taxesTtcConteneur');
+    Array.from(conteneur.children).forEach((ligne, index) => {
+        const champs = ligne.querySelectorAll('input');
+        if (champs[0]) champs[0].name = `taxes_ttc[${index}][nom]`;
+        if (champs[1]) champs[1].name = `taxes_ttc[${index}][taux]`;
+    });
+
+    calculerTotaux();
+}
+
+function basculerChampRne() {
+    const coche = document.getElementById('estRneCheckbox').checked;
+    const bloc  = document.getElementById('champRneContainer');
+    const champ = document.getElementById('numeroRneInput');
+
+    bloc.style.display = coche ? 'block' : 'none';
+    if (champ) champ.required = coche;
+}
+
+function majCompteurMention(prefixe) {
+    const champ    = document.getElementById(prefixe + 'Input');
+    const compteur = document.getElementById(prefixe + 'Compteur');
+    if (champ && compteur) compteur.textContent = champ.value.length;
+}
+
+/**
+ * Ordre de calcul aligné sur le récapitulatif de la FNE :
+ *   Total HT → remise ligne → remise globale → TVA → TTC → autres taxes.
+ */
 function calculerTotaux() {
     let totalHt = 0;
-    let totalTva = 0;
-    
+
     Object.keys(panier).forEach(id => {
         const item = panier[id];
-        totalHt += item.prix * item.qte;
+        const remiseLigne = parseFloat(item.remise_taux || 0);
+        totalHt += item.prix * item.qte * (1 - remiseLigne / 100);
     });
-    
-    const remise = parseFloat(document.getElementById('remiseInput')?.value || 0);
-    const totalHtNet = Math.max(0, totalHt - remise);
-    
-    const ratio = totalHt > 0 ? totalHtNet / totalHt : 0;
-    
+
+    let remiseTaux = parseFloat(document.getElementById('remiseTauxInput')?.value || 0);
+    if (isNaN(remiseTaux) || remiseTaux < 0) remiseTaux = 0;
+    if (remiseTaux > 100) remiseTaux = 100;
+
+    const montantRemise = totalHt * (remiseTaux / 100);
+    const totalHtNet    = Math.max(0, totalHt - montantRemise);
+    const ratio         = totalHt > 0 ? totalHtNet / totalHt : 0;
+
+    let totalTva = 0;
     Object.keys(panier).forEach(id => {
         const item = panier[id];
-        const itemHtNet = item.prix * item.qte * ratio;
+        const remiseLigne = parseFloat(item.remise_taux || 0);
+        const itemHtNet = item.prix * item.qte * (1 - remiseLigne / 100) * ratio;
         totalTva += itemHtNet * ((item.tva || 0) / 100);
     });
-    
+
     const totalTtc = totalHtNet + totalTva;
-    
-    document.getElementById('totalHt').textContent  = formatFcfa(totalHt);
-    document.getElementById('totalTva').textContent = formatFcfa(totalTva);
-    document.getElementById('totalTtc').textContent = formatFcfa(totalTtc);
-    
+
+    // Autres taxes : appliquées sur le total TTC
+    let totalAutresTaxes = 0;
+    document.querySelectorAll('#taxesTtcConteneur > div').forEach(ligne => {
+        const taux = parseFloat(ligne.querySelectorAll('input')[1]?.value || 0);
+        const montant = (isNaN(taux) ? 0 : Math.min(Math.max(taux, 0), 100)) / 100 * totalTtc;
+        totalAutresTaxes += montant;
+        const affichage = ligne.querySelector('.montant-taxe-ttc');
+        if (affichage) affichage.textContent = formatFcfa(montant);
+    });
+
+    document.getElementById('totalHt').textContent          = formatFcfa(totalHt);
+    document.getElementById('montantRemise').textContent    = formatFcfa(montantRemise);
+    document.getElementById('totalHtNet').textContent       = formatFcfa(totalHtNet);
+    document.getElementById('totalTva').textContent         = formatFcfa(totalTva);
+    document.getElementById('totalTtc').textContent         = formatFcfa(totalTtc);
+    document.getElementById('totalAutresTaxes').textContent = formatFcfa(totalAutresTaxes);
+    document.getElementById('netAPayer').textContent        = formatFcfa(totalTtc + totalAutresTaxes);
+
     const inputMontant = document.getElementById('montantPayeInput');
     if (inputMontant) {
         inputMontant.placeholder = `${Math.round(totalTtc)}`;
     }
 }
+
+document.addEventListener('DOMContentLoaded', function () {
+    majCompteurMention('autresMentions');
+    majCompteurMention('piedDePage');
+});
 
 function ouvrirModalNouvelleBanque() {
     document.getElementById('modalNouvelleBanque').classList.add('open');
