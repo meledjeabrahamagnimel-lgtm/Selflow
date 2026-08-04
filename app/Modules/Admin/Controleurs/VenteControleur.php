@@ -171,10 +171,13 @@ class VenteControleur
             foreach ($request->articles as $article) {
                 if (!empty($article['produit_id'])) {
                     $produit = Produit::findOrFail($article['produit_id']);
-                    $tvaRate = $produit->taux_tva;
+                    // Le taux saisi sur la ligne prime sur celui du catalogue
+                    $tvaRate = isset($article['tva']) && $article['tva'] !== ''
+                        ? self::tauxBorne($article['tva'])
+                        : $produit->taux_tva;
                     $prix = $produit->prix_vente;
                 } else {
-                    $tvaRate = floatval($article['tva'] ?? 18);
+                    $tvaRate = self::tauxBorne($article['tva'] ?? 18);
                     $prix = floatval($article['prix_unitaire'] ?? 0);
                 }
 
@@ -255,12 +258,14 @@ class VenteControleur
                     $produit = Produit::lockForUpdate()->findOrFail($article['produit_id']);
                     $prix = $produit->prix_vente;
                     $nomElement = $produit->nom;
-                    $tvaRate = $produit->taux_tva;
+                    $tvaRate = isset($article['tva']) && $article['tva'] !== ''
+                        ? self::tauxBorne($article['tva'])
+                        : $produit->taux_tva;
                 } else {
                     $produit = null;
                     $prix = floatval($article['prix_unitaire'] ?? 0);
                     $nomElement = $article['libelle_virtuel'] ?? 'Saisie libre';
-                    $tvaRate = floatval($article['tva'] ?? 18);
+                    $tvaRate = self::tauxBorne($article['tva'] ?? 18);
                 }
 
                 $remiseLigne = self::tauxBorne($article['remise_taux'] ?? 0);
@@ -719,10 +724,13 @@ class VenteControleur
             foreach ($request->articles as $article) {
                 if (!empty($article['produit_id'])) {
                     $produit = Produit::findOrFail($article['produit_id']);
-                    $tvaRate = $produit->taux_tva;
+                    // Le taux saisi sur la ligne prime sur celui du catalogue
+                    $tvaRate = isset($article['tva']) && $article['tva'] !== ''
+                        ? self::tauxBorne($article['tva'])
+                        : $produit->taux_tva;
                     $prix = $produit->prix_vente;
                 } else {
-                    $tvaRate = floatval($article['tva'] ?? 18);
+                    $tvaRate = self::tauxBorne($article['tva'] ?? 18);
                     $prix = floatval($article['prix_unitaire'] ?? 0);
                 }
 
@@ -785,12 +793,14 @@ class VenteControleur
                     $produit = Produit::lockForUpdate()->findOrFail($article['produit_id']);
                     $prix = $produit->prix_vente;
                     $nomElement = $produit->nom;
-                    $tvaRate = $produit->taux_tva;
+                    $tvaRate = isset($article['tva']) && $article['tva'] !== ''
+                        ? self::tauxBorne($article['tva'])
+                        : $produit->taux_tva;
                 } else {
                     $produit = null;
                     $prix = floatval($article['prix_unitaire'] ?? 0);
                     $nomElement = $article['libelle_virtuel'] ?? 'Saisie libre';
-                    $tvaRate = floatval($article['tva'] ?? 18);
+                    $tvaRate = self::tauxBorne($article['tva'] ?? 18);
                 }
 
                 $remiseLigne = self::tauxBorne($article['remise_taux'] ?? 0);

@@ -126,6 +126,16 @@
         border: none !important;
         border-radius: 0 !important;
         box-shadow: none !important;
+        /* Sans cela, le masquage de debordement rogne le tableau a l'export */
+        overflow: visible !important;
+    }
+    .invoice.mode-export table { font-size: 10px !important; }
+    .invoice.mode-export th,
+    .invoice.mode-export td {
+        padding-left: 5px !important;
+        padding-right: 5px !important;
+        white-space: normal !important;
+        word-break: break-word;
     }
 
     @page {

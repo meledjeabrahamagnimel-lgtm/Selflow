@@ -114,9 +114,21 @@
         table-layout: auto;
         width: 100%;
     }
+    /* A l'ecran, un tableau trop large defile dans son cadre plutot que d'etre
+       ampute par le masquage de debordement de la facture. */
+    .invoice .table-wrap {
+        overflow-x: auto;
+    }
     .invoice table th,
     .invoice table td {
         overflow-wrap: anywhere;
+        white-space: normal;
+        word-break: break-word;
+    }
+    /* Seuls les montants et pourcentages restent sur une seule ligne */
+    .invoice table td.montant,
+    .invoice table th.montant {
+        white-space: nowrap;
     }
 
     /* Styles pour la table modèle 4 standard */
@@ -150,6 +162,23 @@
         border: none !important;
         border-radius: 0 !important;
         box-shadow: none !important;
+        /*
+         * `.invoice` masque son debordement pour arrondir ses coins. A
+         * l'export, ce masquage rognait purement et simplement la partie du
+         * tableau qui depassait : d'ou les factures coupees a droite.
+         */
+        overflow: visible !important;
+    }
+    .invoice.mode-export table {
+        font-size: 10px !important;
+    }
+    .invoice.mode-export th,
+    .invoice.mode-export td {
+        padding-left: 5px !important;
+        padding-right: 5px !important;
+        /* Un libelle long doit se replier plutot qu'elargir la colonne */
+        white-space: normal !important;
+        word-break: break-word;
     }
 
     /* CSS Impression */
@@ -501,6 +530,9 @@ var DATA = {
         parent_fne: {!! json_encode($vente->parent ? $vente->parent->numero_fne : null) !!},
         raison_avoir: {!! json_encode($vente->raison_avoir) !!},
         qr_code_data: {!! json_encode($vente->qr_code_data) !!},
+        qr_code_image: {!! json_encode($vente->qr_code_data
+            ? \App\Modules\Admin\Services\QrCodeService::dataUri($vente->qr_code_data, 220)
+            : null) !!},
         numero_fne: {!! json_encode($vente->numero_fne) !!},
         signature_dgi: {!! json_encode($vente->signature_dgi) !!},
         moyen_bancaire: {!! json_encode($vente->moyen_bancaire) !!},
@@ -529,13 +561,18 @@ var DATA = {
                     { nom: {!! json_encode($taxe->nom) !!}, taux: {{ (float) $taxe->taux }} },
                     @endforeach
                 ],
-                tva: {{ $detail->produit ? $detail->produit->taux_tva : ($detail->montant_tva > 0 ? 18 : 0) }},
-                code_tva: {!! json_encode($detail->produit
-                    ? $detail->produit->codeTvaFne($vente->pointDeVente->entreprise->regime_imposition)
-                    : \App\Modules\Admin\Modeles\Produit::deduireCodeTva(
-                        $detail->montant_tva > 0 ? 18 : 0,
-                        $vente->pointDeVente->entreprise->regime_imposition
-                    )) !!}
+                @php
+                    $htLigne = (float) $detail->quantite * (float) $detail->prix_unitaire
+                        * (1 - (float) ($detail->remise_taux ?? 0) / 100);
+                    $tauxLigne = $htLigne > 0
+                        ? round((float) $detail->montant_tva / $htLigne * 100, 2)
+                        : (float) ($detail->produit->taux_tva ?? 0);
+                @endphp
+                tva: {{ $tauxLigne }},
+                code_tva: {!! json_encode(\App\Modules\Admin\Modeles\Produit::deduireCodeTva(
+                    $tauxLigne,
+                    $vente->pointDeVente->entreprise->regime_imposition
+                )) !!}
             },
             @endforeach
         ],
@@ -860,9 +897,8 @@ function fiscalLinesClient(c, sep) {
 function blocCertificationFne(d) {
     if (!d.normalise || !d.numero_fne) return '';
 
-    var qr = d.qr_code_data
-        ? `<img src="https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(d.qr_code_data)}"
-                style="width:92px;height:92px;" alt="Code de vérification FNE">`
+    var qr = d.qr_code_image
+        ? `<img src="${d.qr_code_image}" style="width:92px;height:92px;" alt="Code de vérification FNE">`
         : '';
 
     return `

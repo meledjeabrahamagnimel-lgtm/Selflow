@@ -170,7 +170,7 @@
                             {{-- Code de vérification : la DGI exige le QR code sur le
                                  document certifié, il n'y figurait pas. --}}
                             @if($achat->qr_code_data)
-                                <img src="https://api.qrserver.com/v1/create-qr-code/?size=160x160&data={{ urlencode($achat->qr_code_data) }}"
+                                <img src="{{ \App\Modules\Admin\Services\QrCodeService::dataUri($achat->qr_code_data, 160) }}"
                                      style="width:80px; height:80px;" alt="Code de vérification FNE">
                             @endif
                         </div>

@@ -1075,6 +1075,8 @@ function renderPanier() {
                     <input type="text" class="form-control form-control-sm" value="${item.unite || 'Unité'}" onchange="saisirUnite('${id}', this.value)" style="width: 80px; height: 22px; font-size: 11px; padding: 2px 6px; display: inline-block;">
                     <span style="font-size: 11px; color: var(--text-3);">Remise (%):</span>
                     <input type="number" class="form-control form-control-sm" value="${remiseLigne}" min="0" max="100" step="0.01" oninput="saisirRemiseLigne('${id}', this.value)" style="width: 70px; height: 22px; font-size: 11px; padding: 2px 6px; display: inline-block;">
+                    <span style="font-size: 11px; color: var(--text-3);">TVA (%):</span>
+                    <input type="number" class="form-control form-control-sm" value="${item.tva || 0}" min="0" max="100" step="0.01" oninput="saisirTvaLigne('${id}', this.value)" style="width: 70px; height: 22px; font-size: 11px; padding: 2px 6px; display: inline-block;">
                 </div>
             </div>
             <div class="qte-ctrl">
@@ -1144,6 +1146,27 @@ function saisirUnite(id, val) {
     }
 }
 
+/**
+ * Taux de TVA de la ligne, modifiable au cas par cas comme la remise.
+ *
+ * Le taux vient de la fiche produit, mais une vente peut relever d'un régime
+ * différent (exonération conventionnelle, marché public…) : il reste donc
+ * ajustable sur la pièce sans toucher au catalogue.
+ */
+function saisirTvaLigne(id, val) {
+    if (!panier[id]) return;
+
+    let taux = parseFloat(val);
+    if (isNaN(taux) || taux < 0) taux = 0;
+    if (taux > 100) taux = 100;
+
+    panier[id].tva = taux;
+    savePanier();
+
+    majChampsArticles();
+    calculerTotaux();
+}
+
 function saisirRemiseLigne(id, val) {
     if (!panier[id]) return;
 
@@ -1185,9 +1208,16 @@ function rafraichirSousTotalLigne(id) {
  * visible du panier.
  */
 function majChampsArticles() {
+    const ids = Object.keys(panier);
+
     document.querySelectorAll('.article-input[name*="[remise_taux]"]').forEach((champ, rang) => {
-        const id = Object.keys(panier)[rang];
+        const id = ids[rang];
         if (id !== undefined) champ.value = panier[id].remise_taux || 0;
+    });
+
+    document.querySelectorAll('.article-input[name*="[tva]"]').forEach((champ, rang) => {
+        const id = ids[rang];
+        if (id !== undefined) champ.value = panier[id].tva || 0;
     });
 }
 
