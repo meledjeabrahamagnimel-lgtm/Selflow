@@ -621,6 +621,62 @@ function telechargerDirectement(url) {
                         <input type="text" name="raison" class="form-control" required placeholder="Ex: Retour produit défectueux, remise commerciale..." style="width:100%; padding:10px; border:1px solid #cbd5e1; border-radius:8px;">
                     </div>
 
+                    <!-- Mentions du document d'avoir -->
+                    <div style="margin-bottom:20px; background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; padding:14px; text-align:left;">
+                        <div style="font-size:12px; font-weight:700; color:#334155; margin-bottom:4px;">
+                            <i class="fas fa-file-lines" style="color:#e17055;"></i> Mentions de l'avoir
+                        </div>
+                        <div style="font-size:11px; color:#64748b; margin-bottom:12px;">
+                            Ces champs sont préremplis depuis la facture d'origine et n'apparaissent que sur
+                            l'avoir imprimé : l'API de remboursement de la FNE n'accepte que la liste des
+                            articles retournés.
+                        </div>
+
+                        <label style="display:flex; align-items:center; gap:8px; font-size:13px; font-weight:700; color:#334155; cursor:pointer; margin-bottom:10px;">
+                            <input type="checkbox" name="est_rne" value="1" id="avoirEstRneCheckbox"
+                                   onchange="basculerChampRneAvoir()" style="width:16px; height:16px; cursor:pointer;">
+                            RNE
+                        </label>
+                        <div id="avoirChampRne" style="display:none; margin-bottom:12px;">
+                            <label style="font-size:11px; font-weight:700; color:#475569; display:block; margin-bottom:4px;">Numéro du reçu</label>
+                            <input type="text" name="numero_rne" id="avoirNumeroRne" maxlength="64"
+                                   placeholder="N° du reçu normalisé d'origine"
+                                   style="width:100%; padding:8px; border:1px solid #cbd5e1; border-radius:6px; font-size:12px;">
+                        </div>
+
+                        <label style="font-size:11px; font-weight:700; color:#475569; display:block; margin-bottom:4px;">Autres mentions</label>
+                        <textarea name="autres_mentions" id="avoirAutresMentions" rows="2" maxlength="248"
+                                  oninput="majCompteurAvoir('avoirAutresMentions')"
+                                  style="width:100%; padding:8px; border:1px solid #cbd5e1; border-radius:6px; font-size:12px;"></textarea>
+                        <div style="font-size:11px; color:#94a3b8; margin-bottom:10px;">
+                            <span id="avoirAutresMentionsCompteur">0</span>/248 caractères
+                        </div>
+
+                        <label style="font-size:11px; font-weight:700; color:#475569; display:block; margin-bottom:4px;">Pied de page</label>
+                        <textarea name="pied_de_page" id="avoirPiedDePage" rows="2" maxlength="248"
+                                  oninput="majCompteurAvoir('avoirPiedDePage')"
+                                  style="width:100%; padding:8px; border:1px solid #cbd5e1; border-radius:6px; font-size:12px;"></textarea>
+                        <div style="font-size:11px; color:#94a3b8;">
+                            <span id="avoirPiedDePageCompteur">0</span>/248 caractères
+                        </div>
+                    </div>
+
+                    <script>
+                        function basculerChampRneAvoir() {
+                            const coche = document.getElementById('avoirEstRneCheckbox').checked;
+                            const bloc  = document.getElementById('avoirChampRne');
+                            const champ = document.getElementById('avoirNumeroRne');
+                            bloc.style.display = coche ? 'block' : 'none';
+                            if (champ) champ.required = coche;
+                        }
+
+                        function majCompteurAvoir(id) {
+                            const champ    = document.getElementById(id);
+                            const compteur = document.getElementById(id + 'Compteur');
+                            if (champ && compteur) compteur.textContent = champ.value.length;
+                        }
+                    </script>
+
                     <!-- Articles -->
                     <label style="font-weight: 700; font-size: 13px; display: block; margin-bottom: 10px; color: #334155;">Sélectionner les articles et ajuster les quantités à créditer</label>
                     <table class="table" style="width: 100%; border-collapse: collapse; font-size: 13px;">
@@ -1001,6 +1057,24 @@ function selectionnerFacturePourAvoir(id) {
             document.getElementById('avoir_parent_id').value = data.id;
             document.getElementById('avoir_facture_ref').textContent = data.numero_facture;
             document.getElementById('avoir_client_nom').textContent = data.client_nom;
+
+            // Preremplir les mentions depuis la facture d'origine
+            const caseRne = document.getElementById('avoirEstRneCheckbox');
+            if (caseRne) {
+                caseRne.checked = !!data.est_rne;
+                document.getElementById('avoirNumeroRne').value = data.numero_rne || '';
+                basculerChampRneAvoir();
+            }
+            const champMentions = document.getElementById('avoirAutresMentions');
+            if (champMentions) {
+                champMentions.value = data.autres_mentions || '';
+                majCompteurAvoir('avoirAutresMentions');
+            }
+            const champPied = document.getElementById('avoirPiedDePage');
+            if (champPied) {
+                champPied.value = data.pied_de_page || '';
+                majCompteurAvoir('avoirPiedDePage');
+            }
             
             const tbody = document.getElementById('avoirItemsTableBody');
             tbody.innerHTML = '';

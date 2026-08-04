@@ -12,6 +12,7 @@ use App\Modules\Admin\Modeles\CodeJournal;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use App\Modules\Admin\Traits\GereLesChampsFne;
 use App\Modules\Admin\Traits\JournaliseActions;
 use Illuminate\Support\Facades\DB;
 use Illuminate\View\View;
@@ -22,6 +23,7 @@ use App\Modules\Admin\Modeles\Entreprise;
 class AchatControleur
 {
     use JournaliseActions;
+    use GereLesChampsFne;
 
     public function nouveau(): View
     {
@@ -77,11 +79,11 @@ class AchatControleur
             'articles.*.quantite'        => ['required', 'integer', 'min:1'],
             'articles.*.prix_unitaire'   => ['required', 'numeric', 'min:0'],
             'articles.*.unite'           => ['nullable', 'string', 'max:50'],
-        ], [
+        ] + self::reglesChampsFne(), [
             'fournisseur_id.required'    => 'Veuillez sélectionner un fournisseur.',
             'fournisseur_nom_bapa.required' => 'Veuillez saisir le nom du vendeur (tiers non immatriculé).',
             'articles.required'          => 'Veuillez ajouter au moins un article.',
-        ]);
+        ] + self::messagesChampsFne());
 
         // Pour le mode BAPA : résoudre (ou créer) le fournisseur "tiers" à partir du nom libre
         if ($isBapa) {
@@ -115,10 +117,14 @@ class AchatControleur
             $montantHt  = 0;
             $montantTva = 0;
             $etape = $request->input('etape', 'Facture');
+            $remiseTaux = self::tauxBorne($request->input('remise_taux', 0));
 
             // --- Calcul HT et TVA ligne par ligne depuis les taux produits ---
+            //     La remise d'article s'applique avant la remise globale,
+            //     comme l'exige le récapitulatif de la FNE.
             foreach ($request->articles as $article) {
-                $ht = (float)$article['quantite'] * (float)$article['prix_unitaire'];
+                $remiseLigne = self::tauxBorne($article['remise_taux'] ?? 0);
+                $ht = (float)$article['quantite'] * (float)$article['prix_unitaire'] * (1 - $remiseLigne / 100);
                 $montantHt += $ht;
 
                 // Récupérer le taux TVA du produit sélectionné
@@ -132,7 +138,14 @@ class AchatControleur
                 // Pour les lignes libres (sans produit), pas de TVA automatique
             }
 
-            $montantTtc = $montantHt + $montantTva;
+            // La remise globale est saisie en pourcentage (format DGI) ; son
+            // équivalent en francs est conservé pour la comptabilité.
+            $remise = round($montantHt * $remiseTaux / 100, 2);
+            $montantHtNet = max(0, $montantHt - $remise);
+            $ratio = $montantHt > 0 ? $montantHtNet / $montantHt : 0;
+            $montantTva = round($montantTva * $ratio, 2);
+
+            $montantTtc = $montantHtNet + $montantTva;
 
             // Déterminer le mode de paiement final (par défaut Caisse si non fourni)
             $modePaiementFinal = $request->input('mode_paiement', 'Caisse');
@@ -167,14 +180,24 @@ class AchatControleur
                 'montant_ht'                 => $montantHt,
                 'montant_tva'                => $montantTva,
                 'montant_ttc'                => $montantTtc,
+                'remise'                     => $remise,
+                'remise_taux'                => $remiseTaux,
                 'statut'                     => $statutInitial,
                 'etape'                      => $etape,
                 'type_facture'               => $request->input('type_facture', 'normale'),
+                'est_rne'                    => $request->boolean('est_rne'),
+                'numero_rne'                 => $request->boolean('est_rne') ? trim($request->input('numero_rne')) : null,
+                'autres_mentions'            => self::mentionBornee($request->input('autres_mentions')),
+                'pied_de_page'               => self::mentionBornee($request->input('pied_de_page')),
             ]);
+
+            // Taxes sur le total TTC (champ `customTaxes` de la FNE)
+            self::enregistrerTaxesSurTtc($achat, $request->input('taxes_ttc', []), $montantTtc);
 
             foreach ($request->articles as $article) {
                 $produit = !empty($article['produit_id']) ? Produit::lockForUpdate()->find($article['produit_id']) : null;
-                $ht      = (float)$article['quantite'] * (float)$article['prix_unitaire'];
+                $remiseLigne = self::tauxBorne($article['remise_taux'] ?? 0);
+                $ht      = (float)$article['quantite'] * (float)$article['prix_unitaire'] * (1 - $remiseLigne / 100);
                 $tvaDeLigne = 0;
                 if ($produit) {
                     $tauxTvaProduit = (float)($produit->taux_tva ?? 0);
@@ -183,16 +206,20 @@ class AchatControleur
                     }
                 }
 
-                AchatDetail::create([
+                $detail = AchatDetail::create([
                     'achat_id'       => $achat->id,
                     'produit_id'     => $produit ? $produit->id : null,
                     'libelle_virtuel'=> $produit ? null : ($article['libelle_virtuel'] ?? 'Saisie libre'),
                     'quantite'       => $article['quantite'],
                     'unite'          => $article['unite'] ?? 'Unité',
                     'prix_unitaire'  => $article['prix_unitaire'],
+                    'remise_taux'    => $remiseLigne,
                     'montant_tva'    => $tvaDeLigne,
                     'montant_ttc'    => $ht + $tvaDeLigne,
                 ]);
+
+                // Instantané des taxes personnalisées du produit sur la ligne
+                self::copierTaxesProduitSurLigne($detail, $produit);
 
                 // Augmenter le stock + mouvement uniquement si Facture et stockable
                 if ($produit && $etape === 'Facture' && $produit->estStockable()) {

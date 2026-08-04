@@ -12,9 +12,15 @@ return new class extends Migration
     public function up(): void
     {
         // 1. Modifier la table 'achat_details'
-        Schema::table('achat_details', function (Blueprint $table) {
-            $table->dropForeign('fk_achat_details_produits');
-        });
+        // SQLite ne sait pas supprimer une contrainte de cle etrangere par son
+        // nom ; il recree de toute facon la table entiere au `change()` qui
+        // suit. On ne fait donc ce retrait explicite que sur les moteurs qui
+        // le supportent (MySQL en production).
+        if (Schema::getConnection()->getDriverName() !== 'sqlite') {
+            Schema::table('achat_details', function (Blueprint $table) {
+                $table->dropForeign('fk_achat_details_produits');
+            });
+        }
 
         Schema::table('achat_details', function (Blueprint $table) {
             $table->unsignedBigInteger('produit_id')->nullable()->change();

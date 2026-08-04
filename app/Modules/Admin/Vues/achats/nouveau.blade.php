@@ -223,8 +223,70 @@
                 </div>
 
                 <div class="total-box" style="border-top: 1px solid var(--border); padding-top:12px; margin-top:12px;">
+                    <div style="display:flex;justify-content:space-between;font-size:13px;color:var(--text-2);padding:4px 0;">
+                        <span>Total HT</span><span id="totHt">0 F</span>
+                    </div>
+                    <div style="display:flex;justify-content:space-between;align-items:center;font-size:13px;color:var(--text-2);padding:4px 0;">
+                        <span>Remise (%)</span>
+                        <input type="number" id="remiseTauxInput" name="remise_taux" class="form-control"
+                               value="{{ old('remise_taux', 0) }}" min="0" max="100" step="0.01" oninput="recalculer()"
+                               style="width:100px;height:28px;text-align:right;font-weight:700;padding:2px 8px;font-size:13px;margin:0;">
+                    </div>
+                    <div style="display:flex;justify-content:space-between;font-size:13px;color:#dc2626;padding:4px 0;">
+                        <span>Montant de la remise sur le total HT</span><span id="totRemise">0 F</span>
+                    </div>
+                    <div style="display:flex;justify-content:space-between;font-size:13px;color:var(--text-2);padding:4px 0;">
+                        <span>Autres taxes</span><span id="totAutresTaxes">0 F</span>
+                    </div>
                     <div class="total-row" style="display:flex;justify-content:space-between;font-size:17px;font-weight:800;color:var(--text);padding:8px 0 4px;">
                         <span>Total</span><span id="totTtc">0 F</span>
+                    </div>
+                </div>
+
+                {{-- Champs transmis a la DGI pour un bordereau d'achat (BAPA) --}}
+                @php $entrepriseCourante = Auth::user()->entreprise; @endphp
+                <div style="margin-top:14px; border:1px solid var(--border); border-radius:10px; padding:12px;">
+                    <div style="font-size:12px; font-weight:700; color:var(--text-2); margin-bottom:10px;">
+                        <i class="fas fa-landmark" style="color:var(--primary);"></i> Mentions DGI (bordereau d'achat)
+                    </div>
+
+                    <label style="display:flex; align-items:center; gap:8px; font-size:13px; font-weight:700; cursor:pointer; margin:0 0 4px;">
+                        <input type="checkbox" name="est_rne" value="1" id="estRneCheckbox"
+                               onchange="basculerChampRne()" {{ old('est_rne') ? 'checked' : '' }}
+                               style="width:16px; height:16px; cursor:pointer;">
+                        RNE
+                    </label>
+                    <small style="display:block; color:var(--text-3); font-size:11px;">
+                        A cocher si ce bordereau est rattache a un recu normalise deja delivre.
+                    </small>
+                    <div id="champRneContainer" style="display:{{ old('est_rne') ? 'block' : 'none' }}; margin-top:10px;">
+                        <label class="form-label" style="font-size:11px;">Numero du recu</label>
+                        <input type="text" name="numero_rne" id="numeroRneInput" class="form-control"
+                               maxlength="64" value="{{ old('numero_rne') }}" placeholder="N&deg; du recu normalise d'origine">
+                    </div>
+
+                    <div class="form-group" style="margin-top:12px;">
+                        <label class="form-label" style="font-size:11px;">Autres mentions</label>
+                        <textarea name="autres_mentions" id="autresMentionsInput" class="form-control" rows="2"
+                                  maxlength="248" oninput="majCompteurMention('autresMentions')">{{ old('autres_mentions', $entrepriseCourante->facture_autres_mentions) }}</textarea>
+                        <small style="color:var(--text-3); font-size:11px;"><span id="autresMentionsCompteur">0</span>/248 caracteres.</small>
+                    </div>
+                    <div class="form-group" style="margin-bottom:0;">
+                        <label class="form-label" style="font-size:11px;">Pied de page</label>
+                        <textarea name="pied_de_page" id="piedDePageInput" class="form-control" rows="2"
+                                  maxlength="248" oninput="majCompteurMention('piedDePage')">{{ old('pied_de_page', $entrepriseCourante->pied_de_page_facture) }}</textarea>
+                        <small style="color:var(--text-3); font-size:11px;"><span id="piedDePageCompteur">0</span>/248 caracteres.</small>
+                    </div>
+
+                    <div style="margin-top:12px;">
+                        <div style="font-size:12px; font-weight:700; color:var(--text-2); margin-bottom:8px;">
+                            <i class="fas fa-percent" style="color:var(--primary);"></i> Taxes sur total TTC
+                        </div>
+                        <div id="taxesTtcConteneur" style="display:flex; flex-direction:column; gap:8px;"></div>
+                        <button type="button" class="btn btn-outline btn-sm" onclick="ajouterTaxeTtc()"
+                                style="width:100%; justify-content:center; margin-top:8px; border-style:dashed; font-size:12px;">
+                            <i class="fas fa-plus"></i> Ajouter une taxe
+                        </button>
                     </div>
                 </div>
 
@@ -373,6 +435,10 @@ function ajouterLigne(prefill = null) {
             <label class="form-label">Prix unitaire</label>
             <input type="number" name="articles[${idx}][prix_unitaire]" class="form-control prix-inp" min="0" step="1" value="${prefill ? prefill.prix_unitaire : 0}" oninput="recalculer(); savePanier();" required>
         </div>
+        <div class="form-group" style="margin-bottom:0;">
+            <label class="form-label">Remise (%)</label>
+            <input type="number" name="articles[${idx}][remise_taux]" class="form-control remise-inp" min="0" max="100" step="0.01" value="${prefill ? (prefill.remise_taux || 0) : 0}" oninput="recalculer(); savePanier();" style="width: 90px;">
+        </div>
         <button type="button" class="btn-remove-ligne" onclick="supprimerLigne(${idx})"><i class="fas fa-trash"></i></button>
     `;
     container.appendChild(div);
@@ -431,27 +497,114 @@ function supprimerLigne(i) {
     savePanier();
 }
 
+// --- Taxes sur total TTC (champ `customTaxes` de la FNE) -------------------
+
+function ajouterTaxeTtc(nom, taux) {
+    const conteneur = document.getElementById('taxesTtcConteneur');
+    if (!conteneur) return;
+
+    const index = conteneur.children.length;
+    const ligne = document.createElement('div');
+    ligne.style.cssText = 'display:flex; gap:6px; align-items:center;';
+    ligne.innerHTML = `
+        <input type="text" name="taxes_ttc[${index}][nom]" class="form-control"
+               placeholder="Nom (ex : DTD)" maxlength="100" value="${nom ? String(nom).replace(/"/g, '&quot;') : ''}"
+               style="flex:2; height:28px; font-size:12px;">
+        <input type="number" name="taxes_ttc[${index}][taux]" class="form-control"
+               placeholder="Taxe (%)" min="0.01" max="100" step="0.01" value="${taux !== undefined ? taux : ''}"
+               oninput="recalculer()" style="flex:1; height:28px; font-size:12px;">
+        <span class="montant-taxe-ttc" style="flex:1; font-size:12px; font-weight:700; text-align:right; white-space:nowrap;">0 F</span>
+        <button type="button" class="btn-remove-ligne" title="Supprimer cette taxe" onclick="supprimerTaxeTtc(this)">
+            <i class="fas fa-trash"></i>
+        </button>
+    `;
+    conteneur.appendChild(ligne);
+    recalculer();
+}
+
+function supprimerTaxeTtc(bouton) {
+    bouton.closest('div').remove();
+
+    const conteneur = document.getElementById('taxesTtcConteneur');
+    Array.from(conteneur.children).forEach((ligne, index) => {
+        const champs = ligne.querySelectorAll('input');
+        if (champs[0]) champs[0].name = `taxes_ttc[${index}][nom]`;
+        if (champs[1]) champs[1].name = `taxes_ttc[${index}][taux]`;
+    });
+
+    recalculer();
+}
+
+function basculerChampRne() {
+    const coche = document.getElementById('estRneCheckbox').checked;
+    const bloc  = document.getElementById('champRneContainer');
+    const champ = document.getElementById('numeroRneInput');
+
+    bloc.style.display = coche ? 'block' : 'none';
+    if (champ) champ.required = coche;
+}
+
+function majCompteurMention(prefixe) {
+    const champ    = document.getElementById(prefixe + 'Input');
+    const compteur = document.getElementById(prefixe + 'Compteur');
+    if (champ && compteur) compteur.textContent = champ.value.length;
+}
+
+/**
+ * Ordre de calcul aligne sur celui de la FNE : remise de ligne, puis remise
+ * globale sur le total HT, puis taxes sur le total.
+ */
 function recalculer() {
     let ht = 0;
     document.querySelectorAll('.ligne').forEach(l => {
         const q  = parseFloat(l.querySelector('.qte-inp').value) || 0;
         const p  = parseFloat(l.querySelector('.prix-inp').value) || 0;
-        ht += q * p;
+        const r  = Math.min(Math.max(parseFloat(l.querySelector('.remise-inp')?.value) || 0, 0), 100);
+        ht += q * p * (1 - r / 100);
     });
+
     const fmt = n => new Intl.NumberFormat('fr-FR').format(Math.round(n)) + ' F';
-    
+
+    let remiseTaux = parseFloat(document.getElementById('remiseTauxInput')?.value) || 0;
+    remiseTaux = Math.min(Math.max(remiseTaux, 0), 100);
+    const montantRemise = ht * (remiseTaux / 100);
+    const htNet = Math.max(0, ht - montantRemise);
+
+    let totalAutresTaxes = 0;
+    document.querySelectorAll('#taxesTtcConteneur > div').forEach(ligne => {
+        const taux = parseFloat(ligne.querySelectorAll('input')[1]?.value) || 0;
+        const montant = Math.min(Math.max(taux, 0), 100) / 100 * htNet;
+        totalAutresTaxes += montant;
+        const affichage = ligne.querySelector('.montant-taxe-ttc');
+        if (affichage) affichage.textContent = fmt(montant);
+    });
+
+    const total = htNet + totalAutresTaxes;
+
     const devise = document.getElementById('deviseInput').value;
     const taux = parseFloat(document.getElementById('tauxChangeDisplayInput').value) || 0;
-    let totalText = fmt(ht);
+    let totalText = fmt(total);
     if (devise !== 'XOF' && taux > 0) {
-        const totalDevise = (ht / taux).toFixed(2);
+        const totalDevise = (total / taux).toFixed(2);
         totalText += ` (${totalDevise} ${devise})`;
     }
-    
+
+    const elHt = document.getElementById('totHt');
+    if (elHt) elHt.textContent = fmt(ht);
+    const elRemise = document.getElementById('totRemise');
+    if (elRemise) elRemise.textContent = fmt(montantRemise);
+    const elTaxes = document.getElementById('totAutresTaxes');
+    if (elTaxes) elTaxes.textContent = fmt(totalAutresTaxes);
+
     document.getElementById('totTtc').textContent = totalText;
     const noItems = document.querySelectorAll('.ligne').length === 0;
     document.getElementById('btnValiderAchat').disabled = noItems;
 }
+
+document.addEventListener('DOMContentLoaded', function () {
+    majCompteurMention('autresMentions');
+    majCompteurMention('piedDePage');
+});
 
 function toggleB2bOptions() {
     const chkEnvoyer = document.getElementById('chkEnvoyerB2b');

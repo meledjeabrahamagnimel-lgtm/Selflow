@@ -423,6 +423,16 @@ var DATA = {
         date: {!! json_encode(\Carbon\Carbon::parse($vente->date_vente)->isoFormat('D MMMM YYYY')) !!},
         etape: {!! json_encode($vente->etape) !!},
         remise: {{ $vente->remise ?? 0 }},
+        remise_taux: {{ (float) ($vente->remise_taux ?? 0) }},
+        est_rne: {{ $vente->est_rne ? 'true' : 'false' }},
+        numero_rne: {!! json_encode($vente->numero_rne) !!},
+        autres_mentions: {!! json_encode($vente->autres_mentions ?: $vente->pointDeVente->entreprise->facture_autres_mentions) !!},
+        pied_de_page: {!! json_encode($vente->pied_de_page ?: $vente->pointDeVente->entreprise->pied_de_page_facture) !!},
+        taxes_ttc: [
+            @foreach($vente->taxesPersonnalisees as $taxe)
+            { nom: {!! json_encode($taxe->nom) !!}, taux: {{ (float) $taxe->taux }} },
+            @endforeach
+        ],
         normalise: {{ $vente->normalise ? 'true' : 'false' }},
         type_facture: {!! json_encode($vente->type_facture) !!},
         parent_ref: {!! json_encode($vente->parent ? $vente->parent->numero_facture : null) !!},
@@ -449,7 +459,19 @@ var DATA = {
                 qty: {{ isset($bl) ? ($bl->details->firstWhere('produit_id', $detail->produit_id)?->qte_livree ?? 0) : $detail->quantite }},
                 unite: {!! json_encode($detail->unite ?? 'Unité') !!},
                 pu: {{ $detail->prix_unitaire }},
-                tva: {{ $detail->produit ? $detail->produit->taux_tva : ($detail->montant_tva > 0 ? 18 : 0) }}
+                remise_taux: {{ (float) ($detail->remise_taux ?? 0) }},
+                taxes: [
+                    @foreach($detail->taxes as $taxe)
+                    { nom: {!! json_encode($taxe->nom) !!}, taux: {{ (float) $taxe->taux }} },
+                    @endforeach
+                ],
+                tva: {{ $detail->produit ? $detail->produit->taux_tva : ($detail->montant_tva > 0 ? 18 : 0) }},
+                code_tva: {!! json_encode($detail->produit
+                    ? $detail->produit->codeTvaFne($vente->pointDeVente->entreprise->regime_imposition)
+                    : \App\Modules\Admin\Modeles\Produit::deduireCodeTva(
+                        $detail->montant_tva > 0 ? 18 : 0,
+                        $vente->pointDeVente->entreprise->regime_imposition
+                    )) !!}
             },
             @endforeach
         ],
@@ -499,19 +521,100 @@ function fmtFcfa(n) {
     return Math.round(n).toLocaleString('fr-FR') + ' FCFA';
 }
 
-function calcItems(items, remiseGlobal) {
+/**
+ * Lignes « Autres taxes » + « Net a payer » du recapitulatif, au format des
+ * modeles 1 a 3 (blocs en <div>).
+ */
+function blocAutresTaxesDiv(c, couleur) {
+    if (c.tot_autres_taxes <= 0) return '';
+    return c.lignes_autres_taxes.map(t =>
+        `<div style="display:flex;justify-content:space-between;padding:6px 0;font-size:12px;border-bottom:0.5px solid var(--border)"><span style="color:var(--mu)">${t.nom}</span><span>${fmtFcfa(t.montant)}</span></div>`
+    ).join('') +
+    `<div style="display:flex;justify-content:space-between;padding:8px 0 6px;font-size:14px;font-weight:800;color:${couleur || 'var(--tx)'};"><span>NET A PAYER</span><span>${fmtFcfa(c.net_a_payer)}</span></div>`;
+}
+
+/**
+ * Idem pour le modele 4, construit en lignes de tableau.
+ */
+function blocAutresTaxesTr(c, colonnes) {
+    if (c.tot_autres_taxes <= 0) return '';
+    return c.lignes_autres_taxes.map(t => `
+            <tr>
+                <td colspan="${colonnes}" style="padding:6px 10px; border:1px solid #000; text-align:right; font-weight:600;">${t.nom}</td>
+                <td style="padding:6px 10px; border:1px solid #000; text-align:right; font-weight:600; white-space:nowrap;">${fmt(t.montant)}</td>
+            </tr>`).join('') + `
+            <tr>
+                <td colspan="${colonnes}" style="padding:6px 10px; border:1px solid #000; text-align:right; font-weight:900; text-transform:uppercase;">Net a payer</td>
+                <td style="padding:6px 10px; border:1px solid #000; text-align:right; font-weight:900; white-space:nowrap;">${fmt(c.net_a_payer)}</td>
+            </tr>`;
+}
+
+/**
+ * Message commercial (`commercialMessage` de la FNE) et rattachement a un recu.
+ */
+function blocMentions(d) {
+    var morceaux = [];
+    if (d.est_rne && d.numero_rne) {
+        morceaux.push(`<div style="font-weight:600;">Facture rattachee au recu normalise n&deg; ${d.numero_rne}</div>`);
+    }
+    if (d.autres_mentions) {
+        morceaux.push(`<div>${d.autres_mentions}</div>`);
+    }
+    if (!morceaux.length) return '';
+    return `<div style="margin-bottom:14px;padding:10px 14px;background:var(--white);border-radius:7px;border:0.5px solid var(--border);font-size:11px;color:var(--mu);line-height:1.7;">${morceaux.join('')}</div>`;
+}
+
+/**
+ * Pied de page personnalise (`footer` de la FNE).
+ */
+function blocPiedDePage(d) {
+    if (!d.pied_de_page) return '';
+    return `<div style="margin-top:10px;font-size:11px;color:var(--mu);line-height:1.6;text-align:center;">${d.pied_de_page}</div>`;
+}
+
+/**
+ * Ordre de calcul aligne sur celui de la FNE :
+ *   remise de ligne -> remise globale -> TVA -> TTC -> autres taxes.
+ *
+ * La TVA est calculee ligne par ligne au taux reel de chaque article : un
+ * article exonere ne doit pas se voir appliquer 18 %.
+ */
+function calcItems(items, remiseGlobal, taxesTtc) {
     remiseGlobal = parseFloat(remiseGlobal || 0);
+
     var rows = items.map(it => {
-        var ht = it.qty * it.pu;
+        var remiseLigne = parseFloat(it.remise_taux || 0);
+        var ht_brut = it.qty * it.pu;
+        var ht = ht_brut * (1 - remiseLigne / 100);
         var tva = ht * it.tva / 100;
-        return { ...it, ht, tva_amt: tva, ttc: ht + tva };
+        return { ...it, remise_taux: remiseLigne, ht_brut, ht, tva_amt: tva, ttc: ht + tva };
     });
+
     var tot_ht = rows.reduce((s, r) => s + r.ht, 0);
     var tot_ht_net = Math.max(0, tot_ht - remiseGlobal);
-    var hasTva = rows.some(r => r.tva > 0);
-    var tot_tva = hasTva ? (tot_ht_net * 0.18) : 0;
+    var ratio = tot_ht > 0 ? tot_ht_net / tot_ht : 0;
+    var tot_tva = rows.reduce((s, r) => s + (r.ht * ratio * r.tva / 100), 0);
     var tot_ttc = tot_ht_net + tot_tva;
-    return { rows, tot_ht, tot_ht_net, tot_tva, tot_ttc, remiseGlobal };
+
+    // Autres taxes : celles des articles (sur le HT net de la ligne) et
+    // celles portant sur le total TTC.
+    var lignes_autres_taxes = [];
+    rows.forEach(r => {
+        (r.taxes || []).forEach(t => {
+            lignes_autres_taxes.push({ nom: t.nom, montant: r.ht * ratio * t.taux / 100 });
+        });
+    });
+    (taxesTtc || []).forEach(t => {
+        lignes_autres_taxes.push({ nom: t.nom, montant: tot_ttc * t.taux / 100 });
+    });
+
+    var tot_autres_taxes = lignes_autres_taxes.reduce((s, t) => s + t.montant, 0);
+
+    return {
+        rows, tot_ht, tot_ht_net, tot_tva, tot_ttc, remiseGlobal,
+        lignes_autres_taxes, tot_autres_taxes,
+        net_a_payer: tot_ttc + tot_autres_taxes
+    };
 }
 
 function executerAction(url, sansConfirmation = false) {
@@ -627,7 +730,7 @@ function getThemeColors() {
 }
 
 function model1(d) {
-    var c = calcItems(d.items, d.remise);
+    var c = calcItems(d.items, d.remise, d.taxes_ttc);
     var theme = getThemeColors();
     var sColor = statusColor(d.statut, theme.color);
     var title = getDocTitle(d);
@@ -702,7 +805,7 @@ function model1(d) {
                     <td style="padding:9px 12px;text-align:center;color:var(--tx);white-space:nowrap;">${r.unite || 'Unité'}</td>
                     <td style="padding:9px 12px;text-align:right;color:var(--tx);white-space:nowrap;">${r.qty}</td>
                     ${isDeliveryMode ? '' : `
-                    <td style="padding:9px 12px;text-align:right;color:var(--tx);white-space:nowrap;">${fmt(r.pu)}</td>
+                    <td style="padding:9px 12px;text-align:right;color:var(--tx);white-space:nowrap;">${fmt(r.pu)}${r.remise_taux > 0 ? `<br><span style="color:#dc2626;font-size:10px;">Remise ${r.remise_taux}%</span>` : ''}</td>
                     <td style="padding:9px 12px;text-align:right;color:var(--mu);white-space:nowrap;">${r.tva}%</td>
                     <td style="padding:9px 12px;text-align:right;font-weight:700;color:var(--tx);white-space:nowrap;">${fmt(r.ttc)}</td>
                     `}
@@ -729,24 +832,27 @@ function model1(d) {
                 <div style="display:flex;justify-content:space-between;padding:6px 0;font-size:12px;border-bottom:0.5px solid var(--border)"><span style="color:var(--mu)">Total Net HT</span><span>${fmtFcfa(c.tot_ht_net)}</span></div>
                 <div style="display:flex;justify-content:space-between;padding:6px 0;font-size:12px;border-bottom:0.5px solid var(--border)"><span style="color:var(--mu)">TVA (18%)</span><span>${fmtFcfa(c.tot_tva)}</span></div>
                 <div style="display:flex;justify-content:space-between;padding:10px 0 6px;font-size:15px;font-weight:800;color:var(--tx);border-top:1.5px solid ${theme.color};"><span>TOTAL TTC</span><span>${fmtFcfa(c.tot_ttc)}</span></div>
+                ${blocAutresTaxesDiv(c, theme.color)}
                 ${d.etape === 'Facture' ? `
                 <div style="display:flex;justify-content:space-between;padding:6px 0;font-size:12px;border-bottom:0.5px solid var(--border)"><span style="color:var(--mu)">Montant Réglé</span><span>${fmtFcfa(d.deja_paye)}</span></div>
                 <div style="display:flex;justify-content:space-between;padding:6px 0;font-size:12px;color:${d.deja_paye < c.tot_ttc ? '#dc2626' : '#059669'};font-weight:700;"><span style="text-transform:uppercase;">Reste à payer</span><span>${fmtFcfa(Math.max(0, c.tot_ttc - d.deja_paye))}</span></div>
                 ` : ''}
             </div>
         </div>
+        ${blocMentions(d)}
         ${COMPANY.ref_bancaire ? `<div style="margin-bottom:14px;padding:10px 14px;background:var(--white);border-radius:7px;border:0.5px solid var(--border);font-size:11px;color:var(--mu);line-height:1.7;"><span style="font-weight:600;color:var(--tx)">Références bancaires : </span>${COMPANY.ref_bancaire}</div>` : ''}
         <div style="border-top:0.5px solid var(--border);padding-top:14px;display:flex;justify-content:space-between;align-items:flex-end">
             <div style="font-size:11px;color:var(--mu);line-height:1.7">Merci pour votre confiance.<br>Document généré par <strong>Selflow</strong> · selflow.app</div>
             <div style="text-align:right;font-size:11px;color:var(--mu)">Signature / Cachet<br><div style="width:100px;height:40px;border:0.5px dashed var(--border);border-radius:4px;margin-top:4px"></div></div>
         </div>
+        ${blocPiedDePage(d)}
         `}
     </div>
 </div>`;
 }
 
 function model2(d) {
-    var c = calcItems(d.items, d.remise);
+    var c = calcItems(d.items, d.remise, d.taxes_ttc);
     var theme = getThemeColors();
     var sColor = statusColor(d.statut, theme.color);
     var title = getDocTitle(d);
@@ -824,7 +930,7 @@ function model2(d) {
                         <td style="padding:8px 6px;text-align:center;color:var(--mu);white-space:nowrap;">${r.unite || 'Unité'}</td>
                         <td style="padding:8px 6px;text-align:right;color:var(--mu);white-space:nowrap;">${r.qty}</td>
                         ${isDeliveryMode ? '' : `
-                        <td style="padding:8px 6px;text-align:right;color:var(--mu);white-space:nowrap;">${fmt(r.pu)}</td>
+                        <td style="padding:8px 6px;text-align:right;color:var(--mu);white-space:nowrap;">${fmt(r.pu)}${r.remise_taux > 0 ? `<br><span style="color:#dc2626;font-size:10px;">Remise ${r.remise_taux}%</span>` : ''}</td>
                         <td style="padding:8px 6px;text-align:right;color:var(--mu);white-space:nowrap;">${r.tva}%</td>
                         <td style="padding:8px 0;text-align:right;font-weight:700;color:var(--tx);white-space:nowrap;">${fmt(r.ttc)}</td>
                         `}
@@ -848,6 +954,7 @@ function model2(d) {
                     <div style="display:flex;justify-content:space-between;font-size:11px;padding:4px 0"><span style="color:var(--mu)">Net HT</span><span>${fmtFcfa(c.tot_ht_net)}</span></div>
                     <div style="display:flex;justify-content:space-between;font-size:11px;padding:4px 0"><span style="color:var(--mu)">TVA 18%</span><span>${fmtFcfa(c.tot_tva)}</span></div>
                     <div style="display:flex;justify-content:space-between;font-size:13px;font-weight:800;padding:6px 0 0;border-top:0.5px solid var(--border);margin-top:4px"><span style="color:var(--tx)">Total TTC</span><span style="color:${theme.color}">${fmtFcfa(c.tot_ttc)}</span></div>
+                    ${blocAutresTaxesDiv(c, theme.color)}
                     ${d.etape === 'Facture' ? `
                     <div style="display:flex;justify-content:space-between;font-size:11px;padding:4px 0;border-top:0.5px solid var(--border);margin-top:4px"><span style="color:var(--mu)">Montant Réglé</span><span>${fmtFcfa(d.deja_paye)}</span></div>
                     <div style="display:flex;justify-content:space-between;font-size:11px;padding:4px 0;font-weight:700;color:${d.deja_paye < c.tot_ttc ? '#dc2626' : '#059669'}"><span>Reste à payer</span><span>${fmtFcfa(Math.max(0, c.tot_ttc - d.deja_paye))}</span></div>
@@ -856,6 +963,8 @@ function model2(d) {
             </div>
             ${COMPANY.ref_bancaire ? `<div style="font-size:10.5px;color:var(--mu);line-height:1.7;margin-bottom:10px;"><strong>Réf. bancaires : </strong>${COMPANY.ref_bancaire}</div>` : ''}
             <div style="font-size:11px;color:var(--mu)">Généré automatiquement par <strong>Selflow</strong></div>
+            ${blocMentions(d)}
+            ${blocPiedDePage(d)}
             `}
         </div>
     </div>
@@ -863,7 +972,7 @@ function model2(d) {
 }
 
 function model3(d) {
-    var c = calcItems(d.items, d.remise);
+    var c = calcItems(d.items, d.remise, d.taxes_ttc);
     var theme = getThemeColors();
     var sColor = statusColor(d.statut, theme.color);
     var title = getDocTitle(d);
@@ -944,7 +1053,7 @@ function model3(d) {
                     <td style="padding:9px 10px;text-align:center;color:var(--tx);white-space:nowrap;">${r.unite || 'Unité'}</td>
                     <td style="padding:9px 10px;text-align:right;color:var(--tx);white-space:nowrap;">${r.qty}</td>
                     ${isDeliveryMode ? '' : `
-                    <td style="padding:9px 10px;text-align:right;color:var(--mu);white-space:nowrap;">${fmt(r.pu)}</td>
+                    <td style="padding:9px 10px;text-align:right;color:var(--mu);white-space:nowrap;">${fmt(r.pu)}${r.remise_taux > 0 ? `<br><span style="color:#dc2626;font-size:10px;">Remise ${r.remise_taux}%</span>` : ''}</td>
                     <td style="padding:9px 10px;text-align:right;color:var(--mu);white-space:nowrap;">${r.tva}%</td>
                     <td style="padding:9px 10px;text-align:right;font-weight:700;color:var(--tx);white-space:nowrap;">${fmt(r.ttc)}</td>
                     `}
@@ -978,6 +1087,7 @@ function model3(d) {
                     <span style="font-size:13px;font-weight:700;color:#fff">Total TTC</span>
                     <span style="font-size:15px;font-weight:800;color:#fff">${fmtFcfa(c.tot_ttc)}</span>
                 </div>
+                ${blocAutresTaxesDiv(c, theme.color)}
                 ${d.etape === 'Facture' ? `
                 <div style="display:flex;justify-content:space-between;padding:6px 8px;font-size:12px;border-bottom:0.5px solid var(--border)"><span style="color:var(--mu)">Montant Réglé</span><span style="font-weight:600;">${fmtFcfa(d.deja_paye)}</span></div>
                 <div style="display:flex;justify-content:space-between;padding:6px 8px;font-size:12px;color:${d.deja_paye < c.tot_ttc ? '#dc2626' : '#059669'};font-weight:700;"><span>Reste à payer</span><span>${fmtFcfa(Math.max(0, c.tot_ttc - d.deja_paye))}</span></div>
@@ -991,13 +1101,15 @@ function model3(d) {
                 <div style="text-align:center;font-size:10px;color:var(--mu)">Cachet société<br><div style="width:80px;height:36px;border:0.5px dashed var(--border);border-radius:4px;margin-top:3px"></div></div>
             </div>
         </div>
+        ${blocMentions(d)}
+        ${blocPiedDePage(d)}
         `}
     </div>
 </div>`;
 }
 
 function modelStandard(d) {
-    var c = calcItems(d.items, d.remise);
+    var c = calcItems(d.items, d.remise, d.taxes_ttc);
     var isNorm = d.normalise;
     var title = getDocTitle(d);
     var hasTva = d.items.some(r => r.tva > 0);
@@ -1018,11 +1130,11 @@ function modelStandard(d) {
             <tr style="background:#fff; color:#000;">
                 <td style="padding:8px 10px; border:1px solid #000; font-weight:500; white-space:nowrap;">${r.ref}</td>
                 <td style="padding:8px 10px; border:1px solid #000; font-weight:700;">${r.desc}</td>
-                <td style="padding:8px 10px; border:1px solid #000; text-align:right; white-space:nowrap;">${fmt(r.pu)}</td>
+                <td style="padding:8px 10px; border:1px solid #000; text-align:right; white-space:nowrap;">${fmt(r.pu)}${r.remise_taux > 0 ? `<br><span style="color:#dc2626;font-size:10px;">Remise ${r.remise_taux}%</span>` : ''}</td>
                 <td style="padding:8px 10px; border:1px solid #000; text-align:right; white-space:nowrap;">${r.qty}</td>
                 <td style="padding:8px 10px; border:1px solid #000; text-align:center; white-space:nowrap;">${r.unite || 'Unité'}</td>
-                <td style="padding:8px 10px; border:1px solid #000; text-align:right; color:#000; white-space:nowrap;">${r.tva > 0 ? 'TVA (18%)' : 'TVAD (0)'}</td>
-                <td style="padding:8px 10px; border:1px solid #000; text-align:right; color:#000; white-space:nowrap;">0%</td>
+                <td style="padding:8px 10px; border:1px solid #000; text-align:right; color:#000; white-space:nowrap;">${r.code_tva || 'TVA'} (${r.tva}%)</td>
+                <td style="padding:8px 10px; border:1px solid #000; text-align:right; color:#000; white-space:nowrap;">${r.remise_taux > 0 ? r.remise_taux + '%' : '0%'}</td>
                 <td style="padding:8px 10px; border:1px solid #000; text-align:right; font-weight:700; white-space:nowrap;">${fmt(r.ht)}</td>
             </tr>
         `).join('');
@@ -1060,6 +1172,7 @@ function modelStandard(d) {
                 <td colspan="7" style="padding:6px 10px; border:1px solid #000; text-align:right; font-weight:900; text-transform:uppercase;">TOTAL A PAYER</td>
                 <td style="padding:6px 10px; border:1px solid #000; text-align:right; font-weight:900; white-space:nowrap;">${fmt(c.tot_ttc)}</td>
             </tr>
+            ${blocAutresTaxesTr(c, 7)}
             <tr style="background:#fff; color:#000;">
                 <td colspan="7" style="padding:6px 10px; border:1px solid #000; text-align:right; font-weight:700; text-transform:uppercase;">MONTANT REGLE</td>
                 <td style="padding:6px 10px; border:1px solid #000; text-align:right; font-weight:700; white-space:nowrap;">${fmt(d.deja_paye)}</td>
@@ -1208,9 +1321,19 @@ function modelStandard(d) {
             </div>
         </div>
         
-        <!-- Pied de page -->
+        <!-- Pied de page : mentions de l'entreprise emettrice -->
         <div style="border-top:1px solid #000; padding-top:15px; margin-top:20px; font-size:9px; color:#444; line-height:1.6; font-weight:500; text-align:center;">
-            Société à responsabilité limitée au capital de 1.000.000 F, située à Riviera Bonoumin collège non loin du collège André Malraux, RCCM N° CI-ABJ-2018-B-31734, NCC : 1864699 A, Tel : 27 22 42 14 43 - 07 67 13 19 93, email : infosdcknowing@gmail.com
+            ${[
+                COMPANY.nom,
+                COMPANY.adresse,
+                COMPANY.rccm ? 'RCCM N&deg; ' + COMPANY.rccm : '',
+                COMPANY.ncc ? 'NCC : ' + COMPANY.ncc : '',
+                COMPANY.tel ? 'Tel : ' + COMPANY.tel : '',
+                COMPANY.email ? 'email : ' + COMPANY.email : ''
+            ].filter(Boolean).join(', ')}
+            ${d.autres_mentions ? `<div style="margin-top:6px;">${d.autres_mentions}</div>` : ''}
+            ${d.est_rne && d.numero_rne ? `<div style="margin-top:4px;font-weight:700;">Facture rattachee au recu normalise n&deg; ${d.numero_rne}</div>` : ''}
+            ${d.pied_de_page ? `<div style="margin-top:6px;">${d.pied_de_page}</div>` : ''}
         </div>
         `}
     </div>

@@ -15,12 +15,21 @@ class FneService
      * Normaliser la facture de vente auprès de la DGI (API FNE).
      *
      * @param Vente $vente
-     * @param bool $estRne
+     * @param bool  $emissionRecuDePassage Vente sans client identifié : Selflow
+     *        en fait un reçu (`type_facture = 'RNE'`) et imprime un ticket.
+     *        ATTENTION : cette notion interne n'a rien à voir avec le champ
+     *        `isRne` de la DGI, qui signifie « cette facture est rattachée à un
+     *        reçu normalisé déjà émis » et provient de la case cochée à la
+     *        saisie (`ventes.est_rne`).
      * @return array
      */
-    public static function normaliserFacture(Vente $vente, bool $estRne = false): array
+    public static function normaliserFacture(Vente $vente, bool $emissionRecuDePassage = false): array
     {
         $entreprise = $vente->pointDeVente->entreprise;
+
+        // Chargement anticipé : le payload lit le produit, ses taxes
+        // personnalisées et celles de la facture pour chaque ligne.
+        $vente->loadMissing(['details.produit', 'details.taxes', 'taxesPersonnalisees']);
 
         // Clé API FNE propre à CETTE entreprise (gérée par le superadmin)
         $credential = $entreprise->fneCredential;
@@ -79,22 +88,25 @@ class FneService
             }
         }
 
-        $items = $vente->details->map(function ($d) use ($isAvoirRefund, $originalInvoiceItems) {
+        $regimeImposition = $entreprise->regime_imposition ?? null;
+
+        $items = $vente->details->map(function ($d) use ($isAvoirRefund, $originalInvoiceItems, $regimeImposition) {
             if ($isAvoirRefund) {
                 return self::buildRefundItem($d, $originalInvoiceItems);
             }
 
-            $taxeCode = self::devinerCodeTaxe($d->produit?->taux_tva ?? 0.0);
+            // Le champ `id` n'est PAS attendu par /external/invoices/sign : il
+            // n'apparaît que dans le payload de remboursement. Il n'est donc
+            // plus envoyé ici.
             return [
-                'id'             => $d->produit?->reference ?? 'item-' . $d->id,
                 'reference'      => $d->produit?->reference ?? ($d->reference ?? ''),
                 'description'    => $d->produit ? $d->produit->nom : $d->libelle_virtuel,
                 'quantity'       => intval($d->quantite),
                 'amount'         => floatval($d->prix_unitaire),
-                'discount'       => floatval($d->discount ?? 0),
-                'measurementUnit'=> $d->unite_de_mesure ?? ($d->unite ?? 'pcs'),
-                'taxes'          => [$taxeCode],
-                'customTaxes'    => [],
+                'discount'       => self::normaliserTaux($d->remise_taux ?? 0),
+                'measurementUnit'=> $d->unite ?? 'pcs',
+                'taxes'          => [self::codeTaxeLigne($d, $regimeImposition)],
+                'customTaxes'    => self::formaterTaxesPersonnalisees($d->taxes ?? null),
             ];
         })->toArray();
 
@@ -103,9 +115,19 @@ class FneService
                 'items' => $items,
             ];
         } else {
-            $template = strtoupper($vente->client?->type_facturation ?? 'B2B');
+            $clientNcc = $vente->client
+                ? preg_replace('/[^0-9A-Z]/', '', strtoupper($vente->client->ncc ?? ''))
+                : '';
+
+            $template = strtoupper($vente->client?->type_facturation ?? '');
             if (!in_array($template, ['B2B', 'B2C', 'B2G', 'B2F'])) {
-                $template = 'B2B';
+                $template = $clientNcc !== '' ? 'B2B' : 'B2C';
+            }
+
+            // Le NCC du client est obligatoire en B2B : sans lui, la FNE rejette
+            // la facture (HTTP 400). Un client de passage relève du B2C.
+            if ($template === 'B2B' && $clientNcc === '') {
+                $template = 'B2C';
             }
 
             $paymentMethod = strtolower(trim($vente->mode_paiement ?? ''));
@@ -117,27 +139,39 @@ class FneService
                 $paymentMethod = 'mobile-money';
             }
 
-            $pointOfSaleValue = trim($vente->pointDeVente?->code_fne ?: $vente->pointDeVente?->nom ?? 'Siège');
+            // `pointOfSale` est décrit par la DGI comme « Nom du point de vente » :
+            // c'est bien le nom, tel que déclaré dans l'espace FNE de
+            // l'entreprise, qui doit être transmis.
+            $pointOfSaleValue = trim($vente->pointDeVente?->nom ?: 'Siège');
+
+            // `isRne` indique que la facture est rattachée à un reçu normalisé
+            // déjà émis. La seule source valable est la case cochée à la saisie :
+            // l'ancienne déduction « pas de client ⇒ isRne = true » envoyait un
+            // rattachement inexistant à la DGI pour toute vente au comptant.
+            $factureRattacheeAUnRecu = (bool) ($vente->est_rne ?? false);
+            $numeroRne = trim((string) ($vente->numero_rne ?? ''));
 
             $payload = [
                 'invoiceType'         => 'sale',
                 'paymentMethod'       => self::mapperModePaiement($paymentMethod),
                 'template'            => $template,
-                'isRne'               => $estRne,
-                'rne'                 => $estRne ? ($vente->parent?->numero_fne ?? '') : '',
-                'clientNcc'           => $vente->client ? preg_replace('/[^0-9A-Z]/', '', strtoupper($vente->client->ncc ?? '')) : '',
+                'isRne'               => $factureRattacheeAUnRecu,
+                'rne'                 => $factureRattacheeAUnRecu ? $numeroRne : '',
+                'clientNcc'           => $clientNcc,
                 'clientCompanyName'   => $vente->client ? $vente->client->nom : 'Client de passage',
                 'clientPhone'         => $vente->client ? preg_replace('/[^0-9]/', '', $vente->client->telephone ?? '') : '',
                 'clientEmail'         => $vente->client?->email ?? '',
                 'clientSellerName'    => $vente->pointDeVente?->responsable ?? '',
                 'pointOfSale'         => $pointOfSaleValue,
                 'establishment'       => $entreprise->nom,
-                'commercialMessage'   => $entreprise->facture_autres_mentions ?? '',
-                'footer'              => $entreprise->pied_de_page_facture ?? '',
+                'commercialMessage'   => self::texteMention($vente->autres_mentions, $entreprise->facture_autres_mentions),
+                'footer'              => self::texteMention($vente->pied_de_page, $entreprise->pied_de_page_facture),
                 'foreignCurrency'     => !empty($vente->devise) && $vente->devise !== 'XOF' ? $vente->devise : '',
                 'foreignCurrencyRate' => !empty($vente->taux_change) && $vente->devise !== 'XOF' ? floatval($vente->taux_change) : 0,
-                'customTaxes'         => [],
-                'discount'            => floatval($vente->remise ?? 0),
+                'customTaxes'         => self::formaterTaxesPersonnalisees($vente->taxesPersonnalisees ?? null),
+                // La FNE attend un POURCENTAGE, pas un montant : `ventes.remise`
+                // (en francs) ne peut pas être envoyé tel quel.
+                'discount'            => self::normaliserTaux($vente->remise_taux ?? 0),
                 'items'               => $items,
             ];
         }
@@ -234,6 +268,8 @@ class FneService
         $pointDeVente = $achat->pointDeVente;
         $entreprise = $pointDeVente->entreprise;
 
+        $achat->loadMissing(['details.produit', 'fournisseur']);
+
         $credential = $entreprise->fneCredential;
         $apiKey = $credential?->cleActive();
         $apiBaseUrl = $credential && $credential->statut === 'validee'
@@ -251,7 +287,7 @@ class FneService
         $apiUrl = $apiBaseUrl . '/external/invoices/sign';
 
         $paymentMethod = strtolower(trim($achat->mode_paiement ?? ''));
-        $pointOfSaleValue = trim($achat->pointDeVente?->code_fne ?: $achat->pointDeVente?->nom ?? 'Siège');
+        $pointOfSaleValue = trim($achat->pointDeVente?->nom ?: 'Siège');
 
         $items = $achat->details->map(function ($d) {
             return [
@@ -259,28 +295,36 @@ class FneService
                 'description'    => $d->produit ? $d->produit->nom : $d->libelle_virtuel,
                 'quantity'       => intval($d->quantite),
                 'amount'         => floatval($d->prix_unitaire),
-                'discount'       => 0,
+                'discount'       => self::normaliserTaux($d->remise_taux ?? 0),
                 'measurementUnit'=> $d->unite ?? 'pcs',
             ];
         })->toArray();
+
+        // Sur un bordereau d'achat, le « client » au sens de la FNE est le
+        // FOURNISSEUR (le producteur agricole) : c'est nous qui émettons le
+        // bordereau. Cf. API #3 — « clientCompanyName : Nom du fournisseur ».
+        $fournisseur = $achat->fournisseur;
+
+        $bordereauRattacheAUnRecu = (bool) ($achat->est_rne ?? false);
 
         $payload = [
             'invoiceType'         => 'purchase',
             'paymentMethod'       => self::mapperModePaiement($paymentMethod),
             'template'            => 'B2B',
-            'clientNcc'           => preg_replace('/[^0-9A-Z]/', '', strtoupper($entreprise->ncc ?? '')),
-            'clientCompanyName'   => $entreprise->nom,
-            'clientPhone'         => preg_replace('/[^0-9]/', '', $entreprise->telephone ?? ''),
-            'clientEmail'         => $entreprise->email ?? '',
-            'clientSellerName'    => $achat->fournisseur?->nom ?? '',
+            'isRne'               => $bordereauRattacheAUnRecu,
+            'rne'                 => $bordereauRattacheAUnRecu ? trim((string) ($achat->numero_rne ?? '')) : '',
+            'clientCompanyName'   => $fournisseur?->nom ?? '',
+            'clientPhone'         => preg_replace('/[^0-9]/', '', $fournisseur?->telephone ?? ''),
+            'clientEmail'         => $fournisseur?->email ?? '',
+            'clientSellerName'    => $achat->pointDeVente?->responsable ?? '',
             'pointOfSale'         => $pointOfSaleValue,
             'establishment'       => $entreprise->nom,
-            'commercialMessage'   => $entreprise->facture_autres_mentions ?? '',
-            'footer'              => $entreprise->pied_de_page_facture ?? '',
+            'commercialMessage'   => self::texteMention($achat->autres_mentions, $entreprise->facture_autres_mentions),
+            'footer'              => self::texteMention($achat->pied_de_page, $entreprise->pied_de_page_facture),
             'foreignCurrency'     => !empty($achat->devise) && $achat->devise !== 'XOF' ? $achat->devise : '',
             'foreignCurrencyRate' => !empty($achat->taux_change) && $achat->devise !== 'XOF' ? floatval($achat->taux_change) : 0,
             'items'               => $items,
-            'discount'            => 0,
+            'discount'            => self::normaliserTaux($achat->remise_taux ?? 0),
         ];
 
         try {
@@ -365,15 +409,107 @@ class FneService
         };
     }
 
-    private static function devinerCodeTaxe(float $taux): string
+    /**
+     * Longueur maximale acceptée pour les mentions libres transmises à la FNE
+     * (`footer` et `commercialMessage`).
+     */
+    public const LONGUEUR_MAX_MENTION = 248;
+
+    /**
+     * Code TVA DGI d'une ligne de facture.
+     *
+     * Le code vient du produit (choix manuel ou déduction automatique tenant
+     * compte du régime d'imposition). Une ligne de saisie libre, sans produit
+     * rattaché, retombe sur la déduction depuis son propre taux de TVA.
+     */
+    private static function codeTaxeLigne($detail, ?string $regimeImposition): string
     {
-        return match (round($taux, 2)) {
-            18.0, 18 => 'TVA',
-            0.0, 0 => 'TVAC',
-            10.0, 10 => 'TVAB',
-            20.0, 20 => 'TVAD',
-            default => 'TVA',
-        };
+        $produit = $detail->produit ?? null;
+
+        if ($produit) {
+            return $produit->codeTvaFne($regimeImposition);
+        }
+
+        $tauxLigne = self::tauxTvaDeLaLigne($detail);
+
+        return \App\Modules\Admin\Modeles\Produit::deduireCodeTva($tauxLigne, $regimeImposition);
+    }
+
+    /**
+     * Taux de TVA effectif d'une ligne sans produit rattaché, reconstitué
+     * depuis les montants enregistrés.
+     */
+    private static function tauxTvaDeLaLigne($detail): float
+    {
+        $ht = floatval($detail->quantite ?? 0) * floatval($detail->prix_unitaire ?? 0);
+        if ($ht <= 0) {
+            return 0.0;
+        }
+
+        return round(floatval($detail->montant_tva ?? 0) / $ht * 100, 2);
+    }
+
+    /**
+     * Table de correspondance taux → code DGI, conservée pour compatibilité.
+     *
+     * @deprecated Utiliser Produit::deduireCodeTva(), qui distingue TVAC
+     *             (exonération conventionnelle) de TVAD (exonération légale
+     *             TEE / RNE) — les deux valant 0 %.
+     */
+    private static function devinerCodeTaxe(float $taux, ?string $regime = null): string
+    {
+        return \App\Modules\Admin\Modeles\Produit::deduireCodeTva($taux, $regime);
+    }
+
+    /**
+     * Met un taux (remise ou taxe) au format attendu par la FNE : un nombre
+     * compris entre 0 et 100, exprimé en pourcentage.
+     */
+    private static function normaliserTaux($taux): float
+    {
+        $valeur = round(floatval($taux), 2);
+
+        return max(0.0, min(100.0, $valeur));
+    }
+
+    /**
+     * Mention libre transmise à la FNE : la valeur saisie sur la pièce prime
+     * sur celle des paramètres de l'entreprise, et la longueur est bornée.
+     */
+    private static function texteMention(?string $valeurPiece, ?string $valeurEntreprise): string
+    {
+        $texte = trim((string) $valeurPiece);
+        if ($texte === '') {
+            $texte = trim((string) $valeurEntreprise);
+        }
+
+        return mb_substr($texte, 0, self::LONGUEUR_MAX_MENTION);
+    }
+
+    /**
+     * Formate une collection de taxes personnalisées au format FNE :
+     * [{ "name": "GRA", "amount": 5 }, ...]
+     *
+     * Les taxes hors bornes (taux nul ou négatif, > 100 %) ou sans nom sont
+     * écartées : la DGI exige `name` et `amount` dès que `customTaxes` est
+     * renseigné.
+     */
+    private static function formaterTaxesPersonnalisees($taxes): array
+    {
+        if (empty($taxes)) {
+            return [];
+        }
+
+        return collect($taxes)
+            ->map(function ($taxe) {
+                $nom  = trim((string) ($taxe->nom ?? $taxe['nom'] ?? ''));
+                $taux = self::normaliserTaux($taxe->taux ?? $taxe['taux'] ?? 0);
+
+                return ['name' => $nom, 'amount' => $taux];
+            })
+            ->filter(fn ($taxe) => $taxe['name'] !== '' && $taxe['amount'] > 0)
+            ->values()
+            ->all();
     }
 
     private static function extraireInvoiceId(array $data): ?string

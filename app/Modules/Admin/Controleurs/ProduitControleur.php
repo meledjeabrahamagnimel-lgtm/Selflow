@@ -19,7 +19,7 @@ class ProduitControleur
         $entreprise = Auth::user()->entreprise;
         $produits   = Produit::where('entreprise_id', $entreprise->id)
             ->actifs()
-            ->with(['category', 'sousCategorieRelation', 'stocks'])
+            ->with(['category', 'sousCategorieRelation', 'stocks', 'taxes'])
             ->orderBy('nom')
             ->paginate(24);
 
@@ -70,6 +70,18 @@ class ProduitControleur
             'stock_actuel'  => [in_array($request->input('type'), ['service', 'consommable_non_stockable']) ? 'nullable' : 'required', 'integer', 'min:0'],
             'stock_minimum' => [in_array($request->input('type'), ['service', 'consommable_non_stockable']) ? 'nullable' : 'required', 'integer', 'min:0'],
             'unite'         => ['nullable', 'string', 'max:20'],
+            // Champs FNE (DGI)
+            'remise_taux'          => ['nullable', 'numeric', 'min:0', 'max:100'],
+            'code_tva_manuel'      => ['nullable', 'boolean'],
+            'code_tva'             => ['nullable', 'string', 'in:TVA,TVAB,TVAC,TVAD'],
+            'taxes_produit'        => ['nullable', 'array'],
+            'taxes_produit.*.nom'  => ['required_with:taxes_produit.*.taux', 'string', 'max:100'],
+            'taxes_produit.*.taux' => ['required_with:taxes_produit.*.nom', 'numeric', 'gt:0', 'max:100'],
+        ], [
+            'taxes_produit.*.taux.gt'  => 'Le taux d\'une taxe doit être strictement supérieur à 0 %.',
+            'taxes_produit.*.taux.max' => 'Le taux d\'une taxe ne peut pas dépasser 100 %.',
+            'taxes_produit.*.nom.required_with' => 'Chaque taxe doit avoir un nom.',
+            'remise_taux.max' => 'La remise ne peut pas dépasser 100 %.',
         ]);
 
         $reference = null;
@@ -137,7 +149,12 @@ class ProduitControleur
             'compte_vente'      => $request->compte_vente,
             'compte_achat'      => $request->compte_achat,
             'unite'             => $request->unite,
+            'remise_taux'       => floatval($request->input('remise_taux', 0)),
+            'code_tva_manuel'   => $request->boolean('code_tva_manuel'),
+            'code_tva'          => $request->boolean('code_tva_manuel') ? $request->input('code_tva') : null,
         ]);
+
+        $this->enregistrerTaxesProduit($produit, $request->input('taxes_produit', []));
 
         // Initialisation automatique des stocks par point de vente
         $pdvs = $entreprise->pointsDeVente;
@@ -157,6 +174,29 @@ class ProduitControleur
         }
 
         return back()->with('succes', 'Produit ajouté au catalogue avec succès. Référence générée : ' . $produit->reference);
+    }
+
+    /**
+     * Remplacer les taxes personnalisées d'un produit (champ `customTaxes` de
+     * la FNE au niveau de l'article).
+     *
+     * Ces taxes sont recopiées sur les lignes de vente au moment de la
+     * facturation : les modifier ici n'altère jamais une facture déjà émise.
+     */
+    private function enregistrerTaxesProduit(Produit $produit, $taxes): void
+    {
+        $produit->taxes()->delete();
+
+        foreach ((array) $taxes as $taxe) {
+            $nom  = trim((string) ($taxe['nom'] ?? ''));
+            $taux = floatval($taxe['taux'] ?? 0);
+
+            if ($nom === '' || $taux <= 0 || $taux > 100) {
+                continue;
+            }
+
+            $produit->taxes()->create(['nom' => $nom, 'taux' => $taux]);
+        }
     }
 
     /**
@@ -231,6 +271,18 @@ class ProduitControleur
             'stock_actuel'  => [$isNoStock ? 'nullable' : 'required', 'integer'],
             'stock_minimum' => [$isNoStock ? 'nullable' : 'required', 'integer', 'min:0'],
             'unite'         => ['nullable', 'string', 'max:20'],
+            // Champs FNE (DGI)
+            'remise_taux'          => ['nullable', 'numeric', 'min:0', 'max:100'],
+            'code_tva_manuel'      => ['nullable', 'boolean'],
+            'code_tva'             => ['nullable', 'string', 'in:TVA,TVAB,TVAC,TVAD'],
+            'taxes_produit'        => ['nullable', 'array'],
+            'taxes_produit.*.nom'  => ['required_with:taxes_produit.*.taux', 'string', 'max:100'],
+            'taxes_produit.*.taux' => ['required_with:taxes_produit.*.nom', 'numeric', 'gt:0', 'max:100'],
+        ], [
+            'taxes_produit.*.taux.gt'  => 'Le taux d\'une taxe doit être strictement supérieur à 0 %.',
+            'taxes_produit.*.taux.max' => 'Le taux d\'une taxe ne peut pas dépasser 100 %.',
+            'taxes_produit.*.nom.required_with' => 'Chaque taxe doit avoir un nom.',
+            'remise_taux.max' => 'La remise ne peut pas dépasser 100 %.',
         ]);
 
         $categorieId = $request->input('categorie_id');
@@ -287,9 +339,14 @@ class ProduitControleur
             'compte_vente'      => $request->compte_vente,
             'compte_achat'      => $request->compte_achat,
             'unite'             => $request->unite,
+            'remise_taux'       => floatval($request->input('remise_taux', 0)),
+            'code_tva_manuel'   => $request->boolean('code_tva_manuel'),
+            'code_tva'          => $request->boolean('code_tva_manuel') ? $request->input('code_tva') : null,
         ]);
 
-        $pdvId = session('point_de_vente_actif_id') 
+        $this->enregistrerTaxesProduit($produit, $request->input('taxes_produit', []));
+
+        $pdvId = session('point_de_vente_actif_id')
             ?? auth()->user()->point_de_vente_id 
             ?? ($entreprise->pointsDeVente->first()->id ?? null);
 

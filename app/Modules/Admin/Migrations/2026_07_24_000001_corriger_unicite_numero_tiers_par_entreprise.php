@@ -70,7 +70,13 @@ return new class extends Migration
 
     private function indexExists(string $table, string $indexName): bool
     {
-        $indexes = DB::select("SHOW INDEX FROM `{$table}` WHERE Key_name = ?", [$indexName]);
-        return !empty($indexes);
+        // `SHOW INDEX` est propre a MySQL : on passe par le Schema Builder.
+        foreach (Schema::getIndexes($table) as $index) {
+            if (($index['name'] ?? null) === $indexName) {
+                return true;
+            }
+        }
+
+        return false;
     }
 };

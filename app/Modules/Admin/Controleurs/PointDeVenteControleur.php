@@ -35,7 +35,6 @@ class PointDeVenteControleur
             'commune'   => ['nullable', 'string', 'max:100'],
             'responsable'=> ['nullable', 'string', 'max:150'],
             'telephone' => ['nullable', 'string', 'max:30'],
-            'code_fne'  => ['nullable', 'string', 'max:100'],
         ]);
 
         if ($entreprise->pointsDeVente()->count() >= $entreprise->quota_points_de_vente) {
@@ -43,7 +42,7 @@ class PointDeVenteControleur
         }
 
         $pdv = PointDeVente::create(array_merge(
-            $request->only(['nom', 'ville', 'commune', 'responsable', 'telephone', 'code_fne']),
+            $request->only(['nom', 'ville', 'commune', 'responsable', 'telephone']),
             ['entreprise_id' => $entreprise->id, 'statut' => 'Ouvert']
         ));
 
@@ -77,7 +76,6 @@ class PointDeVenteControleur
             'commune'     => ['nullable', 'string', 'max:100'],
             'responsable' => ['nullable', 'string', 'max:150'],
             'telephone'   => ['nullable', 'string', 'max:30'],
-            'code_fne'    => ['nullable', 'string', 'max:100'],
         ]);
 
         $pdv->update($validated);

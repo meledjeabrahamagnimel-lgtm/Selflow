@@ -48,6 +48,56 @@ class Produit extends Model
         return self::TYPES[$this->type] ?? ucfirst($this->type);
     }
 
+    /**
+     * Codes TVA de la FNE et leur taux légal
+     * (Procedure_technique_integration_API, Annexe 1 : Lexique).
+     */
+    public const CODES_TVA = [
+        'TVA'  => ['taux' => 18.0, 'libelle' => 'TVA — Taux normal 18 %'],
+        'TVAB' => ['taux' => 9.0,  'libelle' => 'TVAB — Taux réduit 9 %'],
+        'TVAC' => ['taux' => 0.0,  'libelle' => 'TVAC — Exonération conventionnelle 0 %'],
+        'TVAD' => ['taux' => 0.0,  'libelle' => 'TVAD — Exonération légale 0 % (TEE / RNE)'],
+    ];
+
+    /**
+     * Régimes d'imposition pour lesquels une exonération à 0 % relève de
+     * l'exonération LÉGALE (TVAD) et non conventionnelle (TVAC).
+     */
+    public const REGIMES_EXONERATION_LEGALE = ['TEE', 'RNE'];
+
+    /**
+     * Code TVA DGI à transmettre à la FNE pour ce produit.
+     *
+     * Deux modes, au choix de l'utilisateur sur la fiche produit :
+     *  - MANUEL (`code_tva_manuel` = true) : le code saisi fait foi ;
+     *  - AUTOMATIQUE (défaut) : le code est déduit du taux de TVA du produit,
+     *    et pour un taux à 0 % du régime d'imposition de l'entreprise — un
+     *    taux nul ne permettant pas à lui seul de distinguer TVAC de TVAD.
+     */
+    public function codeTvaFne(?string $regimeImposition = null): string
+    {
+        if ($this->code_tva_manuel && !empty($this->code_tva)) {
+            return array_key_exists($this->code_tva, self::CODES_TVA) ? $this->code_tva : 'TVA';
+        }
+
+        $regime = $regimeImposition ?? $this->entreprise?->regime_imposition;
+
+        return self::deduireCodeTva((float) $this->taux_tva, $regime);
+    }
+
+    /**
+     * Déduction automatique du code TVA depuis un taux et un régime.
+     */
+    public static function deduireCodeTva(float $taux, ?string $regime = null): string
+    {
+        return match (round($taux, 2)) {
+            18.0 => 'TVA',
+            9.0  => 'TVAB',
+            0.0  => in_array($regime, self::REGIMES_EXONERATION_LEGALE, true) ? 'TVAD' : 'TVAC',
+            default => 'TVA',
+        };
+    }
+
     protected $fillable = [
         'entreprise_id',
         'reference',
@@ -59,6 +109,10 @@ class Produit extends Model
         'prix_achat',
         'prix_vente',
         'taux_tva',
+        // Champs FNE (DGI)
+        'remise_taux',      // remise par défaut du produit, en %
+        'code_tva',         // TVA | TVAB | TVAC | TVAD
+        'code_tva_manuel',  // false = code déduit du taux et du régime
         'compte_vente',
         'compte_achat',
         'quantite_commandee',
@@ -78,6 +132,8 @@ class Produit extends Model
             'prix_achat'              => 'decimal:2',
             'prix_vente'              => 'decimal:2',
             'taux_tva'                => 'decimal:2',
+            'remise_taux'             => 'decimal:2',
+            'code_tva_manuel'         => 'boolean',
             'categorie_id'            => 'integer',
             'sous_categorie_id'       => 'integer',
             'quantite_commandee'      => 'integer',
@@ -175,6 +231,15 @@ class Produit extends Model
     public function detailsLibres(): \Illuminate\Database\Eloquent\Relations\HasMany
     {
         return $this->hasMany(ProduitDetailLibre::class, 'produit_id')->orderBy('ordre');
+    }
+
+    /**
+     * Taxes personnalisées du produit (GRA, AIRSI...) transmises à la FNE
+     * dans `items[].customTaxes`.
+     */
+    public function taxes(): HasMany
+    {
+        return $this->hasMany(ProduitTaxe::class, 'produit_id');
     }
 
     public function category(): BelongsTo

@@ -109,7 +109,13 @@ return new class extends Migration
             // Ignorer silencieusement si la table n'a pas encore de données lors d'un fresh install
         }
 
-        // Supprimer l'ancienne colonne texte de produits
+        // Supprimer l'ancienne colonne texte de produits.
+        // L'index pose a la creation doit tomber en premier : MySQL le retire
+        // implicitement avec la colonne, pas SQLite.
+        Schema::table('produits', function (Blueprint $table) {
+            $table->dropIndex('produits_categorie_index');
+        });
+
         Schema::table('produits', function (Blueprint $table) {
             $table->dropColumn('categorie');
         });

@@ -645,7 +645,10 @@ class ComptabiliteService
 
         $comptes = [];
         foreach ($vente->details as $detail) {
-            $ht = $detail->quantite * $detail->prix_unitaire;
+            // La remise de ligne s'applique avant la remise globale : c'est
+            // l'ordre retenu à la saisie et celui du récapitulatif de la FNE.
+            $remiseLigne = (float) ($detail->remise_taux ?? 0);
+            $ht = $detail->quantite * $detail->prix_unitaire * (1 - $remiseLigne / 100);
             if ($pourcentageRemise > 0) {
                 $ht = $ht - ($ht * $pourcentageRemise);
             }
@@ -673,7 +676,8 @@ class ComptabiliteService
         $comptes = [];
         $totalTva = 0;
         foreach ($achat->details as $detail) {
-            $ht = $detail->quantite * $detail->prix_unitaire;
+            $remiseLigne = (float) ($detail->remise_taux ?? 0);
+            $ht = $detail->quantite * $detail->prix_unitaire * (1 - $remiseLigne / 100);
             if ($ht > 0) {
                 $compte = $detail->produit?->compte_achat ?? config('selflow.plan_comptable_defaut.achat_defaut');
                 if (!isset($comptes[$compte])) {
