@@ -226,15 +226,19 @@
 
                     {{-- Mode de paiement style buttons --}}
                     <input type="hidden" name="mode_paiement" id="modePaiementInput" value="Caisse">
+                    <input type="hidden" name="mobile_money_operateur" id="mobileMoneyOperateurInput" value="">
+                    <input type="hidden" name="devise" id="deviseInput" value="XOF">
+                    <input type="hidden" name="taux_change" id="tauxChangeInput" value="">
 
                     {{-- Bloc Paiement : visible uniquement à l'étape Facture --}}
                     <div id="blocPaiementVente">
                         <div class="form-group">
                             <label class="form-label">Mode de paiement <span style="color:var(--danger)">*</span></label>
-                            <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:10px; margin-bottom:12px;">
-                                <button type="button" class="btn payment-toggle-btn active" data-mode="Caisse" onclick="selectionnerModePaiement(this)" style="justify-content:center;">Caisse</button>
-                                <button type="button" class="btn payment-toggle-btn" data-mode="Banque" onclick="selectionnerModePaiement(this)" style="justify-content:center;">Banque</button>
-                                <button type="button" class="btn payment-toggle-btn" data-mode="Crédit" onclick="selectionnerModePaiement(this)" style="justify-content:center;">Crédit</button>
+                            <div style="display:flex; gap:8px; margin-bottom:12px;">
+                                <button type="button" class="btn payment-toggle-btn active" data-mode="Caisse" onclick="selectionnerModePaiement(this)" style="flex:1; justify-content:center; padding:8px 0; font-size:12px; font-weight:700; border-radius:8px;">Caisse</button>
+                                <button type="button" class="btn payment-toggle-btn" data-mode="Banque" onclick="selectionnerModePaiement(this)" style="flex:1; justify-content:center; padding:8px 0; font-size:12px; font-weight:700; border-radius:8px;">Banque</button>
+                                <button type="button" class="btn payment-toggle-btn" data-mode="Mobile Money" onclick="selectionnerModePaiement(this)" style="flex:1.2; justify-content:center; padding:8px 0; font-size:12px; font-weight:700; border-radius:8px; white-space:nowrap;">Mobile Money</button>
+                                <button type="button" class="btn payment-toggle-btn" data-mode="Crédit" onclick="selectionnerModePaiement(this)" style="flex:1; justify-content:center; padding:8px 0; font-size:12px; font-weight:700; border-radius:8px;">Crédit</button>
                             </div>
                         </div>
 
@@ -267,10 +271,57 @@
                             </div>
                         </div>
 
+                        {{-- Sélection opérateur Mobile Money (logiciel uniquement) --}}
+                        <div id="selectionMobileMoneyContainer" style="display:none; margin-bottom:16px;">
+                            <div class="form-group">
+                                <label class="form-label">Opérateur Mobile Money</label>
+                                <select id="mobileMoneyOperateurSelect" class="form-control" onchange="document.getElementById('mobileMoneyOperateurInput').value = this.value">
+                                    <option value="">— Sélectionner l'opérateur —</option>
+                                    <option value="MTN">MTN Mobile Money</option>
+                                    <option value="MOOV">MOOV Money</option>
+                                    <option value="ORANGE">Orange Money</option>
+                                    <option value="WAVE">Wave</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        {{-- Devise (par défaut FCFA / XOF) --}}
+                        <div class="form-group" style="margin-bottom:12px;">
+                            <label class="form-label">Devise</label>
+                            <select id="deviseSelect" class="form-control" onchange="changerDevise(this.value)">
+                                <option value="XOF" selected>FCFA — Franc CFA (XOF)</option>
+                                <option value="EUR">Euro (EUR)</option>
+                                <option value="USD">Dollar Américain (USD)</option>
+                                <option value="GBP">Livre Sterling (GBP)</option>
+                                <option value="CHF">Franc Suisse (CHF)</option>
+                                <option value="CAD">Dollar Canadien (CAD)</option>
+                                <option value="JPY">Yen Japonais (JPY)</option>
+                                <option value="CNH">Yuan Chinois (CNH)</option>
+                            </select>
+                        </div>
+                        {{-- Taux de change (visible uniquement si devise != XOF) --}}
+                        <div id="blocTauxChange" style="display:none; margin-bottom:12px;">
+                            <label class="form-label">Taux de change (1 <span id="deviseCodeLabel">EUR</span> = ? FCFA)</label>
+                            <div style="display:flex; gap:8px; align-items:center;">
+                                <input type="number" id="tauxChangeDisplayInput" class="form-control" placeholder="Ex: 655" step="0.0001" min="0"
+                                    onchange="document.getElementById('tauxChangeInput').value = this.value">
+                                <button type="button" class="btn btn-outline" id="btnActualiserTaux" onclick="actualiserTauxChange()" style="white-space:nowrap; font-size:12px; padding:6px 12px;">
+                                    <i class="fas fa-sync-alt"></i> Actualiser
+                                </button>
+                            </div>
+                            <div style="font-size:11px; color:var(--text-3); margin-top:4px;">Taux récupéré automatiquement. Modifiable si nécessaire.</div>
+                        </div>
+
+                        {{-- Montant reçu en Devise Étrangère --}}
+                        <div class="form-group" id="blocMontantPayeDevise" style="display:none; margin-bottom:12px;">
+                            <label class="form-label">Montant reçu en <span class="deviseCodeText">EUR</span></label>
+                            <input type="number" id="montantPayeDeviseInput" class="form-control" placeholder="Saisir le montant dans la devise étrangère" step="0.01" min="0" oninput="calculerMontantEnFcfa()">
+                        </div>
+
                         {{-- Montant reçu --}}
                         <div class="form-group">
-                            <label class="form-label" id="labelMontantPaye">Montant à encaisser / reçu <span style="color:var(--danger)">*</span></label>
-                            <input type="number" name="montant_paye" id="montantPayeInput" class="form-control" placeholder="Saisir le montant reçu / payé">
+                            <label class="form-label" id="labelMontantPaye">Montant à encaisser / reçu (FCFA) <span style="color:var(--danger)">*</span></label>
+                            <input type="number" name="montant_paye" id="montantPayeInput" class="form-control" placeholder="Saisir le montant reçu / payé" oninput="calculerMontantEnDevise()">
                         </div>
                     </div>
                 </div>
@@ -456,38 +507,139 @@ function selectionnerModePaiement(btn) {
 
     const mode = btn.dataset.mode;
     document.getElementById('modePaiementInput').value = mode;
-    
-    const banqueContainer = document.getElementById('selectionBanqueContainer');
-    const banqueSelect = document.getElementById('banqueSelect');
-    const moyenBancaireSelect = document.getElementById('moyenBancaireSelect');
-    const refPaiementInput = document.getElementById('refPaiementInput');
-    const montantInput = document.getElementById('montantPayeInput');
-    const labelMontant = document.getElementById('labelMontantPaye');
-    
+
+    const banqueContainer      = document.getElementById('selectionBanqueContainer');
+    const mobileMoneyContainer = document.getElementById('selectionMobileMoneyContainer');
+    const banqueSelect         = document.getElementById('banqueSelect');
+    const moyenBancaireSelect  = document.getElementById('moyenBancaireSelect');
+    const refPaiementInput     = document.getElementById('refPaiementInput');
+    const montantInput         = document.getElementById('montantPayeInput');
+    const labelMontant         = document.getElementById('labelMontantPaye');
+
+    // Tout masquer d'abord
+    banqueContainer.style.display      = 'none';
+    mobileMoneyContainer.style.display = 'none';
+    banqueSelect.required        = false;
+    moyenBancaireSelect.required = false;
+    refPaiementInput.required    = false;
+    banqueSelect.value           = '';
+    moyenBancaireSelect.value    = '';
+    refPaiementInput.value       = '';
+    document.getElementById('mobileMoneyOperateurInput').value = '';
+
     if (mode === 'Banque') {
         banqueContainer.style.display = 'block';
-        banqueSelect.required = true;
-        moyenBancaireSelect.required = true;
-        refPaiementInput.required = true;
-    } else {
-        banqueContainer.style.display = 'none';
-        banqueSelect.required = false;
-        banqueSelect.value = '';
-        moyenBancaireSelect.required = false;
-        moyenBancaireSelect.value = '';
-        refPaiementInput.required = false;
-        refPaiementInput.value = '';
+        banqueSelect.required         = true;
+        moyenBancaireSelect.required  = true;
+        refPaiementInput.required     = true;
+    } else if (mode === 'Mobile Money') {
+        mobileMoneyContainer.style.display = 'block';
     }
-    
+
     if (mode === 'Crédit') {
-        montantInput.required = false;
-        montantInput.placeholder = "Laisser vide (Crédit)";
-        montantInput.value = "";
-        labelMontant.innerHTML = 'Montant à encaisser / reçu';
+        montantInput.required     = false;
+        montantInput.placeholder  = "Laisser vide (Crédit)";
+        montantInput.value        = "";
+        labelMontant.innerHTML    = 'Montant à encaisser / reçu';
     } else {
-        montantInput.required = true;
+        montantInput.required    = true;
         montantInput.placeholder = "Saisir le montant reçu / payé";
-        labelMontant.innerHTML = 'Montant à encaisser / reçu <span style="color:var(--danger)">*</span>';
+        labelMontant.innerHTML   = 'Montant à encaisser / reçu <span style="color:var(--danger)">*</span>';
+    }
+}
+
+function changerDevise(code) {
+    document.getElementById('deviseInput').value = code;
+    const blocTaux = document.getElementById('blocTauxChange');
+    const blocDeviseAmt = document.getElementById('blocMontantPayeDevise');
+    const devCodeTexts = document.querySelectorAll('.deviseCodeText');
+    
+    devCodeTexts.forEach(el => el.textContent = code);
+
+    if (code && code !== 'XOF') {
+        blocTaux.style.display = 'block';
+        blocDeviseAmt.style.display = 'block';
+        document.getElementById('deviseCodeLabel').textContent = code;
+        // Réinitialiser et lancer la récupération auto du taux
+        document.getElementById('tauxChangeDisplayInput').value = '';
+        document.getElementById('tauxChangeInput').value = '';
+        document.getElementById('montantPayeDeviseInput').value = '';
+        actualiserTauxChange();
+    } else {
+        blocTaux.style.display = 'none';
+        blocDeviseAmt.style.display = 'none';
+        document.getElementById('tauxChangeInput').value = '';
+        document.getElementById('tauxChangeDisplayInput').value = '';
+        document.getElementById('montantPayeDeviseInput').value = '';
+    }
+}
+
+// Taux de change approximatifs (fallback statique si l'API externe échoue)
+const TAUX_FALLBACK = { EUR: 655, USD: 600, GBP: 760, CHF: 670, CAD: 445, JPY: 4, CNH: 83 };
+
+async function actualiserTauxChange() {
+    const code = document.getElementById('deviseInput').value;
+    if (!code || code === 'XOF') return;
+    const btn = document.getElementById('btnActualiserTaux');
+    if (btn) btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+    try {
+        const res = await fetch(`https://open.er-api.com/v6/latest/${code}`);
+        const data = await res.json();
+        if (data && data.rates && data.rates['XOF']) {
+            const taux = Math.round(data.rates['XOF']);
+            document.getElementById('tauxChangeDisplayInput').value = taux;
+            document.getElementById('tauxChangeInput').value = taux;
+            // Lancer le recalcul auto après récupération du taux
+            calculerMontantEnFcfa();
+        } else {
+            throw new Error('rate not found');
+        }
+    } catch (e) {
+        const fallback = TAUX_FALLBACK[code] ?? '';
+        document.getElementById('tauxChangeDisplayInput').value = fallback;
+        document.getElementById('tauxChangeInput').value = fallback;
+        calculerMontantEnFcfa();
+    }
+    if (btn) btn.innerHTML = '<i class="fas fa-sync-alt"></i> Actualiser';
+}
+
+function calculerMontantEnFcfa() {
+    const devInput = document.getElementById('montantPayeDeviseInput');
+    const fcfaInput = document.getElementById('montantPayeInput');
+    const tauxInput = document.getElementById('tauxChangeDisplayInput');
+    const devise = document.getElementById('deviseInput').value;
+
+    if (devise === 'XOF') return;
+
+    const devValue = parseFloat(devInput.value) || 0;
+    const taux = parseFloat(tauxInput.value) || 0;
+
+    if (taux > 0) {
+        fcfaInput.value = Math.round(devValue * taux);
+    } else {
+        fcfaInput.value = '';
+    }
+    // Déclencher le recalcul interne de la monnaie de rendu de monnaie si disponible
+    if (typeof calculerRenduMonnaie === 'function') {
+        calculerRenduMonnaie();
+    }
+}
+
+function calculerMontantEnDevise() {
+    const devInput = document.getElementById('montantPayeDeviseInput');
+    const fcfaInput = document.getElementById('montantPayeInput');
+    const tauxInput = document.getElementById('tauxChangeDisplayInput');
+    const devise = document.getElementById('deviseInput').value;
+
+    if (devise === 'XOF') return;
+
+    const fcfaValue = parseFloat(fcfaInput.value) || 0;
+    const taux = parseFloat(tauxInput.value) || 0;
+
+    if (taux > 0) {
+        devInput.value = (fcfaValue / taux).toFixed(2);
+    } else {
+        devInput.value = '';
     }
 }
 

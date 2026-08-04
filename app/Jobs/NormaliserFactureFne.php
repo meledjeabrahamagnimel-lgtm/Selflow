@@ -3,6 +3,7 @@
 namespace App\Jobs;
 
 use App\Modules\Admin\Modeles\Vente;
+use App\Modules\Admin\Modeles\VenteDetail;
 use App\Modules\Admin\Services\FneService;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
@@ -63,14 +64,31 @@ class NormaliserFactureFne implements ShouldQueue
                 $vente = Vente::find($this->vente->id);
                 
                 if ($vente) {
-                    $vente->update([
+                    $updateData = [
                         'normalise'     => true,
                         'numero_fne'    => $fneResult['numero_recu'],
                         'signature_dgi' => $fneResult['signature'] ?? null,
                         'qr_code_data'  => $fneResult['qr_code_data'],
                         'fichier_fne_pdf_url' => $fneResult['pdf_url'] ?? null,
-                        'type_facture'  => $this->estRne ? 'RNE' : 'normale',
-                    ]);
+                    ];
+
+                    if ($this->estRne) {
+                        $updateData['type_facture'] = 'RNE';
+                    } elseif ($vente->type_facture !== 'avoir') {
+                        $updateData['type_facture'] = 'normale';
+                    }
+
+                    if (!empty($fneResult['invoice_id'])) {
+                        $updateData['fne_invoice_id'] = $fneResult['invoice_id'];
+                    }
+
+                    $vente->update($updateData);
+
+                    if (!empty($fneResult['fne_item_ids']) && is_array($fneResult['fne_item_ids'])) {
+                        foreach ($fneResult['fne_item_ids'] as $detailId => $itemId) {
+                            VenteDetail::where('id', $detailId)->update(['fne_invoice_item_id' => $itemId]);
+                        }
+                    }
 
                     Log::info("NormaliserFactureFne: Normalisation réussie - Vente #{$vente->id} → FNE: {$fneResult['numero_recu']}");
                 }

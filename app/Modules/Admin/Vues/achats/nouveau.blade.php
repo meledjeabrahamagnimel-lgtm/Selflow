@@ -61,14 +61,28 @@
         <div class="card" style="position:sticky; top:calc(var(--topbar-h) + 16px);">
             <div class="card-header"><h2><i class="fas fa-file-invoice"></i> Informations</h2></div>
             <div class="card-body">
-                <div class="form-group">
+                <div class="form-group" id="groupeFournisseurSelect">
                     <label class="form-label">Fournisseur <span style="color:var(--danger)">*</span></label>
-                    <select name="fournisseur_id" class="form-control" required>
+                    <select name="fournisseur_id" id="fournisseurSelect" class="form-control" required>
                         <option value="">— Choisir un fournisseur —</option>
                         @foreach($fournisseurs as $f)
                         <option value="{{ $f->id }}">{{ $f->nom }}</option>
                         @endforeach
                     </select>
+                </div>
+                {{-- Champ BAPA : nom libre du vendeur non déclaré (tiers) --}}
+                <div class="form-group" id="groupeFournisseurBapa" style="display:none;">
+                    <label class="form-label">
+                        <i class="fas fa-user-slash" style="color:var(--danger);"></i>
+                        Nom du vendeur <span style="color:var(--text-3); font-weight:400; font-size:11px;">(Tiers non immatriculé — sans NCC)</span>
+                        <span style="color:var(--danger)">*</span>
+                    </label>
+                    <input type="text" name="fournisseur_nom_bapa" id="fournisseurNomBapa" class="form-control"
+                           placeholder="Ex: KONAN Kofi, Marché de Treichville..."
+                           style="border-color: var(--danger);">
+                    <div style="font-size:11px; color:var(--text-3); margin-top:4px;">
+                        <i class="fas fa-info-circle"></i> Ce vendeur sera déclaré comme «&nbsp;tiers non identifié&nbsp;» auprès de la DGI.
+                    </div>
                 </div>
                 <div class="form-group">
                     <label class="form-label">Date d'achat <span style="color:var(--danger)">*</span></label>
@@ -91,13 +105,21 @@
                     </div>
                 </div>
 
-                {{-- Bouton bascule : Facture physique fournisseur --}}
+                {{-- Bouton bascule : Facture physique fournisseur & BAPA --}}
                 <div style="border:1.5px dashed var(--border); border-radius:8px; padding:12px; margin-bottom:14px; background:#fafafa;">
-                    <button type="button" id="btnFacturePhysique" onclick="toggleFacturePhysique()" 
-                            style="width:100%; display:flex; align-items:center; justify-content:center; gap:8px; background:transparent; border:none; color:var(--text-2); font-weight:700; font-size:13px; cursor:pointer;">
-                        <i class="fas fa-file-invoice" id="iconFacturePhysique"></i>
-                        <span id="labelFacturePhysique">Ajouter une facture physique fournisseur</span>
-                    </button>
+                    <div style="display:flex; flex-direction:column; gap:8px;">
+                        <button type="button" id="btnFacturePhysique" onclick="toggleFacturePhysique()" 
+                                style="width:100%; display:flex; align-items:center; justify-content:center; gap:8px; background:transparent; border:none; color:var(--text-2); font-weight:700; font-size:13px; cursor:pointer;">
+                            <i class="fas fa-file-invoice" id="iconFacturePhysique"></i>
+                            <span id="labelFacturePhysique">Ajouter une facture physique fournisseur</span>
+                        </button>
+                        <button type="button" id="btnBapa" onclick="toggleBapa()" 
+                                style="width:100%; display:flex; align-items:center; justify-content:center; gap:8px; background:transparent; border:none; color:var(--danger); font-weight:700; font-size:13px; cursor:pointer; border-top:1px dashed var(--border); padding-top:8px;">
+                            <i class="fas fa-file-invoice" id="iconBapa"></i>
+                            <span id="labelBapa">Enregistrer sous format BAPA (DGI)</span>
+                        </button>
+                    </div>
+                    <input type="hidden" name="type_facture" id="typeFactureInput" value="normale">
                     <div id="blocFacturePhysique" style="display:none; margin-top:14px;">
                         {{-- Champ etape overridé quand facture physique --}}
                         <div class="form-group" style="margin-bottom:10px;">
@@ -107,12 +129,16 @@
                         </div>
                         {{-- Mode de paiement --}}
                         <input type="hidden" name="mode_paiement" id="modePaiementInput" value="Caisse">
+                        <input type="hidden" name="mobile_money_operateur" id="mobileMoneyOperateurInput" value="">
+                        <input type="hidden" name="devise" id="deviseInput" value="XOF">
+                        <input type="hidden" name="taux_change" id="tauxChangeInput" value="">
                         <div class="form-group" style="margin-bottom:10px;">
                             <label class="form-label" style="font-size:12px; color:var(--text-2);">Mode de paiement <span style="color:var(--danger)">*</span></label>
-                            <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:8px;">
-                                <button type="button" class="btn payment-toggle-btn active" data-mode="Caisse" onclick="selectionnerModePaiement(this)" style="justify-content:center; font-size:12px;">Caisse</button>
-                                <button type="button" class="btn payment-toggle-btn" data-mode="Banque" onclick="selectionnerModePaiement(this)" style="justify-content:center; font-size:12px;">Banque</button>
-                                <button type="button" class="btn payment-toggle-btn" data-mode="Crédit" onclick="selectionnerModePaiement(this)" style="justify-content:center; font-size:12px;">Crédit</button>
+                            <div style="display:flex; gap:8px; margin-bottom:12px;">
+                                <button type="button" class="btn payment-toggle-btn active" data-mode="Caisse" onclick="selectionnerModePaiement(this)" style="flex:1; justify-content:center; padding:8px 0; font-size:11px; font-weight:700; border-radius:8px;">Caisse</button>
+                                <button type="button" class="btn payment-toggle-btn" data-mode="Banque" onclick="selectionnerModePaiement(this)" style="flex:1; justify-content:center; padding:8px 0; font-size:11px; font-weight:700; border-radius:8px;">Banque</button>
+                                <button type="button" class="btn payment-toggle-btn" data-mode="Mobile Money" onclick="selectionnerModePaiement(this)" style="flex:1.2; justify-content:center; padding:8px 0; font-size:11px; font-weight:700; border-radius:8px; white-space:nowrap;">Mobile Money</button>
+                                <button type="button" class="btn payment-toggle-btn" data-mode="Crédit" onclick="selectionnerModePaiement(this)" style="flex:1; justify-content:center; padding:8px 0; font-size:11px; font-weight:700; border-radius:8px;">Crédit</button>
                             </div>
                         </div>
                         {{-- Sélection banque --}}
@@ -142,6 +168,56 @@
                                 <label class="form-label" style="font-size:12px; color:var(--text-2);">Référence / Numéro</label>
                                 <input type="text" name="reference_paiement" id="refPaiementInput" class="form-control" placeholder="Numéro de carte, virement ou chèque">
                             </div>
+                        </div>
+                        {{-- Sélection opérateur Mobile Money --}}
+                        <div id="selectionMobileMoneyContainer" style="display:none; margin-bottom:10px;">
+                            <div class="form-group">
+                                <label class="form-label" style="font-size:12px; color:var(--text-2);">Opérateur Mobile Money</label>
+                                <select id="mobileMoneyOperateurSelect" class="form-control" onchange="document.getElementById('mobileMoneyOperateurInput').value = this.value">
+                                    <option value="">— Sélectionner l'opérateur —</option>
+                                    <option value="MTN">MTN Mobile Money</option>
+                                    <option value="MOOV">MOOV Money</option>
+                                    <option value="ORANGE">Orange Money</option>
+                                    <option value="WAVE">Wave</option>
+                                </select>
+                            </div>
+                        </div>
+                        {{-- Devise --}}
+                        <div class="form-group" style="margin-bottom:8px;">
+                            <label class="form-label" style="font-size:12px; color:var(--text-2);">Devise</label>
+                            <select id="deviseSelect" class="form-control" onchange="changerDevise(this.value)">
+                                <option value="XOF" selected>FCFA — Franc CFA (XOF)</option>
+                                <option value="EUR">Euro (EUR)</option>
+                                <option value="USD">Dollar Américain (USD)</option>
+                                <option value="GBP">Livre Sterling (GBP)</option>
+                                <option value="CHF">Franc Suisse (CHF)</option>
+                                <option value="CAD">Dollar Canadien (CAD)</option>
+                                <option value="JPY">Yen Japonais (JPY)</option>
+                                <option value="CNH">Yuan Chinois (CNH)</option>
+                            </select>
+                        </div>
+                        <div id="blocTauxChange" style="display:none; margin-bottom:8px;">
+                            <label class="form-label" style="font-size:12px; color:var(--text-2);">Taux de change (1 <span id="deviseCodeLabel">EUR</span> = ? FCFA)</label>
+                            <div style="display:flex; gap:8px; align-items:center;">
+                                <input type="number" id="tauxChangeDisplayInput" class="form-control" placeholder="Ex: 655" step="0.0001" min="0"
+                                    onchange="document.getElementById('tauxChangeInput').value = this.value; calculerMontantEnFcfa();">
+                                <button type="button" class="btn btn-outline" id="btnActualiserTaux" onclick="actualiserTauxChange()" style="white-space:nowrap; font-size:11px; padding:5px 10px;">
+                                    <i class="fas fa-sync-alt"></i> Actualiser
+                                </button>
+                            </div>
+                            <div style="font-size:11px; color:var(--text-3); margin-top:4px;">Taux récupéré automatiquement. Modifiable si nécessaire.</div>
+                        </div>
+
+                        {{-- Montant en devise étrangère --}}
+                        <div class="form-group" id="blocMontantDevise" style="display:none; margin-bottom:8px;">
+                            <label class="form-label" style="font-size:12px; color:var(--text-2);">Montant payé en <span class="deviseCodeText">EUR</span></label>
+                            <input type="number" id="montantDeviseInput" class="form-control" placeholder="Saisir le montant en devise étrangère" step="0.01" min="0" oninput="calculerMontantEnFcfa()">
+                        </div>
+
+                        {{-- Montant en FCFA (champ principal) --}}
+                        <div class="form-group" id="blocMontantFcfa" style="display:none; margin-bottom:8px;">
+                            <label class="form-label" style="font-size:12px; color:var(--text-2);">Montant payé (FCFA) <span style="color:var(--danger)">*</span></label>
+                            <input type="number" name="montant_paye" id="montantPayeInput" class="form-control" placeholder="Montant en FCFA" oninput="calculerMontantEnDevise()">
                         </div>
                     </div>
                 </div>
@@ -363,7 +439,16 @@ function recalculer() {
         ht += q * p;
     });
     const fmt = n => new Intl.NumberFormat('fr-FR').format(Math.round(n)) + ' F';
-    document.getElementById('totTtc').textContent = fmt(ht);
+    
+    const devise = document.getElementById('deviseInput').value;
+    const taux = parseFloat(document.getElementById('tauxChangeDisplayInput').value) || 0;
+    let totalText = fmt(ht);
+    if (devise !== 'XOF' && taux > 0) {
+        const totalDevise = (ht / taux).toFixed(2);
+        totalText += ` (${totalDevise} ${devise})`;
+    }
+    
+    document.getElementById('totTtc').textContent = totalText;
     const noItems = document.querySelectorAll('.ligne').length === 0;
     document.getElementById('btnValiderAchat').disabled = noItems;
 }
@@ -389,32 +474,81 @@ function selectionnerEtape(btn) {
     document.getElementById('labelBtnValider').textContent = labelMap[etape] || 'Enregistrer';
 }
 
-// Lot F : bascule affichage bloc facture physique
+// Lot F : bascule affichage bloc facture physique & BAPA
 let facturePhysiqueActive = false;
+let bapaActive = false;
+
 function toggleFacturePhysique() {
     facturePhysiqueActive = !facturePhysiqueActive;
-    const bloc = document.getElementById('blocFacturePhysique');
-    const label = document.getElementById('labelFacturePhysique');
-    const icon = document.getElementById('iconFacturePhysique');
     if (facturePhysiqueActive) {
-        bloc.style.display = 'block';
-        label.textContent = 'Masquer la facture physique fournisseur';
-        icon.className = 'fas fa-chevron-up';
+        bapaActive = false;
+        document.getElementById('btnBapa').style.display = 'none';
+        
+        document.getElementById('blocFacturePhysique').style.display = 'block';
+        document.getElementById('labelFacturePhysique').textContent = 'Masquer la facture physique';
+        document.getElementById('iconFacturePhysique').className = 'fas fa-chevron-up';
         document.getElementById('etapeInput').value = 'Facture';
+        document.getElementById('typeFactureInput').value = 'normale';
         document.getElementById('labelBtnValider').textContent = 'Enregistrer la facture';
+        document.getElementById('numeroFactureFournisseur').closest('.form-group').style.display = 'block';
     } else {
-        bloc.style.display = 'none';
-        label.textContent = 'Ajouter une facture physique fournisseur';
-        icon.className = 'fas fa-file-invoice';
-        // Restaurer l'etape selon le bouton actif
-        const activeEtapeBtn = document.querySelector('[data-etape].active');
-        if (activeEtapeBtn) {
-            document.getElementById('etapeInput').value = activeEtapeBtn.dataset.etape;
-            document.getElementById('labelBtnValider').textContent = 
-                activeEtapeBtn.dataset.etape === 'Demande de prix' 
-                    ? 'Enregistrer la demande de prix' 
-                    : 'Enregistrer le bon de commande';
-        }
+        document.getElementById('btnBapa').style.display = 'flex';
+        
+        document.getElementById('blocFacturePhysique').style.display = 'none';
+        document.getElementById('labelFacturePhysique').textContent = 'Ajouter une facture physique fournisseur';
+        document.getElementById('iconFacturePhysique').className = 'fas fa-file-invoice';
+        
+        restaurerEtapeParDefaut();
+    }
+}
+
+function toggleBapa() {
+    bapaActive = !bapaActive;
+    if (bapaActive) {
+        facturePhysiqueActive = false;
+        document.getElementById('btnFacturePhysique').style.display = 'none';
+        
+        // Swap fournisseur : masquer le dropdown, afficher le champ libre tiers
+        document.getElementById('groupeFournisseurSelect').style.display = 'none';
+        document.getElementById('fournisseurSelect').required = false;
+        document.getElementById('groupeFournisseurBapa').style.display = 'block';
+        document.getElementById('fournisseurNomBapa').required = true;
+
+        document.getElementById('blocFacturePhysique').style.display = 'block';
+        document.getElementById('labelBapa').textContent = 'Annuler le format BAPA';
+        document.getElementById('iconBapa').className = 'fas fa-chevron-up';
+        document.getElementById('etapeInput').value = 'Facture';
+        document.getElementById('typeFactureInput').value = 'bapa';
+        document.getElementById('labelBtnValider').textContent = 'Enregistrer le BAPA (DGI)';
+        document.getElementById('numeroFactureFournisseur').closest('.form-group').style.display = 'none';
+        document.getElementById('numeroFactureFournisseur').value = '';
+    } else {
+        document.getElementById('btnFacturePhysique').style.display = 'flex';
+        
+        // Restaurer le dropdown fournisseur
+        document.getElementById('groupeFournisseurSelect').style.display = 'block';
+        document.getElementById('fournisseurSelect').required = true;
+        document.getElementById('groupeFournisseurBapa').style.display = 'none';
+        document.getElementById('fournisseurNomBapa').required = false;
+        document.getElementById('fournisseurNomBapa').value = '';
+
+        document.getElementById('blocFacturePhysique').style.display = 'none';
+        document.getElementById('labelBapa').textContent = 'Enregistrer sous format BAPA (DGI)';
+        document.getElementById('iconBapa').className = 'fas fa-file-invoice';
+        
+        restaurerEtapeParDefaut();
+    }
+}
+
+function restaurerEtapeParDefaut() {
+    document.getElementById('typeFactureInput').value = 'normale';
+    const activeEtapeBtn = document.querySelector('[data-etape].active');
+    if (activeEtapeBtn) {
+        document.getElementById('etapeInput').value = activeEtapeBtn.dataset.etape;
+        document.getElementById('labelBtnValider').textContent = 
+            activeEtapeBtn.dataset.etape === 'Demande de prix' 
+                ? 'Enregistrer la demande de prix' 
+                : 'Enregistrer le bon de commande';
     }
 }
 
@@ -422,29 +556,115 @@ function selectionnerModePaiement(btn) {
     // Cibler uniquement les boutons de mode paiement
     btn.closest('div').querySelectorAll('.payment-toggle-btn').forEach(b => b.classList.remove('active'));
     btn.classList.add('active');
-    
+
     const mode = btn.dataset.mode;
     document.getElementById('modePaiementInput').value = mode;
-    
-    const banqueContainer = document.getElementById('selectionBanqueContainer');
-    const banqueSelect = document.getElementById('banqueSelect');
-    const moyenBancaireSelect = document.getElementById('moyenBancaireSelect');
-    const refPaiementInput = document.getElementById('refPaiementInput');
-    
+
+    const banqueContainer      = document.getElementById('selectionBanqueContainer');
+    const mobileMoneyContainer = document.getElementById('selectionMobileMoneyContainer');
+    const banqueSelect         = document.getElementById('banqueSelect');
+    const moyenBancaireSelect  = document.getElementById('moyenBancaireSelect');
+    const refPaiementInput     = document.getElementById('refPaiementInput');
+
+    // Tout réinitialiser
+    banqueContainer.style.display      = 'none';
+    mobileMoneyContainer.style.display = 'none';
+    banqueSelect.required        = false;
+    moyenBancaireSelect.required = false;
+    refPaiementInput.required    = false;
+    banqueSelect.value           = '';
+    moyenBancaireSelect.value    = '';
+    refPaiementInput.value       = '';
+    document.getElementById('mobileMoneyOperateurInput').value = '';
+
     if (mode === 'Banque') {
         banqueContainer.style.display = 'block';
-        banqueSelect.required = true;
-        moyenBancaireSelect.required = true;
-        refPaiementInput.required = true;
-    } else {
-        banqueContainer.style.display = 'none';
-        banqueSelect.required = false;
-        banqueSelect.value = '';
-        moyenBancaireSelect.required = false;
-        moyenBancaireSelect.value = '';
-        refPaiementInput.required = false;
-        refPaiementInput.value = '';
+        banqueSelect.required         = true;
+        moyenBancaireSelect.required  = true;
+        refPaiementInput.required     = true;
+    } else if (mode === 'Mobile Money') {
+        mobileMoneyContainer.style.display = 'block';
     }
+}
+
+function changerDevise(code) {
+    document.getElementById('deviseInput').value = code;
+    const blocTaux   = document.getElementById('blocTauxChange');
+    const blocDev    = document.getElementById('blocMontantDevise');
+    const blocFcfa   = document.getElementById('blocMontantFcfa');
+    const devTexts   = document.querySelectorAll('.deviseCodeText');
+
+    devTexts.forEach(el => el.textContent = code);
+
+    if (code && code !== 'XOF') {
+        blocTaux.style.display  = 'block';
+        blocDev.style.display   = 'block';
+        blocFcfa.style.display  = 'block';
+        document.getElementById('deviseCodeLabel').textContent = code;
+        document.getElementById('tauxChangeDisplayInput').value = '';
+        document.getElementById('tauxChangeInput').value = '';
+        document.getElementById('montantDeviseInput').value = '';
+        document.getElementById('montantPayeInput').value = '';
+        actualiserTauxChange();
+    } else {
+        blocTaux.style.display  = 'none';
+        blocDev.style.display   = 'none';
+        blocFcfa.style.display  = 'none';
+        document.getElementById('tauxChangeInput').value = '';
+        document.getElementById('tauxChangeDisplayInput').value = '';
+        if (document.getElementById('montantDeviseInput')) document.getElementById('montantDeviseInput').value = '';
+        if (document.getElementById('montantPayeInput'))   document.getElementById('montantPayeInput').value = '';
+        recalculer();
+    }
+}
+
+const TAUX_FALLBACK = { EUR: 655, USD: 600, GBP: 760, CHF: 670, CAD: 445, JPY: 4, CNH: 83 };
+
+async function actualiserTauxChange() {
+    const code = document.getElementById('deviseInput').value;
+    if (!code || code === 'XOF') return;
+    const btn = document.getElementById('btnActualiserTaux');
+    if (btn) btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+    try {
+        const res = await fetch(`https://open.er-api.com/v6/latest/${code}`);
+        const data = await res.json();
+        if (data && data.rates && data.rates['XOF']) {
+            const taux = Math.round(data.rates['XOF']);
+            document.getElementById('tauxChangeDisplayInput').value = taux;
+            document.getElementById('tauxChangeInput').value = taux;
+            recalculer();
+        } else { throw new Error('no rate'); }
+    } catch (e) {
+        const fallback = TAUX_FALLBACK[code] ?? '';
+        document.getElementById('tauxChangeDisplayInput').value = fallback;
+        document.getElementById('tauxChangeInput').value = fallback;
+        recalculer();
+    }
+    if (btn) btn.innerHTML = '<i class="fas fa-sync-alt"></i> Actualiser';
+}
+
+function calculerMontantEnFcfa() {
+    const devInput  = document.getElementById('montantDeviseInput');
+    const fcfaInput = document.getElementById('montantPayeInput');
+    const tauxInput = document.getElementById('tauxChangeDisplayInput');
+    const devise    = document.getElementById('deviseInput').value;
+    if (devise === 'XOF' || !devInput || !fcfaInput) return;
+    const devVal  = parseFloat(devInput.value) || 0;
+    const taux    = parseFloat(tauxInput.value) || 0;
+    if (taux > 0) fcfaInput.value = Math.round(devVal * taux);
+    else fcfaInput.value = '';
+}
+
+function calculerMontantEnDevise() {
+    const devInput  = document.getElementById('montantDeviseInput');
+    const fcfaInput = document.getElementById('montantPayeInput');
+    const tauxInput = document.getElementById('tauxChangeDisplayInput');
+    const devise    = document.getElementById('deviseInput').value;
+    if (devise === 'XOF' || !devInput || !fcfaInput) return;
+    const fcfaVal = parseFloat(fcfaInput.value) || 0;
+    const taux    = parseFloat(tauxInput.value) || 0;
+    if (taux > 0) devInput.value = (fcfaVal / taux).toFixed(2);
+    else devInput.value = '';
 }
 
 function ouvrirModalNouvelleBanque() {

@@ -114,6 +114,9 @@ class SuperadminControleur
      */
     public function creer(Request $request): RedirectResponse
     {
+        // Normaliser le NCC : suppression des espaces et mise en majuscule
+        $request->merge(['ncc' => $request->has('ncc') ? strtoupper(preg_replace('/\s+/', '', $request->input('ncc'))) : null]);
+
         $request->validate([
             'nom'                     => ['required', 'string', 'max:150', 'unique:entreprises,nom'],
             'forme_juridique'         => ['nullable', 'string', 'max:50'],
@@ -124,7 +127,7 @@ class SuperadminControleur
             'telephone'               => ['nullable', 'string', 'max:30'],
             'adresse'                 => ['nullable', 'string', 'max:255'],
             'rccm'                    => ['nullable', 'string', 'max:100'],
-            'ncc'                     => ['nullable', 'string', 'max:50'],
+            'ncc'                     => ['nullable', 'string', 'size:8', 'regex:/^[A-Z0-9]{7}[A-Z]$/'],
             'compte_contribuable'     => ['nullable', 'string', 'max:100'],
             'regime_imposition'       => ['nullable', 'string', 'max:80'],
             'quota_points_de_vente'   => ['required', 'integer', 'min:1'],

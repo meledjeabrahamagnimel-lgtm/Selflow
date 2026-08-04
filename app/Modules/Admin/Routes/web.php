@@ -145,12 +145,17 @@ Route::prefix('admin')
             // ── Configuration Fiscale (TVA / TSE / TDT) ──
             Route::get('/config',           [\App\Modules\Admin\Controleurs\FneDashboardControleur::class, 'obtenirConfig'])->name('config');
             Route::post('/config',          [\App\Modules\Admin\Controleurs\FneDashboardControleur::class, 'sauvegarderConfig'])->name('config.sauvegarder');
+            // ── Traitement par Lot et Planification ──
+            Route::post('/batch-normaliser', [\App\Modules\Admin\Controleurs\FneDashboardControleur::class, 'batchNormaliser'])->name('batch_normaliser');
+            Route::post('/schedule-batch',   [\App\Modules\Admin\Controleurs\FneDashboardControleur::class, 'scheduleBatch'])->name('schedule_batch');
+            Route::get('/batch-status',      [\App\Modules\Admin\Controleurs\FneDashboardControleur::class, 'batchStatus'])->name('batch_status');
         });
 
         // ── Points de vente ──
         Route::prefix('points-de-vente')->name('pdv.')->group(function () {
             Route::get('/',                     [PointDeVenteControleur::class, 'index'])->name('index');
             Route::post('/',                    [PointDeVenteControleur::class, 'creer'])->name('creer');
+            Route::put('/{pdv}',                [PointDeVenteControleur::class, 'modifier'])->name('modifier');
             Route::post('/activer/{pdv}',       [PointDeVenteControleur::class, 'activerSession'])->name('activer');
             Route::post('/activer-apercu/{pdv}', [PointDeVenteControleur::class, 'activerApercu'])->name('activer_apercu');
             Route::post('/desactiver-apercu',    [PointDeVenteControleur::class, 'desactiverApercu'])->name('desactiver_apercu');

@@ -2,14 +2,17 @@
 
 namespace App\Modules\Admin\Services;
 
+use App\Modules\Admin\Modeles\Achat;
+use App\Modules\Admin\Modeles\PointDeVente;
 use App\Modules\Admin\Modeles\Vente;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Str;
 
 class FneService
 {
     /**
-     * Normaliser la facture de vente auprès de la DGI (API FNE ou simulation cryptographique locale).
+     * Normaliser la facture de vente auprès de la DGI (API FNE).
      *
      * @param Vente $vente
      * @param bool $estRne
@@ -18,133 +21,210 @@ class FneService
     public static function normaliserFacture(Vente $vente, bool $estRne = false): array
     {
         $entreprise = $vente->pointDeVente->entreprise;
-        $nccEmetteur = preg_replace('/[^0-9A-Z]/', '', $entreprise->ncc ?? '0100000A');
 
-        // Clé API FNE propre à CETTE entreprise (il n'existe pas de clé unique
-        // partagée — chaque entreprise a la sienne, fournie par la DGI et
-        // gérée par le superadmin). Voir FneCredential::cleActive() : utilise
-        // la clé réelle si validée, sinon la clé de test.
+        // Clé API FNE propre à CETTE entreprise (gérée par le superadmin)
         $credential = $entreprise->fneCredential;
         $apiKey = $credential?->cleActive();
-        $apiUrl = $credential && $credential->statut === 'validee'
-            ? config('selflow.fne_api_url_production', 'https://fne.dgi.gouv.ci') . '/api/v1/factures'
-            : config('selflow.fne_api_url_sandbox', 'https://fne-sandbox.dgi.gouv.ci') . '/api/v1/factures';
+        $apiBaseUrl = $credential && $credential->statut === 'validee'
+            ? rtrim(config('selflow.fne_api_url_production', 'https://fne.dgi.gouv.ci'), '/')
+            : rtrim(config('selflow.fne_api_url_sandbox', 'https://fne-sandbox.dgi.gouv.ci'), '/');
 
-        // Préparation du payload standard DGI-CI
-        $payload = [
-            'type_document'     => $vente->type_facture === 'avoir' ? 'AV' : ($estRne ? 'RE' : 'EV'), // AV = Avoir, RE = RNE, EV = Facture Vente
-            'numero_interne'    => $vente->numero_facture,
-            'date_emission'     => $vente->date_vente->format('Y-m-d H:i:s'),
-            'montant_ht'        => floatval($vente->montant_ht),
-            'montant_tva'       => floatval($vente->montant_tva),
-            'montant_ttc'       => floatval($vente->montant_ttc),
-            'mode_paiement'     => strtoupper(substr($vente->mode_paiement, 0, 15)),
-            'emetteur' => [
-                'ncc'            => $nccEmetteur,
-                'raison_sociale' => $entreprise->nom,
-                'adresse'        => $vente->pointDeVente->commune . ', ' . $vente->pointDeVente->ville,
-            ],
-            'destinataire' => [
-                'ncc'            => $vente->client ? preg_replace('/[^0-9A-Z]/', '', $vente->client->ncc ?? '') : 'CLIDIVERS',
-                'raison_sociale' => $vente->client ? $vente->client->nom : 'Client de passage',
-            ],
-            'articles' => $vente->details->map(function ($d) {
-                return [
-                    'designation'   => $d->produit ? $d->produit->nom : $d->libelle_virtuel,
-                    'quantite'      => intval($d->quantite),
-                    'prix_unitaire' => floatval($d->prix_unitaire),
-                    'montant_ttc'   => floatval($d->montant_ttc),
-                    'taux_tva'      => $d->produit ? floatval($d->produit->taux_tva) : 18.0,
-                ];
-            })->toArray()
-        ];
-
-        if ($vente->type_facture === 'avoir' && $vente->parent) {
-            $payload['original_invoice_number'] = $vente->parent->numero_fne ?? $vente->parent->numero_facture;
+        if (empty($apiKey)) {
+            return [
+                'success' => false,
+                'message' => 'La normalisation DGI a échoué : aucune clé API FNE active n\'est configurée pour cette entreprise.',
+                'errors'  => ['api_key' => 'Missing FNE API key'],
+            ];
         }
 
-        // 1. Essayer l'appel API DGI si la clé API est présente
-        if (!empty($apiKey)) {
-            try {
-                Log::info("FNE API Call - Normalisation de la facture: " . $vente->numero_facture);
-                
-                $response = Http::withHeaders([
-                    'Authorization' => 'Bearer ' . $apiKey,
-                    'Accept'        => 'application/json',
-                    'Content-Type'  => 'application/json',
-                ])
-                ->timeout(10)
-                ->withOptions(['verify' => true]) // HTTPS Strict
-                ->post($apiUrl, $payload);
+        $parentInvoiceId = $vente->parent?->fne_invoice_id;
+        $isAvoirRefund = $vente->type_facture === 'avoir' && !empty($parentInvoiceId);
 
-                if ($response->successful()) {
-                    $data = $response->json();
-                    return [
-                        'success'        => true,
-                        'numero_recu'    => $data['numero_fne'] ?? self::genererNumeroLocal($nccEmetteur, $vente->id, $estRne),
-                        'signature'      => $data['signature_dgi'] ?? self::calculerSignatureLocale($vente),
-                        'qr_code_data'   => $data['qr_code_url'] ?? self::genererQrCodeUrl($vente, $estRne),
-                        // Nom de champ non confirmé avec la DGI — plusieurs alias tentés
-                        // par prudence (voir /PLAN/FNE-gestion-des-cles.md, section 1).
-                        'pdf_url'        => $data['document_url'] ?? $data['pdf_url'] ?? $data['fichier_pdf'] ?? null,
-                    ];
-                }
+        if ($vente->type_facture === 'avoir' && empty($parentInvoiceId)) {
+            return [
+                'success' => false,
+                'message' => 'Impossible de normaliser un avoir : la facture d\'origine n\'a pas d\'identifiant FNE UUID.',
+                'errors'  => ['parent_invoice_id' => 'Missing fne_invoice_id on parent facture'],
+            ];
+        }
 
-                Log::error("FNE API Error - Code: " . $response->status() . " Body: " . $response->body());
-            } catch (\Exception $e) {
-                Log::error("FNE API Exception: " . $e->getMessage());
+        $apiUrl = $isAvoirRefund
+            ? $apiBaseUrl . '/external/invoices/' . $parentInvoiceId . '/refund'
+            : $apiBaseUrl . '/external/invoices/sign';
+
+        // Préparation des articles originaux en cas de remboursement/avoir
+        $parentDetails = $vente->parent?->details()->with('produit')->get() ?? collect();
+        $originalInvoiceItems = $parentDetails
+            ->map(function ($detail) {
+                return [
+                    'id'          => $detail->fne_invoice_item_id,
+                    'reference'   => $detail->produit?->reference ?? ($detail->reference ?? null),
+                    'description' => $detail->produit?->nom ?? $detail->libelle_virtuel ?? null,
+                    'quantity'    => intval($detail->quantite),
+                    'amount'      => floatval($detail->prix_unitaire),
+                ];
+            })
+            ->filter(fn ($item) => !empty($item['id']))
+            ->values()
+            ->all();
+
+        if ($isAvoirRefund) {
+            $detailsHaveIds = $parentDetails->every(fn ($detail) => !empty($detail->fne_invoice_item_id));
+            if (!$detailsHaveIds || empty($originalInvoiceItems)) {
+                return [
+                    'success' => false,
+                    'message' => 'Impossible de normaliser cet avoir : tous les articles du remboursement doivent avoir un identifiant FNE d’article persistant sur la facture d’origine. Recréez ou re-normalisez la facture originale pour récupérer ces identifiants.',
+                    'errors'  => ['line_item_ids' => 'Missing persisted fne_invoice_item_id on original invoice details'],
+                ];
             }
         }
 
-        // 2. Mode simulation cryptographique robuste (si clé vide ou API en panne)
-        // Conforme aux formats officiels DGI Côte d'Ivoire
-        $numFne    = self::genererNumeroLocal($nccEmetteur, $vente->id, $estRne);
-        $signature = self::calculerSignatureLocale($vente);
-        $qrCode    = self::genererQrCodeUrlLocal($numFne, $signature, $vente->montant_ttc);
+        $items = $vente->details->map(function ($d) use ($isAvoirRefund, $originalInvoiceItems) {
+            if ($isAvoirRefund) {
+                return self::buildRefundItem($d, $originalInvoiceItems);
+            }
 
-        return [
-            'success'      => true,
-            'numero_recu'  => $numFne,
-            'signature'    => $signature,
-            'qr_code_data' => $qrCode,
-            // Pas de PDF officiel DGI en mode simulation locale (pas d'appel API réel).
-            'pdf_url'      => null,
-        ];
-    }
+            $taxeCode = self::devinerCodeTaxe($d->produit?->taux_tva ?? 0.0);
+            return [
+                'id'             => $d->produit?->reference ?? 'item-' . $d->id,
+                'reference'      => $d->produit?->reference ?? ($d->reference ?? ''),
+                'description'    => $d->produit ? $d->produit->nom : $d->libelle_virtuel,
+                'quantity'       => intval($d->quantite),
+                'amount'         => floatval($d->prix_unitaire),
+                'discount'       => floatval($d->discount ?? 0),
+                'measurementUnit'=> $d->unite_de_mesure ?? ($d->unite ?? 'pcs'),
+                'taxes'          => [$taxeCode],
+                'customTaxes'    => [],
+            ];
+        })->toArray();
 
-    /**
-     * Générer le numéro unique FNE au format officiel supermarché / DGI.
-     * Format: {NCC_EMETTEUR}{TIMESTAMP}{SEQUENCE}
-     */
-    private static function genererNumeroLocal(string $ncc, int $id, bool $estRne): string
-    {
-        $prefix = $estRne ? 'RNE' : 'FA';
-        $timestamp = now()->format('ymdHi');
-        $seq = str_pad($id, 4, '0', STR_PAD_LEFT);
-        
-        return substr($ncc, 0, 7) . $timestamp . $seq . ($estRne ? 'T01' : 'F01');
-    }
+        if ($isAvoirRefund) {
+            $payload = [
+                'items' => $items,
+            ];
+        } else {
+            $template = strtoupper($vente->client?->type_facturation ?? 'B2B');
+            if (!in_array($template, ['B2B', 'B2C', 'B2G', 'B2F'])) {
+                $template = 'B2B';
+            }
 
-    /**
-     * Calculer une signature cryptographique sha256 locale simulant la DGI.
-     */
-    private static function calculerSignatureLocale(Vente $vente): string
-    {
-        return strtoupper(hash_hmac('sha256', $vente->numero_facture . '|' . $vente->montant_ttc . '|' . now()->toDateString(), 'selflow_dgi_secure_key'));
-    }
+            $paymentMethod = strtolower(trim($vente->mode_paiement ?? ''));
+            if ($paymentMethod === 'banque' && !empty($vente->moyen_bancaire)) {
+                // Si le mode = Banque, c'est le moyen_bancaire (carte/virement/cheque) qui prime
+                $paymentMethod = strtolower(trim($vente->moyen_bancaire));
+            } elseif ($paymentMethod === 'mobile money' || $paymentMethod === 'mobile-money') {
+                // Mobile Money : toujours mobile-money pour la DGI
+                $paymentMethod = 'mobile-money';
+            }
 
-    /**
-     * Générer l'URL de vérification DGI du QR Code.
-     */
-    private static function genererQrCodeUrlLocal(string $numFne, string $signature, float $montant): string
-    {
-        $sigShort = substr($signature, 0, 16);
-        return "https://fne.dgi.gouv.ci/verifier?doc={$numFne}&sig={$sigShort}&mt=" . round($montant);
+            $pointOfSaleValue = trim($vente->pointDeVente?->code_fne ?: $vente->pointDeVente?->nom ?? 'Siège');
+
+            $payload = [
+                'invoiceType'         => 'sale',
+                'paymentMethod'       => self::mapperModePaiement($paymentMethod),
+                'template'            => $template,
+                'isRne'               => $estRne,
+                'rne'                 => $estRne ? ($vente->parent?->numero_fne ?? '') : '',
+                'clientNcc'           => $vente->client ? preg_replace('/[^0-9A-Z]/', '', strtoupper($vente->client->ncc ?? '')) : '',
+                'clientCompanyName'   => $vente->client ? $vente->client->nom : 'Client de passage',
+                'clientPhone'         => $vente->client ? preg_replace('/[^0-9]/', '', $vente->client->telephone ?? '') : '',
+                'clientEmail'         => $vente->client?->email ?? '',
+                'clientSellerName'    => $vente->pointDeVente?->responsable ?? '',
+                'pointOfSale'         => $pointOfSaleValue,
+                'establishment'       => $entreprise->nom,
+                'commercialMessage'   => $entreprise->facture_autres_mentions ?? '',
+                'footer'              => $entreprise->pied_de_page_facture ?? '',
+                'foreignCurrency'     => !empty($vente->devise) && $vente->devise !== 'XOF' ? $vente->devise : '',
+                'foreignCurrencyRate' => !empty($vente->taux_change) && $vente->devise !== 'XOF' ? floatval($vente->taux_change) : 0,
+                'customTaxes'         => [],
+                'discount'            => floatval($vente->remise ?? 0),
+                'items'               => $items,
+            ];
+        }
+
+        try {
+            Log::info("FNE API Call - Normalisation de la facture: " . $vente->numero_facture);
+            
+            $response = Http::withHeaders([
+                'Authorization' => 'Bearer ' . $apiKey,
+                'Accept'        => 'application/json',
+                'Content-Type'  => 'application/json',
+            ])
+            ->timeout(10)
+            ->withOptions(['verify' => true])
+            ->post($apiUrl, $payload);
+
+            if (!$response->successful()) {
+                Log::error("FNE API Error - Code: " . $response->status() . " Body: " . $response->body());
+                return [
+                    'success' => false,
+                    'message' => 'La normalisation DGI a échoué (HTTP ' . $response->status() . ') : ' . ($response->json('message') ?? $response->body()),
+                    'errors'  => ['api_error' => $response->body()],
+                ];
+            }
+
+            $data = $response->json();
+            Log::info("FNE API Response body: " . json_encode($data));
+            $invoiceId = self::extraireInvoiceId($data) ?: (string) Str::uuid();
+            $fneItemIds = [];
+
+            if (!$isAvoirRefund) {
+                $invoiceItems = self::extraireInvoiceItems($data);
+                $mappedItemIds = !empty($invoiceItems)
+                    ? self::mapperFneItemIdsToDetails($invoiceItems, $vente->details)
+                    : [];
+
+                if (!empty($mappedItemIds)) {
+                    $fneItemIds = $mappedItemIds;
+                } else {
+                    foreach ($vente->details as $detail) {
+                        $fneItemIds[$detail->id] = (string) Str::uuid();
+                    }
+                }
+            }
+
+            $balanceStickers = null;
+            if (isset($data['balance_sticker'])) {
+                $balanceStickers = intval($data['balance_sticker']);
+            } elseif (isset($data['balance_funds'])) {
+                $balanceStickers = intval(intval($data['balance_funds']) / 20);
+            }
+
+            if ($balanceStickers !== null) {
+                $entreprise->update(['fne_sticker_balance' => $balanceStickers]);
+            }
+
+            $numeroRecu = $data['reference'] ?? $data['numero_fne'] ?? null;
+            $tokenData = $data['token'] ?? ($data['invoice']['token'] ?? null) ?? null;
+
+            if (empty($numeroRecu) || empty($tokenData)) {
+                return [
+                    'success' => false,
+                    'message' => 'La normalisation DGI a échoué : la réponse de l\'API est incomplète (référence ou token manquant).',
+                    'body' => $data,
+                ];
+            }
+
+            return [
+                'success'        => true,
+                'numero_recu'    => $numeroRecu,
+                'signature'      => $tokenData,
+                'qr_code_data'   => $tokenData,
+                'pdf_url'        => $data['document_url'] ?? $data['pdf_url'] ?? $data['fichier_pdf'] ?? $tokenData,
+                'invoice_id'     => $invoiceId,
+                'fne_item_ids'   => $fneItemIds,
+            ];
+        } catch (\Exception $e) {
+            Log::error("FNE API Exception: " . $e->getMessage());
+            return [
+                'success' => false,
+                'message' => 'Exception lors de l\'appel API FNE : ' . $e->getMessage(),
+            ];
+        }
     }
 
     /**
      * Normaliser un achat de type BAPA (Bordereau d'Achat de Produits Agricoles).
-     * Normalisation inversée (l'acheteur déclare l'achat d'un vendeur non immatriculé).
      *
      * @param Achat $achat
      * @return array
@@ -153,105 +233,282 @@ class FneService
     {
         $pointDeVente = $achat->pointDeVente;
         $entreprise = $pointDeVente->entreprise;
-        $nccAcheteur = preg_replace('/[^0-9A-Z]/', '', $entreprise->ncc ?? '0100000A');
 
         $credential = $entreprise->fneCredential;
         $apiKey = $credential?->cleActive();
-        $apiUrl = $credential && $credential->statut === 'validee'
-            ? config('selflow.fne_api_url_production', 'https://fne.dgi.gouv.ci') . '/api/v1/factures'
-            : config('selflow.fne_api_url_sandbox', 'https://fne-sandbox.dgi.gouv.ci') . '/api/v1/factures';
+        $apiBaseUrl = $credential && $credential->statut === 'validee'
+            ? rtrim(config('selflow.fne_api_url_production', 'https://fne.dgi.gouv.ci'), '/')
+            : rtrim(config('selflow.fne_api_url_sandbox', 'https://fne-sandbox.dgi.gouv.ci'), '/');
 
-        // Préparation du payload standard BAPA DGI-CI
+        if (empty($apiKey)) {
+            return [
+                'success' => false,
+                'message' => 'La normalisation DGI du BAPA a échoué : aucune clé API FNE active n\'est configurée pour cette entreprise.',
+                'errors'  => ['api_key' => 'Missing FNE API key'],
+            ];
+        }
+
+        $apiUrl = $apiBaseUrl . '/external/invoices/sign';
+
+        $paymentMethod = strtolower(trim($achat->mode_paiement ?? ''));
+        $pointOfSaleValue = trim($achat->pointDeVente?->code_fne ?: $achat->pointDeVente?->nom ?? 'Siège');
+
+        $items = $achat->details->map(function ($d) {
+            return [
+                'reference'      => $d->produit?->reference ?? ($d->reference ?? ''),
+                'description'    => $d->produit ? $d->produit->nom : $d->libelle_virtuel,
+                'quantity'       => intval($d->quantite),
+                'amount'         => floatval($d->prix_unitaire),
+                'discount'       => 0,
+                'measurementUnit'=> $d->unite ?? 'pcs',
+            ];
+        })->toArray();
+
         $payload = [
-            'type_document'     => 'BA', // BA = Bordereau d'Achat (BAPA)
-            'numero_interne'    => $achat->numero_facture,
-            'date_emission'     => $achat->date_achat->format('Y-m-d H:i:s'),
-            'montant_ht'        => floatval($achat->montant_ht),
-            'montant_tva'       => 0.0, // Les achats BAPA sont exonérés de TVA (art. BAPA)
-            'montant_ttc'       => floatval($achat->montant_ttc),
-            'mode_paiement'     => strtoupper(substr($achat->mode_paiement, 0, 15)),
-            'emetteur' => [
-                'ncc'            => $nccAcheteur,
-                'raison_sociale' => $entreprise->nom,
-                'adresse'        => $pointDeVente->commune . ', ' . $pointDeVente->ville,
-            ],
-            'destinataire' => [
-                'ncc'            => 'SANSNCC', // Le vendeur agricole n'a pas de NCC
-                'raison_sociale' => $achat->fournisseur->nom,
-                'adresse'        => $achat->fournisseur->adresse ?? 'Adresse inconnue',
-            ],
-            'articles' => $achat->details->map(function ($d) {
-                return [
-                    'designation'   => $d->produit ? $d->produit->nom : $d->libelle_virtuel,
-                    'quantite'      => intval($d->quantite),
-                    'prix_unitaire' => floatval($d->prix_unitaire),
-                    'montant_ttc'   => floatval($d->montant_ttc),
-                    'taux_tva'      => 0.0, // Exonéré
-                ];
-            })->toArray()
+            'invoiceType'         => 'purchase',
+            'paymentMethod'       => self::mapperModePaiement($paymentMethod),
+            'template'            => 'B2B',
+            'clientNcc'           => preg_replace('/[^0-9A-Z]/', '', strtoupper($entreprise->ncc ?? '')),
+            'clientCompanyName'   => $entreprise->nom,
+            'clientPhone'         => preg_replace('/[^0-9]/', '', $entreprise->telephone ?? ''),
+            'clientEmail'         => $entreprise->email ?? '',
+            'clientSellerName'    => $achat->fournisseur?->nom ?? '',
+            'pointOfSale'         => $pointOfSaleValue,
+            'establishment'       => $entreprise->nom,
+            'commercialMessage'   => $entreprise->facture_autres_mentions ?? '',
+            'footer'              => $entreprise->pied_de_page_facture ?? '',
+            'foreignCurrency'     => !empty($achat->devise) && $achat->devise !== 'XOF' ? $achat->devise : '',
+            'foreignCurrencyRate' => !empty($achat->taux_change) && $achat->devise !== 'XOF' ? floatval($achat->taux_change) : 0,
+            'items'               => $items,
+            'discount'            => 0,
         ];
 
-        // 1. Appel API DGI si clé présente
-        if (!empty($apiKey)) {
-            try {
-                Log::info("FNE API Call - Normalisation BAPA de l'achat: " . $achat->numero_facture);
+        try {
+            Log::info("FNE API Call - Normalisation BAPA de l'achat: " . $achat->numero_facture);
 
-                $response = Http::withHeaders([
-                    'Authorization' => 'Bearer ' . $apiKey,
-                    'Accept'        => 'application/json',
-                    'Content-Type'  => 'application/json',
-                ])
-                ->timeout(10)
-                ->withOptions(['verify' => true])
-                ->post($apiUrl, $payload);
+            $response = Http::withHeaders([
+                'Authorization' => 'Bearer ' . $apiKey,
+                'Accept'        => 'application/json',
+                'Content-Type'  => 'application/json',
+            ])
+            ->timeout(10)
+            ->withOptions(['verify' => true])
+            ->post($apiUrl, $payload);
 
-                if ($response->successful()) {
-                    $data = $response->json();
-                    return [
-                        'success'      => true,
-                        'numero_recu'  => $data['numero_fne'] ?? self::genererNumeroLocalBapa($nccAcheteur, $achat->id),
-                        'signature'    => $data['signature_dgi'] ?? self::calculerSignatureLocaleBapa($achat),
-                        'qr_code_data' => $data['qr_code_url'] ?? self::genererQrCodeUrlBapaLocal(self::genererNumeroLocalBapa($nccAcheteur, $achat->id), self::calculerSignatureLocaleBapa($achat), $achat->montant_ttc),
-                        'pdf_url'      => $data['document_url'] ?? $data['pdf_url'] ?? $data['fichier_pdf'] ?? null,
-                    ];
-                }
-
+            if (!$response->successful()) {
                 Log::error("FNE BAPA API Error - Code: " . $response->status() . " Body: " . $response->body());
-            } catch (\Exception $e) {
-                Log::error("FNE BAPA API Exception: " . $e->getMessage());
+                return [
+                    'success' => false,
+                    'message' => 'La normalisation DGI du BAPA a échoué (HTTP ' . $response->status() . ') : ' . ($response->json('message') ?? $response->body()),
+                    'errors'  => ['api_error' => $response->body()],
+                ];
+            }
+
+            $data = $response->json();
+            Log::info("FNE BAPA API Response body: " . json_encode($data));
+            $balanceStickers = null;
+            if (isset($data['balance_sticker'])) {
+                $balanceStickers = intval($data['balance_sticker']);
+            } elseif (isset($data['balance_funds'])) {
+                $balanceStickers = intval(intval($data['balance_funds']) / 20);
+            }
+
+            if ($balanceStickers !== null) {
+                $entreprise->update(['fne_sticker_balance' => $balanceStickers]);
+            }
+
+            $numeroRecu = $data['reference'] ?? $data['numero_fne'] ?? null;
+            $tokenData = $data['token'] ?? ($data['invoice']['token'] ?? null) ?? null;
+
+            if (empty($numeroRecu) || empty($tokenData)) {
+                return [
+                    'success' => false,
+                    'message' => 'La normalisation DGI du BAPA a échoué : la réponse de l\'API est incomplète (référence ou token manquant).',
+                    'body' => $data,
+                ];
+            }
+
+            return [
+                'success'      => true,
+                'numero_recu'  => $numeroRecu,
+                'signature'    => $tokenData,
+                'qr_code_data' => $tokenData,
+                'pdf_url'      => $data['document_url'] ?? $data['pdf_url'] ?? $data['fichier_pdf'] ?? $tokenData,
+            ];
+        } catch (\Exception $e) {
+            Log::error("FNE BAPA API Exception: " . $e->getMessage());
+            return [
+                'success' => false,
+                'message' => 'Exception lors de l\'appel API FNE BAPA : ' . $e->getMessage(),
+            ];
+        }
+    }
+
+    private static function mapperModePaiement(string $modePaiement): string
+    {
+        return match (strtolower(trim($modePaiement))) {
+            // CAISSE
+            'caisse', 'cash', 'espèces', 'especes', 'espece', 'espèce' => 'cash',
+            // MOBILE MONEY (tous opérateurs → même valeur DGI)
+            'mobile money', 'mobile-money', 'mobilemoney', 'momo',
+            'mtn', 'moov', 'orange', 'wave' => 'mobile-money',
+            // BANQUE — Carte bancaire
+            'carte', 'card', 'visa', 'mastercard' => 'card',
+            // BANQUE — Chèque
+            'chèque', 'cheque', 'chq', 'check' => 'check',
+            // BANQUE — Virement
+            'virement', 'transfer', 'transfert', 'bank transfer' => 'transfer',
+            // CRÉDIT / A TERME
+            'crédit', 'credit', 'deferred', 'à terme', 'a terme', 'terme' => 'deferred',
+            // Par défaut (sécurité)
+            default => 'cash',
+        };
+    }
+
+    private static function devinerCodeTaxe(float $taux): string
+    {
+        return match (round($taux, 2)) {
+            18.0, 18 => 'TVA',
+            0.0, 0 => 'TVAC',
+            10.0, 10 => 'TVAB',
+            20.0, 20 => 'TVAD',
+            default => 'TVA',
+        };
+    }
+
+    private static function extraireInvoiceId(array $data): ?string
+    {
+        return $data['invoice']['id'] ?? $data['invoiceId'] ?? $data['id'] ?? null;
+    }
+
+    private static function extraireInvoiceItems(array $data): array
+    {
+        $items = $data['invoice']['items'] ?? $data['items'] ?? [];
+
+        if (!is_array($items)) {
+            return [];
+        }
+
+        return array_values($items);
+    }
+
+    private static function extraireInvoiceItemId(array $item): ?string
+    {
+        return $item['invoiceItemId'] ?? $item['id'] ?? null;
+    }
+
+    private static function mapperFneItemIdsToDetails(array $invoiceItems, $details): array
+    {
+        $mapping = [];
+        $remaining = array_values($invoiceItems);
+
+        foreach ($details as $detail) {
+            $reference = $detail->produit?->reference ?? ($detail->reference ?? null);
+            $description = $detail->produit?->nom ?? $detail->libelle_virtuel ?? null;
+            $quantity = intval($detail->quantite);
+            $amount = floatval($detail->prix_unitaire);
+            $matchedIndex = null;
+
+            foreach ($remaining as $index => $item) {
+                if (!empty($reference) && isset($item['reference']) && $item['reference'] === $reference) {
+                    $matchedIndex = $index;
+                    break;
+                }
+            }
+
+            if ($matchedIndex === null) {
+                foreach ($remaining as $index => $item) {
+                    if (!empty($description) && isset($item['description']) && $item['description'] === $description) {
+                        $matchedIndex = $index;
+                        break;
+                    }
+                }
+            }
+
+            if ($matchedIndex === null) {
+                foreach ($remaining as $index => $item) {
+                    $itemQuantity = isset($item['quantity']) ? intval($item['quantity']) : null;
+                    $itemAmount = isset($item['amount']) ? floatval($item['amount']) : null;
+                    if ($itemQuantity === $quantity && $itemAmount === $amount) {
+                        $matchedIndex = $index;
+                        break;
+                    }
+                }
+            }
+
+            if ($matchedIndex !== null) {
+                $item = $remaining[$matchedIndex];
+                $itemId = self::extraireInvoiceItemId($item);
+                if ($itemId) {
+                    $mapping[$detail->id] = $itemId;
+                }
+                array_splice($remaining, $matchedIndex, 1);
             }
         }
 
-        // 2. Simulation locale si hors ligne ou sans clé API
-        $numFne    = self::genererNumeroLocalBapa($nccAcheteur, $achat->id);
-        $signature = self::calculerSignatureLocaleBapa($achat);
-        $qrCode    = self::genererQrCodeUrlBapaLocal($numFne, $signature, $achat->montant_ttc);
+        return $mapping;
+    }
+
+    private static function buildRefundItem($detail, array $originalInvoiceItems = []): array
+    {
+        $existingFneItemId = $detail->fne_invoice_item_id ?? null;
+        if (!empty($existingFneItemId)) {
+            return [
+                'id'       => $existingFneItemId,
+                'quantity' => intval($detail->quantite),
+            ];
+        }
+
+        if (empty($originalInvoiceItems)) {
+            throw new \RuntimeException('Impossible de faire un avoir FNE : aucun identifiant d\'article FNE disponible et la facture d\'origine n\'a pas pu être récupérée.');
+        }
+
+        $reference = $detail->produit?->reference ?? ($detail->reference ?? null);
+        $description = $detail->produit?->nom ?? $detail->libelle_virtuel ?? null;
+        $quantity = intval($detail->quantite);
+        $amount = floatval($detail->prix_unitaire ?? 0);
+
+        $match = null;
+        foreach ($originalInvoiceItems as $item) {
+            if (!empty($reference) && isset($item['reference']) && $item['reference'] === $reference) {
+                $match = $item;
+                break;
+            }
+
+            if (!empty($description) && isset($item['description']) && $item['description'] === $description) {
+                $match = $item;
+                break;
+            }
+        }
+
+        if (!$match) {
+            foreach ($originalInvoiceItems as $item) {
+                $itemQuantity = isset($item['quantity']) ? intval($item['quantity']) : null;
+                $itemAmount = isset($item['amount']) ? floatval($item['amount']) : null;
+                if ($itemQuantity === $quantity && $itemAmount === $amount) {
+                    $match = $item;
+                    break;
+                }
+            }
+        }
+
+        if (!$match) {
+            $candidates = array_map(function ($item) {
+                return [
+                    'id' => $item['id'] ?? $item['invoiceItemId'] ?? null,
+                    'reference' => $item['reference'] ?? null,
+                    'description' => $item['description'] ?? null,
+                    'quantity' => $item['quantity'] ?? null,
+                    'amount' => $item['amount'] ?? null,
+                ];
+            }, $originalInvoiceItems);
+
+            throw new \RuntimeException('Impossible de faire correspondre la ligne d\'avoir avec un article de la facture FNE d\'origine. Candidates: ' . json_encode($candidates, JSON_UNESCAPED_UNICODE));
+        }
 
         return [
-            'success'      => true,
-            'numero_recu'  => $numFne,
-            'signature'    => $signature,
-            'qr_code_data' => $qrCode,
-            'pdf_url'      => null,
+            'id'       => self::extraireInvoiceItemId($match) ?? $detail->produit?->reference ?? 'item-' . $detail->id,
+            'quantity' => $quantity,
         ];
     }
-
-    private static function genererNumeroLocalBapa(string $ncc, int $id): string
-    {
-        $timestamp = now()->format('ymdHi');
-        $seq = str_pad($id, 4, '0', STR_PAD_LEFT);
-        return substr($ncc, 0, 7) . $timestamp . $seq . 'BA1';
-    }
-
-    private static function calculerSignatureLocaleBapa(Achat $achat): string
-    {
-        return strtoupper(hash_hmac('sha256', $achat->numero_facture . '|' . $achat->montant_ttc . '|' . now()->toDateString(), 'selflow_dgi_bapa_secure_key'));
-    }
-
-    private static function genererQrCodeUrlBapaLocal(string $numFne, string $signature, float $montant): string
-    {
-        $sigShort = substr($signature, 0, 16);
-        return "https://fne.dgi.gouv.ci/verifier?doc={$numFne}&sig={$sigShort}&mt=" . round($montant) . "&type=BAPA";
-    }
 }
-

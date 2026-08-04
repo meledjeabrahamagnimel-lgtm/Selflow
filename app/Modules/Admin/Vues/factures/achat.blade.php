@@ -921,6 +921,14 @@ function setModel(n, el) {
 // Initial render
 render();
 
+// Auto-download if ?download=1 is in URL
+const urlParams = new URLSearchParams(window.location.search);
+if (urlParams.get('download') === '1') {
+    setTimeout(() => {
+        telechargerPdf();
+    }, 800);
+}
+
 function ouvrirModalAvoir() {
     document.getElementById('modalAvoir').style.display = 'flex';
 }

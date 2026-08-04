@@ -31,11 +31,16 @@ class Vente extends Model
         'qr_code_data',
         'fichier_fne_pdf_url',
         'signature_dgi',
+        'fne_invoice_id',
         'etape',
         'archived',
         'bon_livraison_id',
         'parent_id',
         'raison_avoir',
+        'fne_invoice_id',
+        'devise',
+        'taux_change',
+        'mobile_money_operateur',
     ];
 
     protected static function booted()

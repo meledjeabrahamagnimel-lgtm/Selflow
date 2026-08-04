@@ -285,9 +285,12 @@ class ImportControleur
         $type = strtoupper(trim($d['type_facturation'] ?? 'B2C'));
         if (!in_array($type, ['B2B', 'B2C', 'B2G', 'B2F'])) $type = 'B2C';
 
-        $ncc = trim($d['ncc'] ?? '');
+        $ncc = $this->normaliserNcc(trim($d['ncc'] ?? ''));
         if ($type === 'B2B' && !$ncc) {
             return "Ligne {$num} : NCC obligatoire pour le type B2B (client: {$nom}).";
+        }
+        if ($ncc && !$this->nccValide($ncc)) {
+            return "Ligne {$num} : NCC invalide pour le client {$nom}. Il doit contenir 8 caractères et se terminer par une lettre majuscule.";
         }
 
         // Numéro tiers : auto si vide
@@ -329,9 +332,12 @@ class ImportControleur
         $type = strtoupper(trim($d['type_facturation'] ?? 'B2B'));
         if (!in_array($type, ['B2B', 'B2C', 'B2G', 'B2F'])) $type = 'B2B';
 
-        $ncc = trim($d['ncc'] ?? '');
+        $ncc = $this->normaliserNcc(trim($d['ncc'] ?? ''));
         if ($type === 'B2B' && !$ncc) {
             return "Ligne {$num} : NCC obligatoire pour le type B2B (fournisseur: {$nom}).";
+        }
+        if ($ncc && !$this->nccValide($ncc)) {
+            return "Ligne {$num} : NCC invalide pour le fournisseur {$nom}. Il doit contenir 8 caractères et se terminer par une lettre majuscule.";
         }
 
         $numeroTiers = trim($d['numero_tiers'] ?? '');
@@ -359,6 +365,19 @@ class ImportControleur
             ]
         );
         return null;
+    }
+
+    private function normaliserNcc(?string $ncc): ?string
+    {
+        $ncc = $ncc === null ? '' : preg_replace('/\s+/', '', $ncc);
+        $ncc = strtoupper($ncc);
+
+        return $ncc === '' ? null : $ncc;
+    }
+
+    private function nccValide(?string $ncc): bool
+    {
+        return $ncc === null || preg_match('/^[A-Z0-9]{7}[A-Z]$/', $ncc) === 1;
     }
 
     // ─────────────────────────────────────────────────────────────

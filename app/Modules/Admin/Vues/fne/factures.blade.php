@@ -93,7 +93,8 @@
             <th style="text-align:right;">TTC</th>
             <th>Statut DGI</th>
             <th>Site</th>
-            <th style="text-align:center;">Fichier</th>
+            <th>Facture origine</th>
+            <th style="text-align:center;">Actions</th>
         </tr>
     </thead>
     <tbody id="corps-table">
@@ -110,6 +111,19 @@
 </div>
 
 <script>
+function telechargerDirectement(url) {
+    const iframe = document.createElement('iframe');
+    iframe.style.position = 'absolute';
+    iframe.style.width = '1024px';
+    iframe.style.height = '768px';
+    iframe.style.top = '-9999px';
+    iframe.style.left = '-9999px';
+    iframe.style.border = 'none';
+    iframe.src = url;
+    document.body.appendChild(iframe);
+    setTimeout(() => { iframe.remove(); }, 15000);
+}
+
 let flux = 'ventes';
 let categorie = 'emis';
 let page = 1;
@@ -188,10 +202,38 @@ function rafraichirFactures() {
                             </span>
                         </td>
                         <td>${doc.pdv ?? '—'}</td>
+                        <td>
+                            <div style="display:flex; gap:6px; align-items:center; justify-content:center;">
+                                <span style="font-weight:600; margin-right:4px;">${doc.facture_origine ? doc.facture_origine : doc.num_piece}</span>
+                                <a href="${doc.local_url}" class="btn btn-outline" style="padding:4px 8px; font-size:11px;" title="Voir la facture d'origine (4 modèles)">
+                                    <i class="fas fa-eye"></i>
+                                </a>
+                                <button type="button" onclick="telechargerDirectement('${doc.local_url}?download=1')" class="btn btn-outline" style="padding:4px 8px; font-size:11px; cursor:pointer; height:auto; display:inline-flex; align-items:center; justify-content:center;" title="Télécharger la facture d'origine (4 modèles)">
+                                    <i class="fas fa-download"></i>
+                                </button>
+                            </div>
+                        </td>
                         <td style="text-align:center;">
-                            <a href="${doc.telechargement_url}" target="_blank" class="btn btn-outline" style="padding:5px 10px; font-size:12px;" title="${doc.normalise ? 'Télécharger le PDF officiel DGI' : 'Voir la facture originale Selflow'}">
-                                <i class="fas fa-download"></i>
-                            </a>
+                            <div style="display:flex; gap:6px; justify-content:center; align-items:center;">
+                                ${doc.normalise ? `
+                                    <a href="${doc.voir_url}" target="_blank" class="btn btn-outline" style="padding:5px 10px; font-size:12px;" title="Voir le document original / FNE">
+                                        <i class="fas fa-eye"></i>
+                                    </a>
+                                    <a href="${doc.telechargement_url}" target="_blank" class="btn btn-outline" style="padding:5px 10px; font-size:12px;" title="Télécharger le PDF">
+                                        <i class="fas fa-download"></i>
+                                    </a>
+                                ` : `
+                                    <button class="btn btn-outline" style="padding:5px 10px; font-size:12px; opacity:0.5; cursor:not-allowed;" disabled title="Indisponible pour les factures non normalisées">
+                                        <i class="fas fa-eye"></i>
+                                    </button>
+                                    <form method="POST" action="${doc.normaliser_url}" style="display:inline; margin:0;">
+                                        <input type="hidden" name="_token" value="{{ csrf_token() }}">
+                                        <button type="submit" class="btn btn-success" style="padding:5px 10px; font-size:12px; color:#fff;" title="Normaliser auprès de la DGI">
+                                            <i class="fas fa-share-nodes"></i> Normaliser
+                                        </button>
+                                    </form>
+                                `}
+                            </div>
                         </td>
                     </tr>
                 `).join('');

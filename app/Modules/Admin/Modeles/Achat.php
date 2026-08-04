@@ -34,6 +34,9 @@ class Achat extends Model
         'archived',
         'parent_id',
         'raison_avoir',
+        'devise',
+        'taux_change',
+        'mobile_money_operateur',
     ];
 
 

@@ -44,6 +44,9 @@ class EntrepriseControleur
     {
         $entreprise = Auth::user()->entreprise;
 
+        // Normaliser le NCC : suppression des espaces et mise en majuscule
+        $request->merge(['ncc' => $request->has('ncc') ? strtoupper(preg_replace('/\s+/', '', $request->input('ncc'))) : null]);
+
         $request->validate([
             'nom'                    => ['required', 'string', 'max:150'],
             'gerant_nom'             => ['nullable', 'string', 'max:100'],
@@ -58,7 +61,7 @@ class EntrepriseControleur
             'comptaflow_sync_key'    => ['nullable', 'string', 'max:255'],
             // Nouveaux champs d'inscription complète dégrisés
             'rccm'                   => ['nullable', 'string', 'max:100'],
-            'ncc'                    => ['nullable', 'string', 'max:100'],
+            'ncc'                    => ['nullable', 'string', 'size:8', 'regex:/^[A-Z0-9]{7}[A-Z]$/'],
             'regime_imposition'      => ['nullable', 'string', 'in:TEE,RNE,RSI,RNI'],
             'centre_impots'          => ['nullable', 'string', 'max:100'],
             'compte_contribuable'    => ['nullable', 'string', 'max:100'],

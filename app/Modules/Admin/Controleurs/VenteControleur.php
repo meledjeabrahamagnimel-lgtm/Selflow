@@ -199,19 +199,22 @@ class VenteControleur
             }
 
             $vente = Vente::create([
-                'point_de_vente_id' => $pointDeVenteId,
-                'client_id'         => $request->client_id ?: null,
-                'numero_facture'    => $numero,
-                'date_vente'        => now()->toDateString(),
-                'mode_paiement'     => $modePaiementFinal,
-                'moyen_bancaire'    => $request->mode_paiement === 'Banque' ? $request->moyen_bancaire : null,
-                'reference_paiement'=> $request->mode_paiement === 'Banque' ? $request->reference_paiement : null,
-                'montant_ht'        => $montantHt,
-                'montant_tva'       => $montantTva,
-                'remise'            => $remise,
-                'montant_ttc'       => $montantTtc,
-                'statut'            => $statutVente,
-                'etape'             => $etape,
+                'point_de_vente_id'       => $pointDeVenteId,
+                'client_id'               => $request->client_id ?: null,
+                'numero_facture'          => $numero,
+                'date_vente'              => now()->toDateString(),
+                'mode_paiement'           => $modePaiementFinal,
+                'moyen_bancaire'          => $request->mode_paiement === 'Banque' ? $request->moyen_bancaire : null,
+                'reference_paiement'      => $request->mode_paiement === 'Banque' ? $request->reference_paiement : null,
+                'mobile_money_operateur'  => $request->mode_paiement === 'Mobile Money' ? $request->mobile_money_operateur : null,
+                'devise'                  => $request->devise ?: 'XOF',
+                'taux_change'             => ($request->devise && $request->devise !== 'XOF') ? floatval($request->taux_change) : null,
+                'montant_ht'              => $montantHt,
+                'montant_tva'             => $montantTva,
+                'remise'                  => $remise,
+                'montant_ttc'             => $montantTtc,
+                'statut'                  => $statutVente,
+                'etape'                   => $etape,
             ]);
 
             foreach ($request->articles as $article) {
@@ -470,6 +473,10 @@ class VenteControleur
             }
             if (request()->filled('statut_filtre')) {
                 $baseQuery->where('statut', request('statut_filtre'));
+            }
+            if (request()->filled('dgi_filtre')) {
+                $dgiFiltre = request('dgi_filtre');
+                $baseQuery->where('normalise', $dgiFiltre === 'oui');
             }
             if (request()->filled('date_debut')) {
                 $baseQuery->whereDate('date_vente', '>=', request('date_debut'));
@@ -936,19 +943,22 @@ class VenteControleur
                 'statut'            => 'Payé',
                 'type_facture'      => 'avoir',
                 'etape'             => 'Facture',
+                'parent_id'         => $vente->id,
+                'raison_avoir'      => $request->raison,
             ]);
 
             // 2. Copie des détails et retour en stock
             foreach ($vente->details as $detail) {
                 VenteDetail::create([
-                    'vente_id'        => $avoir->id,
-                    'produit_id'      => $detail->produit_id,
-                    'libelle_virtuel' => $detail->libelle_virtuel,
-                    'quantite'        => $detail->quantite,
-                    'unite'           => $detail->unite,
-                    'prix_unitaire'   => $detail->prix_unitaire,
-                    'montant_tva'     => $detail->montant_tva,
-                    'montant_ttc'     => $detail->montant_ttc,
+                    'vente_id'           => $avoir->id,
+                    'produit_id'         => $detail->produit_id,
+                    'libelle_virtuel'    => $detail->libelle_virtuel,
+                    'quantite'           => $detail->quantite,
+                    'unite'              => $detail->unite,
+                    'prix_unitaire'      => $detail->prix_unitaire,
+                    'montant_tva'        => $detail->montant_tva,
+                    'montant_ttc'        => $detail->montant_ttc,
+                    'fne_invoice_item_id'=> $detail->fne_invoice_item_id,
                 ]);
 
                 // Ré-incrémenter le stock si le produit est stockable
@@ -1012,11 +1022,11 @@ class VenteControleur
             return back()->with('erreur', 'Seules les factures finalisées peuvent être normalisées.');
         }
 
-        NormaliserFactureFne::dispatch($vente);
+        NormaliserFactureFne::dispatchSync($vente);
 
         $this->journaliser('normalisation_manuelle_vente', 'Vente', $vente->id);
 
-        return back()->with('succes', 'La normalisation DGI a été lancée avec succès. Elle sera traitée en arrière-plan.');
+        return back()->with('succes', 'La normalisation DGI a été effectuée avec succès. Le document est maintenant normalisé.');
     }
 
     // ──────────────────────────────────────────────────────────────────────────
@@ -1336,14 +1346,15 @@ class VenteControleur
                     $itemTtc = $itemHt + $itemTva;
 
                     VenteDetail::create([
-                        'vente_id'        => $avoir->id,
-                        'produit_id'      => $detail->produit_id,
-                        'libelle_virtuel' => $detail->libelle_virtuel,
-                        'quantite'        => $qteAvoir,
-                        'unite'           => $detail->unite,
-                        'prix_unitaire'   => $prixUnit,
-                        'montant_tva'     => $itemTva,
-                        'montant_ttc'     => $itemTtc,
+                        'vente_id'           => $avoir->id,
+                        'produit_id'         => $detail->produit_id,
+                        'libelle_virtuel'    => $detail->libelle_virtuel,
+                        'quantite'           => $qteAvoir,
+                        'unite'              => $detail->unite,
+                        'prix_unitaire'      => $prixUnit,
+                        'montant_tva'        => $itemTva,
+                        'montant_ttc'        => $itemTtc,
+                        'fne_invoice_item_id'=> $detail->fne_invoice_item_id,
                     ]);
 
                     $totalHt += $itemHt;

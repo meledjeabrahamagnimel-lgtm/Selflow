@@ -61,12 +61,21 @@
                 </div>
             </div>
 
+            <div style="display:flex; gap:10px; flex-wrap:wrap; margin-bottom:16px;">
+                <button type="button" class="btn btn-outline" data-modal-open="modalModifierPdv-{{ $pdv->id }}" style="min-width:160px; justify-content:center;">
+                    <i class="fas fa-edit"></i> Modifier le nom
+                </button>
+            </div>
+
             <div style="font-size:13px; color:var(--text-2); margin-bottom:16px;">
                 @if($pdv->responsable)
                 <div><i class="fas fa-user" style="width:16px;"></i> {{ $pdv->responsable }}</div>
                 @endif
                 @if($pdv->telephone)
                 <div style="margin-top:4px;"><i class="fas fa-phone" style="width:16px;"></i> {{ $pdv->telephone }}</div>
+                @endif
+                @if($pdv->code_fne)
+                <div style="margin-top:4px;"><i class="fas fa-hashtag" style="width:16px;"></i> Code FNE : <strong>{{ $pdv->code_fne }}</strong></div>
                 @endif
             </div>
 
@@ -103,6 +112,52 @@
                 <i class="fas fa-building"></i> Point de vente principal (Siège)
             </div>
             @endif
+
+            <div class="modal-overlay" id="modalModifierPdv-{{ $pdv->id }}">
+                <div class="modal">
+                    <div class="modal-header">
+                        <h3><i class="fas fa-edit"></i> Modifier Point de vente</h3>
+                        <button class="modal-close" data-modal-close>✕</button>
+                    </div>
+                    <form method="POST" action="{{ route('admin.pdv.modifier', $pdv) }}">
+                        @csrf
+                        @method('PUT')
+                        <div class="form-grid-2" style="gap:14px;">
+                            <div class="form-group">
+                                <label class="form-label">Nom <span style="color:var(--danger)">*</span></label>
+                                <input type="text" name="nom" class="form-control" value="{{ old('nom', $pdv->nom) }}" required>
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">Ville <span style="color:var(--danger)">*</span></label>
+                                <input type="text" name="ville" class="form-control" value="{{ old('ville', $pdv->ville) }}" required>
+                            </div>
+                        </div>
+                        <div class="form-grid-2" style="gap:14px; margin-top:12px;">
+                            <div class="form-group">
+                                <label class="form-label">Commune</label>
+                                <input type="text" name="commune" class="form-control" value="{{ old('commune', $pdv->commune) }}">
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">Téléphone</label>
+                                <input type="text" name="telephone" class="form-control" value="{{ old('telephone', $pdv->telephone) }}">
+                            </div>
+                        </div>
+                        <div class="form-group" style="margin-top:12px;">
+                            <label class="form-label">Responsable</label>
+                            <input type="text" name="responsable" class="form-control" value="{{ old('responsable', $pdv->responsable) }}">
+                        </div>
+                        <div class="form-group" style="margin-top:12px;">
+                            <label class="form-label">Code FNE</label>
+                            <input type="text" name="code_fne" class="form-control" value="{{ old('code_fne', $pdv->code_fne) }}" placeholder="Ex: 23">
+                            <small class="text-muted">Valeur à utiliser dans le champ <code>pointOfSale</code> de la DGI.</small>
+                        </div>
+                        <div style="display:flex; gap:10px; justify-content:flex-end; margin-top:16px;">
+                            <button type="button" class="btn btn-outline" data-modal-close>Annuler</button>
+                            <button type="submit" class="btn btn-primary"><i class="fas fa-check"></i> Enregistrer</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
         </div>
     </div>
     @endforeach
@@ -138,6 +193,11 @@
             <div class="form-group">
                 <label class="form-label">Responsable</label>
                 <input type="text" name="responsable" class="form-control" placeholder="Nom du responsable">
+            </div>
+            <div class="form-group">
+                <label class="form-label">Code FNE</label>
+                <input type="text" name="code_fne" class="form-control" placeholder="Ex: 23">
+                <small class="text-muted">Valeur à envoyer à la DGI dans le champ <code>pointOfSale</code>.</small>
             </div>
             <div style="display:flex; gap:10px; justify-content:flex-end; margin-top:8px;">
                 <button type="button" class="btn btn-outline" data-modal-close>Annuler</button>

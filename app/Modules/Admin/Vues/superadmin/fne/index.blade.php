@@ -279,6 +279,13 @@ function soumettreCle(type) {
     const valeur = document.getElementById(type === 'test' ? 'nouvelleCleTest' : 'nouvelleCleReelle').value.trim();
     if (!valeur) { alert('Veuillez saisir une clé.'); return; }
 
+    if (type === 'reelle') {
+        const confirmMsg = "⚠️ ATTENTION : Vous êtes sur le point d'activer la clé API de PRODUCTION.\n\n" +
+                           "Cette action va basculer l'entreprise en mode réel (DGI officiel) et SUPPRIMER DÉFINITIVEMENT toutes les factures, avoirs et achats de test (sandbox) enregistrés pour repartir sur une base saine et propre.\n\n" +
+                           "Confirmez-vous cette opération de passage en production ?";
+        if (!confirm(confirmMsg)) return;
+    }
+
     const form = document.createElement('form');
     form.method = 'POST';
     form.action = urlFne(type === 'test' ? 'cleTest' : 'cleReelle', entrepriseCourante);

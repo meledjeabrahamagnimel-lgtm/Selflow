@@ -62,11 +62,15 @@ class AchatControleur
                 'statut'        => 'Ouvert',
             ]))->id;
 
+        $isBapa = $request->input('type_facture') === 'bapa';
+
         $request->validate([
-            'fournisseur_id'             => ['required', 'integer', 'exists:fournisseurs,id'],
+            'fournisseur_id'             => $isBapa ? ['nullable'] : ['required', 'integer', 'exists:fournisseurs,id'],
+            'fournisseur_nom_bapa'        => $isBapa ? ['required', 'string', 'max:255'] : ['nullable'],
             'date_achat'                 => ['required', 'date'],
-            'mode_paiement'              => ['required', 'string'],
+            'mode_paiement'              => ['nullable', 'string'], // optionnel hors bloc Facture physique/BAPA
             'numero_facture_fournisseur' => ['nullable', 'string', 'max:100'],
+            'type_facture'               => ['nullable', 'string', 'in:normale,bapa'],
             'articles'                   => ['required', 'array', 'min:1'],
             'articles.*.produit_id'      => ['nullable', 'integer', 'exists:produits,id'],
             'articles.*.libelle_virtuel' => ['nullable', 'string', 'max:255'],
@@ -74,9 +78,26 @@ class AchatControleur
             'articles.*.prix_unitaire'   => ['required', 'numeric', 'min:0'],
             'articles.*.unite'           => ['nullable', 'string', 'max:50'],
         ], [
-            'fournisseur_id.required' => 'Veuillez sélectionner un fournisseur.',
-            'articles.required'       => 'Veuillez ajouter au moins un article.',
+            'fournisseur_id.required'    => 'Veuillez sélectionner un fournisseur.',
+            'fournisseur_nom_bapa.required' => 'Veuillez saisir le nom du vendeur (tiers non immatriculé).',
+            'articles.required'          => 'Veuillez ajouter au moins un article.',
         ]);
+
+        // Pour le mode BAPA : résoudre (ou créer) le fournisseur "tiers" à partir du nom libre
+        if ($isBapa) {
+            $nomTiers = trim($request->input('fournisseur_nom_bapa'));
+            $fournisseurTiers = Fournisseur::firstOrCreate(
+                [
+                    'entreprise_id' => $entreprise->id,
+                    'nom'           => $nomTiers,
+                ],
+                [
+                    'ncc'     => null,
+                    'adresse' => 'Tiers non immatriculé (BAPA)',
+                ]
+            );
+            $request->merge(['fournisseur_id' => $fournisseurTiers->id]);
+        }
 
         if ($request->mode_paiement === 'Banque') {
             $request->validate([
@@ -113,8 +134,8 @@ class AchatControleur
 
             $montantTtc = $montantHt + $montantTva;
 
-            // Déterminer le mode de paiement final
-            $modePaiementFinal = $request->mode_paiement;
+            // Déterminer le mode de paiement final (par défaut Caisse si non fourni)
+            $modePaiementFinal = $request->input('mode_paiement', 'Caisse');
             if ($request->mode_paiement === 'Banque' && $request->filled('banque_id')) {
                 $codeJournal = CodeJournal::where('entreprise_id', Auth::user()->entreprise_id)->findOrFail($request->banque_id);
                 $modePaiementFinal = 'Banque : ' . $codeJournal->intitule;
@@ -140,11 +161,15 @@ class AchatControleur
                 'mode_paiement'              => $modePaiementFinal,
                 'moyen_bancaire'             => $request->mode_paiement === 'Banque' ? $request->moyen_bancaire : null,
                 'reference_paiement'         => $request->mode_paiement === 'Banque' ? $request->reference_paiement : null,
+                'mobile_money_operateur'     => $request->mode_paiement === 'Mobile Money' ? $request->mobile_money_operateur : null,
+                'devise'                     => $request->devise ?: 'XOF',
+                'taux_change'                => ($request->devise && $request->devise !== 'XOF') ? floatval($request->taux_change) : null,
                 'montant_ht'                 => $montantHt,
                 'montant_tva'                => $montantTva,
                 'montant_ttc'                => $montantTtc,
                 'statut'                     => $statutInitial,
                 'etape'                      => $etape,
+                'type_facture'               => $request->input('type_facture', 'normale'),
             ]);
 
             foreach ($request->articles as $article) {
@@ -228,8 +253,8 @@ class AchatControleur
             return $achat;
         });
 
-        // Si c'est une facture finalisée et que le fournisseur n'a pas de NCC, normalisation BAPA asynchrone
-        if ($achat && $achat->etape === 'Facture' && empty($achat->fournisseur?->ncc)) {
+        // Si c'est un achat de type BAPA, normalisation BAPA asynchrone
+        if ($achat && $achat->etape === 'Facture' && $achat->type_facture === 'bapa') {
             NormaliserAchatBapaJob::dispatch($achat);
         }
 
@@ -320,6 +345,10 @@ class AchatControleur
         }
         if (request()->filled('statut_filtre')) {
             $baseQuery->where('statut', request('statut_filtre'));
+        }
+        if (request()->filled('dgi_filtre')) {
+            $dgiFiltre = request('dgi_filtre');
+            $baseQuery->where('normalise', $dgi_filtre === 'oui');
         }
         if (request()->filled('date_debut')) {
             $baseQuery->whereDate('date_achat', '>=', request('date_debut'));
@@ -609,11 +638,11 @@ class AchatControleur
             return back()->with('erreur', 'Seules les factures finalisées peuvent être normalisées.');
         }
 
-        NormaliserAchatBapaJob::dispatch($achat);
+        NormaliserAchatBapaJob::dispatchSync($achat);
 
         $this->journaliser('normalisation_manuelle_achat', 'Achat', $achat->id);
 
-        return back()->with('succes', 'La normalisation BAPA/DGI a été lancée avec succès. Elle sera traitée en arrière-plan.');
+        return back()->with('succes', 'La normalisation BAPA/DGI a été effectuée avec succès. Le document est maintenant normalisé.');
     }
 
     public function rechercherFacturesPourAvoir(Request $request): \Illuminate\Http\JsonResponse

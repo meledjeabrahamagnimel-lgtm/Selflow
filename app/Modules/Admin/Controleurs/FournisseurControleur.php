@@ -50,6 +50,8 @@ class FournisseurControleur
     public function creer(Request $request): RedirectResponse
     {
         $entreprise = Auth::user()->entreprise;
+        // Normaliser le NCC : suppression des espaces et mise en majuscule
+        $request->merge(['ncc' => $request->has('ncc') ? strtoupper(preg_replace('/\s+/', '', $request->input('ncc'))) : null]);
 
         $request->validate([
             'nom'               => ['required', 'string', 'max:150'],
@@ -58,7 +60,7 @@ class FournisseurControleur
             'email'             => ['nullable', 'email', 'max:150'],
             'adresse'           => ['nullable', 'string', 'max:255'],
             'secteur'           => ['nullable', 'string', 'max:100'],
-            'ncc'               => ['required_if:type_facturation,B2B', 'nullable', 'string', 'max:50'],
+            'ncc'               => ['required_if:type_facturation,B2B', 'nullable', 'string', 'size:8', 'regex:/^[A-Z0-9]{7}[A-Z]$/'],
             'rccm'              => ['nullable', 'string', 'max:100'],
             'regime_imposition' => ['nullable', 'string', 'max:100'],
             'compte_comptable'  => [
@@ -70,6 +72,8 @@ class FournisseurControleur
             ],
         ], [
             'ncc.required_if' => 'Le NCC est obligatoire pour un fournisseur de type B2B (Entreprise à Entreprise).',
+            'ncc.size' => 'Le NCC doit contenir exactement 8 caractères.',
+            'ncc.regex' => 'Le NCC doit comporter 8 caractères et se terminer par une lettre majuscule.',
         ]);
 
         $autoNumero = $request->boolean('auto_numero_tiers');
@@ -120,17 +124,21 @@ class FournisseurControleur
         abort_unless($fournisseur->entreprise_id === $entreprise->id, 403);
 
         if ($fournisseur->source === 'comptaflow') {
+            // Normaliser le NCC en entrée
+            $request->merge(['ncc' => $request->has('ncc') ? strtoupper(preg_replace('/\s+/', '', $request->input('ncc'))) : null]);
             $request->validate([
                 'type_facturation'  => ['nullable', 'in:B2B,B2C,B2G,B2F'],
                 'telephone'         => ['nullable', 'string', 'max:30'],
                 'email'             => ['nullable', 'email', 'max:150'],
                 'adresse'           => ['nullable', 'string', 'max:255'],
                 'secteur'           => ['nullable', 'string', 'max:100'],
-                'ncc'               => ['required_if:type_facturation,B2B', 'nullable', 'string', 'max:50'],
+                'ncc'               => ['required_if:type_facturation,B2B', 'nullable', 'string', 'size:8', 'regex:/^[A-Z0-9]{7}[A-Z]$/'],
                 'rccm'              => ['nullable', 'string', 'max:100'],
                 'regime_imposition' => ['nullable', 'string', 'max:100'],
             ], [
                 'ncc.required_if' => 'Le NCC est obligatoire pour un fournisseur de type B2B.',
+                'ncc.size' => 'Le NCC doit contenir exactement 8 caractères.',
+                'ncc.regex' => 'Le NCC doit comporter 8 caractères et se terminer par une lettre majuscule.',
             ]);
 
             $fournisseur->update(array_merge(
@@ -138,6 +146,9 @@ class FournisseurControleur
                 ['ncc' => ($request->input('type_facturation') === 'B2B') ? $request->input('ncc') : null]
             ));
         } else {
+            // Normaliser le NCC en entrée
+            $request->merge(['ncc' => $request->has('ncc') ? strtoupper(preg_replace('/\s+/', '', $request->input('ncc'))) : null]);
+
             $request->validate([
                 'nom'               => ['required', 'string', 'max:150'],
                 'type_facturation'  => ['nullable', 'in:B2B,B2C,B2G,B2F'],
@@ -145,7 +156,7 @@ class FournisseurControleur
                 'email'             => ['nullable', 'email', 'max:150'],
                 'adresse'           => ['nullable', 'string', 'max:255'],
                 'secteur'           => ['nullable', 'string', 'max:100'],
-                'ncc'               => ['required_if:type_facturation,B2B', 'nullable', 'string', 'max:50'],
+                'ncc'               => ['required_if:type_facturation,B2B', 'nullable', 'string', 'size:8', 'regex:/^[A-Z0-9]{7}[A-Z]$/'],
                 'rccm'              => ['nullable', 'string', 'max:100'],
                 'regime_imposition' => ['nullable', 'string', 'max:100'],
                 'compte_comptable'  => [
@@ -163,6 +174,8 @@ class FournisseurControleur
                 ],
             ], [
                 'ncc.required_if' => 'Le NCC est obligatoire pour un fournisseur de type B2B.',
+                'ncc.size' => 'Le NCC doit contenir exactement 8 caractères.',
+                'ncc.regex' => 'Le NCC doit comporter 8 caractères et se terminer par une lettre majuscule.',
             ]);
 
             $fournisseur->update(array_merge(

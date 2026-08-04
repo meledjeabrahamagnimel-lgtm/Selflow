@@ -65,22 +65,8 @@ class ProduitControleur
             'prix_achat'    => [$request->input('type') === 'service' ? 'nullable' : 'required', 'numeric', 'min:0'],
             'prix_vente'    => ['required', 'numeric', 'min:0'],
             'taux_tva'      => ['required', 'numeric', 'min:0'],
-            'compte_vente'  => [
-                'required',
-                'string',
-                'max:20',
-                \Illuminate\Validation\Rule::exists('plan_comptable', 'numero')->where(function ($q) use ($entreprise) {
-                    $q->whereNull('entreprise_id')->orWhere('entreprise_id', $entreprise->id);
-                })
-            ],
-            'compte_achat'  => [
-                'required',
-                'string',
-                'max:20',
-                \Illuminate\Validation\Rule::exists('plan_comptable', 'numero')->where(function ($q) use ($entreprise) {
-                    $q->whereNull('entreprise_id')->orWhere('entreprise_id', $entreprise->id);
-                })
-            ],
+            'compte_vente'  => ['required', 'string', 'max:20'],
+            'compte_achat'  => ['required', 'string', 'max:20'],
             'stock_actuel'  => [in_array($request->input('type'), ['service', 'consommable_non_stockable']) ? 'nullable' : 'required', 'integer', 'min:0'],
             'stock_minimum' => [in_array($request->input('type'), ['service', 'consommable_non_stockable']) ? 'nullable' : 'required', 'integer', 'min:0'],
             'unite'         => ['nullable', 'string', 'max:20'],
@@ -226,6 +212,9 @@ class ProduitControleur
         abort_unless($produit->entreprise_id === Auth::user()->entreprise_id, 403);
         $entreprise = Auth::user()->entreprise;
 
+        $isService = ($request->input('type') === 'service');
+        $isNoStock = ($isService || $request->input('type') === 'consommable_non_stockable');
+
         $request->validate([
             'nom'           => ['required', 'string', 'max:200'],
             'type'          => ['required', 'string', 'in:marchandise,matiere_premiere,produit_fini,consommable_stockable,consommable_non_stockable,service'],
@@ -234,27 +223,13 @@ class ProduitControleur
             'nouvelle_categorie' => ['nullable', 'string', 'max:100'],
             'prefixe_categorie' => ['nullable', 'string', 'max:5'],
             'nouvelle_sous_categorie' => ['nullable', 'string', 'max:100'],
-            'prix_achat'    => ['required', 'numeric', 'min:0'],
+            'prix_achat'    => [$isService ? 'nullable' : 'required', 'numeric', 'min:0'],
             'prix_vente'    => ['required', 'numeric', 'min:0'],
             'taux_tva'      => ['required', 'numeric', 'min:0'],
-            'compte_vente'  => [
-                'required',
-                'string',
-                'max:20',
-                \Illuminate\Validation\Rule::exists('plan_comptable', 'numero')->where(function ($q) use ($entreprise) {
-                    $q->whereNull('entreprise_id')->orWhere('entreprise_id', $entreprise->id);
-                })
-            ],
-            'compte_achat'  => [
-                'required',
-                'string',
-                'max:20',
-                \Illuminate\Validation\Rule::exists('plan_comptable', 'numero')->where(function ($q) use ($entreprise) {
-                    $q->whereNull('entreprise_id')->orWhere('entreprise_id', $entreprise->id);
-                })
-            ],
-            'stock_actuel'  => ['required', 'integer'],
-            'stock_minimum' => ['required', 'integer', 'min:0'],
+            'compte_vente'  => ['required', 'string', 'max:20'],
+            'compte_achat'  => ['required', 'string', 'max:20'],
+            'stock_actuel'  => [$isNoStock ? 'nullable' : 'required', 'integer'],
+            'stock_minimum' => [$isNoStock ? 'nullable' : 'required', 'integer', 'min:0'],
             'unite'         => ['nullable', 'string', 'max:20'],
         ]);
 
@@ -306,7 +281,7 @@ class ProduitControleur
             'type'              => $request->type,
             'categorie_id'      => $categorieId ?: null,
             'sous_categorie_id' => $sousCategorieId ?: null,
-            'prix_achat'        => $request->prix_achat,
+            'prix_achat'        => $isService ? 0 : $request->prix_achat,
             'prix_vente'        => $request->prix_vente,
             'taux_tva'          => $request->taux_tva,
             'compte_vente'      => $request->compte_vente,
@@ -316,9 +291,9 @@ class ProduitControleur
 
         $pdvId = session('point_de_vente_actif_id') 
             ?? auth()->user()->point_de_vente_id 
-            ?? ($entreprise->pointsDeVente()->first()->id ?? null);
+            ?? ($entreprise->pointsDeVente->first()->id ?? null);
 
-        if ($pdvId) {
+        if ($pdvId && !$isNoStock) {
             \App\Modules\Admin\Modeles\Stock::updateOrCreate([
                 'produit_id'        => $produit->id,
                 'point_de_vente_id' => $pdvId,

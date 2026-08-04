@@ -66,6 +66,29 @@ class FneDashboardControleur
 
     private function calculerKpisGestionFne(Request $request, int $entrepriseId): array
     {
+        $ent = \App\Modules\Admin\Modeles\Entreprise::find($entrepriseId);
+        $taxConfig = TaxConfiguration::where('entreprise_id', $entrepriseId)->first();
+
+        // 1. Calculer les stickers consommés (quantité) à vie (toutes périodes confondues)
+        $totalVentesNormalisees = Vente::whereHas('pointDeVente', fn($q) => $q->where('entreprise_id', $entrepriseId))
+            ->where('etape', 'Facture')
+            ->where('normalise', true)
+            ->count();
+
+        $totalAchatsNormalises = Achat::whereHas('pointDeVente', fn($q) => $q->where('entreprise_id', $entrepriseId))
+            ->where('type_facture', 'bapa')
+            ->where('etape', 'Facture')
+            ->where('normalise', true)
+            ->count();
+
+        $stickers_consommes = $totalVentesNormalisees + $totalAchatsNormalises;
+
+        // 2. Solde des stickers (quantité) stocké en base
+        $stickers_solde = intval($ent?->fne_sticker_balance ?? 0);
+
+        // 3. Stickers achetés (quantité) = Solde + Consommés
+        $stickers_achats = $stickers_solde + $stickers_consommes;
+
         [$debut, $fin] = $this->resoudrePeriode($request);
         $pdvId = $request->input('pdv_id');
 
@@ -80,6 +103,21 @@ class FneDashboardControleur
             ->where('etape', 'Facture')
             ->where('normalise', true);
         if ($pdvId && $pdvId !== 'tous') $achatsQuery->where('point_de_vente_id', $pdvId);
+
+        // 4. Calculer le Timbre de quittance pour la période sélectionnée
+        $timbre_montant = 0;
+        $timbre_quantite = 0;
+        if ($taxConfig && $taxConfig->tdt_active) {
+            $ventesEspeces = (clone $ventesQuery)
+                ->where('mode_paiement', 'Caisse')
+                ->where('montant_ttc', '>', (float) $taxConfig->tdt_seuil)
+                ->get();
+            
+            $timbre_quantite = $ventesEspeces->count();
+            $timbre_montant = $ventesEspeces->sum(function($v) use ($taxConfig) {
+                return round($v->montant_ttc * ($taxConfig->tdt_taux / 100), 2);
+            });
+        }
 
         // Ventes normalisées, hors avoirs / reçus (facture + client identifié)
         $facturesVente = (clone $ventesQuery)->where(function($q) { $q->whereNull('type_facture')->orWhere('type_facture', '!=', 'avoir'); })
@@ -99,12 +137,12 @@ class FneDashboardControleur
         return [
             'periode' => ['debut' => $debut->toDateString(), 'fin' => $fin->toDateString()],
 
-            // Indicateurs propres à la plateforme DGI — non disponibles sans
-            // appel API dédié (non implémenté). Affichés à 0 par choix validé.
-            'stickers_solde'    => 0,
-            'stickers_achats'   => 0,
-            'stickers_consommes'=> 0,
-            'timbre_quittance'  => 0,
+            // Indicateurs propres à la plateforme DGI
+            'stickers_solde'    => $stickers_solde,
+            'stickers_achats'   => $stickers_achats,
+            'stickers_consommes'=> $stickers_consommes,
+            'timbre_quittance'  => $timbre_montant,
+            'timbre_quantite'   => $timbre_quantite,
 
             'ventes' => [
                 'factures' => ['nombre' => (clone $facturesVente)->count(), 'montant' => (clone $facturesVente)->sum('montant_ttc')],
@@ -354,7 +392,7 @@ class FneDashboardControleur
         $parPage = 20;
 
         if ($flux === 'ventes') {
-            $query = Vente::with(['client', 'pointDeVente'])
+            $query = Vente::with(['client', 'pointDeVente', 'parent'])
                 ->whereHas('pointDeVente', fn($q) => $q->where('entreprise_id', $entreprise->id))
                 ->whereBetween('date_vente', [$debut, $fin])
                 ->where('etape', 'Facture');
@@ -374,9 +412,11 @@ class FneDashboardControleur
                 });
             }
 
-            $documents = $query->orderByDesc('date_vente')->paginate($parPage);
+            $documents = $query->orderByDesc('date_vente')->orderByDesc('id')->paginate($parPage);
 
             $lignes = $documents->getCollection()->map(function (Vente $v) {
+                $dgiUrl = $v->fichier_fne_pdf_url;
+
                 return [
                     'id' => $v->id,
                     'type_doc' => $v->type_facture === 'avoir' ? 'Facture Avoir' : ($v->client_id ? 'Facture' : 'Reçu'),
@@ -390,13 +430,15 @@ class FneDashboardControleur
                     'normalise' => (bool) $v->normalise,
                     'date' => $v->date_vente?->toDateString(),
                     'pdv' => $v->pointDeVente?->nom,
-                    'telechargement_url' => $v->normalise && $v->fichier_fne_pdf_url
-                        ? $v->fichier_fne_pdf_url
-                        : route('admin.ventes.imprimer', $v->id),
+                    'facture_origine' => $v->type_facture === 'avoir' ? $v->parent?->numero_facture : null,
+                    'voir_url' => $dgiUrl,
+                    'telechargement_url' => $dgiUrl,
+                    'local_url' => route('admin.ventes.imprimer', $v->id),
+                    'normaliser_url' => route('admin.ventes.normaliser', $v->id),
                 ];
             });
         } else {
-            $query = Achat::with(['fournisseur', 'pointDeVente'])
+            $query = Achat::with(['fournisseur', 'pointDeVente', 'parent'])
                 ->whereHas('pointDeVente', fn($q) => $q->where('entreprise_id', $entreprise->id))
                 ->whereBetween('date_achat', [$debut, $fin])
                 ->where('etape', 'Facture');
@@ -416,9 +458,11 @@ class FneDashboardControleur
                 });
             }
 
-            $documents = $query->orderByDesc('date_achat')->paginate($parPage);
+            $documents = $query->orderByDesc('date_achat')->orderByDesc('id')->paginate($parPage);
 
             $lignes = $documents->getCollection()->map(function (Achat $a) {
+                $dgiUrl = $a->fichier_fne_pdf_url;
+
                 return [
                     'id' => $a->id,
                     'type_doc' => $a->type_facture === 'avoir' ? 'Facture Avoir' : ($a->type_facture === 'bapa' ? 'BAPA' : 'Facture'),
@@ -432,9 +476,11 @@ class FneDashboardControleur
                     'normalise' => (bool) $a->normalise,
                     'date' => $a->date_achat?->toDateString(),
                     'pdv' => $a->pointDeVente?->nom,
-                    'telechargement_url' => $a->normalise && $a->fichier_fne_pdf_url
-                        ? $a->fichier_fne_pdf_url
-                        : route('admin.achats.imprimer', $a->id),
+                    'facture_origine' => $a->type_facture === 'avoir' ? $a->parent?->numero_facture : null,
+                    'voir_url' => $dgiUrl,
+                    'telechargement_url' => $dgiUrl,
+                    'local_url' => route('admin.achats.imprimer', $a->id),
+                    'normaliser_url' => route('admin.achats.normaliser', $a->id),
                 ];
             });
         }
@@ -479,5 +525,186 @@ class FneDashboardControleur
             'annee'  => [$carbon->copy()->startOfYear(), $carbon->copy()->endOfYear()],
             default  => [$carbon->copy()->startOfMonth(), $carbon->copy()->endOfMonth()],
         };
+    }
+
+    // ─────────────────────────────────────────────────────────────────
+    // TRAITEMENTS PAR LOT & PLANIFICATION
+    // ─────────────────────────────────────────────────────────────────
+
+    public function batchNormaliser(Request $request): JsonResponse
+    {
+        $entreprise = Auth::user()->entreprise;
+        $ids = $request->input('ids', []);
+        $flux = $request->input('flux', 'ventes');
+
+        if (empty($ids) || !is_array($ids)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Aucune facture sélectionnée.'
+            ], 400);
+        }
+
+        if (count($ids) > 15) {
+            return response()->json([
+                'success' => false,
+                'message' => 'La sélection ne peut pas dépasser 15 factures.'
+            ], 400);
+        }
+
+        $successCount = 0;
+        $errors = [];
+
+        foreach ($ids as $id) {
+            try {
+                if ($flux === 'ventes') {
+                    $vente = Vente::whereHas('pointDeVente', fn($q) => $q->where('entreprise_id', $entreprise->id))
+                        ->find($id);
+
+                    if (!$vente) {
+                        $errors[] = "Vente #{$id} introuvable.";
+                        break;
+                    }
+
+                    if ($vente->normalise) {
+                        $successCount++;
+                        continue;
+                    }
+
+                    $estRne = ($vente->type_facture === 'RNE');
+                    $fneResult = \App\Modules\Admin\Services\FneService::normaliserFacture($vente, $estRne);
+
+                    if ($fneResult['success']) {
+                        $updateData = [
+                            'normalise'     => true,
+                            'numero_fne'    => $fneResult['numero_recu'],
+                            'signature_dgi' => $fneResult['signature'] ?? null,
+                            'qr_code_data'  => $fneResult['qr_code_data'],
+                            'fichier_fne_pdf_url' => $fneResult['pdf_url'] ?? null,
+                        ];
+
+                        if ($estRne) {
+                            $updateData['type_facture'] = 'RNE';
+                        } elseif ($vente->type_facture !== 'avoir') {
+                            $updateData['type_facture'] = 'normale';
+                        }
+
+                        if (!empty($fneResult['invoice_id'])) {
+                            $updateData['fne_invoice_id'] = $fneResult['invoice_id'];
+                        }
+
+                        $vente->update($updateData);
+
+                        if (!empty($fneResult['fne_item_ids']) && is_array($fneResult['fne_item_ids'])) {
+                            foreach ($fneResult['fne_item_ids'] as $detailId => $itemId) {
+                                \App\Modules\Admin\Modeles\VenteDetail::where('id', $detailId)->update(['fne_invoice_item_id' => $itemId]);
+                            }
+                        }
+
+                        $successCount++;
+                    } else {
+                        $errors[] = "Erreur sur la facture {$vente->numero_facture} : " . ($fneResult['message'] ?? 'Erreur inconnue');
+                        break;
+                    }
+                } else {
+                    $achat = Achat::whereHas('pointDeVente', fn($q) => $q->where('entreprise_id', $entreprise->id))
+                        ->find($id);
+
+                    if (!$achat) {
+                        $errors[] = "Achat #{$id} introuvable.";
+                        break;
+                    }
+
+                    if ($achat->normalise) {
+                        $successCount++;
+                        continue;
+                    }
+
+                    $fneResult = \App\Modules\Admin\Services\FneService::normaliserAchatBapa($achat);
+
+                    if ($fneResult['success']) {
+                        $achat->update([
+                            'normalise'     => true,
+                            'numero_fne'    => $fneResult['numero_recu'],
+                            'signature_dgi' => $fneResult['signature'] ?? null,
+                            'qr_code_data'  => $fneResult['qr_code_data'],
+                            'fichier_fne_pdf_url' => $fneResult['pdf_url'] ?? null,
+                        ]);
+                        $successCount++;
+                    } else {
+                        $errors[] = "Erreur sur l'achat {$achat->numero_facture} : " . ($fneResult['message'] ?? 'Erreur inconnue');
+                        break;
+                    }
+                }
+            } catch (\Exception $e) {
+                $errors[] = "Exception : " . $e->getMessage();
+                break;
+            }
+        }
+
+        return response()->json([
+            'success' => empty($errors),
+            'success_count' => $successCount,
+            'total' => count($ids),
+            'errors' => $errors
+        ]);
+    }
+
+    public function scheduleBatch(Request $request): JsonResponse
+    {
+        $entreprise = Auth::user()->entreprise;
+        $flux = $request->input('flux', 'ventes');
+        $dateDebut = $request->input('date_debut');
+        $dateFin = $request->input('date_fin');
+        $batchSize = intval($request->input('batch_size', 15));
+
+        if (empty($dateDebut) || empty($dateFin)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Les dates de début et de fin sont obligatoires.'
+            ], 400);
+        }
+
+        if ($batchSize <= 0 || $batchSize > 100) {
+            $batchSize = 15;
+        }
+
+        \App\Jobs\BatchNormalisationJob::dispatch(
+            $entreprise->id,
+            $flux,
+            $dateDebut,
+            $dateFin,
+            $batchSize
+        );
+
+        return response()->json([
+            'success' => true,
+            'message' => 'La normalisation en arrière-plan a été lancée.'
+        ]);
+    }
+
+    public function batchStatus(Request $request): JsonResponse
+    {
+        $entreprise = Auth::user()->entreprise;
+        $statusPath = storage_path("app/fne_batch_{$entreprise->id}.json");
+
+        if ($request->input('cancel') === '1') {
+            if (file_exists($statusPath)) {
+                $data = json_decode(file_get_contents($statusPath), true);
+                $data['status'] = 'cancelled';
+                file_put_contents($statusPath, json_encode($data));
+                return response()->json(['success' => true, 'message' => 'Demande d\'annulation prise en compte.']);
+            }
+        }
+
+        if (!file_exists($statusPath)) {
+            return response()->json([
+                'status' => 'idle',
+                'processed_count' => 0,
+                'total_to_process' => 0
+            ]);
+        }
+
+        $data = json_decode(file_get_contents($statusPath), true);
+        return response()->json($data);
     }
 }

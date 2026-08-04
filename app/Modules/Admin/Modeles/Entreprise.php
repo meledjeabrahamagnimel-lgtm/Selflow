@@ -42,6 +42,7 @@ class Entreprise extends Model
         'commune',
         'quartier',
         'sticker_solde_alerte',
+        'fne_sticker_balance',
         'timbre_quittance',
         'bapa',
         'pied_de_page_facture',
@@ -54,6 +55,7 @@ class Entreprise extends Model
         'timbre_quittance'   => 'boolean',
         'bapa'               => 'boolean',
         'sticker_solde_alerte' => 'integer',
+        'fne_sticker_balance' => 'integer',
     ];
 
     public function pointsDeVente(): HasMany

@@ -402,9 +402,8 @@
 @endsection
 
 @section('scripts')
-<!-- CDNs pour html2pdf et qrcodejs -->
+<!-- CDN pour html2pdf -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 
 <script>
 var curModel = 1;
@@ -599,7 +598,7 @@ function getDocTitle(d) {
     if (d.type_facture === 'avoir') return "FACTURE D'AVOIR";
     if (d.etape === 'Devis') return "DEVIS ESTIMATIF";
     if (d.etape === 'Bon de commande') return "BON DE COMMANDE";
-    return d.normalise ? "FACTURE NORMALISÉE" : "FACTURE";
+    return "FACTURE";
 }
 
 function getBadgeText(d) {
@@ -722,17 +721,7 @@ function model1(d) {
         ` : `
         <div style="display:flex;justify-content:space-between;margin-bottom:20px;align-items:flex-start;">
             <div style="flex:1;">
-                ${d.normalise && d.qr_code_data ? `
-                <div style="display:flex;gap:12px;align-items:center;margin-top:10px;">
-                    <div style="display:inline-block;padding:5px;border:1px solid #e2e5ec;background:#fff;">
-                        <div id="qrcode"></div>
-                    </div>
-                    <div style="font-size:9.5px;color:var(--mu);line-height:1.4;">
-                        <strong>FNE N° :</strong> ${d.numero_fne || '—'}<br>
-                        <strong>Signature DGI :</strong><br>
-                        <span style="font-family:monospace;word-break:break-all;">${(d.signature_dgi || '').substring(0, 16)}...</span>
-                    </div>
-                </div>` : ''}
+
             </div>
             <div style="width:240px">
                 <div style="display:flex;justify-content:space-between;padding:6px 0;font-size:12px;border-bottom:0.5px solid var(--border)"><span style="color:var(--mu)">Sous-total Brut HT</span><span>${fmtFcfa(c.tot_ht)}</span></div>
@@ -781,17 +770,7 @@ function model2(d) {
                 ${COMPANY.centre_impots ? '<br>' + COMPANY.centre_impots : ''}
                 ${COMPANY.rccm ? '<br>RCCM : ' + COMPANY.rccm : ''}
             </div>
-            ${!isDeliveryMode && d.normalise && d.qr_code_data ? `
-            <div style="margin-top:16px;padding-top:12px;border-top:1px solid rgba(255,255,255,.2);text-align:center;">
-                <div style="display:inline-block;padding:5px;background:#fff;border-radius:4px;margin-bottom:8px;">
-                    <div id="qrcode"></div>
-                </div>
-                <div style="font-size:9px;color:rgba(255,255,255,.75);line-height:1.3;text-align:left;">
-                    <strong>FNE N° :</strong><br>${d.numero_fne || '—'}<br>
-                    <strong>Signature DGI :</strong><br>
-                    <span style="font-family:monospace;word-break:break-all;">${(d.signature_dgi || '').substring(0, 12)}...</span>
-                </div>
-            </div>` : ''}
+
             <div style="margin-top:auto;padding-top:16px;border-top:1px solid rgba(255,255,255,.15)">
                 <div style="font-size:9.5px;color:rgba(255,255,255,.5);margin-bottom:3px;text-transform:uppercase;letter-spacing:.5px">Vendeur</div>
                 <div style="font-size:11px;color:rgba(255,255,255,.85);font-weight:600;">${COMPANY.vendeur || '—'}</div>
@@ -988,17 +967,7 @@ function model3(d) {
                 ${COMPANY.adresse ? COMPANY.adresse + '<br>' : ''}
                 ${COMPANY.tel ? 'Tél : ' + COMPANY.tel : ''}${COMPANY.email ? ' · ' + COMPANY.email : ''}<br>
                 ${COMPANY.ref_bancaire ? '<strong>Réf. bancaires : </strong>' + COMPANY.ref_bancaire : ''}
-                ${d.normalise && d.qr_code_data ? `
-                <div style="display:flex;gap:12px;align-items:center;margin-top:10px;">
-                    <div style="display:inline-block;padding:5px;border:1px solid #e2e5ec;background:#fff;">
-                        <div id="qrcode"></div>
-                    </div>
-                    <div style="font-size:9.5px;color:var(--mu);line-height:1.4;">
-                        <strong>FNE N° :</strong> ${d.numero_fne || '—'}<br>
-                        <strong>Signature DGI :</strong><br>
-                        <span style="font-family:monospace;word-break:break-all;">${(d.signature_dgi || '').substring(0, 16)}...</span>
-                    </div>
-                </div>` : ''}
+
             </div>
             <div style="width:235px">
                 <div style="display:flex;justify-content:space-between;padding:4px 0;font-size:12px;border-bottom:0.5px solid var(--border)"><span style="color:var(--mu)">Sous-total Brut HT</span><span>${fmtFcfa(c.tot_ht)}</span></div>
@@ -1145,19 +1114,7 @@ function modelStandard(d) {
                 <div style="font-size:12px; font-weight:700; color:#000;">N° ${isDeliveryMode ? (d.ref_bl || 'BL-EN-COURS') : d.num}</div>
                 ${isDeliveryMode ? '' : `<div style="font-size:11px; color:#333; margin-top:2px;">Statut : <span style="font-weight:700; text-transform:uppercase;">${d.statut}</span></div>`}
                 
-                ${!isDeliveryMode && isNorm && d.qr_code_data ? `
-                <div style="margin-top:15px; display:flex; gap: 10px; align-items: center; justify-content:flex-end;">
-                    <div style="padding:6px; border:1px solid #000; background:#fff; text-align:center; display:flex; align-items:center; justify-content:center; width:80px; height:80px;">
-                        <div id="qrcode"></div>
-                    </div>
-                    <div style="width:80px; height:80px; display:flex; align-items:center; justify-content:center;">
-                        <img src="/dgi-stamp.png" style="max-height:100%; max-width:100%; object-fit:contain;">
-                    </div>
-                </div>
-                <div style="font-size:9px; color:#000; text-align:right; margin-top:8px; font-family:monospace; line-height:1.4;">
-                    FNE N° : <strong>${d.numero_fne || '—'}</strong><br>
-                    Signature DGI : <strong>${(d.signature_dgi || '').substring(0, 16)}...</strong>
-                </div>` : ''}
+
             </div>
         </div>
         
@@ -1276,21 +1233,7 @@ function render() {
     
     document.getElementById('invoice-wrap').innerHTML = html;
 
-    // Générer le QR Code si normalisé et pas en BL
-    if (!isDeliveryMode && d.normalise && d.qr_code_data) {
-        var qrEl = document.getElementById('qrcode');
-        if (qrEl) {
-            qrEl.innerHTML = '';
-            new QRCode(qrEl, {
-                text: d.qr_code_data,
-                width: 76,
-                height: 76,
-                colorDark: "#000000",
-                colorLight: "#ffffff",
-                correctLevel: QRCode.CorrectLevel.H
-            });
-        }
-    }
+
 }
 
 function setModel(n, el) {

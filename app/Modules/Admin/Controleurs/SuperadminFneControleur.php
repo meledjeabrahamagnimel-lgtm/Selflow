@@ -102,11 +102,76 @@ class SuperadminFneControleur extends Controller
         $cred->cle_reelle_ajoutee_at = now();
         $cred->cle_reelle_ajoutee_par = Auth::id();
         $cred->statut = 'validee';
-        $cred->save();
 
-        Log::warning("[FNE] Clé RÉELLE (production) ajoutée pour l'entreprise #{$entreprise->id} par l'utilisateur #" . Auth::id());
+        // PURGE DES DONNÉES DE TEST DE L'ENTREPRISE (passage en production)
+        $pdvIds = \App\Modules\Admin\Modeles\PointDeVente::where('entreprise_id', $entreprise->id)->pluck('id')->toArray();
 
-        return back()->with('success', "✅ Clé réelle FNE activée pour « {$entreprise->nom} ». Les factures seront désormais normalisées en production.");
+        \Illuminate\Support\Facades\DB::transaction(function() use ($pdvIds, $entreprise, $cred) {
+            // Réinitialiser le solde stickers pour la production
+            $entreprise->update(['fne_sticker_balance' => 0]);
+
+            if (!empty($pdvIds)) {
+                // 1. Découpler les relations parentes pour éviter les restrictions de clés étrangères
+                \Illuminate\Support\Facades\DB::table('ventes')->whereIn('point_de_vente_id', $pdvIds)->update(['parent_id' => null, 'bon_livraison_id' => null]);
+                \Illuminate\Support\Facades\DB::table('achats')->whereIn('point_de_vente_id', $pdvIds)->update(['parent_id' => null, 'b2b_negotiation_id' => null]);
+                \Illuminate\Support\Facades\DB::table('bons_livraison')->whereIn('point_de_vente_id', $pdvIds)->update(['facture_vente_id' => null]);
+
+                // 2. Supprimer les lignes et bons de livraison
+                \Illuminate\Support\Facades\DB::table('bon_livraison_details')->whereIn('bon_livraison_id', function($q) use ($pdvIds) {
+                    $q->select('id')->from('bons_livraison')->whereIn('point_de_vente_id', $pdvIds);
+                })->delete();
+                \Illuminate\Support\Facades\DB::table('bons_livraison')->whereIn('point_de_vente_id', $pdvIds)->delete();
+
+                // 3. Supprimer les lignes de vente et d'achat
+                \Illuminate\Support\Facades\DB::table('vente_details')->whereIn('vente_id', function($q) use ($pdvIds) {
+                    $q->select('id')->from('ventes')->whereIn('point_de_vente_id', $pdvIds);
+                })->delete();
+                \Illuminate\Support\Facades\DB::table('achat_details')->whereIn('achat_id', function($q) use ($pdvIds) {
+                    $q->select('id')->from('achats')->whereIn('point_de_vente_id', $pdvIds);
+                })->delete();
+
+                // 4. Supprimer les ventes, achats et transactions de stickers fictives
+                \Illuminate\Support\Facades\DB::table('ventes')->whereIn('point_de_vente_id', $pdvIds)->delete();
+                \Illuminate\Support\Facades\DB::table('achats')->whereIn('point_de_vente_id', $pdvIds)->delete();
+                \Illuminate\Support\Facades\DB::table('sticker_transactions')->where('entreprise_id', $entreprise->id)->delete();
+
+                // 5. Supprimer les mouvements de stock, ordres de production, transferts, fiches techniques, stocks et produits
+                \Illuminate\Support\Facades\DB::table('mouvements_stock')->whereIn('point_de_vente_id', $pdvIds)->delete();
+                \Illuminate\Support\Facades\DB::table('transferts_stock')
+                    ->whereIn('point_de_vente_source_id', $pdvIds)
+                    ->orWhereIn('point_de_vente_destination_id', $pdvIds)
+                    ->delete();
+                \Illuminate\Support\Facades\DB::table('ordres_production')->whereIn('point_de_vente_id', $pdvIds)->delete();
+                
+                // Supprimer les détails puis les fiches techniques de l'entreprise
+                \Illuminate\Support\Facades\DB::table('fiche_technique_details')->whereIn('fiche_technique_id', function($q) use ($entreprise) {
+                    $q->select('id')->from('fiches_techniques')->where('entreprise_id', $entreprise->id);
+                })->delete();
+                \Illuminate\Support\Facades\DB::table('fiches_techniques')->where('entreprise_id', $entreprise->id)->delete();
+                
+                // Supprimer le stock physique et enfin les produits de test de l'entreprise
+                \Illuminate\Support\Facades\DB::table('stocks')->whereIn('point_de_vente_id', $pdvIds)->delete();
+                \Illuminate\Support\Facades\DB::table('produits')->where('entreprise_id', $entreprise->id)->delete();
+
+                // 6. Supprimer le journal de trésorerie (caisse/banque)
+                \Illuminate\Support\Facades\DB::table('tresorerie_journal')->whereIn('point_de_vente_id', $pdvIds)->delete();
+
+                // 7. Supprimer les écritures comptables associées
+                \Illuminate\Support\Facades\DB::table('ecritures_comptables')->whereIn('point_de_vente_id', $pdvIds)->delete();
+
+                // 8. Supprimer les négociations B2B (RFQ/Commandes)
+                \Illuminate\Support\Facades\DB::table('b2b_negotiations')
+                    ->where('entreprise_client_id', $entreprise->id)
+                    ->orWhere('entreprise_fournisseur_id', $entreprise->id)
+                    ->delete();
+            }
+
+            $cred->save();
+        });
+
+        Log::warning("[FNE] Clé RÉELLE (production) activée et base de données purgée pour l'entreprise #{$entreprise->id} par l'utilisateur #" . Auth::id());
+
+        return back()->with('success', "✅ Clé réelle FNE activée pour « {$entreprise->nom} ». La base de données de test a été purgée avec succès, l'entreprise est prête pour la production.");
     }
 
     /**

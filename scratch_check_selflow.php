@@ -1,10 +1,15 @@
 <?php
 require 'vendor/autoload.php';
-$app = require 'bootstrap/app.php';
+$app = require_once 'bootstrap/app.php';
 $app->make('Illuminate\Contracts\Console\Kernel')->bootstrap();
 
-echo "SELFLOW CLIENTS:\n";
-print_r(DB::table('clients')->get()->toArray());
+$updated = App\Modules\Admin\Modeles\Vente::where('numero_facture', 'like', 'AVO-%')
+    ->where('type_facture', '!=', 'avoir')
+    ->get();
 
-echo "\nSELFLOW FOURNISSEURS:\n";
-print_r(DB::table('fournisseurs')->get()->toArray());
+foreach ($updated as $v) {
+    $v->update(['type_facture' => 'avoir']);
+    echo "Restored type_facture of Vente #{$v->id} ({$v->numero_facture}) to 'avoir'\n";
+}
+
+echo "Avoir type_facture restoration complete.\n";

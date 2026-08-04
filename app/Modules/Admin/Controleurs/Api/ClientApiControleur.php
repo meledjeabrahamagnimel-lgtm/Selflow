@@ -26,18 +26,21 @@ class ClientApiControleur
     public function creer(Request $request): JsonResponse
     {
         $entreprise = Auth::user()->entreprise;
+        // Normaliser le NCC : suppression des espaces et mise en majuscule
+        $request->merge(['ncc' => $request->has('ncc') ? strtoupper(preg_replace('/\s+/', '', $request->input('ncc'))) : null]);
 
         $request->validate([
             'nom'               => ['required', 'string', 'max:150'],
+            'type_facturation'  => ['nullable', 'in:B2B,B2C,B2G,B2F'],
             'telephone'         => ['nullable', 'string', 'max:30'],
             'email'             => ['nullable', 'email', 'max:150'],
             'adresse'           => ['nullable', 'string', 'max:255'],
-            'ncc'               => ['nullable', 'string', 'max:50'],
+            'ncc'               => ['required_if:type_facturation,B2B', 'nullable', 'string', 'size:8', 'regex:/^[A-Z0-9]{7}[A-Z]$/'],
             'regime_imposition' => ['nullable', 'string', 'max:100'],
         ]);
 
         $client = Client::create(array_merge(
-            $request->only(['nom', 'telephone', 'email', 'adresse', 'ncc', 'regime_imposition']),
+            $request->only(['nom', 'type_facturation', 'telephone', 'email', 'adresse', 'ncc', 'regime_imposition']),
             ['entreprise_id' => $entreprise->id]
         ));
 

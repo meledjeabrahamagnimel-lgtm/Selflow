@@ -150,6 +150,14 @@
             @endforeach
         </select>
     </div>
+    <div class="form-group" style="margin-bottom:0;">
+        <label class="form-label" style="font-size:11px; text-transform:uppercase; font-weight:700; color:var(--text-3); margin-bottom:4px; display:block;">Statut DGI</label>
+        <select name="dgi_filtre" class="form-control" onchange="document.getElementById('formFiltreVentes').submit();">
+            <option value="">— Tous —</option>
+            <option value="oui" {{ request('dgi_filtre') === 'oui' ? 'selected' : '' }}>Normalisée (DGI)</option>
+            <option value="non" {{ request('dgi_filtre') === 'non' ? 'selected' : '' }}>Non normalisée</option>
+        </select>
+    </div>
     @endif
     <div class="form-group" style="margin-bottom:0;">
         <label class="form-label" style="font-size:11px; text-transform:uppercase; font-weight:700; color:var(--text-3); margin-bottom:4px; display:block;">Du</label>
@@ -159,7 +167,7 @@
         <label class="form-label" style="font-size:11px; text-transform:uppercase; font-weight:700; color:var(--text-3); margin-bottom:4px; display:block;">Au</label>
         <input type="date" name="date_fin" value="{{ request('date_fin') }}" class="form-control" onchange="document.getElementById('formFiltreVentes').submit();">
     </div>
-    @if(request('recherche') || request('statut_filtre') || request('date_debut') || request('date_fin'))
+    @if(request('recherche') || request('statut_filtre') || request('dgi_filtre') || request('date_debut') || request('date_fin'))
         <a href="{{ route($routeBase, array_filter(['etape' => $etapeActive, 'type' => $type, 'archives' => $voirArchives ? '1' : null])) }}" class="btn btn-outline" style="white-space:nowrap;"><i class="fas fa-times"></i> Effacer</a>
     @endif
 </form>
@@ -171,7 +179,49 @@
 </script>
 @endif
 
+@php
+    $activerSelectionGroup = (!$estDevisOuBC && !$estBL);
+@endphp
+
+@if($activerSelectionGroup)
+    <div id="background-job-tracker" style="display: none; background: #fff; border: 1px solid var(--border); border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); padding: 16px; margin-bottom: 16px; position: relative;">
+        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px;">
+            <h4 style="margin: 0; font-size: 14px; font-weight: 700; color: var(--text);">
+                <i class="fas fa-rotate fa-spin" style="color: var(--primary); margin-right: 6px;"></i>
+                Normalisation en cours en arrière-plan...
+            </h4>
+            <button type="button" onclick="annulerJobArrierePlan()" class="btn btn-sm" style="background: #fef2f2; color: #dc2626; border: 0.5px solid #fca5a5; font-size: 11px; padding: 2px 8px;">
+                Annuler
+            </button>
+        </div>
+        <div style="background: #e2e8f0; height: 8px; border-radius: 4px; overflow: hidden; margin-bottom: 6px;">
+            <div id="job-progress-bar" style="background: var(--primary); width: 0%; height: 100%; transition: width 0.3s;"></div>
+        </div>
+        <div style="display: flex; justify-content: space-between; font-size: 11px; color: var(--text-3);">
+            <span id="job-progress-text">0 / 0 factures</span>
+            <span id="job-current-invoice"></span>
+        </div>
+    </div>
+@endif
+
 <div class="card">
+    @if($activerSelectionGroup)
+        <div id="batch-actions-panel" style="background: #f8fafc; border-bottom: 1px solid var(--border); padding: 12px 16px; display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
+            <span style="font-weight: 700; color: var(--text-2); font-size: 13px;">
+                <i class="fas fa-list-check" style="color: var(--primary); margin-right: 6px;"></i> 
+                Actions par lot : <span id="batch-selected-count" style="color: var(--primary);">0</span> sélectionné(s) (max 15)
+            </span>
+            <button type="button" class="btn btn-outline btn-sm" onclick="selectFirst15NonNormalized()" style="padding: 6px 12px; font-size: 12px; font-weight: 700;">
+                Sélectionner les 15 premiers
+            </button>
+            <button type="button" id="btn-batch-normalise" class="btn btn-success btn-sm" onclick="lancerBatchNormalisation()" style="padding: 6px 12px; font-size: 12px; font-weight: 700; color: #fff;" disabled>
+                <i class="fas fa-share-nodes"></i> Normaliser la sélection
+            </button>
+            <button type="button" class="btn btn-sm" onclick="ouvrirModalPlanification()" style="background: var(--bg3); color: var(--primary); border: 0.5px solid var(--border); padding: 6px 12px; font-size: 12px; font-weight: 700; margin-left: auto;">
+                <i class="fas fa-clock"></i> Planifier une normalisation automatique
+            </button>
+        </div>
+    @endif
     <div class="table-wrap">
         @if($estBL)
         {{-- =========== TABLE BONS DE LIVRAISON =========== --}}
@@ -277,6 +327,11 @@
         <table>
             <thead>
                 <tr>
+                    @if($activerSelectionGroup)
+                    <th style="width: 40px; text-align: center; white-space: nowrap;">
+                        <input type="checkbox" id="check-all-sales" onclick="toggleAllSales(this)">
+                    </th>
+                    @endif
                     <th style="white-space: nowrap;">
                         @if($type === 'avoir') N° Avoir
                         @elseif($etapeActive === 'Devis') N° Devis
@@ -297,6 +352,7 @@
                     @if(!$estDevisOuBC)
                     <th style="white-space: nowrap; text-align: center;">Normalisée (DGI)</th>
                     @endif
+                    <th style="white-space: nowrap;">Fichier DGI</th>
                     <th style="white-space: nowrap;">Actions</th>
                 </tr>
             </thead>
@@ -311,6 +367,15 @@
                     $routeSupprimer = $isCaissier ? route('caissier.ventes.supprimer', $vente) : route('admin.ventes.supprimer', $vente);
                 @endphp
                 <tr>
+                    @if($activerSelectionGroup)
+                    <td style="text-align: center; white-space: nowrap;">
+                        @if(!$vente->normalise)
+                            <input type="checkbox" class="sale-checkbox" value="{{ $vente->id }}" onchange="onSaleCheckboxChange(this)">
+                        @else
+                            <i class="fas fa-check-circle" style="color: var(--success);" title="Facture déjà normalisée"></i>
+                        @endif
+                    </td>
+                    @endif
                     <td style="font-weight:700; color:var(--primary); white-space: nowrap;">{{ $vente->numero_facture }}</td>
                     <td style="white-space: nowrap;">{{ \Carbon\Carbon::parse($vente->date_vente)->format('d/m/Y') }}</td>
                     <td style="white-space: nowrap;">{{ $vente->client?->nom ?? '— Passage —' }}</td>
@@ -357,6 +422,29 @@
                         @endif
                     </td>
                     @endif
+
+                    <td>
+                        @php
+                            $dgiVoirUrl = $vente->fichier_fne_pdf_url;
+                        @endphp
+                        <div style="display:flex; gap:6px; align-items:center;">
+                            @if($dgiVoirUrl)
+                                <a href="{{ $dgiVoirUrl }}" target="_blank" class="btn btn-outline btn-sm" style="padding:4px 8px; font-size:11px;" title="Voir le document DGI">
+                                    <i class="fas fa-eye"></i>
+                                </a>
+                                <a href="{{ $dgiVoirUrl }}" target="_blank" class="btn btn-outline btn-sm" style="padding:4px 8px; font-size:11px;" title="Télécharger le fichier DGI">
+                                    <i class="fas fa-download"></i>
+                                </a>
+                            @else
+                                <button type="button" class="btn btn-outline btn-sm" style="padding:4px 8px; font-size:11px; opacity:.5; cursor:not-allowed;" title="Aucun document DGI retourné" disabled>
+                                    <i class="fas fa-eye"></i>
+                                </button>
+                                <button type="button" class="btn btn-outline btn-sm" style="padding:4px 8px; font-size:11px; opacity:.5; cursor:not-allowed;" title="Aucun document DGI retourné" disabled>
+                                    <i class="fas fa-download"></i>
+                                </button>
+                            @endif
+                        </div>
+                    </td>
 
                     {{-- Colonne Actions --}}
                     <td style="white-space: nowrap;">
@@ -422,19 +510,32 @@
 
                             @else
                                 {{-- Mode Facture : actions habituelles --}}
-                                <a href="{{ $isCaissier ? route('caissier.ventes.ticket', $vente) : route('admin.ventes.ticket', $vente) }}"
-                                   class="btn btn-outline btn-sm" style="padding:4px 8px; font-size:11px; border-color:var(--success); color:var(--success);" title="Imprimer le Ticket RNE">
-                                    <i class="fas fa-print"></i> Ticket
-                                </a>
-                                <button type="button" onclick="telechargerDirectement('{{ $routeImprimer }}?download=1')"
-                                        class="btn btn-outline btn-sm" style="padding:4px 8px; font-size:11px;" title="Télécharger le PDF">
-                                    <i class="fas fa-download"></i>
-                                </button>
+                                @if($type === 'avoir')
+                                    <button type="button" class="btn btn-outline btn-sm" style="padding:4px 8px; font-size:11px; opacity:.5; cursor:not-allowed;" title="Ticket indisponible pour les avoirs" disabled>
+                                        <i class="fas fa-print"></i> Ticket
+                                    </button>
+                                    <button type="button" onclick="telechargerDirectement('{{ $routeImprimer }}?download=1')"
+                                            class="btn btn-outline btn-sm" style="padding:4px 8px; font-size:11px;" title="Télécharger le PDF">
+                                        <i class="fas fa-download"></i>
+                                    </button>
+                                    <button type="button" class="btn btn-outline btn-sm" style="padding:4px 8px; font-size:11px; opacity:.5; cursor:not-allowed;" title="La facture d'avoir ne peut pas être modifiée" disabled>
+                                        <i class="fas fa-edit"></i>
+                                    </button>
+                                @else
+                                    <a href="{{ $isCaissier ? route('caissier.ventes.ticket', $vente) : route('admin.ventes.ticket', $vente) }}"
+                                       class="btn btn-outline btn-sm" style="padding:4px 8px; font-size:11px; border-color:var(--success); color:var(--success);" title="Imprimer le Ticket RNE">
+                                        <i class="fas fa-print"></i> Ticket
+                                    </a>
+                                    <button type="button" onclick="telechargerDirectement('{{ $routeImprimer }}?download=1')"
+                                            class="btn btn-outline btn-sm" style="padding:4px 8px; font-size:11px;" title="Télécharger le PDF">
+                                        <i class="fas fa-download"></i>
+                                    </button>
 
-                                @if(!$vente->normalise)
-                                <a href="{{ $routeModifier }}" class="btn btn-outline btn-sm" style="padding:4px 8px; font-size:11px;" title="Modifier">
-                                    <i class="fas fa-edit"></i>
-                                </a>
+                                    @if(!$vente->normalise)
+                                    <a href="{{ $routeModifier }}" class="btn btn-outline btn-sm" style="padding:4px 8px; font-size:11px;" title="Modifier">
+                                        <i class="fas fa-edit"></i>
+                                    </a>
+                                    @endif
                                 @endif
 
                                 {{-- Normalisation DGI --}}
@@ -1180,5 +1281,274 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 });
+
+@if($activerSelectionGroup)
+let selectedSalesIds = [];
+
+function toggleAllSales(master) {
+    const checkboxes = document.querySelectorAll('.sale-checkbox');
+    let count = 0;
+    checkboxes.forEach(cb => {
+        if (master.checked) {
+            if (count < 15) {
+                cb.checked = true;
+                count++;
+            } else {
+                cb.checked = false;
+            }
+        } else {
+            cb.checked = false;
+        }
+    });
+    
+    if (master.checked && checkboxes.length > 15) {
+        alert("La normalisation par lot est limitée à 15 factures maximum. Seules les 15 premières ont été sélectionnées.");
+    }
+    
+    updateSelectedSalesCount();
+}
+
+function onSaleCheckboxChange(cb) {
+    const checked = document.querySelectorAll('.sale-checkbox:checked');
+    if (checked.length > 15) {
+        alert("Vous ne pouvez pas sélectionner plus de 15 factures pour la normalisation par lot.");
+        cb.checked = false;
+    }
+    updateSelectedSalesCount();
+}
+
+function updateSelectedSalesCount() {
+    const checked = document.querySelectorAll('.sale-checkbox:checked');
+    selectedSalesIds = Array.from(checked).map(cb => cb.value);
+    
+    document.getElementById('batch-selected-count').textContent = selectedSalesIds.length;
+    const btn = document.getElementById('btn-batch-normalise');
+    btn.disabled = selectedSalesIds.length === 0;
+}
+
+function selectFirst15NonNormalized() {
+    document.querySelectorAll('.sale-checkbox').forEach(cb => cb.checked = false);
+    
+    const checkboxes = document.querySelectorAll('.sale-checkbox');
+    let count = 0;
+    for (let i = 0; i < checkboxes.length; i++) {
+        if (count < 15) {
+            checkboxes[i].checked = true;
+            count++;
+        } else {
+            break;
+        }
+    }
+    
+    updateSelectedSalesCount();
+}
+
+function lancerBatchNormalisation() {
+    if (selectedSalesIds.length === 0) return;
+    
+    const btn = document.getElementById('btn-batch-normalise');
+    const oldHtml = btn.innerHTML;
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Traitement...';
+    
+    fetch("{{ route('admin.fne.batch_normaliser') }}", {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json",
+            "X-CSRF-TOKEN": "{{ csrf_token() }}"
+        },
+        body: JSON.stringify({
+            ids: selectedSalesIds,
+            flux: 'ventes'
+        })
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.success) {
+            alert(`Succès ! ${data.success_count} facture(s) normalisée(s) avec succès.`);
+            window.location.reload();
+        } else {
+            const errorMsg = data.errors && data.errors.length > 0 ? data.errors.join('\n') : (data.message ?? 'Une erreur est survenue.');
+            alert(`Traitement arrêté. ${data.success_count} facture(s) traitée(s) avant l'erreur suivante :\n\n${errorMsg}`);
+            window.location.reload();
+        }
+    })
+    .catch(err => {
+        alert("Erreur de connexion lors du traitement par lot : " + err.message);
+        btn.disabled = false;
+        btn.innerHTML = oldHtml;
+    });
+}
+
+function ouvrirModalPlanification() {
+    document.getElementById('modal-planifier-fne').style.display = 'flex';
+}
+
+function fermerModalPlanification() {
+    document.getElementById('modal-planifier-fne').style.display = 'none';
+    document.getElementById('modal-error-msg').style.display = 'none';
+}
+
+function soumettrePlanification(e) {
+    e.preventDefault();
+    const form = e.target;
+    const formData = new FormData(form);
+    
+    const errorDiv = document.getElementById('modal-error-msg');
+    errorDiv.style.display = 'none';
+    
+    const submitBtn = form.querySelector('button[type="submit"]');
+    submitBtn.disabled = true;
+    submitBtn.textContent = 'Lancement...';
+    
+    fetch("{{ route('admin.fne.schedule_batch') }}", {
+        method: "POST",
+        headers: {
+            "X-CSRF-TOKEN": "{{ csrf_token() }}"
+        },
+        body: formData
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.success) {
+            fermerModalPlanification();
+            startPollingJobStatus();
+        } else {
+            errorDiv.textContent = data.message ?? 'Erreur lors du lancement.';
+            errorDiv.style.display = 'block';
+            submitBtn.disabled = false;
+            submitBtn.textContent = 'Lancer le traitement';
+        }
+    })
+    .catch(err => {
+        errorDiv.textContent = "Erreur de connexion : " + err.message;
+        errorDiv.style.display = 'block';
+        submitBtn.disabled = false;
+        submitBtn.textContent = 'Lancer le traitement';
+    });
+}
+
+let jobPollInterval = null;
+
+function startPollingJobStatus() {
+    const tracker = document.getElementById('background-job-tracker');
+    tracker.style.display = 'block';
+    
+    if (jobPollInterval) clearInterval(jobPollInterval);
+    jobPollInterval = setInterval(pollJobStatus, 2000);
+    pollJobStatus();
+}
+
+function pollJobStatus() {
+    fetch("{{ route('admin.fne.batch_status') }}")
+    .then(r => r.json())
+    .then(data => {
+        const tracker = document.getElementById('background-job-tracker');
+        
+        if (data.status === 'idle') {
+            tracker.style.display = 'none';
+            clearInterval(jobPollInterval);
+            return;
+        }
+        
+        tracker.style.display = 'block';
+        
+        const total = data.total_to_process ?? 0;
+        const processed = data.processed_count ?? 0;
+        const percent = total > 0 ? Math.round((processed / total) * 100) : 0;
+        
+        document.getElementById('job-progress-bar').style.width = percent + '%';
+        document.getElementById('job-progress-text').textContent = `${processed} / ${total} facture(s) normalisée(s) (${percent}%)`;
+        document.getElementById('job-current-invoice').textContent = data.current_invoice ? `En cours : ${data.current_invoice}` : '';
+        
+        if (data.status === 'completed') {
+            clearInterval(jobPollInterval);
+            setTimeout(() => {
+                alert("Normalisation en arrière-plan terminée avec succès !");
+                window.location.reload();
+            }, 1000);
+        } else if (data.status === 'failed') {
+            clearInterval(jobPollInterval);
+            setTimeout(() => {
+                alert(`Normalisation en arrière-plan arrêtée en raison de l'erreur suivante :\n\n${data.error}`);
+                window.location.reload();
+            }, 1000);
+        } else if (data.status === 'cancelled') {
+            clearInterval(jobPollInterval);
+            setTimeout(() => {
+                alert("Normalisation en arrière-plan annulée par l'utilisateur.");
+                window.location.reload();
+            }, 1000);
+        }
+    })
+    .catch(err => {
+        console.error("Erreur lors de la récupération du statut :", err);
+    });
+}
+
+function annulerJobArrierePlan() {
+    if (!confirm("Annuler le traitement en cours ? La normalisation s'arrêtera après la facture en cours de traitement.")) return;
+    
+    fetch("{{ route('admin.fne.batch_status') }}?cancel=1")
+    .then(r => r.json())
+    .then(data => {
+        if (data.success) {
+            pollJobStatus();
+        }
+    });
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+    fetch("{{ route('admin.fne.batch_status') }}")
+    .then(r => r.json())
+    .then(data => {
+        if (data && data.status === 'running') {
+            startPollingJobStatus();
+        }
+    });
+});
+@endif
 </script>
+
+@if($activerSelectionGroup)
+<div id="modal-planifier-fne" class="modal-backdrop" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 1000; align-items: center; justify-content: center; backdrop-filter: blur(4px);">
+    <div style="background: #fff; border-radius: 12px; width: 100%; max-width: 450px; box-shadow: 0 10px 25px rgba(0,0,0,0.15); overflow: hidden; animation: modalFadeIn 0.3s;">
+        <div style="padding: 16px 20px; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; background: var(--bg2);">
+            <h3 style="margin: 0; font-size: 16px; font-weight: 700; color: var(--text);"><i class="fas fa-clock" style="margin-right: 6px; color: var(--primary);"></i> Planifier la normalisation</h3>
+            <button type="button" onclick="fermerModalPlanification()" style="background: none; border: none; font-size: 20px; color: var(--text-3); cursor: pointer;"><i class="fas fa-times"></i></button>
+        </div>
+        <form id="form-planifier-fne" onsubmit="soumettrePlanification(event)">
+            @csrf
+            <input type="hidden" name="flux" value="ventes">
+            <div style="padding: 20px;">
+                <div class="form-group" style="margin-bottom: 16px;">
+                    <label class="form-label" style="font-weight: 700; margin-bottom: 6px;">Date de début</label>
+                    <input type="date" name="date_debut" class="form-control" required value="{{ date('Y-m-01') }}">
+                </div>
+                <div class="form-group" style="margin-bottom: 16px;">
+                    <label class="form-label" style="font-weight: 700; margin-bottom: 6px;">Date de fin</label>
+                    <input type="date" name="date_fin" class="form-control" required value="{{ date('Y-m-d') }}">
+                </div>
+                <div class="form-group" style="margin-bottom: 16px;">
+                    <label class="form-label" style="font-weight: 700; margin-bottom: 6px;">Nombre maximum à normaliser</label>
+                    <input type="number" name="batch_size" class="form-control" required min="1" max="100" value="15">
+                    <span style="font-size: 11px; color: var(--text-3);">Taille maximale du lot à traiter en arrière-plan.</span>
+                </div>
+                <div id="modal-error-msg" style="display: none; background: #fef2f2; color: #dc2626; padding: 10px; border-radius: 6px; font-size: 12px; margin-top: 10px;"></div>
+            </div>
+            <div style="padding: 14px 20px; border-top: 1px solid var(--border); display: flex; gap: 10px; justify-content: flex-end; background: var(--bg2);">
+                <button type="button" class="btn btn-outline" onclick="fermerModalPlanification()">Annuler</button>
+                <button type="submit" class="btn btn-primary">Lancer le traitement</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<style>
+@keyframes modalFadeIn {
+    from { opacity: 0; transform: translateY(-20px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+</style>
+@endif
 @endsection

@@ -35,6 +35,7 @@ class PointDeVenteControleur
             'commune'   => ['nullable', 'string', 'max:100'],
             'responsable'=> ['nullable', 'string', 'max:150'],
             'telephone' => ['nullable', 'string', 'max:30'],
+            'code_fne'  => ['nullable', 'string', 'max:100'],
         ]);
 
         if ($entreprise->pointsDeVente()->count() >= $entreprise->quota_points_de_vente) {
@@ -42,7 +43,7 @@ class PointDeVenteControleur
         }
 
         $pdv = PointDeVente::create(array_merge(
-            $request->only(['nom', 'ville', 'commune', 'responsable', 'telephone']),
+            $request->only(['nom', 'ville', 'commune', 'responsable', 'telephone', 'code_fne']),
             ['entreprise_id' => $entreprise->id, 'statut' => 'Ouvert']
         ));
 
@@ -63,6 +64,26 @@ class PointDeVenteControleur
         CacheService::invaliderPointsDeVente($entreprise->id);
 
         return back()->with('succes', 'Point de vente créé avec succès.');
+    }
+
+    public function modifier(Request $request, PointDeVente $pdv): RedirectResponse
+    {
+        $entreprise = Auth::user()->entreprise;
+        abort_unless($pdv->entreprise_id === $entreprise->id, 403);
+
+        $validated = $request->validate([
+            'nom'         => ['required', 'string', 'max:100'],
+            'ville'       => ['required', 'string', 'max:100'],
+            'commune'     => ['nullable', 'string', 'max:100'],
+            'responsable' => ['nullable', 'string', 'max:150'],
+            'telephone'   => ['nullable', 'string', 'max:30'],
+            'code_fne'    => ['nullable', 'string', 'max:100'],
+        ]);
+
+        $pdv->update($validated);
+        CacheService::invaliderPointsDeVente($entreprise->id);
+
+        return back()->with('succes', "Point de vente « {$pdv->nom} » mis à jour avec succès.");
     }
 
     public function activerSession(Request $request, PointDeVente $pdv): RedirectResponse

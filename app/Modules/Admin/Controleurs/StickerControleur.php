@@ -22,14 +22,13 @@ class StickerControleur
             ->orderBy('created_at', 'desc')
             ->paginate(20);
 
-        // KPIs calculés localement (base Selflow) — sera remplacé par API DGI quand disponible
+        // KPIs calculés depuis l'API FNE
         $totalAchetes   = StickerTransaction::where('entreprise_id', $entreprise->id)
             ->where('statut', 'succes')
             ->sum('nombre_stickers');
 
-        $totalConsommes = 0; // TODO: brancher l'API DGI pour le solde réel
-
-        $soldeActuel = $totalAchetes - $totalConsommes;
+        $soldeActuel = $entreprise->fne_sticker_balance ?? 0;
+        $totalConsommes = max(0, $totalAchetes - $soldeActuel);
 
         $alerteSeuil = $entreprise->sticker_solde_alerte ?? 5;
         $alerte      = $soldeActuel <= $alerteSeuil && $totalAchetes > 0;

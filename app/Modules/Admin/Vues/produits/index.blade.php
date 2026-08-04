@@ -185,21 +185,28 @@
                         </span>
                     </td>
                     <td><span class="badge badge-purple">{{ $p->categorie ?? '—' }}</span></td>
-                    <td>{{ number_format($p->prix_achat, 0, ',', ' ') }} F</td>
+                    <td>@if(in_array($p->type, ['service', 'consommable_non_stockable'])) — @else {{ number_format($p->prix_achat, 0, ',', ' ') }} F @endif</td>
                     <td style="color:var(--success); font-weight:600;">{{ number_format($p->prix_vente, 0, ',', ' ') }} F</td>
                     <td style="color:var(--info);">
-                        @php $marge = $p->prix_achat > 0 ? round((($p->prix_vente - $p->prix_achat) / $p->prix_achat) * 100) : 0; @endphp
-                        +{{ $marge }}%
+                        @if(in_array($p->type, ['service', 'consommable_non_stockable']))
+                            —
+                        @else
+                            @php $marge = $p->prix_achat > 0 ? round((($p->prix_vente - $p->prix_achat) / $p->prix_achat) * 100) : 0; @endphp
+                            +{{ $marge }}%
+                        @endif
                     </td>
-                    <td style="font-weight:600; {{ $p->stock_actuel == 0 ? 'color:var(--danger)' : ($p->stock_actuel <= $p->stock_minimum ? 'color:var(--warning)' : 'color:var(--success)') }}">
-                        {{ $p->stock_actuel }} {{ $p->unite }}
+                    @php $sansStock = in_array($p->type, ['service', 'consommable_non_stockable']); @endphp
+                    <td style="font-weight:600; {{ $sansStock ? 'color:var(--text-3)' : ($p->stock_actuel == 0 ? 'color:var(--danger)' : ($p->stock_actuel <= $p->stock_minimum ? 'color:var(--warning)' : 'color:var(--success)')) }}">
+                        @if($sansStock) — @else {{ $p->stock_actuel }} {{ $p->unite }} @endif
                     </td>
                     <td style="font-weight:800; color:var(--primary);">
-                        {{ $p->prevision }} {{ $p->unite }}
+                        @if($sansStock) — @else {{ $p->prevision }} {{ $p->unite }} @endif
                     </td>
-                    <td style="color:var(--text-3);">{{ $p->stock_minimum }}</td>
+                    <td style="color:var(--text-3);">@if($sansStock) — @else {{ $p->stock_minimum }} @endif</td>
                     <td>
-                        @if($p->stock_actuel == 0)
+                        @if($sansStock)
+                            <span class="badge" style="background:#f1f5f9; color:#64748b;">Sans stock</span>
+                        @elseif($p->stock_actuel == 0)
                             <span class="badge badge-danger">Rupture</span>
                         @elseif($p->stock_actuel <= $p->stock_minimum)
                             <span class="badge badge-warning">Faible</span>

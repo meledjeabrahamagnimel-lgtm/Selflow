@@ -18,6 +18,7 @@ class PointDeVente extends Model
         'responsable',
         'telephone',
         'statut',
+        'code_fne',
     ];
 
     public function entreprise(): BelongsTo

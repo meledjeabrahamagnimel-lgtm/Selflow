@@ -93,13 +93,13 @@
     </div>
 </div>
 
-{{-- ── Cartes 100% DGI (non disponibles sans appel API dédié — affichées à 0) ── --}}
+{{-- ── Cartes Stickers & Timbres (récupérées en temps réel depuis la base / API) ── --}}
 <div class="section-titre"><i class="fas fa-stamp"></i> Stickers &amp; Timbres (plateforme DGI)</div>
 <div class="kpi-grid">
-    <div class="kpi-card"><div class="lbl">Solde Stickers</div><div class="val" id="k-stickers-solde">0</div><div class="sub">Non disponible — API DGI non branchée</div></div>
-    <div class="kpi-card"><div class="lbl">Stickers achetés</div><div class="val" id="k-stickers-achats">0</div><div class="sub">Non disponible — API DGI non branchée</div></div>
-    <div class="kpi-card"><div class="lbl">Stickers consommés</div><div class="val" id="k-stickers-consommes">0</div><div class="sub">Non disponible — API DGI non branchée</div></div>
-    <div class="kpi-card"><div class="lbl">Timbre de quittance</div><div class="val" id="k-timbre">0 F</div><div class="sub">Non disponible — API DGI non branchée</div></div>
+    <div class="kpi-card"><div class="lbl">Solde Stickers</div><div class="val" id="k-stickers-solde">0</div><div class="sub" id="k-stickers-solde-sub">Stickers disponibles auprès de la DGI</div></div>
+    <div class="kpi-card"><div class="lbl">Stickers achetés</div><div class="val" id="k-stickers-achats">0</div><div class="sub" id="k-stickers-achats-sub">Total acheté Mobile Money</div></div>
+    <div class="kpi-card"><div class="lbl">Stickers consommés</div><div class="val" id="k-stickers-consommes">0</div><div class="sub" id="k-stickers-consommes-sub">Total utilisé pour normalisation</div></div>
+    <div class="kpi-card"><div class="lbl">Timbre de quittance</div><div class="val" id="k-timbre">0 F</div><div class="sub" id="k-timbre-sub">Droits de timbre fiscaux collectés</div></div>
 </div>
 
 {{-- ── Ventes normalisées ── --}}
@@ -239,10 +239,21 @@ function rafraichirFneGestion() {
 }
 
 function appliquerKpis(d) {
+    // Solde de stickers (quantité en valeur principale)
     document.getElementById('k-stickers-solde').textContent = d.stickers_solde;
+    document.getElementById('k-stickers-solde-sub').textContent = `${d.stickers_solde} sticker(s) disponible(s) (Valeur: ${formatF(d.stickers_solde * 20)})`;
+
+    // Achat de stickers (quantité en valeur principale)
     document.getElementById('k-stickers-achats').textContent = d.stickers_achats;
+    document.getElementById('k-stickers-achats-sub').textContent = `${d.stickers_achats} sticker(s) acheté(s) (Valeur: ${formatF(d.stickers_achats * 20)})`;
+
+    // Stickers consommés (quantité en valeur principale)
     document.getElementById('k-stickers-consommes').textContent = d.stickers_consommes;
+    document.getElementById('k-stickers-consommes-sub').textContent = `${d.stickers_consommes} sticker(s) consommé(s) (Valeur: ${formatF(d.stickers_consommes * 20)})`;
+
+    // Timbre de quittance
     document.getElementById('k-timbre').textContent = formatF(d.timbre_quittance);
+    document.getElementById('k-timbre-sub').textContent = `${d.timbre_quantite} timbre(s) de quittance collecté(s) (${formatF(d.timbre_quittance)})`;
 
     document.getElementById('k-v-factures-n').textContent = d.ventes.factures.nombre;
     document.getElementById('k-v-factures-m').textContent = formatF(d.ventes.factures.montant);

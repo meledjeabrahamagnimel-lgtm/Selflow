@@ -155,23 +155,20 @@
                 <div style="font-size:12px;">
                     <strong>Numéro :</strong> {{ $achat->numero_facture }}<br>
                     <strong>Date :</strong> {{ $achat->date_achat->format('d/m/Y') }}
+                    
+                    {{-- Affichage FNE/BAPA DGI officiel --}}
+                    @if($achat->normalise)
+                        <div style="margin-top:15px; display:flex; gap: 10px; align-items: center; justify-content:flex-end;">
+                            <div style="width:80px; height:80px; display:flex; align-items:center; justify-content:center;">
+                                <img src="/dgi-stamp.png" style="max-height:100%; max-width:100%; object-fit:contain;" alt="DGI Stamp">
+                            </div>
+                        </div>
+                        <div style="font-size:9px; color:#000; text-align:right; margin-top:8px; font-family:monospace; line-height:1.4;">
+                            N° BAPA/FNE : <strong>{{ $achat->numero_fne }}</strong><br>
+                            Signature DGI : <strong>{{ substr($achat->signature_dgi, 0, 16) }}...</strong>
+                        </div>
+                    @endif
                 </div>
-
-                {{-- Affichage FNE/BAPA DGI officiel --}}
-                @if($achat->normalise && $achat->qr_code_data)
-                    <div style="margin-top:15px; display:flex; gap: 10px; align-items: center; justify-content:flex-end;">
-                        <div style="padding:6px; border:1px solid #000; background:#fff; text-align:center; display:flex; align-items:center; justify-content:center; width:80px; height:80px;">
-                            <div id="qrcode"></div>
-                        </div>
-                        <div style="width:80px; height:80px; display:flex; align-items:center; justify-content:center;">
-                            <img src="/dgi-stamp.png" style="max-height:100%; max-width:100%; object-fit:contain;" alt="DGI Stamp">
-                        </div>
-                    </div>
-                    <div style="font-size:9px; color:#000; text-align:right; margin-top:8px; font-family:monospace; line-height:1.4;">
-                        N° BAPA/FNE : <strong>{{ $achat->numero_fne }}</strong><br>
-                        Signature DGI : <strong>{{ substr($achat->signature_dgi, 0, 16) }}...</strong>
-                    </div>
-                @endif
             </div>
         </div>
 
@@ -266,23 +263,4 @@
 @endsection
 
 @section('scripts')
-<!-- CDN pour qrcodejs -->
-<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
-<script>
-document.addEventListener("DOMContentLoaded", function() {
-    @if($achat->normalise && $achat->qr_code_data)
-        var qrEl = document.getElementById('qrcode');
-        if (qrEl) {
-            new QRCode(qrEl, {
-                text: {!! json_encode($achat->qr_code_data) !!},
-                width: 76,
-                height: 76,
-                colorDark: "#000000",
-                colorLight: "#ffffff",
-                correctLevel: QRCode.CorrectLevel.H
-            });
-        }
-    @endif
-});
-</script>
 @endsection
