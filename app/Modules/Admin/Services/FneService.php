@@ -240,16 +240,7 @@ class FneService
                 }
             }
 
-            $balanceStickers = null;
-            if (isset($data['balance_sticker'])) {
-                $balanceStickers = intval($data['balance_sticker']);
-            } elseif (isset($data['balance_funds'])) {
-                $balanceStickers = intval(intval($data['balance_funds']) / 20);
-            }
-
-            if ($balanceStickers !== null) {
-                $entreprise->update(['fne_sticker_balance' => $balanceStickers]);
-            }
+            self::enregistrerSoldeFne($entreprise, $data);
 
             $numeroRecu = $data['reference'] ?? $data['numero_fne'] ?? null;
             $tokenData = $data['token'] ?? ($data['invoice']['token'] ?? null) ?? null;
@@ -374,16 +365,7 @@ class FneService
 
             $data = $response->json();
             Log::info("FNE BAPA API Response body: " . json_encode($data));
-            $balanceStickers = null;
-            if (isset($data['balance_sticker'])) {
-                $balanceStickers = intval($data['balance_sticker']);
-            } elseif (isset($data['balance_funds'])) {
-                $balanceStickers = intval(intval($data['balance_funds']) / 20);
-            }
-
-            if ($balanceStickers !== null) {
-                $entreprise->update(['fne_sticker_balance' => $balanceStickers]);
-            }
+            self::enregistrerSoldeFne($entreprise, $data);
 
             $numeroRecu = $data['reference'] ?? $data['numero_fne'] ?? null;
             $tokenData = $data['token'] ?? ($data['invoice']['token'] ?? null) ?? null;
@@ -418,6 +400,45 @@ class FneService
      * suivi : alerte de stock de stickers, montants retenus par la DGI, timbre
      * fiscal applique et horodatage de la certification.
      */
+    /**
+     * Enregistre le solde FNE et le mode de facturation observe.
+     *
+     * La DGI facture la certification de deux manieres, au choix de
+     * l'entreprise dans SES propres parametres : par STICKERS (des vignettes
+     * decomptees a l'unite) ou par PROVISION (un solde en francs). Ce reglage
+     * se coche chez la DGI et l'API n'expose aucun champ pour le lire.
+     *
+     * La reponse de certification le trahit toutefois : elle porte
+     * `balance_sticker` dans un cas, `balance_funds` dans l'autre. C'est donc
+     * une CONSTATATION, faite a chaque normalisation, et non un parametre que
+     * Selflow pourrait definir ou interroger.
+     *
+     * Le code convertissait auparavant la provision en nombre de stickers en
+     * la divisant par 20. Ce prix unitaire n'est transmis nulle part : la
+     * valeur affichee etait une invention, presentee comme un solde reel. Les
+     * deux soldes sont desormais conserves chacun dans son unite.
+     */
+    private static function enregistrerSoldeFne($entreprise, array $data): void
+    {
+        if (isset($data['balance_sticker'])) {
+            $entreprise->update([
+                'fne_mode_facturation' => 'stickers',
+                'fne_sticker_balance'  => intval($data['balance_sticker']),
+                'fne_solde_maj_at'     => now(),
+            ]);
+
+            return;
+        }
+
+        if (isset($data['balance_funds'])) {
+            $entreprise->update([
+                'fne_mode_facturation' => 'provision',
+                'fne_solde_provision'  => floatval($data['balance_funds']),
+                'fne_solde_maj_at'     => now(),
+            ]);
+        }
+    }
+
     /**
      * Colonnes a enregistrer sur la piece a partir des retours de la
      * plateforme, pretes a etre passees a un update().
