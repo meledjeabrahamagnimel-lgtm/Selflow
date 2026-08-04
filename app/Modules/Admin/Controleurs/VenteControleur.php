@@ -571,7 +571,10 @@ class VenteControleur
         );
 
         $vendeur = $vente->utilisateur;
-        
+
+        // Le document affiche les taxes de chaque ligne et celles de la pièce
+        $vente->load(['details.produit', 'details.taxes', 'taxesPersonnalisees', 'client', 'pointDeVente.entreprise']);
+
         // Calculer ce qui a été effectivement payé
         $dejaPaye = TresorerieJournal::where('reference_document', $vente->numero_facture)->sum('montant_entree');
 

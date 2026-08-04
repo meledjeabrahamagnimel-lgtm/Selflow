@@ -382,3 +382,45 @@ vert (suite complète : 18 tests).
   reste la base des écritures comptables et de la trésorerie existantes. Elles
   sont stockées avec leur montant, affichées dans le « Net à payer » et
   transmises à la FNE, qui les recalcule de son côté.
+
+---
+
+## 9. AUDIT DES MENTIONS DGI SUR LES DOCUMENTS IMPRIMÉS
+
+Distinct de l'audit du payload API (§1 à §4) : il porte sur ce que le client
+reçoit entre les mains. La réforme impose que la facture certifiée porte la
+**signature électronique en trois éléments** — QR code, visuel FNE et numéro
+normalisé (`Procedure_technique_integration_API.txt`, § I).
+
+### Manques corrigés
+
+| Mention | Vente | Avoir | BAPA | État |
+|---|---|---|---|---|
+| **QR code de vérification** | ❌ → ✅ | ❌ → ✅ | ❌ → ✅ | `qr_code_data` était transmis à la vue sans jamais être affiché |
+| **Visuel FNE** | ❌ → ✅ | ❌ → ✅ | ✅ | `logo-FNE.png` existait sans être utilisé côté vente |
+| **N° FNE normalisé** | ❌ → ✅ | ❌ → ✅ | ✅ | idem |
+| **Signature DGI** | ❌ → ✅ | ❌ → ✅ | ✅ | idem |
+| Compte contribuable émetteur | ✅ (mod. 1-3) / ❌ → ✅ (mod. 4) | idem | ❌ → ✅ | |
+| RCCM émetteur | ✅ | ✅ | ❌ → ✅ | |
+| Centre des impôts | ✅ | ✅ | ❌ → ✅ | |
+| Téléphone / e-mail client | ✅ (mod. 1-3) / ❌ → ✅ (mod. 4) | idem | ❌ → ✅ (fournisseur) | |
+| RCCM client | ❌ → ✅ | ❌ → ✅ | ✅ | exigé en B2B |
+| Type de facturation (B2B/B2C…) | ❌ → ✅ | ❌ → ✅ | — | |
+| Mode de paiement | ✅ | ✅ | ❌ → ✅ | |
+| Point de vente | ✅ | ✅ | ❌ → ✅ | `pointOfSale` transmis à la DGI |
+| Remise par ligne | ✅ | ✅ | ✅ | |
+| Autres taxes par ligne | ✅ | ✅ | ✅ | |
+| Mentions et pied de page | ✅ | ✅ | ✅ | |
+| Rattachement au reçu (RNE) | ✅ | ✅ | ✅ | |
+
+**Le plus grave était le premier : aucune facture certifiée ne portait sa
+preuve de certification.** Les trois éléments existaient en base et étaient
+passés à la vue, mais aucun modèle ne les affichait — les spécimens envoyés à
+la DGI pour validation auraient été refusés.
+
+### Points restant à confirmer auprès de la DGI
+
+- Le **visuel FNE** utilisé (`public/logo-FNE.png`) doit être celui fourni par
+  la plateforme ; à vérifier avant l'envoi des spécimens.
+- Le **format de numérotation** est celui renvoyé par l'API (`reference`), donc
+  conforme par construction.

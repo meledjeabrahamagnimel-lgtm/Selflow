@@ -511,7 +511,9 @@ var DATA = {
             tel: {!! json_encode($vente->client?->telephone ?? '') !!},
             email: {!! json_encode($vente->client?->email ?? '') !!},
             ncc: {!! json_encode($vente->client?->ncc ?? '') !!},
-            regime: {!! json_encode($vente->client?->regime_imposition ?? '') !!}
+            regime: {!! json_encode($vente->client?->regime_imposition ?? '') !!},
+            template: {!! json_encode($vente->client?->type_facturation ?? ($vente->client?->ncc ? 'B2B' : 'B2C')) !!},
+            rccm: {!! json_encode($vente->client?->rccm ?? '') !!}
         },
         items: [
             @foreach($vente->details as $detail)
@@ -837,12 +839,43 @@ function fiscalLinesSeller(sep) {
 
 function fiscalLinesClient(c, sep) {
     var lines = [];
-    if (c.adresse) lines.push(c.adresse);
-    if (c.tel)     lines.push('Tél : ' + c.tel);
-    if (c.email)   lines.push(c.email);
-    if (c.ncc)     lines.push('NCC : ' + c.ncc);
-    if (c.regime)  lines.push('Régime : ' + c.regime);
+    if (c.adresse)  lines.push(c.adresse);
+    if (c.tel)      lines.push('Tél : ' + c.tel);
+    if (c.email)    lines.push(c.email);
+    if (c.ncc)      lines.push('NCC : ' + c.ncc);
+    if (c.rccm)     lines.push('RCCM : ' + c.rccm);
+    if (c.regime)   lines.push('Régime : ' + c.regime);
+    if (c.template) lines.push('Facturation : ' + c.template);
     return lines.join(sep || '<br>');
+}
+
+/**
+ * Signature électronique exigée par la DGI sur toute pièce certifiée.
+ *
+ * La réforme impose trois éléments indissociables (Procédure d'interfaçage,
+ * § I) : le QR code de vérification, le visuel FNE et le numéro normalisé.
+ * Ils étaient transmis à la vue sans jamais être affichés : aucune facture
+ * certifiée ne portait sa preuve de certification.
+ */
+function blocCertificationFne(d) {
+    if (!d.normalise || !d.numero_fne) return '';
+
+    var qr = d.qr_code_data
+        ? `<img src="https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(d.qr_code_data)}"
+                style="width:92px;height:92px;" alt="Code de vérification FNE">`
+        : '';
+
+    return `
+    <div style="display:flex; align-items:center; gap:14px; border:1px solid var(--border); border-radius:8px; padding:12px 14px; margin-top:16px; background:#fff;">
+        ${qr}
+        <img src="/logo-FNE.png" style="height:52px; object-fit:contain;" alt="Facture normalisée électronique">
+        <div style="font-size:10px; line-height:1.6; color:var(--tx);">
+            <div style="font-weight:800; text-transform:uppercase; letter-spacing:.04em;">Facture normalisée électronique</div>
+            <div>N° FNE : <strong style="font-family:monospace;">${d.numero_fne}</strong></div>
+            ${d.signature_dgi ? `<div>Signature DGI : <span style="font-family:monospace;">${String(d.signature_dgi).substring(0, 24)}…</span></div>` : ''}
+            ${d.qr_code_data ? `<div style="color:var(--mu);">Vérifiable en scannant le code ci-contre.</div>` : ''}
+        </div>
+    </div>`;
 }
 
 function getAvoirBlock(d) {
@@ -1004,6 +1037,7 @@ function model1(d) {
                 ` : ''}
             </div>
         </div>
+        ${blocCertificationFne(d)}
         ${blocMentions(d)}
         ${COMPANY.ref_bancaire ? `<div style="margin-bottom:14px;padding:10px 14px;background:var(--white);border-radius:7px;border:0.5px solid var(--border);font-size:11px;color:var(--mu);line-height:1.7;"><span style="font-weight:600;color:var(--tx)">Références bancaires : </span>${COMPANY.ref_bancaire}</div>` : ''}
         <div style="border-top:0.5px solid var(--border);padding-top:14px;display:flex;justify-content:space-between;align-items:flex-end">
@@ -1134,6 +1168,7 @@ function model2(d) {
             </div>
             ${COMPANY.ref_bancaire ? `<div style="font-size:10.5px;color:var(--mu);line-height:1.7;margin-bottom:10px;"><strong>Réf. bancaires : </strong>${COMPANY.ref_bancaire}</div>` : ''}
             <div style="font-size:11px;color:var(--mu)">Généré automatiquement par <strong>Selflow</strong></div>
+            ${blocCertificationFne(d)}
             ${blocMentions(d)}
             ${blocPiedDePage(d)}
             `}
@@ -1278,6 +1313,7 @@ function model3(d) {
                 <div style="text-align:center;font-size:10px;color:var(--mu)">Cachet société<br><div style="width:80px;height:36px;border:0.5px dashed var(--border);border-radius:4px;margin-top:3px"></div></div>
             </div>
         </div>
+        ${blocCertificationFne(d)}
         ${blocMentions(d)}
         ${blocPiedDePage(d)}
         `}
@@ -1372,6 +1408,7 @@ function modelStandard(d) {
                 <div style="border: 1.5px solid #000; border-radius: 8px; padding: 12px; margin-bottom: 12px;">
                     <div style="font-size:14px; font-weight:800; text-transform:uppercase; margin-bottom:4px;">${COMPANY.nom}</div>
                     <div>NCC : <strong>${COMPANY.ncc || '—'}</strong></div>
+                    <div>Compte contribuable : <strong>${COMPANY.cc || '—'}</strong></div>
                     <div>Régime d'imposition : <strong>${COMPANY.regime || '—'}</strong></div>
                     <div>Centre des impôts : <strong>${COMPANY.centre_impots || '—'}</strong></div>
                 </div>
@@ -1415,8 +1452,11 @@ function modelStandard(d) {
             <div style="font-size:11px; font-weight:800; text-transform:uppercase; color:#000; margin-bottom:5px; letter-spacing:0.5px;">CLIENT</div>
             <div>Nom : <strong>${d.client.nom}</strong></div>
             <div>Adresse : <strong>${d.client.adresse || '—'}</strong></div>
+            <div>Nº Tel : <strong>${d.client.tel || '—'}</strong></div>
+            <div>Mail : <strong>${d.client.email || '—'}</strong></div>
             <div>NCC : <strong>${d.client.ncc || '—'}</strong></div>
             <div>Régime d'imposition : <strong>${d.client.regime || '—'}</strong></div>
+            <div>Type de facturation : <strong>${d.client.template || '—'}</strong></div>
         </div>
         
         ${getAvoirBlock(d)}
@@ -1506,6 +1546,8 @@ function modelStandard(d) {
             </div>
         </div>
         
+        ${blocCertificationFne(d)}
+
         <!-- Pied de page : mentions de l'entreprise emettrice -->
         <div style="border-top:1px solid #000; padding-top:15px; margin-top:20px; font-size:9px; color:#444; line-height:1.6; font-weight:500; text-align:center;">
             ${[
