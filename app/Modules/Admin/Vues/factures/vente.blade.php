@@ -540,6 +540,7 @@ var DATA = {
         mode: {!! json_encode($vente->mode_paiement) !!},
         statut: {!! json_encode($vente->statut) !!},
         deja_paye: {{ $vente->type_facture === 'avoir' ? $vente->montant_ttc : ($dejaPaye ?? 0) }},
+        autres_taxes_montant: {{ (float) ($vente->montant_autres_taxes ?? 0) }},
         ref_bl: {!! json_encode(isset($bl) ? $bl->numero_bl : ($vente->etape === 'Bon de commande' ? ($vente->bonLivraison?->numero_bl ?? '') : ($vente->bonLivraisonSource?->numero_bl ?? ''))) !!},
         ref_bc: {!! json_encode(isset($bl) ? $bl->bonDeCommande->numero_facture : ($vente->etape === 'Bon de commande' ? $vente->numero_facture : (optional($vente->bonLivraisonSource?->bonDeCommande)->numero_facture ?? ''))) !!}
     }
@@ -781,6 +782,14 @@ function telechargerPdf() {
     // sans gain visible : 3 suffit pour du texte net a l'impression.
     var echelle = Math.min(3, Math.max(2, window.devicePixelRatio || 1) + 1);
 
+    // La capture doit partir du haut de la page : html2canvas se cale sur la
+    // position de défilement courante, ce qui décalait et rognait le document.
+    var defilementInitial = window.scrollY;
+    window.scrollTo(0, 0);
+
+    // On laisse html2canvas mesurer l'élément lui-même. Forcer une largeur
+    // fixe rognait la facture quand sa largeur réelle differait, d'où les
+    // bords coupés à gauche comme à droite.
     var opt = {
         margin:       [8, 8, 8, 8],
         filename:     (isDeliveryMode ? 'BL_' : 'Facture_') + DATA.vente.num + '.pdf',
@@ -793,8 +802,8 @@ function telechargerPdf() {
             letterRendering: true,
             scrollX: 0,
             scrollY: 0,
-            windowWidth: 794,
-            width: 794
+            windowWidth: element.scrollWidth,
+            windowHeight: element.scrollHeight
         },
         jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait', compress: true },
         pagebreak:    { mode: ['css', 'legacy'] }
@@ -803,6 +812,7 @@ function telechargerPdf() {
     function restaurer() {
         element.classList.remove('mode-export');
         if (controls) controls.style.display = '';
+        window.scrollTo(0, defilementInitial);
     }
 
     html2pdf().set(opt).from(element).save().then(restaurer).catch(function(err) {

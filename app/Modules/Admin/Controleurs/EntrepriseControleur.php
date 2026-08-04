@@ -47,6 +47,18 @@ class EntrepriseControleur
         // Normaliser le NCC : suppression des espaces et mise en majuscule
         $request->merge(['ncc' => $request->has('ncc') ? strtoupper(preg_replace('/\s+/', '', $request->input('ncc'))) : null]);
 
+        // Mentions transmises à la FNE : un copier-coller depuis un document
+        // apporte des retours à la ligne et des espaces multiples qui font
+        // dépasser la limite pour rien. On les ramène à une seule ligne, ce que
+        // la plateforme attend de toute façon.
+        foreach (['pied_de_page_facture', 'facture_autres_mentions'] as $champ) {
+            if ($request->filled($champ)) {
+                $request->merge([
+                    $champ => trim(preg_replace('/\s+/u', ' ', $request->input($champ))),
+                ]);
+            }
+        }
+
         $request->validate([
             'nom'                    => ['required', 'string', 'max:150'],
             'gerant_nom'             => ['nullable', 'string', 'max:100'],
@@ -75,9 +87,17 @@ class EntrepriseControleur
             'quartier'               => ['nullable', 'string', 'max:100'],
             'sticker_solde_alerte'   => ['nullable', 'integer', 'min:1', 'max:9999'],
             // 248 caractères : longueur maximale acceptée par la FNE pour les
-            // champs `footer` et `commercialMessage`.
+            // champs `footer` et `commercialMessage`. Le texte est ramené à une
+            // seule ligne juste avant (voir normaliserMentions) : un copier-
+            // coller depuis un document apporte sinon des retours à la ligne et
+            // des espaces multiples qui font dépasser la limite pour rien.
             'pied_de_page_facture'   => ['nullable', 'string', 'max:248'],
             'facture_autres_mentions'=> ['nullable', 'string', 'max:248'],
+        ], [
+            'pied_de_page_facture.max'    => 'Le pied de page ne peut pas dépasser 248 caractères.',
+            'facture_autres_mentions.max' => 'Les autres mentions ne peuvent pas dépasser 248 caractères.',
+            'ncc.size'                    => 'Le NCC doit comporter exactement 8 caractères.',
+            'ncc.regex'                   => 'Le NCC doit être composé de 7 chiffres ou lettres suivis d\'une lettre.',
         ]);
 
         $data = $request->only([

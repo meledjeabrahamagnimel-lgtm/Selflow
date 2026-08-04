@@ -187,6 +187,10 @@ class VenteControleur
 
             $montantTtc = $montantHtNet + $montantTva;
 
+            // Taxes parafiscales (GRA, AIRSI, DTD…) : elles s'ajoutent a ce que
+            // paie le client sans etre du chiffre d'affaires ni de la TVA.
+            $montantAutresTaxes = self::calculerAutresTaxes($request, $montantTtc, $ratio);
+
             // Déterminer la valeur finale du mode de paiement pour l'enregistrement
             $modePaiementFinal = $request->mode_paiement;
             if ($request->mode_paiement === 'Banque' && $request->filled('banque_id')) {
@@ -202,11 +206,12 @@ class VenteControleur
             if ($request->mode_paiement === 'Crédit') {
                 $statutVente = 'Crédit';
             } else {
-                $montantPaye = $request->filled('montant_paye') ? floatval($request->montant_paye) : $montantTtc;
+                $netAPayer = $montantTtc + $montantAutresTaxes;
+                $montantPaye = $request->filled('montant_paye') ? floatval($request->montant_paye) : $netAPayer;
                 if ($montantPaye <= 0) {
                     $statutVente = 'Crédit';
                     $montantPaye = 0;
-                } elseif ($montantPaye >= $montantTtc) {
+                } elseif ($montantPaye >= $netAPayer) {
                     $statutVente = 'Payé';
                 } else {
                     $statutVente = 'Avance';
@@ -229,6 +234,7 @@ class VenteControleur
                 'remise'                  => $remise,
                 'remise_taux'             => $remiseTaux,
                 'montant_ttc'             => $montantTtc,
+                'montant_autres_taxes'    => $montantAutresTaxes,
                 'statut'                  => $statutVente,
                 'etape'                   => $etape,
                 // Nature du document : facture par defaut. Un encaissement en

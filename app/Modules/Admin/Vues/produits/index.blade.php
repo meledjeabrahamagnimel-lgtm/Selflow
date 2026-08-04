@@ -292,21 +292,6 @@
                                     <label class="form-label">Unité</label>
                                     <input type="text" name="unite" class="form-control" value="{{ $p->unite }}">
                                 </div>
-                                <div class="form-group">
-                                    <label class="form-label">Taux TVA par défaut</label>
-                                    @php
-                                        $isCustomTva = !in_array($p->taux_tva, [0.00, 18.00]);
-                                    @endphp
-                                    <select id="tva_select_{{ $p->id }}" class="form-control" onchange="toggleCustomTva('{{ $p->id }}')" required>
-                                        <option value="18.00" {{ $p->taux_tva == 18.00 ? 'selected' : '' }}>18% (Taux normal)</option>
-                                        <option value="0.00" {{ $p->taux_tva == 0.00 ? 'selected' : '' }}>0% (Exonéré)</option>
-                                        <option value="custom" {{ $isCustomTva ? 'selected' : '' }}>Autre (Saisie libre)</option>
-                                    </select>
-                                    <div id="custom_tva_container_{{ $p->id }}" style="display: {{ $isCustomTva ? 'block' : 'none' }}; margin-top:8px;">
-                                        <input type="number" id="tva_input_{{ $p->id }}" name="taux_tva" class="form-control" placeholder="Entrez le taux (%)" step="0.01" min="0" max="100" oninput="rafraichirApercuCodeTva('{{ $p->id }}')" value="{{ $p->taux_tva }}">
-                                    </div>
-                                </div>
-
                                 @include('admin::composants.champs_fne_produit', [
                                     'cle'     => $p->id,
                                     'produit' => $p,
@@ -466,18 +451,6 @@
                     <label class="form-label">Unité</label>
                     <input type="text" name="unite" class="form-control" placeholder="pcs, kg, L…">
                 </div>
-                <div class="form-group">
-                    <label class="form-label">Taux TVA par défaut <span style="color:var(--danger)">*</span></label>
-                    <select id="tva_select_nouveau" class="form-control" onchange="toggleCustomTva('nouveau')" required>
-                        <option value="18.00">18% (Taux normal)</option>
-                        <option value="0.00">0% (Exonéré)</option>
-                        <option value="custom">Autre (Saisie libre)</option>
-                    </select>
-                    <div id="custom_tva_container_nouveau" style="display:none; margin-top:8px;">
-                        <input type="number" id="tva_input_nouveau" name="taux_tva" class="form-control" placeholder="Entrez le taux (%)" step="0.01" min="0" max="100" oninput="rafraichirApercuCodeTva('nouveau')" value="18.00">
-                    </div>
-                </div>
-
                 @include('admin::composants.champs_fne_produit', [
                     'cle'     => 'nouveau',
                     'produit' => null,
@@ -706,19 +679,33 @@ function toggleCustomCompta(id) {
     }
 }
 
-function toggleCustomTva(id) {
-    var select = document.getElementById('tva_select_' + id);
-    var container = document.getElementById('custom_tva_container_' + id);
-    var input = document.getElementById('tva_input_' + id);
-    
-    if (select.value === 'custom') {
-        container.style.display = 'block';
-    } else {
-        container.style.display = 'none';
-        input.value = select.value;
+/**
+ * Régime de TVA choisi manuellement : le code DGI porte le taux, sauf « Autre »
+ * qui ouvre une saisie libre. Le champ caché `taux_tva` reste la seule valeur
+ * envoyée au serveur.
+ */
+function appliquerTauxDuCodeTva(cle) {
+    const select = document.getElementById('code_tva_select_' + cle);
+    const libre  = document.getElementById('code_tva_libre_' + cle);
+    const cache  = document.getElementById('tva_input_' + cle);
+    if (!select || !cache) return;
+
+    const estLibre = select.value === 'AUTRE';
+    if (libre) libre.style.display = estLibre ? 'block' : 'none';
+
+    if (estLibre) {
+        synchroniserTauxLibre(cle);
+        return;
     }
 
-    rafraichirApercuCodeTva(id);
+    const option = select.options[select.selectedIndex];
+    cache.value = option.dataset.taux ?? 18;
+}
+
+function synchroniserTauxLibre(cle) {
+    const saisie = document.getElementById('taux_libre_' + cle);
+    const cache  = document.getElementById('tva_input_' + cle);
+    if (saisie && cache) cache.value = saisie.value;
 }
 
 // ─── Champs FNE du produit : code TVA et autres taxes ────────────────────────
@@ -743,11 +730,13 @@ function rafraichirApercuCodeTva(cle) {
     const apercu = document.getElementById('apercu_code_tva_' + cle);
     if (!apercu) return;
 
-    const select = document.getElementById('tva_select_' + cle);
-    const input  = document.getElementById('tva_input_' + cle);
-    const taux   = (select && select.value !== 'custom') ? select.value : (input ? input.value : 0);
-
+    const taux = parseFloat(document.getElementById('tva_input_' + cle)?.value || 0);
     apercu.textContent = deduireCodeTva(taux);
+
+    // Le taux est rappelé à côté du code : « TVA » seul ne disait pas de
+    // combien il s'agissait.
+    const apercuTaux = document.getElementById('apercu_taux_tva_' + cle);
+    if (apercuTaux) apercuTaux.textContent = String(taux).replace('.', ',');
 }
 
 function basculerCodeTva(cle) {

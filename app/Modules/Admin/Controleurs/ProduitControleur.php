@@ -73,7 +73,7 @@ class ProduitControleur
             // Champs FNE (DGI)
             'remise_taux'          => ['nullable', 'numeric', 'min:0', 'max:100'],
             'code_tva_manuel'      => ['nullable', 'boolean'],
-            'code_tva'             => ['nullable', 'string', 'in:TVA,TVAB,TVAC,TVAD'],
+            'code_tva'             => ['nullable', 'string', 'in:TVA,TVAB,TVAC,TVAD,AUTRE'],
             'taxes_produit'        => ['nullable', 'array'],
             'taxes_produit.*.nom'  => ['required_with:taxes_produit.*.taux', 'string', 'max:100'],
             'taxes_produit.*.taux' => ['required_with:taxes_produit.*.nom', 'numeric', 'gt:0', 'max:100'],
@@ -151,7 +151,11 @@ class ProduitControleur
             'unite'             => $request->unite,
             'remise_taux'       => floatval($request->input('remise_taux', 0)),
             'code_tva_manuel'   => $request->boolean('code_tva_manuel'),
-            'code_tva'          => $request->boolean('code_tva_manuel') ? $request->input('code_tva') : null,
+            // « AUTRE » signale un taux hors barème : le code DGI est alors déduit
+            // du taux saisi plutôt que stocké tel quel.
+            'code_tva'          => ($request->boolean('code_tva_manuel') && $request->input('code_tva') !== 'AUTRE')
+                ? $request->input('code_tva')
+                : null,
         ]);
 
         $this->enregistrerTaxesProduit($produit, $request->input('taxes_produit', []));
@@ -274,7 +278,7 @@ class ProduitControleur
             // Champs FNE (DGI)
             'remise_taux'          => ['nullable', 'numeric', 'min:0', 'max:100'],
             'code_tva_manuel'      => ['nullable', 'boolean'],
-            'code_tva'             => ['nullable', 'string', 'in:TVA,TVAB,TVAC,TVAD'],
+            'code_tva'             => ['nullable', 'string', 'in:TVA,TVAB,TVAC,TVAD,AUTRE'],
             'taxes_produit'        => ['nullable', 'array'],
             'taxes_produit.*.nom'  => ['required_with:taxes_produit.*.taux', 'string', 'max:100'],
             'taxes_produit.*.taux' => ['required_with:taxes_produit.*.nom', 'numeric', 'gt:0', 'max:100'],
@@ -341,7 +345,11 @@ class ProduitControleur
             'unite'             => $request->unite,
             'remise_taux'       => floatval($request->input('remise_taux', 0)),
             'code_tva_manuel'   => $request->boolean('code_tva_manuel'),
-            'code_tva'          => $request->boolean('code_tva_manuel') ? $request->input('code_tva') : null,
+            // « AUTRE » signale un taux hors barème : le code DGI est alors déduit
+            // du taux saisi plutôt que stocké tel quel.
+            'code_tva'          => ($request->boolean('code_tva_manuel') && $request->input('code_tva') !== 'AUTRE')
+                ? $request->input('code_tva')
+                : null,
         ]);
 
         $this->enregistrerTaxesProduit($produit, $request->input('taxes_produit', []));

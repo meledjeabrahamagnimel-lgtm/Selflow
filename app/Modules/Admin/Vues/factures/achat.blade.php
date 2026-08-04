@@ -380,6 +380,11 @@ function telechargerPdf() {
     var element = document.querySelector('.invoice');
     element.classList.add('mode-export');
 
+    // Capturer depuis le haut : html2canvas se cale sinon sur la position de
+    // defilement courante et rogne le document.
+    var defilementInitial = window.scrollY;
+    window.scrollTo(0, 0);
+
     var echelle = Math.min(3, Math.max(2, window.devicePixelRatio || 1) + 1);
 
     var opt = {
@@ -394,8 +399,8 @@ function telechargerPdf() {
             letterRendering: true,
             scrollX: 0,
             scrollY: 0,
-            windowWidth: 794,
-            width: 794
+            windowWidth: element.scrollWidth,
+            windowHeight: element.scrollHeight
         },
         jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait', compress: true },
         pagebreak:    { mode: ['css', 'legacy'] }
@@ -404,6 +409,7 @@ function telechargerPdf() {
     function restaurer() {
         element.classList.remove('mode-export');
         if (controls) controls.style.display = '';
+        window.scrollTo(0, defilementInitial);
     }
 
     html2pdf().set(opt).from(element).save().then(restaurer).catch(function(err) {
