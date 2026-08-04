@@ -170,6 +170,32 @@ class Vente extends Model
     }
 
     /**
+     * Écarte les pièces qui feraient compter deux fois le même chiffre
+     * d'affaires.
+     *
+     * Un reçu qui a donné lieu à une facture est remplacé par elle : les deux
+     * portent les mêmes montants. Le reçu reste consultable et imprimable, et
+     * conserve les écritures comptables de son encaissement — la facture, elle,
+     * n'en génère aucune —, mais il sort des agrégats pour que le chiffre
+     * d'affaires ne soit pas doublé.
+     */
+    public function scopeSansDoublonRecu($query)
+    {
+        return $query->where(function ($q) {
+            $q->where('type_piece', '!=', self::TYPE_RECU)
+              ->orWhereNull('piece_liee_id');
+        });
+    }
+
+    /**
+     * Ce reçu a-t-il été remplacé par la facture qui en découle ?
+     */
+    public function estRemplaceParUneFacture(): bool
+    {
+        return $this->estRecu() && $this->piece_liee_id !== null;
+    }
+
+    /**
      * Libellé de la pièce, tel qu'affiché dans les registres.
      */
     public function libelleTypeDocument(): string
