@@ -83,10 +83,20 @@ class FneDashboardControleur
 
         $stickers_consommes = $totalVentesNormalisees + $totalAchatsNormalises;
 
-        // 2. Solde des stickers (quantité) stocké en base
-        $stickers_solde = intval($ent?->fne_sticker_balance ?? 0);
+        // 2. Mode de facturation constaté chez la DGI et solde correspondant.
+        //    Le mode (stickers ou provision en francs) se coche dans les
+        //    paramètres de la plateforme et l'API n'expose aucun champ pour le
+        //    lire. Il se déduit du solde renvoyé à la dernière certification :
+        //    `balance_sticker` d'un côté, `balance_funds` de l'autre. Tant
+        //    qu'aucune pièce n'a été normalisée, le mode reste inconnu — et on
+        //    le dit, plutôt que d'afficher un zéro qui ressemble à une panne.
+        $mode_facturation = $ent?->fne_mode_facturation;
+        $stickers_solde   = intval($ent?->fne_sticker_balance ?? 0);
+        $solde_provision  = (float) ($ent?->fne_solde_provision ?? 0);
+        $solde_maj_at     = $ent?->fne_solde_maj_at;
 
-        // 3. Stickers achetés (quantité) = Solde + Consommés
+        // 3. Stickers achetés (quantité) = Solde + Consommés. Le calcul n'a de
+        //    sens qu'en mode stickers : une provision se compte en francs.
         $stickers_achats = $stickers_solde + $stickers_consommes;
 
         [$debut, $fin] = $this->resoudrePeriode($request);
@@ -156,6 +166,9 @@ class FneDashboardControleur
             'periode' => ['debut' => $debut->toDateString(), 'fin' => $fin->toDateString()],
 
             // Indicateurs propres à la plateforme DGI
+            'mode_facturation'  => $mode_facturation,
+            'solde_provision'   => $solde_provision,
+            'solde_maj_at'      => $solde_maj_at?->toDateTimeString(),
             'stickers_solde'    => $stickers_solde,
             'stickers_achats'   => $stickers_achats,
             'stickers_consommes'=> $stickers_consommes,

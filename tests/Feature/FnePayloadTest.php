@@ -509,6 +509,51 @@ class FnePayloadTest extends TestCase
         ];
     }
 
+    // ─── Mode de facturation de la plateforme (stickers ou provision) ────
+
+    public function test_le_mode_stickers_est_constate_depuis_le_solde_renvoye(): void
+    {
+        $this->simulerReponseFne(['balance_sticker' => 179]);
+
+        FneService::normaliserFacture($this->venteMinimale());
+
+        $this->entreprise->refresh();
+        $this->assertSame('stickers', $this->entreprise->fne_mode_facturation);
+        $this->assertSame(179, $this->entreprise->fne_sticker_balance);
+        $this->assertNotNull($this->entreprise->fne_solde_maj_at);
+    }
+
+    public function test_le_mode_provision_est_constate_et_le_solde_garde_son_unite(): void
+    {
+        // Stickers désactivés côté DGI : la réponse ne porte plus de solde de
+        // vignettes mais un solde en francs. On ne passe pas par
+        // `simulerReponseFne`, qui renvoie toujours un `balance_sticker`.
+        Http::fake(['*' => Http::response([
+            'reference' => '9606123E25000000019',
+            'token'     => 'https://fne.test/verification/019465c1',
+            'balance_funds' => 45000,
+            'invoice'   => ['id' => 'e2b2d8da-a532-4c08-9182-f5b428ca468d', 'items' => []],
+        ], 200)]);
+
+        FneService::normaliserFacture($this->venteMinimale());
+
+        $this->entreprise->refresh();
+        $this->assertSame('provision', $this->entreprise->fne_mode_facturation);
+        $this->assertEquals(45000, $this->entreprise->fne_solde_provision);
+
+        // Le solde en francs ne se convertit pas en nombre de vignettes : le
+        // prix unitaire n'est transmis nulle part. Le code divisait auparavant
+        // par 20 et rangeait le resultat dans le compteur de stickers, qui
+        // affichait donc 2 250 vignettes imaginaires.
+        $this->assertNotEquals(2250, $this->entreprise->fne_sticker_balance);
+        $this->assertEmpty($this->entreprise->fne_sticker_balance);
+    }
+
+    public function test_le_mode_reste_inconnu_tant_qu_aucune_piece_n_est_normalisee(): void
+    {
+        $this->assertNull($this->entreprise->fne_mode_facturation);
+    }
+
     public function test_les_ventes_validees_portent_une_etape_facture_et_jamais_le_statut_facturee(): void
     {
         // Les tableaux de bord filtraient sur un statut « Facturée » qui

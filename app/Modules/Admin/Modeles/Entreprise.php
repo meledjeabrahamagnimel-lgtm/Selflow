@@ -43,6 +43,11 @@ class Entreprise extends Model
         'quartier',
         'sticker_solde_alerte',
         'fne_sticker_balance',
+        // Mode de facturation constaté chez la DGI ('stickers' | 'provision')
+        // et solde correspondant. Voir FneService::enregistrerSoldeFne().
+        'fne_mode_facturation',
+        'fne_solde_provision',
+        'fne_solde_maj_at',
         'timbre_quittance',
         'bapa',
         'pied_de_page_facture',
@@ -56,6 +61,8 @@ class Entreprise extends Model
         'bapa'               => 'boolean',
         'sticker_solde_alerte' => 'integer',
         'fne_sticker_balance' => 'integer',
+        'fne_solde_provision' => 'decimal:2',
+        'fne_solde_maj_at'    => 'datetime',
     ];
 
     public function pointsDeVente(): HasMany

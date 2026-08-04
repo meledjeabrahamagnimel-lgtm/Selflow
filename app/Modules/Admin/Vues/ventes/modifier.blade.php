@@ -781,11 +781,11 @@ function renderPanier() {
                     <label>Remise&nbsp;(%)
                         <input type="number" class="form-control form-control-sm" value="${remiseLigne}" min="0" max="100" step="0.01" oninput="saisirRemiseLigne('${id}', this.value)" style="width: 64px;">
                     </label>
-                    <label>TVA&nbsp;(%)
-                        <input type="number" class="form-control form-control-sm" value="${item.tva || 0}" min="0" max="100" step="0.01" oninput="saisirTvaLigne('${id}', this.value)" style="width: 64px;">
+                    <label>TVA
+                        ${selecteurCodeTva(id, item)}
                     </label>
                 </div>
-                ${alerteTauxTva(item.tva)}
+                ${alerteCodeTva(item)}
             </div>
             <div class="qte-ctrl">
                 <button type="button" class="qte-btn" onclick="changerQte('${id}', -1)">−</button>
@@ -845,40 +845,87 @@ function saisirUnite(id, val) {
  * ajustable sur la pièce sans toucher au catalogue.
  */
 /**
- * Taux de TVA acceptes par la facture normalisee.
- *
- * La FNE ne recoit pas un pourcentage mais un code (TVA 18 %, TVAB 9 %,
- * TVAC / TVAD 0 %) et applique le taux attache a ce code. Un taux
- * intermediaire n'a nulle part ou se ranger : la plateforme le taxerait a
- * 18 % et la facture certifiee afficherait un montant different du notre.
+ * Codes TVA reconnus par la DGI, avec le taux que la plateforme applique a
+ * chacun. C'est la liste de reference : la FNE ne recoit pas un pourcentage
+ * mais un code, et un taux hors de cette table n'a nulle part ou se ranger.
  */
-const TAUX_TVA_DGI = [18, 9, 0];
+const CODES_TVA_DGI = {!! json_encode(\App\Modules\Admin\Modeles\Produit::CODES_TVA) !!};
+const REGIME_ENTREPRISE = {!! json_encode(Auth::user()->entreprise->regime_imposition ?? null) !!};
+const REGIMES_EXONERATION_LEGALE = ['TEE', 'RNE'];
 
-function tauxTvaReconnu(taux) {
-    return TAUX_TVA_DGI.indexOf(Math.round(parseFloat(taux || 0) * 100) / 100) !== -1;
+/**
+ * Meme regle que Produit::deduireCodeTva() cote serveur : a 0 %, seul le
+ * regime distingue l'exoneration conventionnelle (TVAC) de l'exoneration
+ * legale (TVAD, reservee aux regimes TEE et RNE).
+ */
+function deduireCodeTvaDgi(taux) {
+    const t = Math.round(parseFloat(taux || 0) * 100) / 100;
+    if (t === 18) return 'TVA';
+    if (t === 9)  return 'TVAB';
+    if (t === 0)  return REGIMES_EXONERATION_LEGALE.includes(REGIME_ENTREPRISE) ? 'TVAD' : 'TVAC';
+    return null; // taux hors bareme : aucun code ne le represente
 }
 
-/** Avertissement affiche sous une ligne dont le taux de TVA sort du bareme. */
-function alerteTauxTva(taux) {
-    if (tauxTvaReconnu(taux)) return '';
+/** Code retenu pour une ligne : le choix explicite prime sur la deduction. */
+function codeTvaDeLaLigne(item) {
+    if (item.code_tva && CODES_TVA_DGI[item.code_tva]) return item.code_tva;
+    return deduireCodeTvaDgi(item.tva);
+}
+
+/**
+ * Liste deroulante du code TVA d'une ligne du panier.
+ *
+ * Elle remplace la saisie libre du taux : celle-ci laissait passer des valeurs
+ * comme 5 %, qu'aucun code DGI ne represente. La plateforme les taxait alors a
+ * 18 % et la facture certifiee ne correspondait plus a celle etablie ici.
+ *
+ * Une ligne portant deja un taux hors bareme (article ancien, panier
+ * enregistre) garde une option supplementaire, desactivee, qui rend le
+ * probleme visible au lieu de le corriger dans le dos de l'utilisateur.
+ */
+function selecteurCodeTva(id, item) {
+    const codeCourant = codeTvaDeLaLigne(item);
+    let options = '';
+
+    if (codeCourant === null) {
+        const taux = String(item.tva || 0).replace('.', ',');
+        options += `<option value="" selected disabled>Hors barème : ${taux} %</option>`;
+    }
+
+    options += Object.keys(CODES_TVA_DGI).map(function (code) {
+        const infos = CODES_TVA_DGI[code];
+        const taux = String(infos.taux).replace('.', ',').replace(',00', '');
+        return `<option value="${code}"${code === codeCourant ? ' selected' : ''} title="${infos.libelle}">`
+             + `${code} — ${taux} %</option>`;
+    }).join('');
+
+    return `<select class="form-control form-control-sm" style="width:132px;"
+                    onchange="saisirCodeTvaLigne('${id}', this.value)">${options}</select>`;
+}
+
+/** Avertissement affiche sous une ligne dont le taux ne correspond a aucun code DGI. */
+function alerteCodeTva(item) {
+    if (codeTvaDeLaLigne(item) !== null) return '';
     return '<div style="font-size:10px;color:#b45309;background:#fef3c7;border-radius:4px;'
          + 'padding:3px 6px;margin-top:4px;">'
          + '<i class="fas fa-triangle-exclamation"></i> '
-         + 'Taux hors barème DGI (18 %, 9 % ou 0 %) : cette facture ne pourra pas être normalisée.'
+         + 'Taux hors barème DGI : choisissez un code ci-dessus, sinon cette facture '
+         + 'ne pourra pas être normalisée.'
          + '</div>';
 }
 
-function saisirTvaLigne(id, val) {
-    if (!panier[id]) return;
+/**
+ * Le code choisi porte son taux : les deux sont mis a jour ensemble, faute de
+ * quoi la facture afficherait un taux et transmettrait un autre code.
+ */
+function saisirCodeTvaLigne(id, code) {
+    if (!panier[id] || !CODES_TVA_DGI[code]) return;
 
-    let taux = parseFloat(val);
-    if (isNaN(taux) || taux < 0) taux = 0;
-    if (taux > 100) taux = 100;
-
-    panier[id].tva = taux;
+    panier[id].code_tva = code;
+    panier[id].tva = parseFloat(CODES_TVA_DGI[code].taux);
     savePanier();
 
-    majChampsArticles();
+    renderPanier();
     calculerTotaux();
 }
 

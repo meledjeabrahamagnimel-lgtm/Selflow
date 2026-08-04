@@ -96,8 +96,11 @@
 {{-- ── Cartes Stickers & Timbres (récupérées en temps réel depuis la base / API) ── --}}
 <div class="section-titre"><i class="fas fa-stamp"></i> Stickers &amp; Timbres (plateforme DGI)</div>
 <div class="kpi-grid">
-    <div class="kpi-card"><div class="lbl">Solde Stickers</div><div class="val" id="k-stickers-solde">0</div><div class="sub" id="k-stickers-solde-sub">Stickers disponibles auprès de la DGI</div></div>
-    <div class="kpi-card"><div class="lbl">Stickers achetés</div><div class="val" id="k-stickers-achats">0</div><div class="sub" id="k-stickers-achats-sub">Total acheté Mobile Money</div></div>
+    {{-- Le mode de facturation (stickers ou provision) se coche dans les
+         paramètres de la DGI et l'API n'expose aucun champ pour le lire. Il se
+         constate à chaque certification, selon le solde renvoyé. --}}
+    <div class="kpi-card"><div class="lbl" id="k-solde-lbl">Solde DGI</div><div class="val" id="k-stickers-solde">—</div><div class="sub" id="k-stickers-solde-sub">En attente d'une première normalisation</div></div>
+    <div class="kpi-card"><div class="lbl">Stickers achetés</div><div class="val" id="k-stickers-achats">—</div><div class="sub" id="k-stickers-achats-sub">Total acheté Mobile Money</div></div>
     <div class="kpi-card"><div class="lbl">Stickers consommés</div><div class="val" id="k-stickers-consommes">0</div><div class="sub" id="k-stickers-consommes-sub">Total utilisé pour normalisation</div></div>
     <div class="kpi-card"><div class="lbl">Timbre de quittance</div><div class="val" id="k-timbre">0 F</div><div class="sub" id="k-timbre-sub">Droits de timbre fiscaux collectés</div></div>
 </div>
@@ -257,17 +260,51 @@ function rafraichirFneGestion() {
 }
 
 function appliquerKpis(d) {
-    // Solde de stickers (quantité en valeur principale)
-    document.getElementById('k-stickers-solde').textContent = d.stickers_solde;
-    document.getElementById('k-stickers-solde-sub').textContent = `${d.stickers_solde} sticker(s) disponible(s) (Valeur: ${formatF(d.stickers_solde * 20)})`;
+    // Solde DGI. Le mode de facturation est CONSTATE, pas configure : la
+    // reponse de certification porte `balance_sticker` en mode stickers et
+    // `balance_funds` en mode provision. Tant qu'aucune piece n'a ete
+    // normalisee, on l'ignore et on le dit — un « 0 » ressemblerait a une
+    // panne ou a un solde epuise.
+    //
+    // La valeur en francs d'un solde de stickers n'est plus affichee : le prix
+    // unitaire n'est transmis nulle part et le chiffre precedent (× 20 F)
+    // etait une supposition presentee comme un fait.
+    const majDate = d.solde_maj_at ? ` · relevé le ${d.solde_maj_at}` : '';
 
-    // Achat de stickers (quantité en valeur principale)
-    document.getElementById('k-stickers-achats').textContent = d.stickers_achats;
-    document.getElementById('k-stickers-achats-sub').textContent = `${d.stickers_achats} sticker(s) acheté(s) (Valeur: ${formatF(d.stickers_achats * 20)})`;
+    if (d.mode_facturation === 'stickers') {
+        document.getElementById('k-solde-lbl').textContent = 'Solde Stickers';
+        document.getElementById('k-stickers-solde').textContent = d.stickers_solde;
+        document.getElementById('k-stickers-solde-sub').textContent =
+            `${d.stickers_solde} sticker(s) disponible(s)${majDate}`;
 
-    // Stickers consommés (quantité en valeur principale)
+        document.getElementById('k-stickers-achats').textContent = d.stickers_achats;
+        document.getElementById('k-stickers-achats-sub').textContent =
+            `${d.stickers_achats} sticker(s) acheté(s) : solde + consommés`;
+    } else if (d.mode_facturation === 'provision') {
+        document.getElementById('k-solde-lbl').textContent = 'Provision DGI';
+        document.getElementById('k-stickers-solde').textContent = formatF(d.solde_provision);
+        document.getElementById('k-stickers-solde-sub').textContent =
+            `Facturation à la provision : les stickers sont désactivés${majDate}`;
+
+        document.getElementById('k-stickers-achats').textContent = '—';
+        document.getElementById('k-stickers-achats-sub').textContent =
+            'Sans objet : la DGI décompte une provision, pas des vignettes';
+    } else {
+        document.getElementById('k-solde-lbl').textContent = 'Solde DGI';
+        document.getElementById('k-stickers-solde').textContent = '—';
+        document.getElementById('k-stickers-solde-sub').textContent =
+            'Mode inconnu : la DGI ne le communique qu\'en réponse à une normalisation';
+
+        document.getElementById('k-stickers-achats').textContent = '—';
+        document.getElementById('k-stickers-achats-sub').textContent =
+            'Connu une fois le mode de facturation constaté';
+    }
+
+    // Stickers consommés : une pièce certifiée = une vignette, quel que soit
+    // le mode. Le décompte reste valable.
     document.getElementById('k-stickers-consommes').textContent = d.stickers_consommes;
-    document.getElementById('k-stickers-consommes-sub').textContent = `${d.stickers_consommes} sticker(s) consommé(s) (Valeur: ${formatF(d.stickers_consommes * 20)})`;
+    document.getElementById('k-stickers-consommes-sub').textContent =
+        `${d.stickers_consommes} pièce(s) certifiée(s) auprès de la DGI`;
 
     // Timbre de quittance
     document.getElementById('k-timbre').textContent = formatF(d.timbre_quittance);
