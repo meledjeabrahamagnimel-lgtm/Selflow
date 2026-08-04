@@ -206,6 +206,7 @@
                     <th style="text-align:center; width:80px;">Quantité</th>
                     <th style="text-align:center; width:60px;">Unité</th>
                     <th style="text-align:right; width:120px;">Prix unitaire</th>
+                    <th style="text-align:right; width:80px;">Remise (%)</th>
                     <th style="text-align:right; width:120px;">Total Net</th>
                 </tr>
             </thead>
@@ -216,6 +217,7 @@
                         <td style="text-align:center;">{{ $d->quantite }}</td>
                         <td style="text-align:center;">{{ $d->unite }}</td>
                         <td style="text-align:right;">{{ number_format($d->prix_unitaire, 0, ',', ' ') }} F</td>
+                        <td style="text-align:right;">{{ rtrim(rtrim(number_format((float) ($d->remise_taux ?? 0), 2, ',', ' '), '0'), ',') }} %</td>
                         <td style="text-align:right; font-weight:700;">{{ number_format($d->montant_ttc, 0, ',', ' ') }} F</td>
                     </tr>
                 @endforeach
@@ -231,14 +233,26 @@
                         {{ number_format($achat->montant_ttc, 0, ',', ' ') }} F
                     </td>
                 </tr>
+                @if(($achat->remise ?? 0) > 0)
+                <tr style="border-bottom:1px solid #000; color:#dc2626;">
+                    <td style="padding:6px 0; font-weight:600;">Remise ({{ rtrim(rtrim(number_format((float) $achat->remise_taux, 2, ',', ' '), '0'), ',') }} %)</td>
+                    <td style="padding:6px 0; text-align:right; font-weight:700;">-{{ number_format($achat->remise, 0, ',', ' ') }} F</td>
+                </tr>
+                @endif
                 <tr style="border-bottom:1px solid #000;">
                     <td style="padding:6px 0; font-weight:600;">TVA (Exonéré art. BAPA)</td>
                     <td style="padding:6px 0; text-align:right; font-weight:700;">0 F</td>
                 </tr>
+                @foreach($achat->taxesPersonnalisees as $taxe)
+                <tr style="border-bottom:1px solid #000;">
+                    <td style="padding:6px 0; font-weight:600;">{{ $taxe->nom }} ({{ rtrim(rtrim(number_format((float) $taxe->taux, 2, ',', ' '), '0'), ',') }} %)</td>
+                    <td style="padding:6px 0; text-align:right; font-weight:700;">{{ number_format($taxe->montant, 0, ',', ' ') }} F</td>
+                </tr>
+                @endforeach
                 <tr style="background:#f1f5f9; font-weight:800; font-size:15px; border:1px solid #000;">
                     <td style="padding:8px 10px;">Montant Net à Payer</td>
                     <td style="padding:8px 10px; text-align:right; color:var(--navy);">
-                        {{ number_format($achat->montant_ttc, 0, ',', ' ') }} FCFA
+                        {{ number_format($achat->montant_ttc + $achat->taxesPersonnalisees->sum('montant'), 0, ',', ' ') }} FCFA
                     </td>
                 </tr>
             </table>
@@ -257,6 +271,25 @@
                 <span style="font-size:11px; color:#555;">Pour {{ $achat->pointDeVente->entreprise->nom }}</span>
             </div>
         </div>
+
+        @php
+            $entrepriseBapa = $achat->pointDeVente->entreprise;
+            $mentionsBapa   = $achat->autres_mentions ?: $entrepriseBapa->facture_autres_mentions;
+            $piedBapa       = $achat->pied_de_page ?: $entrepriseBapa->pied_de_page_facture;
+        @endphp
+        @if($achat->est_rne && $achat->numero_rne)
+            <div style="margin-top:24px; font-size:11px; font-weight:700;">
+                Bordereau rattaché au reçu normalisé n° {{ $achat->numero_rne }}
+            </div>
+        @endif
+        @if($mentionsBapa)
+            <div style="margin-top:12px; font-size:11px; color:#444; line-height:1.6;">{{ $mentionsBapa }}</div>
+        @endif
+        @if($piedBapa)
+            <div style="margin-top:16px; border-top:1px solid #000; padding-top:10px; font-size:10px; color:#444; line-height:1.6; text-align:center;">
+                {{ $piedBapa }}
+            </div>
+        @endif
 
     </div>
 </div>

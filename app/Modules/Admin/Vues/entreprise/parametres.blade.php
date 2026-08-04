@@ -327,15 +327,34 @@
                     <div style="display:flex;flex-direction:column;gap:14px;">
                         <div class="form-group">
                             <label class="form-label">Pied de page des factures</label>
-                            <textarea name="pied_de_page_facture" class="form-control" rows="3"
+                            <textarea name="pied_de_page_facture" id="piedDePageFactureInput" class="form-control" rows="3"
+                                maxlength="248" oninput="majCompteurParametre('piedDePageFacture')"
                                 placeholder="Ex: Merci pour votre confiance. Paiement à 30 jours. Pénalités de retard : 1,5% / mois.">{{ old('pied_de_page_facture', $entreprise->pied_de_page_facture) }}</textarea>
-                            <small style="color:var(--text-3);font-size:11px;">Ce texte apparaît en bas de chaque facture imprimée.</small>
+                            <small style="color:var(--text-3);font-size:11px;">
+                                Ce texte apparaît en bas de chaque facture imprimée et est transmis à la DGI.
+                                <span id="piedDePageFactureCompteur">0</span>/248 caractères.
+                            </small>
                         </div>
                         <div class="form-group">
                             <label class="form-label">Autres mentions légales</label>
-                            <textarea name="facture_autres_mentions" class="form-control" rows="3"
+                            <textarea name="facture_autres_mentions" id="factureAutresMentionsInput" class="form-control" rows="3"
+                                maxlength="248" oninput="majCompteurParametre('factureAutresMentions')"
                                 placeholder="Ex: Capital social : 1 000 000 FCFA — Forme juridique : SARL">{{ old('facture_autres_mentions', $entreprise->facture_autres_mentions) }}</textarea>
-                            <small style="color:var(--text-3);font-size:11px;">Mentions additionnelles : capital social, forme juridique, etc.</small>
+                            <small style="color:var(--text-3);font-size:11px;">
+                                Mentions additionnelles : capital social, forme juridique, etc. Transmises à la DGI.
+                                <span id="factureAutresMentionsCompteur">0</span>/248 caractères.
+                            </small>
+                            <script>
+                                function majCompteurParametre(prefixe) {
+                                    const champ    = document.getElementById(prefixe + 'Input');
+                                    const compteur = document.getElementById(prefixe + 'Compteur');
+                                    if (champ && compteur) compteur.textContent = champ.value.length;
+                                }
+                                document.addEventListener('DOMContentLoaded', function () {
+                                    majCompteurParametre('piedDePageFacture');
+                                    majCompteurParametre('factureAutresMentions');
+                                });
+                            </script>
                         </div>
                     </div>
                 </div>

@@ -74,8 +74,10 @@ class EntrepriseControleur
             'commune'                => ['nullable', 'string', 'max:100'],
             'quartier'               => ['nullable', 'string', 'max:100'],
             'sticker_solde_alerte'   => ['nullable', 'integer', 'min:1', 'max:9999'],
-            'pied_de_page_facture'   => ['nullable', 'string', 'max:1000'],
-            'facture_autres_mentions'=> ['nullable', 'string', 'max:1000'],
+            // 248 caractères : longueur maximale acceptée par la FNE pour les
+            // champs `footer` et `commercialMessage`.
+            'pied_de_page_facture'   => ['nullable', 'string', 'max:248'],
+            'facture_autres_mentions'=> ['nullable', 'string', 'max:248'],
         ]);
 
         $data = $request->only([
