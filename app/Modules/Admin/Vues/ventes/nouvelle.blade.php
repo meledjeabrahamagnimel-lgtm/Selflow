@@ -26,10 +26,40 @@
         display: flex; align-items: center; gap: 10px;
         background: var(--bg3); border-radius: 8px; padding: 10px 12px;
         margin-bottom: 8px;
+        /* Le contenu ne doit jamais deborder de la carte du panier. */
+        overflow: hidden;
     }
-    .panier-item .item-nom { flex: 1; font-weight: 600; font-size: 13px; }
+    /* Sans `min-width:0`, un element flexible refuse de passer sous la largeur
+       de son contenu : la ligne Unite / Remise / TVA debordait vers la droite. */
+    .panier-item > .item-corps { flex: 1; min-width: 0; }
+    .panier-item .item-nom { flex: 1; font-weight: 600; font-size: 13px; overflow-wrap: break-word; }
     .panier-item .item-prix { color: var(--text-3); font-size: 12px; }
-    .qte-ctrl { display: flex; align-items: center; gap: 4px; }
+
+    /* Champs de ligne : ils se replient sur plusieurs rangees si la colonne du
+       panier est etroite, plutot que de sortir de la carte. */
+    .panier-item .champs-ligne {
+        margin-top: 6px;
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 6px 12px;
+    }
+    .panier-item .champs-ligne label {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        margin: 0;
+        font-size: 11px;
+        color: var(--text-3);
+        white-space: nowrap;
+    }
+    .panier-item .champs-ligne input {
+        height: 24px;
+        font-size: 11px;
+        padding: 2px 6px;
+        max-width: 100%;
+    }
+    .qte-ctrl { display: flex; align-items: center; gap: 4px; flex-shrink: 0; }
     .qte-btn {
         width: 26px; height: 26px; border-radius: 6px;
         border: none; cursor: pointer; font-size: 14px; font-weight: 700;
@@ -1066,17 +1096,20 @@ function renderPanier() {
         const div = document.createElement('div');
         div.className = 'panier-item';
         div.innerHTML = `
-            <div style="flex:1;">
+            <div class="item-corps">
                 <div class="item-nom">${item.nom}</div>
                 <div class="item-prix">${formatFcfa(item.prix)} × ${item.qte} = <strong>${formatFcfa(sousTotalNet)}</strong>${remiseLigne > 0 ? ` <span style="color:#dc2626;">(−${remiseLigne}%)</span>` : ''}</div>
                 ${(item.taxes || []).length ? `<div style="font-size:10px; color:var(--text-3);">${item.taxes.map(t => `${t.nom} ${t.taux}%`).join(' · ')}</div>` : ''}
-                <div style="margin-top: 5px; display: flex; align-items: center; gap: 6px;">
-                    <span style="font-size: 11px; color: var(--text-3);">Unité:</span>
-                    <input type="text" class="form-control form-control-sm" value="${item.unite || 'Unité'}" onchange="saisirUnite('${id}', this.value)" style="width: 80px; height: 22px; font-size: 11px; padding: 2px 6px; display: inline-block;">
-                    <span style="font-size: 11px; color: var(--text-3);">Remise (%):</span>
-                    <input type="number" class="form-control form-control-sm" value="${remiseLigne}" min="0" max="100" step="0.01" oninput="saisirRemiseLigne('${id}', this.value)" style="width: 70px; height: 22px; font-size: 11px; padding: 2px 6px; display: inline-block;">
-                    <span style="font-size: 11px; color: var(--text-3);">TVA (%):</span>
-                    <input type="number" class="form-control form-control-sm" value="${item.tva || 0}" min="0" max="100" step="0.01" oninput="saisirTvaLigne('${id}', this.value)" style="width: 70px; height: 22px; font-size: 11px; padding: 2px 6px; display: inline-block;">
+                <div class="champs-ligne">
+                    <label>Unité
+                        <input type="text" class="form-control form-control-sm" value="${item.unite || 'Unité'}" onchange="saisirUnite('${id}', this.value)" style="width: 76px;">
+                    </label>
+                    <label>Remise&nbsp;(%)
+                        <input type="number" class="form-control form-control-sm" value="${remiseLigne}" min="0" max="100" step="0.01" oninput="saisirRemiseLigne('${id}', this.value)" style="width: 64px;">
+                    </label>
+                    <label>TVA&nbsp;(%)
+                        <input type="number" class="form-control form-control-sm" value="${item.tva || 0}" min="0" max="100" step="0.01" oninput="saisirTvaLigne('${id}', this.value)" style="width: 64px;">
+                    </label>
                 </div>
             </div>
             <div class="qte-ctrl">

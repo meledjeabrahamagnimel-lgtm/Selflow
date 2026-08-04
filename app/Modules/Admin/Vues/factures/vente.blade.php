@@ -105,13 +105,20 @@
     }
 
     /*
-     * Tableaux d'articles : la repartition des colonnes est laissee au
-     * navigateur, avec un minimum garanti. Les largeurs en pourcentage
-     * cumulaient au-dela de 100 % depuis l'ajout des colonnes Remise et
-     * Montant HT, ce qui tronquait la derniere colonne.
+     * Tableaux d'articles.
+     *
+     * `overflow-wrap: anywhere` (et son equivalent `word-break: break-word`)
+     * autorise le navigateur a couper un mot n'importe ou. Effet de bord :
+     * la largeur minimale d'une colonne tombe a UN caractere. Avec dix
+     * colonnes de montants en `nowrap`, la colonne Description se faisait
+     * ecraser jusqu'a afficher une lettre par ligne — c'est ce qu'on voyait
+     * sur les modeles 1 a 3.
+     *
+     * On revient donc a une coupure au mot (`break-word`, qui ne reduit pas
+     * la largeur minimale calculee) et on impose la repartition des colonnes
+     * via un <colgroup> plutot que de la laisser au navigateur.
      */
     .invoice table {
-        table-layout: auto;
         width: 100%;
     }
     /* A l'ecran, un tableau trop large defile dans son cadre plutot que d'etre
@@ -121,15 +128,55 @@
     }
     .invoice table th,
     .invoice table td {
-        overflow-wrap: anywhere;
+        overflow-wrap: break-word;
         white-space: normal;
-        word-break: break-word;
     }
     /* Seuls les montants et pourcentages restent sur une seule ligne */
     .invoice table td.montant,
     .invoice table th.montant {
         white-space: nowrap;
     }
+
+    /*
+     * Tableau des articles : largeurs pilotees par le <colgroup> associe.
+     * Les en-tetes ont le droit de passer sur deux lignes (« Autres / taxes »)
+     * plutot que de deborder de leur colonne.
+     */
+    .invoice table.tbl-articles {
+        table-layout: fixed;
+    }
+    .invoice table.tbl-articles th {
+        white-space: normal !important;
+        /* Un intitule se replie entre ses mots (« Autres / taxes ») mais jamais
+           a l'interieur d'un mot : « TV / A » etait illisible. */
+        overflow-wrap: normal;
+        word-break: normal;
+        hyphens: none;
+        font-size: 10px;
+        line-height: 1.25;
+    }
+    /* La designation se replie sur plusieurs lignes, jamais en colonne. */
+    .invoice table.tbl-articles td.col-desc,
+    .invoice table.tbl-articles td.col-ref {
+        white-space: normal !important;
+        overflow-wrap: break-word;
+        word-break: normal;
+    }
+    /*
+     * Libelles de taxes : ils se replient entre les mots. On interdit la
+     * coupure a l'interieur d'un mot, qui donnait des « Taxe spécifiqu / e 5% »
+     * illisibles dans une colonne etroite.
+     */
+    .invoice table.tbl-articles td.col-taxes {
+        white-space: normal !important;
+        overflow-wrap: normal;
+        word-break: normal;
+        hyphens: none;
+    }
+    /*
+     * Volontairement pas de `overflow: hidden` ici : mieux vaut un montant qui
+     * mord legerement sur sa voisine qu'un montant ampute de ses chiffres.
+     */
 
     /* Styles pour la table modèle 4 standard */
     .table-m4 {
@@ -142,7 +189,9 @@
     
     .table-m4 th, .table-m4 td {
         border: 1px solid #000;
-        padding: 8px 10px;
+        /* Huit colonnes : une gouttiere de 10 px de chaque cote ne laissait plus
+           de place au libelle de l'article. */
+        padding: 7px 6px;
     }
 
     /* QR Code styling */
@@ -150,81 +199,7 @@
         display: inline-block;
     }
 
-    /*
-     * Etat applique le temps de la capture PDF : largeur figee a une page A4
-     * (794 px a 96 dpi) et suppression des effets d'ecran, pour un rendu de
-     * page photocopiee.
-     */
-    .invoice.mode-export {
-        width: 794px !important;
-        max-width: 794px !important;
-        margin: 0 !important;
-        border: none !important;
-        border-radius: 0 !important;
-        box-shadow: none !important;
-        /*
-         * `.invoice` masque son debordement pour arrondir ses coins. A
-         * l'export, ce masquage rognait purement et simplement la partie du
-         * tableau qui depassait : d'ou les factures coupees a droite.
-         */
-        overflow: visible !important;
-    }
-    .invoice.mode-export table {
-        font-size: 10px !important;
-    }
-    .invoice.mode-export th,
-    .invoice.mode-export td {
-        padding-left: 5px !important;
-        padding-right: 5px !important;
-        /* Un libelle long doit se replier plutot qu'elargir la colonne */
-        white-space: normal !important;
-        word-break: break-word;
-    }
-
-    /* CSS Impression */
-    @page {
-        size: A4 portrait;
-        margin: 10mm;
-    }
-
-    @media print {
-        * {
-            -webkit-print-color-adjust: exact !important;
-            print-color-adjust: exact !important;
-        }
-        .sidebar, header, .topbar, .no-print, .banner-alert, .user-dropdown-menu, .sidebar-logo, .sidebar-pdv {
-            display: none !important;
-        }
-        body, .main-wrap, .main-content, main {
-            margin: 0 !important;
-            padding: 0 !important;
-            background: #fff !important;
-            width: 100% !important;
-            max-width: 100% !important;
-            position: static !important;
-        }
-        .invoice-container {
-            padding: 0 !important;
-        }
-        .invoice {
-            border: none !important;
-            box-shadow: none !important;
-            max-width: 100% !important;
-            width: 100% !important;
-            margin: 0 !important;
-            padding: 0 !important;
-            border-radius: 0 !important;
-            overflow: visible !important;
-        }
-        /* Rien d'autre que la facture ne doit atterrir sur la feuille */
-        .controls-card, .page-header, nav, footer, .breadcrumb {
-            display: none !important;
-        }
-        /* Eviter qu'une ligne de tableau soit coupee en deux pages */
-        table, tr, td, th {
-            page-break-inside: avoid !important;
-        }
-    }
+@include('admin::factures.partials.styles-impression')
 </style>
 @endsection
 
@@ -297,7 +272,8 @@
                     </button>
                 @endif
             @endif
-            <button class="print-btn main" onclick="telechargerPdf()">
+            <button class="print-btn main" onclick="telechargerPdf()"
+                    title="Dans la boîte de dialogue, choisissez la destination « Enregistrer au format PDF » pour obtenir le fichier.">
                 <i class="fas fa-download"></i> Télécharger PDF
             </button>
             
@@ -493,8 +469,6 @@
 @endsection
 
 @section('scripts')
-<!-- CDN pour html2pdf -->
-<script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
 
 <script>
 var curModel = 1;
@@ -618,6 +592,37 @@ function fmt(n) {
 
 function fmtFcfa(n) {
     return Math.round(n).toLocaleString('fr-FR') + ' FCFA';
+}
+
+/**
+ * Repartition des colonnes du tableau des articles (modeles 1 a 3).
+ *
+ * Laissee au navigateur, cette repartition sacrifiait la designation : c'est
+ * la seule colonne « compressible » face a neuf colonnes de montants en
+ * `nowrap`, d'ou le libelle affiche une lettre par ligne. Les largeurs sont
+ * donc fixees ici, une bonne fois, et totalisent exactement 100 %.
+ */
+function colgroupArticles() {
+    // Total exactement egal a 100 %. Les colonnes de montants sont calibrees
+    // pour un chiffre a sept positions (« 1 234 567 F »), courant en FCFA.
+    var largeurs = isDeliveryMode
+        ? ['14%', '58%', '14%', '14%']
+        : ['8%', '23.5%', '6.5%', '5.5%', '11.5%', '6%', '9.5%', '5%', '12%', '12.5%'];
+
+    return '<colgroup>' + largeurs.map(function (l) {
+        return '<col style="width:' + l + '">';
+    }).join('') + '</colgroup>';
+}
+
+/** Meme principe pour le modele 4, dont le tableau a un jeu de colonnes propre. */
+function colgroupArticlesM4() {
+    var largeurs = isDeliveryMode
+        ? ['16%', '56%', '14%', '14%']
+        : ['10%', '26%', '13%', '6%', '8%', '12%', '10%', '15%'];
+
+    return '<colgroup>' + largeurs.map(function (l) {
+        return '<col style="width:' + l + '">';
+    }).join('') + '</colgroup>';
 }
 
 /**
@@ -792,69 +797,12 @@ function toggleDeliveryMode() {
     render();
 }
 
-/**
- * Export PDF de la seule facture, en qualite « photocopie ».
- *
- * Trois causes de flou etaient reunies :
- *   - la capture etait encodee en JPEG, dont la compression brouille le texte
- *     fin ; on passe en PNG, sans perte ;
- *   - la largeur capturee suivait celle de l'ecran (barre laterale comprise),
- *     puis l'image etait etiree pour remplir l'A4 ; on fige desormais la
- *     largeur de rendu a celle d'une page A4 a 96 dpi (794 px) ;
- *   - l'echelle de rasterisation etait trop basse pour une impression.
- *
- * On neutralise aussi l'ombre et les coins arrondis le temps de la capture :
- * une facture imprimee n'a ni l'un ni l'autre.
- */
-function telechargerPdf() {
-    var controls = document.querySelector('.controls-card');
-    if (controls) controls.style.display = 'none';
-
-    var element = document.querySelector('.invoice');
-    element.classList.add('mode-export');
-
-    // Une echelle plus elevee sur les grands documents alourdit le fichier
-    // sans gain visible : 3 suffit pour du texte net a l'impression.
-    var echelle = Math.min(3, Math.max(2, window.devicePixelRatio || 1) + 1);
-
-    // La capture doit partir du haut de la page : html2canvas se cale sur la
-    // position de défilement courante, ce qui décalait et rognait le document.
-    var defilementInitial = window.scrollY;
-    window.scrollTo(0, 0);
-
-    // On laisse html2canvas mesurer l'élément lui-même. Forcer une largeur
-    // fixe rognait la facture quand sa largeur réelle differait, d'où les
-    // bords coupés à gauche comme à droite.
-    var opt = {
-        margin:       [8, 8, 8, 8],
-        filename:     (isDeliveryMode ? 'BL_' : 'Facture_') + DATA.vente.num + '.pdf',
-        image:        { type: 'png' },
-        html2canvas:  {
-            scale: echelle,
-            useCORS: true,
-            logging: false,
-            backgroundColor: '#ffffff',
-            letterRendering: true,
-            scrollX: 0,
-            scrollY: 0,
-            windowWidth: element.scrollWidth,
-            windowHeight: element.scrollHeight
-        },
-        jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait', compress: true },
-        pagebreak:    { mode: ['css', 'legacy'] }
-    };
-
-    function restaurer() {
-        element.classList.remove('mode-export');
-        if (controls) controls.style.display = '';
-        window.scrollTo(0, defilementInitial);
-    }
-
-    html2pdf().set(opt).from(element).save().then(restaurer).catch(function(err) {
-        restaurer();
-        console.error(err);
-    });
+/** Nom de fichier propose par le navigateur dans la boite d'impression. */
+function nomFichierPdf() {
+    return (isDeliveryMode ? 'BL_' : 'Facture_') + DATA.vente.num;
 }
+
+@include('admin::factures.partials.script-impression')
 
 function logoHtml(src, alt, maxH) {
     if (!src) return '';
@@ -1002,36 +950,37 @@ function model1(d) {
         </div>
         
         ${getAvoirBlock(d)}
-        <table style="width:100%;border-collapse:collapse;font-size:12px;margin-bottom:16px">
+        <table class="tbl-articles" style="border-collapse:collapse;font-size:11px;margin-bottom:16px">
+            ${colgroupArticles()}
             <thead>
                 <tr style="background:${theme.color};color:#fff;">
-                    <th style="padding:9px 12px;text-align:left;color:#fff;background:${theme.color};font-weight:600;white-space:nowrap;">Réf.</th>
-                    <th style="padding:9px 12px;text-align:left;color:#fff;background:${theme.color};font-weight:600">Description</th>
-                    <th style="padding:9px 12px;text-align:center;color:#fff;background:${theme.color};font-weight:600;white-space:nowrap;">Unité</th>
-                    <th style="padding:9px 12px;text-align:right;color:#fff;background:${theme.color};font-weight:600;white-space:nowrap;">Qté</th>
+                    <th style="padding:8px 6px;text-align:left;color:#fff;background:${theme.color};font-weight:600;">Réf.</th>
+                    <th style="padding:8px 6px;text-align:left;color:#fff;background:${theme.color};font-weight:600">Description</th>
+                    <th style="padding:8px 6px;text-align:center;color:#fff;background:${theme.color};font-weight:600;">Unité</th>
+                    <th style="padding:8px 6px;text-align:right;color:#fff;background:${theme.color};font-weight:600;">Qté</th>
                     ${isDeliveryMode ? '' : `
-                    <th style="padding:9px 12px;text-align:right;color:#fff;background:${theme.color};font-weight:600;white-space:nowrap;">P.U. HT</th>
-                    <th style="padding:9px 12px;text-align:right;color:#fff;background:${theme.color};font-weight:600;white-space:nowrap;">Rem. (%)</th>
-                    <th style="padding:9px 12px;text-align:right;color:#fff;background:${theme.color};font-weight:600;white-space:nowrap;">Autres taxes</th>
-                    <th style="padding:9px 12px;text-align:right;color:#fff;background:${theme.color};font-weight:600;white-space:nowrap;">TVA</th>
-                    <th style="padding:9px 12px;text-align:right;color:#fff;background:${theme.color};font-weight:600;white-space:nowrap;">Montant HT</th>
-                    <th style="padding:9px 12px;text-align:right;color:#fff;background:${theme.color};font-weight:600;white-space:nowrap;">Total TTC</th>
+                    <th style="padding:8px 6px;text-align:right;color:#fff;background:${theme.color};font-weight:600;">P.U. HT</th>
+                    <th style="padding:8px 6px;text-align:right;color:#fff;background:${theme.color};font-weight:600;">Rem. (%)</th>
+                    <th style="padding:8px 6px;text-align:right;color:#fff;background:${theme.color};font-weight:600;">Autres taxes</th>
+                    <th style="padding:8px 6px;text-align:right;color:#fff;background:${theme.color};font-weight:600;">TVA</th>
+                    <th style="padding:8px 6px;text-align:right;color:#fff;background:${theme.color};font-weight:600;">Montant HT</th>
+                    <th style="padding:8px 6px;text-align:right;color:#fff;background:${theme.color};font-weight:600;">Total TTC</th>
                     `}
                 </tr>
             </thead>
             <tbody>
                 ${c.rows.map((r, i) => `<tr style="background:${i % 2 === 0 ? '#fff' : '#F9FAFB'}">
-                    <td style="padding:9px 12px;color:var(--mu);font-weight:500;word-break:break-word;">${r.ref}</td>
-                    <td style="padding:9px 12px;font-weight:600;color:var(--tx)">${r.desc}</td>
-                    <td style="padding:9px 12px;text-align:center;color:var(--tx);white-space:nowrap;">${r.unite || 'Unité'}</td>
-                    <td style="padding:9px 12px;text-align:right;color:var(--tx);white-space:nowrap;">${r.qty}</td>
+                    <td class="col-ref" style="padding:8px 6px;color:var(--mu);font-weight:500;">${r.ref}</td>
+                    <td class="col-desc" style="padding:8px 6px;font-weight:600;color:var(--tx)">${r.desc}</td>
+                    <td style="padding:8px 6px;text-align:center;color:var(--tx);white-space:nowrap;">${r.unite || 'Unité'}</td>
+                    <td style="padding:8px 6px;text-align:right;color:var(--tx);white-space:nowrap;">${r.qty}</td>
                     ${isDeliveryMode ? '' : `
-                    <td style="padding:9px 12px;text-align:right;color:var(--tx);white-space:nowrap;">${fmt(r.pu)}</td>
-                    <td style="padding:9px 12px;text-align:right;color:${r.remise_taux > 0 ? '#dc2626' : 'var(--mu)'};white-space:nowrap;">${r.remise_taux || 0}%</td>
-                    <td style="padding:9px 12px;text-align:right;color:var(--mu);font-size:11px;">${detailTaxesLigne(r)}</td>
-                    <td style="padding:9px 12px;text-align:right;color:var(--mu);white-space:nowrap;">${r.tva}%</td>
-                    <td style="padding:9px 12px;text-align:right;color:var(--tx);white-space:nowrap;">${fmt(r.ht)}</td>
-                    <td style="padding:9px 12px;text-align:right;font-weight:700;color:var(--tx);white-space:nowrap;">${fmt(r.ttc)}</td>
+                    <td style="padding:8px 6px;text-align:right;color:var(--tx);white-space:nowrap;">${fmt(r.pu)}</td>
+                    <td style="padding:8px 6px;text-align:right;color:${r.remise_taux > 0 ? '#dc2626' : 'var(--mu)'};white-space:nowrap;">${r.remise_taux || 0}%</td>
+                    <td class="col-taxes" style="padding:8px 6px;text-align:right;color:var(--mu);font-size:10px;">${detailTaxesLigne(r)}</td>
+                    <td style="padding:8px 6px;text-align:right;color:var(--mu);white-space:nowrap;">${r.tva}%</td>
+                    <td style="padding:8px 6px;text-align:right;color:var(--tx);white-space:nowrap;">${fmt(r.ht)}</td>
+                    <td style="padding:8px 6px;text-align:right;font-weight:700;color:var(--tx);white-space:nowrap;">${fmt(r.ttc)}</td>
                     `}
                 </tr>`).join('')}
             </tbody>
@@ -1134,36 +1083,37 @@ function model2(d) {
                 </div>` : ''}
             </div>
             ${getAvoirBlock(d)}
-            <table style="width:100%;border-collapse:collapse;font-size:12px;margin-bottom:14px">
+            <table class="tbl-articles" style="border-collapse:collapse;font-size:11px;margin-bottom:14px">
+                ${colgroupArticles()}
                 <thead>
                     <tr style="border-bottom:1.5px solid ${theme.color}">
-                        <th style="padding:7px 0;text-align:left;color:${theme.color};font-weight:700;white-space:nowrap;">Réf.</th>
-                        <th style="padding:7px 6px;text-align:left;color:${theme.color};font-weight:700">Article</th>
-                        <th style="padding:7px 6px;text-align:center;color:${theme.color};font-weight:700;white-space:nowrap;">Unité</th>
-                        <th style="padding:7px 6px;text-align:right;color:${theme.color};font-weight:700;white-space:nowrap;">Qté</th>
+                        <th style="padding:7px 4px 7px 0;text-align:left;color:${theme.color};font-weight:700;">Réf.</th>
+                        <th style="padding:7px 4px;text-align:left;color:${theme.color};font-weight:700">Article</th>
+                        <th style="padding:7px 4px;text-align:center;color:${theme.color};font-weight:700;">Unité</th>
+                        <th style="padding:7px 4px;text-align:right;color:${theme.color};font-weight:700;">Qté</th>
                         ${isDeliveryMode ? '' : `
-                        <th style="padding:7px 6px;text-align:right;color:${theme.color};font-weight:700;white-space:nowrap;">P.U. HT</th>
-                        <th style="padding:7px 6px;text-align:right;color:${theme.color};font-weight:700;white-space:nowrap;">Rem. (%)</th>
-                        <th style="padding:7px 6px;text-align:right;color:${theme.color};font-weight:700;white-space:nowrap;">Autres taxes</th>
-                        <th style="padding:7px 6px;text-align:right;color:${theme.color};font-weight:700;white-space:nowrap;">TVA</th>
-                        <th style="padding:7px 6px;text-align:right;color:${theme.color};font-weight:700;white-space:nowrap;">Montant HT</th>
-                        <th style="padding:7px 0;text-align:right;color:${theme.color};font-weight:700;white-space:nowrap;">TTC</th>
+                        <th style="padding:7px 4px;text-align:right;color:${theme.color};font-weight:700;">P.U. HT</th>
+                        <th style="padding:7px 4px;text-align:right;color:${theme.color};font-weight:700;">Rem. (%)</th>
+                        <th style="padding:7px 4px;text-align:right;color:${theme.color};font-weight:700;">Autres taxes</th>
+                        <th style="padding:7px 4px;text-align:right;color:${theme.color};font-weight:700;">TVA</th>
+                        <th style="padding:7px 4px;text-align:right;color:${theme.color};font-weight:700;">Montant HT</th>
+                        <th style="padding:7px 0 7px 4px;text-align:right;color:${theme.color};font-weight:700;">TTC</th>
                         `}
                     </tr>
                 </thead>
                 <tbody>
                     ${c.rows.map(r => `<tr style="border-bottom:0.5px solid var(--border)">
-                        <td style="padding:8px 0;color:var(--mu);font-weight:500;word-break:break-word;">${r.ref}</td>
-                        <td style="padding:8px 6px;color:var(--tx);font-weight:600;">${r.desc}</td>
-                        <td style="padding:8px 6px;text-align:center;color:var(--mu);white-space:nowrap;">${r.unite || 'Unité'}</td>
-                        <td style="padding:8px 6px;text-align:right;color:var(--mu);white-space:nowrap;">${r.qty}</td>
+                        <td class="col-ref" style="padding:8px 4px 8px 0;color:var(--mu);font-weight:500;">${r.ref}</td>
+                        <td class="col-desc" style="padding:8px 4px;color:var(--tx);font-weight:600;">${r.desc}</td>
+                        <td style="padding:8px 4px;text-align:center;color:var(--mu);white-space:nowrap;">${r.unite || 'Unité'}</td>
+                        <td style="padding:8px 4px;text-align:right;color:var(--mu);white-space:nowrap;">${r.qty}</td>
                         ${isDeliveryMode ? '' : `
-                        <td style="padding:8px 6px;text-align:right;color:var(--mu);white-space:nowrap;">${fmt(r.pu)}</td>
-                        <td style="padding:8px 6px;text-align:right;color:${r.remise_taux > 0 ? '#dc2626' : 'var(--mu)'};white-space:nowrap;">${r.remise_taux || 0}%</td>
-                        <td style="padding:8px 6px;text-align:right;color:var(--mu);font-size:11px;">${detailTaxesLigne(r)}</td>
-                        <td style="padding:8px 6px;text-align:right;color:var(--mu);white-space:nowrap;">${r.tva}%</td>
-                        <td style="padding:8px 6px;text-align:right;color:var(--tx);white-space:nowrap;">${fmt(r.ht)}</td>
-                        <td style="padding:8px 0;text-align:right;font-weight:700;color:var(--tx);white-space:nowrap;">${fmt(r.ttc)}</td>
+                        <td style="padding:8px 4px;text-align:right;color:var(--mu);white-space:nowrap;">${fmt(r.pu)}</td>
+                        <td style="padding:8px 4px;text-align:right;color:${r.remise_taux > 0 ? '#dc2626' : 'var(--mu)'};white-space:nowrap;">${r.remise_taux || 0}%</td>
+                        <td class="col-taxes" style="padding:8px 4px;text-align:right;color:var(--mu);font-size:10px;">${detailTaxesLigne(r)}</td>
+                        <td style="padding:8px 4px;text-align:right;color:var(--mu);white-space:nowrap;">${r.tva}%</td>
+                        <td style="padding:8px 4px;text-align:right;color:var(--tx);white-space:nowrap;">${fmt(r.ht)}</td>
+                        <td style="padding:8px 0 8px 4px;text-align:right;font-weight:700;color:var(--tx);white-space:nowrap;">${fmt(r.ttc)}</td>
                         `}
                     </tr>`).join('')}
                 </tbody>
@@ -1264,36 +1214,37 @@ function model3(d) {
         </div>
 
         ${getAvoirBlock(d)}
-        <table style="width:100%;border-collapse:collapse;font-size:12px;margin-bottom:16px;table-layout:fixed">
+        <table class="tbl-articles" style="border-collapse:collapse;font-size:11px;margin-bottom:16px">
+            ${colgroupArticles()}
             <thead>
                 <tr>
-                    <th style="padding:9px 10px;text-align:left;border-bottom:2px solid ${theme.color};color:var(--tx);font-weight:700;white-space:nowrap;">Réf.</th>
-                    <th style="padding:9px 10px;text-align:left;border-bottom:2px solid ${theme.color};color:var(--tx);font-weight:700;">Article</th>
-                    <th style="padding:9px 10px;text-align:center;border-bottom:2px solid ${theme.color};color:var(--tx);font-weight:700;white-space:nowrap;">Unité</th>
-                    <th style="padding:9px 10px;text-align:right;border-bottom:2px solid ${theme.color};color:var(--tx);font-weight:700;white-space:nowrap;">Qté</th>
+                    <th style="padding:9px 5px;text-align:left;border-bottom:2px solid ${theme.color};color:var(--tx);font-weight:700;">Réf.</th>
+                    <th style="padding:9px 5px;text-align:left;border-bottom:2px solid ${theme.color};color:var(--tx);font-weight:700;">Article</th>
+                    <th style="padding:9px 5px;text-align:center;border-bottom:2px solid ${theme.color};color:var(--tx);font-weight:700;">Unité</th>
+                    <th style="padding:9px 5px;text-align:right;border-bottom:2px solid ${theme.color};color:var(--tx);font-weight:700;">Qté</th>
                     ${isDeliveryMode ? '' : `
-                    <th style="padding:9px 10px;text-align:right;border-bottom:2px solid ${theme.color};color:var(--tx);font-weight:700;white-space:nowrap;">P.U. HT</th>
-                    <th style="padding:9px 10px;text-align:right;border-bottom:2px solid ${theme.color};color:var(--tx);font-weight:700;white-space:nowrap;">Rem. (%)</th>
-                    <th style="padding:9px 10px;text-align:right;border-bottom:2px solid ${theme.color};color:var(--tx);font-weight:700;white-space:nowrap;">Autres taxes</th>
-                    <th style="padding:9px 10px;text-align:right;border-bottom:2px solid ${theme.color};color:var(--tx);font-weight:700;white-space:nowrap;">TVA</th>
-                    <th style="padding:9px 10px;text-align:right;border-bottom:2px solid ${theme.color};color:var(--tx);font-weight:700;white-space:nowrap;">Montant HT</th>
-                    <th style="padding:9px 10px;text-align:right;border-bottom:2px solid ${theme.color};color:var(--tx);font-weight:700;white-space:nowrap;">TTC</th>
+                    <th style="padding:9px 5px;text-align:right;border-bottom:2px solid ${theme.color};color:var(--tx);font-weight:700;">P.U. HT</th>
+                    <th style="padding:9px 5px;text-align:right;border-bottom:2px solid ${theme.color};color:var(--tx);font-weight:700;">Rem. (%)</th>
+                    <th style="padding:9px 5px;text-align:right;border-bottom:2px solid ${theme.color};color:var(--tx);font-weight:700;">Autres taxes</th>
+                    <th style="padding:9px 5px;text-align:right;border-bottom:2px solid ${theme.color};color:var(--tx);font-weight:700;">TVA</th>
+                    <th style="padding:9px 5px;text-align:right;border-bottom:2px solid ${theme.color};color:var(--tx);font-weight:700;">Montant HT</th>
+                    <th style="padding:9px 5px;text-align:right;border-bottom:2px solid ${theme.color};color:var(--tx);font-weight:700;">TTC</th>
                     `}
                 </tr>
             </thead>
             <tbody>
                 ${c.rows.map((r, i) => `<tr style="background:${i % 2 === 1 ? '#F9FAFB' : '#fff'}">
-                    <td style="padding:9px 10px;color:var(--mu);font-size:11px;font-weight:500;word-break:break-word;">${r.ref}</td>
-                    <td style="padding:9px 10px;font-weight:600;color:var(--tx)">${r.desc}</td>
-                    <td style="padding:9px 10px;text-align:center;color:var(--tx);white-space:nowrap;">${r.unite || 'Unité'}</td>
-                    <td style="padding:9px 10px;text-align:right;color:var(--tx);white-space:nowrap;">${r.qty}</td>
+                    <td class="col-ref" style="padding:9px 5px;color:var(--mu);font-size:10px;font-weight:500;">${r.ref}</td>
+                    <td class="col-desc" style="padding:9px 5px;font-weight:600;color:var(--tx)">${r.desc}</td>
+                    <td style="padding:9px 5px;text-align:center;color:var(--tx);white-space:nowrap;">${r.unite || 'Unité'}</td>
+                    <td style="padding:9px 5px;text-align:right;color:var(--tx);white-space:nowrap;">${r.qty}</td>
                     ${isDeliveryMode ? '' : `
-                    <td style="padding:9px 10px;text-align:right;color:var(--mu);white-space:nowrap;">${fmt(r.pu)}</td>
-                    <td style="padding:9px 10px;text-align:right;color:${r.remise_taux > 0 ? '#dc2626' : 'var(--mu)'};white-space:nowrap;">${r.remise_taux || 0}%</td>
-                    <td style="padding:9px 10px;text-align:right;color:var(--mu);font-size:11px;">${detailTaxesLigne(r)}</td>
-                    <td style="padding:9px 10px;text-align:right;color:var(--mu);white-space:nowrap;">${r.tva}%</td>
-                    <td style="padding:9px 10px;text-align:right;color:var(--tx);white-space:nowrap;">${fmt(r.ht)}</td>
-                    <td style="padding:9px 10px;text-align:right;font-weight:700;color:var(--tx);white-space:nowrap;">${fmt(r.ttc)}</td>
+                    <td style="padding:9px 5px;text-align:right;color:var(--mu);white-space:nowrap;">${fmt(r.pu)}</td>
+                    <td style="padding:9px 5px;text-align:right;color:${r.remise_taux > 0 ? '#dc2626' : 'var(--mu)'};white-space:nowrap;">${r.remise_taux || 0}%</td>
+                    <td class="col-taxes" style="padding:9px 5px;text-align:right;color:var(--mu);font-size:10px;">${detailTaxesLigne(r)}</td>
+                    <td style="padding:9px 5px;text-align:right;color:var(--mu);white-space:nowrap;">${r.tva}%</td>
+                    <td style="padding:9px 5px;text-align:right;color:var(--tx);white-space:nowrap;">${fmt(r.ht)}</td>
+                    <td style="padding:9px 5px;text-align:right;font-weight:700;color:var(--tx);white-space:nowrap;">${fmt(r.ttc)}</td>
                     `}
                 </tr>`).join('')}
             </tbody>
@@ -1358,8 +1309,8 @@ function modelStandard(d) {
     if (isDeliveryMode) {
         rowsHtml = c.rows.map(r => `
             <tr style="background:#fff; color:#000;">
-                <td style="padding:8px 10px; border:1px solid #000; font-weight:500; word-break:break-word;">${r.ref}</td>
-                <td style="padding:8px 10px; border:1px solid #000; font-weight:700;">${r.desc}</td>
+                <td class="col-ref" style="padding:8px 6px; border:1px solid #000; font-weight:500;">${r.ref}</td>
+                <td class="col-desc" style="padding:8px 6px; border:1px solid #000; font-weight:700;">${r.desc}</td>
                 <td style="padding:8px 10px; border:1px solid #000; text-align:right; white-space:nowrap;">${r.qty}</td>
                 <td style="padding:8px 10px; border:1px solid #000; text-align:center; white-space:nowrap;">${r.unite || 'Unité'}</td>
             </tr>
@@ -1367,8 +1318,8 @@ function modelStandard(d) {
     } else {
         rowsHtml = c.rows.map(r => `
             <tr style="background:#fff; color:#000;">
-                <td style="padding:8px 10px; border:1px solid #000; font-weight:500; word-break:break-word;">${r.ref}</td>
-                <td style="padding:8px 10px; border:1px solid #000; font-weight:700;">${r.desc}</td>
+                <td class="col-ref" style="padding:8px 6px; border:1px solid #000; font-weight:500;">${r.ref}</td>
+                <td class="col-desc" style="padding:8px 6px; border:1px solid #000; font-weight:700;">${r.desc}</td>
                 <td style="padding:8px 10px; border:1px solid #000; text-align:right; white-space:nowrap;">${fmt(r.pu)}${r.remise_taux > 0 ? `<br><span style="color:#dc2626;font-size:10px;">Remise ${r.remise_taux}%</span>` : ''}</td>
                 <td style="padding:8px 10px; border:1px solid #000; text-align:right; white-space:nowrap;">${r.qty}</td>
                 <td style="padding:8px 10px; border:1px solid #000; text-align:center; white-space:nowrap;">${r.unite || 'Unité'}</td>
@@ -1487,25 +1438,26 @@ function modelStandard(d) {
         
         ${getAvoirBlock(d)}
         <!-- Tableau des Articles -->
-        <table class="table-m4">
+        <table class="table-m4 tbl-articles">
+            ${colgroupArticlesM4()}
             <thead>
                 ${isDeliveryMode ? `
                 <tr style="background:#000; color:#fff; text-transform:uppercase;">
-                    <th style="text-align:left; font-weight:700;  white-space:nowrap;">Réf.</th>
+                    <th style="text-align:left; font-weight:700;">Réf.</th>
                     <th style="text-align:left; font-weight:700;">Désignation</th>
-                    <th style="text-align:right; font-weight:700;  white-space:nowrap;">Qté</th>
-                    <th style="text-align:center; font-weight:700;  white-space:nowrap;">Unité</th>
+                    <th style="text-align:right; font-weight:700;">Qté</th>
+                    <th style="text-align:center; font-weight:700;">Unité</th>
                 </tr>
                 ` : `
                 <tr style="background:#000; color:#fff; text-transform:uppercase;">
-                    <th style="text-align:left; font-weight:700;  white-space:nowrap;">Réf.</th>
+                    <th style="text-align:left; font-weight:700;">Réf.</th>
                     <th style="text-align:left; font-weight:700;">Désignation</th>
-                    <th style="text-align:right; font-weight:700;  white-space:nowrap;">P.U. HT</th>
-                    <th style="text-align:right; font-weight:700;  white-space:nowrap;">Qté</th>
-                    <th style="text-align:center; font-weight:700;  white-space:nowrap;">Unité</th>
-                    <th style="text-align:right; font-weight:700;  white-space:nowrap;">Taxes (%)</th>
-                    <th style="text-align:right; font-weight:700;  white-space:nowrap;">Rem. (%)</th>
-                    <th style="text-align:right; font-weight:700;  white-space:nowrap;">Montant HT</th>
+                    <th style="text-align:right; font-weight:700;">P.U. HT</th>
+                    <th style="text-align:right; font-weight:700;">Qté</th>
+                    <th style="text-align:center; font-weight:700;">Unité</th>
+                    <th style="text-align:right; font-weight:700;">Taxes (%)</th>
+                    <th style="text-align:right; font-weight:700;">Rem. (%)</th>
+                    <th style="text-align:right; font-weight:700;">Montant HT</th>
                 </tr>
                 `}
             </thead>
