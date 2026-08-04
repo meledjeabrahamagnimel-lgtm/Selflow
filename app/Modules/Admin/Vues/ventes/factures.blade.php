@@ -621,43 +621,21 @@ function telechargerDirectement(url) {
                         <input type="text" name="raison" class="form-control" required placeholder="Ex: Retour produit défectueux, remise commerciale..." style="width:100%; padding:10px; border:1px solid #cbd5e1; border-radius:8px;">
                     </div>
 
-                    <!-- Mentions du document d'avoir -->
+                    <!-- Rattachement à un reçu déjà émis -->
                     <div style="margin-bottom:20px; background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; padding:14px; text-align:left;">
-                        <div style="font-size:12px; font-weight:700; color:#334155; margin-bottom:4px;">
-                            <i class="fas fa-file-lines" style="color:#e17055;"></i> Mentions de l'avoir
-                        </div>
-                        <div style="font-size:11px; color:#64748b; margin-bottom:12px;">
-                            Ces champs sont préremplis depuis la facture d'origine et n'apparaissent que sur
-                            l'avoir imprimé : l'API de remboursement de la FNE n'accepte que la liste des
-                            articles retournés.
-                        </div>
-
-                        <label style="display:flex; align-items:center; gap:8px; font-size:13px; font-weight:700; color:#334155; cursor:pointer; margin-bottom:10px;">
+                        <label style="display:flex; align-items:center; gap:8px; font-size:13px; font-weight:700; color:#334155; cursor:pointer; margin:0;">
                             <input type="checkbox" name="est_rne" value="1" id="avoirEstRneCheckbox"
                                    onchange="basculerChampRneAvoir()" style="width:16px; height:16px; cursor:pointer;">
                             RNE
                         </label>
-                        <div id="avoirChampRne" style="display:none; margin-bottom:12px;">
+                        <div style="font-size:11px; color:#64748b; margin-top:4px;">
+                            Les autres mentions et le pied de page proviennent des paramètres de l'entreprise.
+                        </div>
+                        <div id="avoirChampRne" style="display:none; margin-top:10px;">
                             <label style="font-size:11px; font-weight:700; color:#475569; display:block; margin-bottom:4px;">Numéro du reçu</label>
                             <input type="text" name="numero_rne" id="avoirNumeroRne" maxlength="64"
                                    placeholder="N° du reçu normalisé d'origine"
                                    style="width:100%; padding:8px; border:1px solid #cbd5e1; border-radius:6px; font-size:12px;">
-                        </div>
-
-                        <label style="font-size:11px; font-weight:700; color:#475569; display:block; margin-bottom:4px;">Autres mentions</label>
-                        <textarea name="autres_mentions" id="avoirAutresMentions" rows="2" maxlength="248"
-                                  oninput="majCompteurAvoir('avoirAutresMentions')"
-                                  style="width:100%; padding:8px; border:1px solid #cbd5e1; border-radius:6px; font-size:12px;"></textarea>
-                        <div style="font-size:11px; color:#94a3b8; margin-bottom:10px;">
-                            <span id="avoirAutresMentionsCompteur">0</span>/248 caractères
-                        </div>
-
-                        <label style="font-size:11px; font-weight:700; color:#475569; display:block; margin-bottom:4px;">Pied de page</label>
-                        <textarea name="pied_de_page" id="avoirPiedDePage" rows="2" maxlength="248"
-                                  oninput="majCompteurAvoir('avoirPiedDePage')"
-                                  style="width:100%; padding:8px; border:1px solid #cbd5e1; border-radius:6px; font-size:12px;"></textarea>
-                        <div style="font-size:11px; color:#94a3b8;">
-                            <span id="avoirPiedDePageCompteur">0</span>/248 caractères
                         </div>
                     </div>
 
@@ -668,12 +646,6 @@ function telechargerDirectement(url) {
                             const champ = document.getElementById('avoirNumeroRne');
                             bloc.style.display = coche ? 'block' : 'none';
                             if (champ) champ.required = coche;
-                        }
-
-                        function majCompteurAvoir(id) {
-                            const champ    = document.getElementById(id);
-                            const compteur = document.getElementById(id + 'Compteur');
-                            if (champ && compteur) compteur.textContent = champ.value.length;
                         }
                     </script>
 
@@ -1064,16 +1036,6 @@ function selectionnerFacturePourAvoir(id) {
                 caseRne.checked = !!data.est_rne;
                 document.getElementById('avoirNumeroRne').value = data.numero_rne || '';
                 basculerChampRneAvoir();
-            }
-            const champMentions = document.getElementById('avoirAutresMentions');
-            if (champMentions) {
-                champMentions.value = data.autres_mentions || '';
-                majCompteurAvoir('avoirAutresMentions');
-            }
-            const champPied = document.getElementById('avoirPiedDePage');
-            if (champPied) {
-                champPied.value = data.pied_de_page || '';
-                majCompteurAvoir('avoirPiedDePage');
             }
             
             const tbody = document.getElementById('avoirItemsTableBody');
@@ -1467,32 +1429,32 @@ function soumettrePlanification(e) {
     e.preventDefault();
     const form = e.target;
     const formData = new FormData(form);
-    
+
     const errorDiv = document.getElementById('modal-error-msg');
     errorDiv.style.display = 'none';
-    
+
     const submitBtn = form.querySelector('button[type="submit"]');
     submitBtn.disabled = true;
-    submitBtn.textContent = 'Lancement...';
-    
+    submitBtn.textContent = 'Préparation...';
+
     fetch("{{ route('admin.fne.schedule_batch') }}", {
         method: "POST",
-        headers: {
-            "X-CSRF-TOKEN": "{{ csrf_token() }}"
-        },
+        headers: { "X-CSRF-TOKEN": "{{ csrf_token() }}" },
         body: formData
     })
-    .then(r => r.json())
-    .then(data => {
-        if (data.success) {
-            fermerModalPlanification();
-            startPollingJobStatus();
-        } else {
+    .then(r => r.json().then(data => ({ ok: r.ok, data })))
+    .then(({ ok, data }) => {
+        submitBtn.disabled = false;
+        submitBtn.textContent = 'Lancer le traitement';
+
+        if (!ok || !data.success) {
             errorDiv.textContent = data.message ?? 'Erreur lors du lancement.';
             errorDiv.style.display = 'block';
-            submitBtn.disabled = false;
-            submitBtn.textContent = 'Lancer le traitement';
+            return;
         }
+
+        fermerModalPlanification();
+        traiterParTranches(data.ids, data.flux);
     })
     .catch(err => {
         errorDiv.textContent = "Erreur de connexion : " + err.message;
@@ -1502,95 +1464,94 @@ function soumettrePlanification(e) {
     });
 }
 
-let jobPollInterval = null;
+/**
+ * Normalisation d'une periode, traitee par tranches successives.
+ *
+ * Le traitement passait auparavant par une file d'attente : sans worker, rien
+ * ne se produisait. Chaque tranche est desormais un appel HTTP synchrone, le
+ * meme que celui de la selection manuelle.
+ */
+const TAILLE_TRANCHE = 5;
+let annulationDemandee = false;
 
-function startPollingJobStatus() {
+function traiterParTranches(ids, flux) {
+    annulationDemandee = false;
+
     const tracker = document.getElementById('background-job-tracker');
     tracker.style.display = 'block';
-    
-    if (jobPollInterval) clearInterval(jobPollInterval);
-    jobPollInterval = setInterval(pollJobStatus, 2000);
-    pollJobStatus();
-}
 
-function pollJobStatus() {
-    fetch("{{ route('admin.fne.batch_status') }}")
-    .then(r => r.json())
-    .then(data => {
-        const tracker = document.getElementById('background-job-tracker');
-        
-        if (data.status === 'idle') {
-            tracker.style.display = 'none';
-            clearInterval(jobPollInterval);
-            return;
-        }
-        
-        tracker.style.display = 'block';
-        
-        const total = data.total_to_process ?? 0;
-        const processed = data.processed_count ?? 0;
-        const percent = total > 0 ? Math.round((processed / total) * 100) : 0;
+    const total = ids.length;
+    let traites = 0;
+    const erreurs = [];
 
-        document.getElementById('job-progress-bar').style.width = percent + '%';
-        document.getElementById('job-progress-text').textContent = data.status === 'queued'
-            ? `En attente de traitement — ${total} document(s) à normaliser`
-            : `${processed} / ${total} facture(s) normalisée(s) (${percent}%)`;
-        document.getElementById('job-current-invoice').textContent = data.current_invoice ? `En cours : ${data.current_invoice}` : '';
+    function majProgression(enCours) {
+        const pourcent = total > 0 ? Math.round((traites / total) * 100) : 0;
+        document.getElementById('job-progress-bar').style.width = pourcent + '%';
+        document.getElementById('job-progress-text').textContent =
+            `${traites} / ${total} document(s) normalisé(s) (${pourcent}%)`;
+        document.getElementById('job-current-invoice').textContent = enCours || '';
+    }
 
-        // Aucun worker ne consomme la file : inutile d'attendre davantage.
-        if (data.worker_missing) {
-            clearInterval(jobPollInterval);
-            document.getElementById('job-current-invoice').textContent = data.error;
-            alert(data.error);
+    majProgression('Démarrage…');
+
+    function tranche(depart) {
+        if (annulationDemandee) {
+            terminer('Traitement annulé.');
             return;
         }
 
-        if (data.status === 'completed') {
-            clearInterval(jobPollInterval);
-            setTimeout(() => {
-                alert("Normalisation en arrière-plan terminée avec succès !");
-                fetch("{{ route('admin.fne.batch_status') }}?reset=1").finally(() => window.location.reload());
-            }, 1000);
-        } else if (data.status === 'failed') {
-            clearInterval(jobPollInterval);
-            setTimeout(() => {
-                alert(`Normalisation en arrière-plan arrêtée en raison de l'erreur suivante :\n\n${data.error}`);
-                fetch("{{ route('admin.fne.batch_status') }}?reset=1").finally(() => window.location.reload());
-            }, 1000);
-        } else if (data.status === 'cancelled') {
-            clearInterval(jobPollInterval);
-            setTimeout(() => {
-                alert("Normalisation en arrière-plan annulée par l'utilisateur.");
-                fetch("{{ route('admin.fne.batch_status') }}?reset=1").finally(() => window.location.reload());
-            }, 1000);
+        if (depart >= total) {
+            terminer(null);
+            return;
         }
-    })
-    .catch(err => {
-        console.error("Erreur lors de la récupération du statut :", err);
-    });
+
+        const lot = ids.slice(depart, depart + TAILLE_TRANCHE);
+        majProgression(`Traitement de ${lot.length} document(s)…`);
+
+        const corps = new FormData();
+        corps.append('flux', flux);
+        lot.forEach(id => corps.append('ids[]', id));
+
+        fetch("{{ route('admin.fne.batch_normaliser') }}", {
+            method: "POST",
+            headers: { "X-CSRF-TOKEN": "{{ csrf_token() }}" },
+            body: corps
+        })
+        .then(r => r.json())
+        .then(data => {
+            traites += data.success_count ?? lot.length;
+            if (data.errors && data.errors.length) erreurs.push(...data.errors);
+            majProgression(null);
+            tranche(depart + TAILLE_TRANCHE);
+        })
+        .catch(err => {
+            erreurs.push(err.message);
+            terminer(null);
+        });
+    }
+
+    function terminer(messageAnnulation) {
+        majProgression(null);
+        setTimeout(() => {
+            if (messageAnnulation) {
+                alert(messageAnnulation + ` ${traites} document(s) traité(s).`);
+            } else if (erreurs.length) {
+                alert(`Normalisation terminée : ${traites} document(s) sur ${total}.\n\nErreurs :\n` + erreurs.join('\n'));
+            } else {
+                alert(`Normalisation terminée : ${traites} document(s) normalisé(s).`);
+            }
+            window.location.reload();
+        }, 400);
+    }
+
+    tranche(0);
 }
 
 function annulerJobArrierePlan() {
-    if (!confirm("Annuler le traitement en cours ? La normalisation s'arrêtera après la facture en cours de traitement.")) return;
-    
-    fetch("{{ route('admin.fne.batch_status') }}?cancel=1")
-    .then(r => r.json())
-    .then(data => {
-        if (data.success) {
-            pollJobStatus();
-        }
-    });
+    if (!confirm("Annuler le traitement en cours ? La normalisation s'arrêtera après la tranche en cours.")) return;
+    annulationDemandee = true;
 }
 
-document.addEventListener('DOMContentLoaded', () => {
-    fetch("{{ route('admin.fne.batch_status') }}")
-    .then(r => r.json())
-    .then(data => {
-        if (data && (data.status === 'running' || data.status === 'queued')) {
-            startPollingJobStatus();
-        }
-    });
-});
 @endif
 </script>
 

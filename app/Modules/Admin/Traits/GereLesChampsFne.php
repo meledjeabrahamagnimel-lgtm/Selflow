@@ -33,9 +33,8 @@ trait GereLesChampsFne
             'est_rne'    => ['nullable', 'boolean'],
             'numero_rne' => ['nullable', 'required_if:est_rne,1', 'string', 'max:64'],
 
-            // Mentions libres
-            'autres_mentions' => ['nullable', 'string', 'max:' . self::$longueurMaxMention],
-            'pied_de_page'    => ['nullable', 'string', 'max:' . self::$longueurMaxMention],
+            // Les mentions libres et le pied de page ne sont plus saisis sur la
+            // pièce : ils proviennent des paramètres de l'entreprise.
 
             // Taxes sur le total TTC
             'taxes_ttc'        => ['nullable', 'array'],
@@ -91,6 +90,24 @@ trait GereLesChampsFne
                 'nom'  => $taxe->nom,
                 'taux' => $taxe->taux,
             ]);
+        }
+    }
+
+    /**
+     * Enregistre les taxes saisies directement sur une ligne libre, qui n'a pas
+     * de fiche produit d'où les recopier.
+     */
+    protected static function enregistrerTaxesDeLigne($ligne, $taxes): void
+    {
+        foreach ((array) $taxes as $taxe) {
+            $nom  = trim((string) ($taxe['nom'] ?? ''));
+            $taux = self::tauxBorne($taxe['taux'] ?? 0);
+
+            if ($nom === '' || $taux <= 0) {
+                continue;
+            }
+
+            $ligne->taxes()->create(['nom' => $nom, 'taux' => $taux]);
         }
     }
 

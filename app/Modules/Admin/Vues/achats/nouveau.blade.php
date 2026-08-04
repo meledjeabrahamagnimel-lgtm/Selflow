@@ -265,19 +265,6 @@
                                maxlength="64" value="{{ old('numero_rne') }}" placeholder="N&deg; du recu normalise d'origine">
                     </div>
 
-                    <div class="form-group" style="margin-top:12px;">
-                        <label class="form-label" style="font-size:11px;">Autres mentions</label>
-                        <textarea name="autres_mentions" id="autresMentionsInput" class="form-control" rows="2"
-                                  maxlength="248" oninput="majCompteurMention('autresMentions')">{{ old('autres_mentions', $entrepriseCourante->facture_autres_mentions) }}</textarea>
-                        <small style="color:var(--text-3); font-size:11px;"><span id="autresMentionsCompteur">0</span>/248 caracteres.</small>
-                    </div>
-                    <div class="form-group" style="margin-bottom:0;">
-                        <label class="form-label" style="font-size:11px;">Pied de page</label>
-                        <textarea name="pied_de_page" id="piedDePageInput" class="form-control" rows="2"
-                                  maxlength="248" oninput="majCompteurMention('piedDePage')">{{ old('pied_de_page', $entrepriseCourante->pied_de_page_facture) }}</textarea>
-                        <small style="color:var(--text-3); font-size:11px;"><span id="piedDePageCompteur">0</span>/248 caracteres.</small>
-                    </div>
-
                     <div style="margin-top:12px;">
                         <div style="font-size:12px; font-weight:700; color:var(--text-2); margin-bottom:8px;">
                             <i class="fas fa-percent" style="color:var(--primary);"></i> Taxes sur total TTC
@@ -544,11 +531,6 @@ function basculerChampRne() {
     if (champ) champ.required = coche;
 }
 
-function majCompteurMention(prefixe) {
-    const champ    = document.getElementById(prefixe + 'Input');
-    const compteur = document.getElementById(prefixe + 'Compteur');
-    if (champ && compteur) compteur.textContent = champ.value.length;
-}
 
 /**
  * Ordre de calcul aligne sur celui de la FNE : remise de ligne, puis remise
@@ -602,8 +584,6 @@ function recalculer() {
 }
 
 document.addEventListener('DOMContentLoaded', function () {
-    majCompteurMention('autresMentions');
-    majCompteurMention('piedDePage');
 });
 
 function toggleB2bOptions() {

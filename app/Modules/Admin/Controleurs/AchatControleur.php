@@ -187,8 +187,6 @@ class AchatControleur
                 'type_facture'               => $request->input('type_facture', 'normale'),
                 'est_rne'                    => $request->boolean('est_rne'),
                 'numero_rne'                 => $request->boolean('est_rne') ? trim($request->input('numero_rne')) : null,
-                'autres_mentions'            => self::mentionBornee($request->input('autres_mentions')),
-                'pied_de_page'               => self::mentionBornee($request->input('pied_de_page')),
             ]);
 
             // Taxes sur le total TTC (champ `customTaxes` de la FNE)
