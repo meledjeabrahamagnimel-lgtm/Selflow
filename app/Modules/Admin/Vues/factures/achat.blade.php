@@ -157,8 +157,8 @@
                 </button>
             @endif
             <button class="print-btn main" onclick="telechargerPdf()"
-                    title="Dans la boîte de dialogue, choisissez la destination « Enregistrer au format PDF » pour obtenir le fichier.">
-                <i class="fas fa-download"></i> Télécharger PDF
+                    title="Choisissez la destination « Enregistrer au format PDF » pour obtenir le fichier, ou votre imprimante pour une sortie papier.">
+                <i class="fas fa-file-pdf"></i> Imprimer / PDF
             </button>
             <button class="print-btn" onclick="window.print()">
                 <i class="fas fa-print"></i> Imprimer

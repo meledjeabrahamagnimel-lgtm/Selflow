@@ -601,6 +601,10 @@ class FneDashboardControleur
         $successCount = 0;
         $errors = [];
 
+        // Une pièce en échec ne fait plus tomber le lot entier : l'erreur est
+        // relevée et le traitement passe à la suivante. Auparavant, une seule
+        // facture non conforme suffisait à interrompre toute la série, sans
+        // que rien n'indique que les pièces restantes n'avaient pas été vues.
         foreach ($ids as $id) {
             try {
                 if ($flux === 'ventes') {
@@ -612,7 +616,7 @@ class FneDashboardControleur
 
                     if (!$vente) {
                         $errors[] = "Vente #{$id} introuvable.";
-                        break;
+                        continue;
                     }
 
                     if ($vente->normalise) {
@@ -652,7 +656,7 @@ class FneDashboardControleur
                         $successCount++;
                     } else {
                         $errors[] = "Erreur sur la facture {$vente->numero_facture} : " . ($fneResult['message'] ?? 'Erreur inconnue');
-                        break;
+                        continue;
                     }
                 } else {
                     $achat = Achat::withoutGlobalScopes()
@@ -661,7 +665,7 @@ class FneDashboardControleur
 
                     if (!$achat) {
                         $errors[] = "Achat #{$id} introuvable.";
-                        break;
+                        continue;
                     }
 
                     if ($achat->normalise) {
@@ -682,12 +686,12 @@ class FneDashboardControleur
                         $successCount++;
                     } else {
                         $errors[] = "Erreur sur l'achat {$achat->numero_facture} : " . ($fneResult['message'] ?? 'Erreur inconnue');
-                        break;
+                        continue;
                     }
                 }
             } catch (\Exception $e) {
                 $errors[] = "Exception : " . $e->getMessage();
-                break;
+                continue;
             }
         }
 

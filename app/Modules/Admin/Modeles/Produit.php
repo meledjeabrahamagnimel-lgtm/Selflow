@@ -86,7 +86,42 @@ class Produit extends Model
     }
 
     /**
+     * Les seuls taux de TVA que la facture normalisée sait représenter.
+     *
+     * La FNE ne transmet pas un pourcentage mais un code, et la plateforme
+     * applique elle-même le taux attaché à ce code. Un taux hors de cette
+     * liste — 5 % par exemple — n'a donc aucun code où se ranger.
+     */
+    public const TAUX_TVA_DGI = [18.0, 9.0, 0.0];
+
+    /**
+     * Le taux est-il représentable par un code DGI ?
+     *
+     * À vérifier avant toute normalisation : sans ce contrôle, un taux
+     * inconnu tombait sur le code `TVA`, que la plateforme applique à 18 %.
+     * La facture certifiée affichait alors un montant différent de celle
+     * établie dans Selflow, sans que rien ne le signale.
+     */
+    public static function estTauxTvaReconnu(float $taux): bool
+    {
+        // Le taux d'une ligne est reconstitué depuis les montants enregistrés
+        // (TVA / HT), qui sont arrondis au centime. Une tolérance d'un dixième
+        // de point absorbe cette dérive sans laisser passer un vrai 5 %.
+        foreach (self::TAUX_TVA_DGI as $tauxDgi) {
+            if (abs($taux - $tauxDgi) <= 0.1) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
      * Déduction automatique du code TVA depuis un taux et un régime.
+     *
+     * Un taux non reconnu retombe sur `TVA` faute de mieux : c'est un repli
+     * d'affichage, jamais une autorisation à transmettre. La conformité se
+     * contrôle en amont avec estTauxTvaReconnu().
      */
     public static function deduireCodeTva(float $taux, ?string $regime = null): string
     {

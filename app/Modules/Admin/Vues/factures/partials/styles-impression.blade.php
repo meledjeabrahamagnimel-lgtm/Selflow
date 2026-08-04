@@ -11,8 +11,11 @@
       - plusieurs secondes de calcul a chaque clic.
 
     On confie desormais le rendu au moteur d'impression du navigateur : texte
-    vectoriel, pagination A4 native, aucun delai. Ces regles se contentent
-    d'isoler le document du reste de l'interface.
+    vectoriel, pagination A4 native, aucun delai.
+
+    Le bouton « Imprimer / PDF » recopie le document dans un cadre isole (voir
+    partials/script-impression) ; ces regles-ci servent a l'impression directe
+    de la page, au clavier (Ctrl+P), ou l'interface est encore presente.
 --}}
     @page {
         size: A4 portrait;
@@ -39,29 +42,6 @@
         .no-print, .controls-card, .sidebar, header, .topbar, .banner-alert,
         .user-dropdown-menu, .sidebar-logo, .sidebar-pdv, nav, footer, .breadcrumb {
             display: none !important;
-        }
-
-        /*
-         * Conteneurs traverses pour atteindre le document : marques en JavaScript
-         * juste avant window.print(). Ils ne doivent plus contraindre ni la
-         * largeur ni le debordement, sinon le document ressort tronque a droite.
-         */
-        .chemin-impression {
-            display: block !important;
-            position: static !important;
-            float: none !important;
-            margin: 0 !important;
-            padding: 0 !important;
-            width: 100% !important;
-            max-width: none !important;
-            min-width: 0 !important;
-            height: auto !important;
-            max-height: none !important;
-            overflow: visible !important;
-            background: #fff !important;
-            box-shadow: none !important;
-            border: none !important;
-            transform: none !important;
         }
 
         .invoice {

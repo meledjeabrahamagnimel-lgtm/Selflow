@@ -273,8 +273,8 @@
                 @endif
             @endif
             <button class="print-btn main" onclick="telechargerPdf()"
-                    title="Dans la boîte de dialogue, choisissez la destination « Enregistrer au format PDF » pour obtenir le fichier.">
-                <i class="fas fa-download"></i> Télécharger PDF
+                    title="Choisissez la destination « Enregistrer au format PDF » pour obtenir le fichier, ou votre imprimante pour une sortie papier.">
+                <i class="fas fa-file-pdf"></i> Imprimer / PDF
             </button>
             
             @if(!isset($bl))
@@ -551,6 +551,9 @@ var DATA = {
         statut: {!! json_encode($vente->statut) !!},
         deja_paye: {{ $vente->type_facture === 'avoir' ? $vente->montant_ttc : ($dejaPaye ?? 0) }},
         autres_taxes_montant: {{ (float) ($vente->montant_autres_taxes ?? 0) }},
+        // Droit de timbre applique par la DGI sur les paiements en especes.
+        // Seule la plateforme le calcule : il n'existe qu'apres normalisation.
+        timbre_fiscal: {{ (float) ($vente->fne_timbre_fiscal ?? 0) }},
         ref_bl: {!! json_encode(isset($bl) ? $bl->numero_bl : ($vente->etape === 'Bon de commande' ? ($vente->bonLivraison?->numero_bl ?? '') : ($vente->bonLivraisonSource?->numero_bl ?? ''))) !!},
         ref_bc: {!! json_encode(isset($bl) ? $bl->bonDeCommande->numero_facture : ($vente->etape === 'Bon de commande' ? $vente->numero_facture : (optional($vente->bonLivraisonSource?->bonDeCommande)->numero_facture ?? ''))) !!}
     }
@@ -685,10 +688,17 @@ function libelleTotalTva(c) {
  * modeles 1 a 3 (blocs en <div>).
  */
 function blocAutresTaxesDiv(c, couleur) {
-    if (c.tot_autres_taxes <= 0) return '';
-    return c.lignes_autres_taxes.map(t =>
+    if (c.tot_autres_taxes <= 0 && c.timbre <= 0) return '';
+
+    var lignes = c.lignes_autres_taxes.map(t =>
         `<div style="display:flex;justify-content:space-between;padding:6px 0;font-size:12px;border-bottom:0.5px solid var(--border)"><span style="color:var(--mu)">${t.nom}</span><span>${fmtFcfa(t.montant)}</span></div>`
-    ).join('') +
+    ).join('');
+
+    if (c.timbre > 0) {
+        lignes += `<div style="display:flex;justify-content:space-between;padding:6px 0;font-size:12px;border-bottom:0.5px solid var(--border)"><span style="color:var(--mu)">Timbre de quittance</span><span>${fmtFcfa(c.timbre)}</span></div>`;
+    }
+
+    return lignes +
     `<div style="display:flex;justify-content:space-between;padding:8px 0 6px;font-size:14px;font-weight:800;color:${couleur || 'var(--tx)'};"><span>NET A PAYER</span><span>${fmtFcfa(c.net_a_payer)}</span></div>`;
 }
 
@@ -696,12 +706,16 @@ function blocAutresTaxesDiv(c, couleur) {
  * Idem pour le modele 4, construit en lignes de tableau.
  */
 function blocAutresTaxesTr(c, colonnes) {
-    if (c.tot_autres_taxes <= 0) return '';
+    if (c.tot_autres_taxes <= 0 && c.timbre <= 0) return '';
     return c.lignes_autres_taxes.map(t => `
             <tr>
                 <td colspan="${colonnes}" style="padding:6px 10px; border:1px solid #000; text-align:right; font-weight:600;">${t.nom}</td>
                 <td style="padding:6px 10px; border:1px solid #000; text-align:right; font-weight:600; white-space:nowrap;">${fmt(t.montant)}</td>
-            </tr>`).join('') + `
+            </tr>`).join('') + (c.timbre > 0 ? `
+            <tr>
+                <td colspan="${colonnes}" style="padding:6px 10px; border:1px solid #000; text-align:right; font-weight:600;">Timbre de quittance</td>
+                <td style="padding:6px 10px; border:1px solid #000; text-align:right; font-weight:600; white-space:nowrap;">${fmt(c.timbre)}</td>
+            </tr>` : '') + `
             <tr>
                 <td colspan="${colonnes}" style="padding:6px 10px; border:1px solid #000; text-align:right; font-weight:900; text-transform:uppercase;">Net a payer</td>
                 <td style="padding:6px 10px; border:1px solid #000; text-align:right; font-weight:900; white-space:nowrap;">${fmt(c.net_a_payer)}</td>
@@ -738,8 +752,9 @@ function blocPiedDePage(d) {
  * La TVA est calculee ligne par ligne au taux reel de chaque article : un
  * article exonere ne doit pas se voir appliquer 18 %.
  */
-function calcItems(items, remiseGlobal, taxesTtc) {
+function calcItems(items, remiseGlobal, taxesTtc, timbreFiscal) {
     remiseGlobal = parseFloat(remiseGlobal || 0);
+    timbreFiscal = parseFloat(timbreFiscal || 0);
 
     var rows = items.map(it => {
         var remiseLigne = parseFloat(it.remise_taux || 0);
@@ -772,7 +787,8 @@ function calcItems(items, remiseGlobal, taxesTtc) {
     return {
         rows, tot_ht, tot_ht_net, tot_tva, tot_ttc, remiseGlobal,
         lignes_autres_taxes, tot_autres_taxes,
-        net_a_payer: tot_ttc + tot_autres_taxes
+        timbre: timbreFiscal,
+        net_a_payer: tot_ttc + tot_autres_taxes + timbreFiscal
     };
 }
 
@@ -896,7 +912,7 @@ function getThemeColors() {
 }
 
 function model1(d) {
-    var c = calcItems(d.items, d.remise, d.taxes_ttc);
+    var c = calcItems(d.items, d.remise, d.taxes_ttc, d.timbre_fiscal);
     var theme = getThemeColors();
     var sColor = statusColor(d.statut, theme.color);
     var title = getDocTitle(d);
@@ -1026,7 +1042,7 @@ function model1(d) {
 }
 
 function model2(d) {
-    var c = calcItems(d.items, d.remise, d.taxes_ttc);
+    var c = calcItems(d.items, d.remise, d.taxes_ttc, d.timbre_fiscal);
     var theme = getThemeColors();
     var sColor = statusColor(d.statut, theme.color);
     var title = getDocTitle(d);
@@ -1154,7 +1170,7 @@ function model2(d) {
 }
 
 function model3(d) {
-    var c = calcItems(d.items, d.remise, d.taxes_ttc);
+    var c = calcItems(d.items, d.remise, d.taxes_ttc, d.timbre_fiscal);
     var theme = getThemeColors();
     var sColor = statusColor(d.statut, theme.color);
     var title = getDocTitle(d);
@@ -1299,7 +1315,7 @@ function model3(d) {
 }
 
 function modelStandard(d) {
-    var c = calcItems(d.items, d.remise, d.taxes_ttc);
+    var c = calcItems(d.items, d.remise, d.taxes_ttc, d.timbre_fiscal);
     var isNorm = d.normalise;
     var title = getDocTitle(d);
     var hasTva = d.items.some(r => r.tva > 0);
@@ -1513,6 +1529,13 @@ function modelStandard(d) {
                             <td style="padding:5px 8px; border:1px solid #000; text-align:right;">—</td>
                             <td style="padding:5px 8px; border:1px solid #000; text-align:right;">${fmtFcfa(t.montant)}</td>
                         </tr>`).join('')}
+                        ${c.timbre > 0 ? `
+                        <tr>
+                            <td style="padding:5px 8px; border:1px solid #000;">Timbre de quittance</td>
+                            <td style="padding:5px 8px; border:1px solid #000; text-align:right;">—</td>
+                            <td style="padding:5px 8px; border:1px solid #000; text-align:right;">—</td>
+                            <td style="padding:5px 8px; border:1px solid #000; text-align:right;">${fmtFcfa(c.timbre)}</td>
+                        </tr>` : ''}
                     </tbody>
                 </table>
             </div>

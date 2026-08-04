@@ -466,6 +466,49 @@ class FnePayloadTest extends TestCase
         Http::assertNothingSent();
     }
 
+    public function test_un_taux_de_tva_hors_bareme_dgi_bloque_la_normalisation(): void
+    {
+        Http::fake();
+
+        // 5 % n'existe pas au barème DGI : aucun code FNE ne le représente.
+        $produit = $this->creerProduit(['reference' => 'ref-tva5', 'taux_tva' => 5]);
+        $vente = $this->venteMinimale([], $produit);
+        $vente->details()->update(['montant_tva' => 1000, 'montant_ttc' => 21000]);
+
+        $resultat = FneService::normaliserFacture($vente->fresh());
+
+        $this->assertFalse($resultat['success']);
+        $this->assertArrayHasKey('taux_tva', $resultat['errors']);
+        $this->assertStringContainsString('18 %, 9 % et 0 %', $resultat['message']);
+
+        // Rien ne part : une facture certifiée à 18 % ne correspondrait pas
+        // à celle établie ici.
+        Http::assertNothingSent();
+    }
+
+    #[\PHPUnit\Framework\Attributes\DataProvider('tauxDgiValides')]
+    public function test_les_taux_du_bareme_dgi_laissent_passer_la_normalisation(float $taux, int $tva): void
+    {
+        $this->simulerReponseFne();
+
+        $produit = $this->creerProduit(['reference' => 'ref-' . $taux, 'taux_tva' => $taux]);
+        $vente = $this->venteMinimale([], $produit);
+        $vente->details()->update(['montant_tva' => $tva]);
+
+        $resultat = FneService::normaliserFacture($vente->fresh());
+
+        $this->assertTrue($resultat['success'], $resultat['message'] ?? '');
+    }
+
+    public static function tauxDgiValides(): array
+    {
+        return [
+            'taux normal 18 %' => [18.0, 3600],
+            'taux reduit 9 %'  => [9.0, 1800],
+            'exoneration 0 %'  => [0.0, 0],
+        ];
+    }
+
     public function test_les_ventes_validees_portent_une_etape_facture_et_jamais_le_statut_facturee(): void
     {
         // Les tableaux de bord filtraient sur un statut « Facturée » qui
