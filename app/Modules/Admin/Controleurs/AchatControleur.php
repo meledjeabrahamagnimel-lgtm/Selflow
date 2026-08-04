@@ -432,7 +432,7 @@ class AchatControleur
     public function imprimer(Achat $achat): View
     {
         $this->autoriserAcces($achat);
-        $achat->load(['fournisseur', 'pointDeVente.entreprise', 'details.produit']);
+        $achat->load(['fournisseur', 'pointDeVente.entreprise', 'details.produit', 'details.taxes', 'taxesPersonnalisees']);
         $dejaPaye = \App\Modules\Admin\Modeles\TresorerieJournal::where('reference_document', $achat->numero_facture)->sum('montant_sortie');
         return view('admin::factures.achat', compact('achat', 'dejaPaye'));
     }

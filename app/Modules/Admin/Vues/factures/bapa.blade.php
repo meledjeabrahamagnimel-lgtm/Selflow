@@ -141,9 +141,13 @@
                     {{ $achat->pointDeVente->entreprise->nom }}
                 </h1>
                 <div style="font-size:11px; line-height:1.5; color:#333;">
-                    <strong>NCC :</strong> {{ $achat->pointDeVente->entreprise->ncc ?? '—' }}<br>
-                    <strong>Régime :</strong> {{ $achat->pointDeVente->entreprise->regime_imposition ?? '—' }}<br>
-                    <strong>Téléphone :</strong> {{ $achat->pointDeVente->entreprise->telephone ?? '—' }}<br>
+                    <strong>NCC :</strong> {{ $achat->pointDeVente->entreprise->ncc ?: '—' }}<br>
+                    <strong>Compte contribuable :</strong> {{ $achat->pointDeVente->entreprise->compte_contribuable ?: '—' }}<br>
+                    <strong>RCCM :</strong> {{ $achat->pointDeVente->entreprise->rccm ?: '—' }}<br>
+                    <strong>Régime :</strong> {{ $achat->pointDeVente->entreprise->regime_imposition ?: '—' }}<br>
+                    <strong>Centre des impôts :</strong> {{ $achat->pointDeVente->entreprise->centre_impots ?: '—' }}<br>
+                    <strong>Téléphone :</strong> {{ $achat->pointDeVente->entreprise->telephone ?: '—' }}<br>
+                    <strong>Point de vente :</strong> {{ $achat->pointDeVente->nom }}<br>
                     <strong>Adresse :</strong> {{ $achat->pointDeVente->ville }}, {{ $achat->pointDeVente->commune }}
                 </div>
             </div>
@@ -154,14 +158,21 @@
                 </div>
                 <div style="font-size:12px;">
                     <strong>Numéro :</strong> {{ $achat->numero_facture }}<br>
-                    <strong>Date :</strong> {{ $achat->date_achat->format('d/m/Y') }}
+                    <strong>Date :</strong> {{ $achat->date_achat->format('d/m/Y') }}<br>
+                    <strong>Mode de paiement :</strong> {{ $achat->mode_paiement ?: '—' }}
                     
                     {{-- Affichage FNE/BAPA DGI officiel --}}
                     @if($achat->normalise)
                         <div style="margin-top:15px; display:flex; gap: 10px; align-items: center; justify-content:flex-end;">
                             <div style="width:80px; height:80px; display:flex; align-items:center; justify-content:center;">
-                                <img src="/dgi-stamp.png" style="max-height:100%; max-width:100%; object-fit:contain;" alt="DGI Stamp">
+                                <img src="/dgi-stamp.png" style="max-height:100%; max-width:100%; object-fit:contain;" alt="Visuel FNE">
                             </div>
+                            {{-- Code de vérification : la DGI exige le QR code sur le
+                                 document certifié, il n'y figurait pas. --}}
+                            @if($achat->qr_code_data)
+                                <img src="https://api.qrserver.com/v1/create-qr-code/?size=160x160&data={{ urlencode($achat->qr_code_data) }}"
+                                     style="width:80px; height:80px;" alt="Code de vérification FNE">
+                            @endif
                         </div>
                         <div style="font-size:9px; color:#000; text-align:right; margin-top:8px; font-family:monospace; line-height:1.4;">
                             N° BAPA/FNE : <strong>{{ $achat->numero_fne }}</strong><br>
@@ -189,7 +200,8 @@
             <div style="display:grid; grid-template-columns:1fr 1fr; gap:16px; font-size:12px;">
                 <div>
                     <strong>Nom / Raison Sociale :</strong> {{ $achat->fournisseur->nom }}<br>
-                    <strong>Téléphone :</strong> {{ $achat->fournisseur->telephone ?? '—' }}
+                    <strong>Téléphone :</strong> {{ $achat->fournisseur->telephone ?: '—' }}<br>
+                    <strong>E-mail :</strong> {{ $achat->fournisseur->email ?: '—' }}
                 </div>
                 <div>
                     <strong>Adresse / Commune :</strong> {{ $achat->fournisseur->adresse ?? '—' }}<br>
@@ -207,6 +219,7 @@
                     <th style="text-align:center; width:60px;">Unité</th>
                     <th style="text-align:right; width:120px;">Prix unitaire</th>
                     <th style="text-align:right; width:80px;">Remise (%)</th>
+                    <th style="text-align:right; width:110px;">Autres taxes</th>
                     <th style="text-align:right; width:120px;">Total Net</th>
                 </tr>
             </thead>
@@ -218,6 +231,13 @@
                         <td style="text-align:center;">{{ $d->unite }}</td>
                         <td style="text-align:right;">{{ number_format($d->prix_unitaire, 0, ',', ' ') }} F</td>
                         <td style="text-align:right;">{{ rtrim(rtrim(number_format((float) ($d->remise_taux ?? 0), 2, ',', ' '), '0'), ',') }} %</td>
+                        <td style="text-align:right; font-size:10px;">
+                            @forelse($d->taxes as $taxe)
+                                {{ $taxe->nom }} {{ rtrim(rtrim(number_format((float) $taxe->taux, 2, ',', ' '), '0'), ',') }} %@if(!$loop->last)<br>@endif
+                            @empty
+                                —
+                            @endforelse
+                        </td>
                         <td style="text-align:right; font-weight:700;">{{ number_format($d->montant_ttc, 0, ',', ' ') }} F</td>
                     </tr>
                 @endforeach
