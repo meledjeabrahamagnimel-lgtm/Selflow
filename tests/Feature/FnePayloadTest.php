@@ -509,6 +509,54 @@ class FnePayloadTest extends TestCase
         ];
     }
 
+    // ─── Avoirs : reprise fidèle de la facture d'origine ─────────────────
+
+    public function test_un_avoir_reprend_le_taux_de_tva_et_la_remise_de_la_ligne_creditee(): void
+    {
+        // Ligne exonérée (TVAD 0 %) remisée à 2 %, comme sur la facture
+        // 1864699A26000000051 fournie par la DGI.
+        $produit = $this->creerProduit(['reference' => 'ref-exo', 'taux_tva' => 0]);
+
+        $facture = $this->venteMinimale(['fne_invoice_id' => 'uuid-facture'], $produit);
+        $ligne = $facture->details->first();
+        $ligne->update([
+            'quantite'      => 1,
+            'prix_unitaire' => 5000,
+            'remise_taux'   => 2,
+            'montant_tva'   => 0,
+            'montant_ttc'   => 4900,
+        ]);
+
+        $taux = $this->invoquerMethodePrivee('tauxTvaDeLaLigne', $ligne->fresh());
+
+        // Le calcul précédent testait `montant_ttc - montant_ht`, or la colonne
+        // `montant_ht` n'existe pas : la soustraction portait sur null et toute
+        // ligne repartait à 18 %, exonérations comprises.
+        $this->assertSame(0.0, $taux);
+    }
+
+    public function test_le_taux_reconstitue_suit_le_taux_reellement_applique(): void
+    {
+        $produit = $this->creerProduit(['reference' => 'ref-neuf']);
+        $facture = $this->venteMinimale([], $produit);
+
+        $ligne = $facture->details->first();
+        $ligne->update(['quantite' => 4, 'prix_unitaire' => 50000, 'remise_taux' => 0, 'montant_tva' => 36000]);
+        $this->assertSame(18.0, $this->invoquerMethodePrivee('tauxTvaDeLaLigne', $ligne->fresh()));
+
+        $ligne->update(['quantite' => 2, 'prix_unitaire' => 10000, 'remise_taux' => 0, 'montant_tva' => 1800]);
+        $this->assertSame(9.0, $this->invoquerMethodePrivee('tauxTvaDeLaLigne', $ligne->fresh()));
+    }
+
+    /** Accès aux méthodes privées du contrôleur de vente, pour les tester isolément. */
+    private function invoquerMethodePrivee(string $methode, ...$arguments)
+    {
+        $reflexion = new \ReflectionMethod(\App\Modules\Admin\Controleurs\VenteControleur::class, $methode);
+        $reflexion->setAccessible(true);
+
+        return $reflexion->invoke(null, ...$arguments);
+    }
+
     // ─── Mode de facturation de la plateforme (stickers ou provision) ────
 
     public function test_le_mode_stickers_est_constate_depuis_le_solde_renvoye(): void

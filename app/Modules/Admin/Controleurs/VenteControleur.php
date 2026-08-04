@@ -1383,6 +1383,10 @@ class VenteControleur
         abort_unless($vente->pointDeVente->entreprise_id === Auth::user()->entreprise_id, 403);
         $vente->load(['details.produit', 'client']);
 
+        // Une facture peut recevoir plusieurs avoirs successifs : la modale
+        // doit proposer ce qui reste à créditer, pas la quantité vendue.
+        $dejaCredite = self::quantitesDejaCreditees($vente);
+
         return response()->json([
             'id' => $vente->id,
             'numero_facture' => $vente->numero_facture,
@@ -1392,13 +1396,20 @@ class VenteControleur
             'numero_rne' => $vente->numero_rne,
             'autres_mentions' => $vente->autres_mentions,
             'pied_de_page' => $vente->pied_de_page,
-            'details' => $vente->details->map(function($d) {
+            'details' => $vente->details->map(function($d) use ($dejaCredite) {
+                $credite  = (float) ($dejaCredite[$d->id] ?? 0);
+                $restante = max(0, (float) $d->quantite - $credite);
+
                 return [
                     'id' => $d->id,
                     'produit_id' => $d->produit_id,
                     'libelle' => $d->produit ? $d->produit->nom : $d->libelle_virtuel,
                     'quantite' => $d->quantite,
+                    'quantite_creditee' => $credite,
+                    'quantite_restante' => $restante,
                     'prix_unitaire' => $d->prix_unitaire,
+                    'remise_taux' => (float) ($d->remise_taux ?? 0),
+                    'taux_tva' => self::tauxTvaDeLaLigne($d),
                     'montant_tva' => $d->montant_tva,
                     'montant_ttc' => $d->montant_ttc,
                     'unite' => $d->unite ?? 'pcs',
@@ -1406,6 +1417,71 @@ class VenteControleur
                 ];
             })
         ]);
+    }
+
+    /**
+     * Taux de TVA réellement appliqué à une ligne, reconstitué depuis les
+     * montants enregistrés.
+     *
+     * `vente_details` ne stocke ni le taux ni le HT : seuls la quantité, le
+     * prix unitaire, la remise et la TVA en valeur sont conservés. Le taux se
+     * retrouve donc en divisant la TVA par le HT net de remise.
+     */
+    private static function tauxTvaDeLaLigne(VenteDetail $detail): float
+    {
+        $remise = (float) ($detail->remise_taux ?? 0);
+        $htNet  = (float) $detail->quantite * (float) $detail->prix_unitaire * (1 - $remise / 100);
+
+        if ($htNet <= 0) {
+            return 0.0;
+        }
+
+        return round((float) $detail->montant_tva / $htNet * 100, 2);
+    }
+
+    /**
+     * Quantités déjà créditées par les avoirs existants d'une facture, par
+     * ligne d'origine.
+     *
+     * Une facture peut recevoir plusieurs avoirs — un retour partiel
+     * aujourd'hui, un autre demain. Mais la somme des quantités créditées ne
+     * peut pas dépasser ce qui a été vendu, sans quoi on rembourserait plus
+     * que la facture ne portait.
+     *
+     * @return array<int,float> quantité déjà créditée, indexée par id de ligne d'origine
+     */
+    private static function quantitesDejaCreditees(Vente $facture): array
+    {
+        $lignesOrigine = $facture->details()->get(['id', 'produit_id', 'libelle_virtuel']);
+
+        $avoirs = Vente::where('parent_id', $facture->id)
+            ->where('type_facture', 'avoir')
+            ->with('details')
+            ->get();
+
+        $deja = [];
+        foreach ($lignesOrigine as $ligne) {
+            $deja[$ligne->id] = 0.0;
+        }
+
+        foreach ($avoirs as $avoir) {
+            foreach ($avoir->details as $ligneAvoir) {
+                // Le rattachement se fait sur le produit, ou sur le libellé
+                // pour une ligne de saisie libre. Une ligne ajoutée à l'avoir
+                // sans correspondance dans la facture n'entre pas au compteur.
+                $origine = $lignesOrigine->first(function ($o) use ($ligneAvoir) {
+                    return $ligneAvoir->produit_id
+                        ? $o->produit_id === $ligneAvoir->produit_id
+                        : $o->libelle_virtuel === $ligneAvoir->libelle_virtuel;
+                });
+
+                if ($origine) {
+                    $deja[$origine->id] += (float) $ligneAvoir->quantite;
+                }
+            }
+        }
+
+        return $deja;
     }
 
     public function creerAvoirNouveau(Request $request): RedirectResponse
@@ -1424,6 +1500,43 @@ class VenteControleur
         $parent = Vente::findOrFail($request->parent_id);
         abort_unless($parent->pointDeVente->entreprise_id === Auth::user()->entreprise_id, 403);
         abort_if($parent->type_facture === 'avoir', 400, "Impossible de générer un avoir sur une facture d'avoir.");
+
+        // Plusieurs avoirs peuvent se succéder sur une même facture, mais leur
+        // cumul ne peut pas dépasser les quantités vendues : au-delà, on
+        // recréditerait au client davantage que ce qu'il a payé.
+        $dejaCredite = self::quantitesDejaCreditees($parent);
+        $depassements = [];
+
+        foreach ($request->items as $itemId => $itemData) {
+            if (!empty($itemData['est_nouveau'])) {
+                continue; // ligne ajoutée à l'avoir, sans origine à plafonner
+            }
+
+            $ligne = $parent->details->firstWhere('id', (int) $itemId);
+            if (!$ligne) {
+                continue;
+            }
+
+            $restante = (float) $ligne->quantite - (float) ($dejaCredite[$ligne->id] ?? 0);
+            $demandee = floatval($itemData['quantite'] ?? 0);
+
+            if ($demandee > $restante + 0.001) {
+                $depassements[] = sprintf(
+                    '%s : %s demandé(s), %s restant(s) à créditer',
+                    $ligne->produit?->nom ?? $ligne->libelle_virtuel ?? 'Article',
+                    rtrim(rtrim(number_format($demandee, 2, ',', ' '), '0'), ','),
+                    rtrim(rtrim(number_format(max(0, $restante), 2, ',', ' '), '0'), ',')
+                );
+            }
+        }
+
+        if (!empty($depassements)) {
+            return back()->withErrors([
+                'items' => 'Cette facture a déjà fait l\'objet d\'un ou plusieurs avoirs. '
+                    . 'Les quantités demandées dépassent ce qui reste à créditer — '
+                    . implode(' ; ', $depassements) . '.',
+            ])->withInput();
+        }
 
         $avoirId = null;
 
@@ -1538,23 +1651,46 @@ class VenteControleur
                     $detail = VenteDetail::where('vente_id', $parent->id)->where('id', $itemId)->first();
                     if (!$detail) continue;
 
-                    $tvaRate = ($detail->montant_ttc - $detail->montant_ht) > 0 ? 0.18 : 0;
+                    // Un avoir reprend la ligne d'origine telle qu'elle a été
+                    // facturée : même taux de TVA, même remise, mêmes taxes.
+                    //
+                    // Le taux était auparavant calculé ainsi :
+                    //     ($detail->montant_ttc - $detail->montant_ht) > 0 ? 0.18 : 0
+                    // Or `vente_details` n'a pas de colonne `montant_ht` : la
+                    // soustraction portait sur null, la condition était donc
+                    // toujours vraie et TOUTES les lignes repartaient à 18 %,
+                    // y compris celles exonérées. La remise de ligne, elle,
+                    // n'était pas reprise du tout. L'avoir imprimé affichait
+                    // ainsi un montant supérieur à celui de la facture qu'il
+                    // annulait — et à celui de l'avoir certifié par la DGI.
+                    $remiseLigne = (float) ($detail->remise_taux ?? 0);
+                    $tauxTva = self::tauxTvaDeLaLigne($detail);
 
-                    $itemHt = $qteAvoir * $prixUnit;
-                    $itemTva = $itemHt * $tvaRate;
+                    $itemHt  = $qteAvoir * $prixUnit * (1 - $remiseLigne / 100);
+                    $itemTva = $itemHt * $tauxTva / 100;
                     $itemTtc = $itemHt + $itemTva;
 
-                    VenteDetail::create([
+                    $ligneAvoir = VenteDetail::create([
                         'vente_id'           => $avoir->id,
                         'produit_id'         => $detail->produit_id,
                         'libelle_virtuel'    => $detail->libelle_virtuel,
                         'quantite'           => $qteAvoir,
                         'unite'              => $detail->unite,
                         'prix_unitaire'      => $prixUnit,
+                        'remise_taux'        => $remiseLigne,
                         'montant_tva'        => $itemTva,
                         'montant_ttc'        => $itemTtc,
                         'fne_invoice_item_id'=> $detail->fne_invoice_item_id,
                     ]);
+
+                    // Taxes personnalisées de la ligne d'origine : elles ont été
+                    // facturées au client, elles doivent lui être recréditées.
+                    foreach ($detail->taxes as $taxe) {
+                        $ligneAvoir->taxes()->create([
+                            'nom'  => $taxe->nom,
+                            'taux' => $taxe->taux,
+                        ]);
+                    }
 
                     $totalHt += $itemHt;
                     $totalTva += $itemTva;

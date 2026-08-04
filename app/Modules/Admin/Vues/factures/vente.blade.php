@@ -764,9 +764,22 @@ function calcItems(items, remiseGlobal, taxesTtc, timbreFiscal) {
         return { ...it, remise_taux: remiseLigne, ht_brut, ht, tva_amt: tva, ttc: ht + tva };
     });
 
+    // Trois niveaux de HT, a ne pas confondre :
+    //   tot_ht_brut  = avant toute remise                (« TOTAL HT » de la DGI)
+    //   tot_ht       = apres les remises de ligne
+    //   tot_ht_net   = apres la remise globale           (« TOTAL HT APRES REMISE »)
+    //
+    // Le « Sous-total Brut HT » affichait jusqu'ici tot_ht, deja net des
+    // remises de ligne, et la ligne « Remise » ne reprenait que la remise
+    // globale. Une facture remisee ligne par ligne annoncait donc un brut
+    // inferieur a celui de la facture certifiee, sans que la difference
+    // apparaisse nulle part.
+    var tot_ht_brut = rows.reduce((s, r) => s + r.ht_brut, 0);
     var tot_ht = rows.reduce((s, r) => s + r.ht, 0);
+    var remise_lignes = tot_ht_brut - tot_ht;
     var tot_ht_net = Math.max(0, tot_ht - remiseGlobal);
     var ratio = tot_ht > 0 ? tot_ht_net / tot_ht : 0;
+    var remise_totale = remise_lignes + remiseGlobal;
     var tot_tva = rows.reduce((s, r) => s + (r.ht * ratio * r.tva / 100), 0);
     var tot_ttc = tot_ht_net + tot_tva;
 
@@ -785,7 +798,8 @@ function calcItems(items, remiseGlobal, taxesTtc, timbreFiscal) {
     var tot_autres_taxes = lignes_autres_taxes.reduce((s, t) => s + t.montant, 0);
 
     return {
-        rows, tot_ht, tot_ht_net, tot_tva, tot_ttc, remiseGlobal,
+        rows, tot_ht_brut, tot_ht, tot_ht_net, tot_tva, tot_ttc,
+        remiseGlobal, remise_lignes, remise_totale,
         lignes_autres_taxes, tot_autres_taxes,
         timbre: timbreFiscal,
         net_a_payer: tot_ttc + tot_autres_taxes + timbreFiscal
@@ -1016,8 +1030,8 @@ function model1(d) {
 
             </div>
             <div style="width:240px">
-                <div style="display:flex;justify-content:space-between;padding:6px 0;font-size:12px;border-bottom:0.5px solid var(--border)"><span style="color:var(--mu)">Sous-total Brut HT</span><span>${fmtFcfa(c.tot_ht)}</span></div>
-                ${c.remiseGlobal > 0 ? `<div style="display:flex;justify-content:space-between;padding:6px 0;font-size:12px;border-bottom:0.5px solid var(--border);color:#dc2626;font-weight:600;"><span>Remise</span><span>-${fmtFcfa(c.remiseGlobal)}</span></div>` : ''}
+                <div style="display:flex;justify-content:space-between;padding:6px 0;font-size:12px;border-bottom:0.5px solid var(--border)"><span style="color:var(--mu)">Sous-total Brut HT</span><span>${fmtFcfa(c.tot_ht_brut)}</span></div>
+                ${c.remise_totale > 0 ? `<div style="display:flex;justify-content:space-between;padding:6px 0;font-size:12px;border-bottom:0.5px solid var(--border);color:#dc2626;font-weight:600;"><span>Remise</span><span>-${fmtFcfa(c.remise_totale)}</span></div>` : ''}
                 <div style="display:flex;justify-content:space-between;padding:6px 0;font-size:12px;border-bottom:0.5px solid var(--border)"><span style="color:var(--mu)">Total Net HT</span><span>${fmtFcfa(c.tot_ht_net)}</span></div>
                 <div style="display:flex;justify-content:space-between;padding:6px 0;font-size:12px;border-bottom:0.5px solid var(--border)"><span style="color:var(--mu)">${libelleTotalTva(c)}</span><span>${fmtFcfa(c.tot_tva)}</span></div>
                 <div style="display:flex;justify-content:space-between;padding:10px 0 6px;font-size:15px;font-weight:800;color:var(--tx);border-top:1.5px solid ${theme.color};"><span>TOTAL TTC</span><span>${fmtFcfa(c.tot_ttc)}</span></div>
@@ -1146,8 +1160,8 @@ function model2(d) {
             ` : `
             <div style="display:flex;justify-content:flex-end;margin-bottom:14px">
                 <div style="width:220px;background:var(--white);border-radius:8px;padding:10px 12px;border:0.5px solid var(--border)">
-                    <div style="display:flex;justify-content:space-between;font-size:11px;padding:4px 0"><span style="color:var(--mu)">Brut HT</span><span>${fmtFcfa(c.tot_ht)}</span></div>
-                    ${c.remiseGlobal > 0 ? `<div style="display:flex;justify-content:space-between;font-size:11px;padding:4px 0;color:#dc2626;font-weight:600;"><span>Remise</span><span>-${fmtFcfa(c.remiseGlobal)}</span></div>` : ''}
+                    <div style="display:flex;justify-content:space-between;font-size:11px;padding:4px 0"><span style="color:var(--mu)">Brut HT</span><span>${fmtFcfa(c.tot_ht_brut)}</span></div>
+                    ${c.remise_totale > 0 ? `<div style="display:flex;justify-content:space-between;font-size:11px;padding:4px 0;color:#dc2626;font-weight:600;"><span>Remise</span><span>-${fmtFcfa(c.remise_totale)}</span></div>` : ''}
                     <div style="display:flex;justify-content:space-between;font-size:11px;padding:4px 0"><span style="color:var(--mu)">Net HT</span><span>${fmtFcfa(c.tot_ht_net)}</span></div>
                     <div style="display:flex;justify-content:space-between;font-size:11px;padding:4px 0"><span style="color:var(--mu)">${libelleTotalTva(c)}</span><span>${fmtFcfa(c.tot_tva)}</span></div>
                     <div style="display:flex;justify-content:space-between;font-size:13px;font-weight:800;padding:6px 0 0;border-top:0.5px solid var(--border);margin-top:4px"><span style="color:var(--tx)">Total TTC</span><span style="color:${theme.color}">${fmtFcfa(c.tot_ttc)}</span></div>
@@ -1284,8 +1298,8 @@ function model3(d) {
 
             </div>
             <div style="width:235px">
-                <div style="display:flex;justify-content:space-between;padding:4px 0;font-size:12px;border-bottom:0.5px solid var(--border)"><span style="color:var(--mu)">Sous-total Brut HT</span><span>${fmtFcfa(c.tot_ht)}</span></div>
-                ${c.remiseGlobal > 0 ? `<div style="display:flex;justify-content:space-between;padding:4px 0;font-size:12px;border-bottom:0.5px solid var(--border);color:#dc2626;font-weight:600;"><span>Remise</span><span>-${fmtFcfa(c.remiseGlobal)}</span></div>` : ''}
+                <div style="display:flex;justify-content:space-between;padding:4px 0;font-size:12px;border-bottom:0.5px solid var(--border)"><span style="color:var(--mu)">Sous-total Brut HT</span><span>${fmtFcfa(c.tot_ht_brut)}</span></div>
+                ${c.remise_totale > 0 ? `<div style="display:flex;justify-content:space-between;padding:4px 0;font-size:12px;border-bottom:0.5px solid var(--border);color:#dc2626;font-weight:600;"><span>Remise</span><span>-${fmtFcfa(c.remise_totale)}</span></div>` : ''}
                 <div style="display:flex;justify-content:space-between;padding:4px 0;font-size:12px;border-bottom:0.5px solid var(--border)"><span style="color:var(--mu)">Total Net HT</span><span>${fmtFcfa(c.tot_ht_net)}</span></div>
                 <div style="display:flex;justify-content:space-between;padding:4px 0;font-size:12px;border-bottom:0.5px solid var(--border)"><span style="color:var(--mu)">${libelleTotalTva(c)}</span><span>${fmtFcfa(c.tot_tva)}</span></div>
                 <div style="display:flex;justify-content:space-between;padding:8px;margin-top:4px;background:${theme.color};border-radius:6px">
@@ -1349,12 +1363,12 @@ function modelStandard(d) {
         rowsHtml += `
             <tr style="background:#fff; color:#000;">
                 <td colspan="7" style="padding:6px 10px; border:1px solid #000; text-align:right; font-weight:700; text-transform:uppercase;">TOTAL HT</td>
-                <td style="padding:6px 10px; border:1px solid #000; text-align:right; font-weight:700; white-space:nowrap;">${fmt(c.tot_ht)}</td>
+                <td style="padding:6px 10px; border:1px solid #000; text-align:right; font-weight:700; white-space:nowrap;">${fmt(c.tot_ht_brut)}</td>
             </tr>
-            ${c.remiseGlobal > 0 ? `
+            ${c.remise_totale > 0 ? `
             <tr style="background:#fff; color:#000;">
                 <td colspan="7" style="padding:6px 10px; border:1px solid #000; text-align:right; font-weight:700; text-transform:uppercase; color:#dc2626;">Remise</td>
-                <td style="padding:6px 10px; border:1px solid #000; text-align:right; font-weight:700; color:#dc2626; white-space:nowrap;">-${fmt(c.remiseGlobal)}</td>
+                <td style="padding:6px 10px; border:1px solid #000; text-align:right; font-weight:700; color:#dc2626; white-space:nowrap;">-${fmt(c.remise_totale)}</td>
             </tr>
             <tr style="background:#fff; color:#000;">
                 <td colspan="7" style="padding:6px 10px; border:1px solid #000; text-align:right; font-weight:700; text-transform:uppercase;">TOTAL HT NET</td>

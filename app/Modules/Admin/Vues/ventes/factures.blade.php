@@ -1119,13 +1119,23 @@ function selectionnerFacturePourAvoir(id) {
                 tdOriginalQty.style.padding = '10px';
                 tdOriginalQty.style.textAlign = 'center';
                 tdOriginalQty.style.fontWeight = '600';
-                tdOriginalQty.textContent = `${item.quantite} ${item.unite}`;
+                // Une facture peut avoir deja fait l'objet d'un avoir partiel :
+                // on montre alors ce qui reste reellement a crediter.
+                const restante = item.quantite_restante !== undefined
+                    ? item.quantite_restante
+                    : item.quantite;
+                const dejaCredite = item.quantite_creditee || 0;
+
+                tdOriginalQty.innerHTML = `${item.quantite} ${item.unite}`
+                    + (dejaCredite > 0
+                        ? `<div style="font-size:10px;font-weight:500;color:#b45309;margin-top:2px;">deja credite : ${dejaCredite} — reste ${restante}</div>`
+                        : '');
                 tr.appendChild(tdOriginalQty);
                 
                 // Return Qty
                 const tdReturnQty = document.createElement('td');
                 tdReturnQty.style.padding = '10px';
-                tdReturnQty.innerHTML = `<input type="number" name="items[${item.id}][quantite]" class="form-control" value="${item.quantite}" min="0" max="${item.quantite}" required style="width: 100%; padding: 6px; border: 1px solid #cbd5e1; border-radius: 6px; text-align: center;">`;
+                tdReturnQty.innerHTML = `<input type="number" name="items[${item.id}][quantite]" class="form-control" value="${restante}" min="0" max="${restante}" ${restante <= 0 ? 'disabled' : 'required'} style="width: 100%; padding: 6px; border: 1px solid #cbd5e1; border-radius: 6px; text-align: center;">`;
                 tr.appendChild(tdReturnQty);
                 
                 // Price
