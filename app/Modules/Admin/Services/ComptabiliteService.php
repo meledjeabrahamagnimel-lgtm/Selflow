@@ -84,7 +84,10 @@ class ComptabiliteService
         $pdvId = $vente->point_de_vente_id;
         $date = $date ?? ($vente->date_vente ? $vente->date_vente->toDateString() : now()->toDateString());
         $refDoc = $vente->numero_facture;
-        $ttc = (float) $vente->montant_ttc;
+        // Les taxes parafiscales collectees pour l'Etat s'ajoutent au TTC
+        // fiscal : c'est ce total qui entre en caisse.
+        $autresTaxes = (float) ($vente->montant_autres_taxes ?? 0);
+        $ttc = (float) $vente->montant_ttc + $autresTaxes;
         $montantPaye = max(0, min($montantPaye, $ttc));
 
         $codeJournalVente = self::codeJournal($entrepriseId, 'Vente', 'VTE');
@@ -96,7 +99,7 @@ class ComptabiliteService
         DB::transaction(function () use (
             $vente, $entrepriseId, $pdvId, $date, $refDoc, $ttc, $montantPaye,
             $codeJournalVente, $compteFinancier, $codeJournalFinancier,
-            $ventilation, $libelleGeneral, $modePaiement
+            $ventilation, $libelleGeneral, $modePaiement, $autresTaxes
         ) {
             $estPaiementIntegralImmediat = $montantPaye >= $ttc && $ttc > 0;
 
@@ -122,6 +125,10 @@ class ComptabiliteService
                 if ($ventilation['tva'] > 0) {
                     self::ligne($operation, $entrepriseId, $pdvId, $date, $refDoc, $codeJournalVente,
                         $refDoc . ' / TVA Collectée Vente', null, config('selflow.plan_comptable_defaut.tva_collectee'), null, 0, $ventilation['tva']);
+                }
+                if ($autresTaxes > 0) {
+                    self::ligne($operation, $entrepriseId, $pdvId, $date, $refDoc, $codeJournalVente,
+                        $refDoc . ' / Taxes collectées pour l\'État', null, config('selflow.plan_comptable_defaut.taxes_collectees'), null, 0, $autresTaxes);
                 }
 
                 $operation->cloturerEquilibre();
@@ -150,6 +157,10 @@ class ComptabiliteService
             if ($ventilation['tva'] > 0) {
                 self::ligne($opFacture, $entrepriseId, $pdvId, $date, $refDoc, $codeJournalVente,
                     $refDoc . ' / TVA Collectée Vente', null, config('selflow.plan_comptable_defaut.tva_collectee'), null, 0, $ventilation['tva']);
+            }
+            if ($autresTaxes > 0) {
+                self::ligne($opFacture, $entrepriseId, $pdvId, $date, $refDoc, $codeJournalVente,
+                    $refDoc . ' / Taxes collectées pour l\'État', null, config('selflow.plan_comptable_defaut.taxes_collectees'), null, 0, $autresTaxes);
             }
             $opFacture->cloturerEquilibre();
 

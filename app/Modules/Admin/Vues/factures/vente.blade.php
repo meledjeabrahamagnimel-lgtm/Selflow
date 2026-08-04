@@ -540,6 +540,7 @@ var DATA = {
         mode: {!! json_encode($vente->mode_paiement) !!},
         statut: {!! json_encode($vente->statut) !!},
         deja_paye: {{ $vente->type_facture === 'avoir' ? $vente->montant_ttc : ($dejaPaye ?? 0) }},
+        autres_taxes_montant: {{ (float) ($vente->montant_autres_taxes ?? 0) }},
         ref_bl: {!! json_encode(isset($bl) ? $bl->numero_bl : ($vente->etape === 'Bon de commande' ? ($vente->bonLivraison?->numero_bl ?? '') : ($vente->bonLivraisonSource?->numero_bl ?? ''))) !!},
         ref_bc: {!! json_encode(isset($bl) ? $bl->bonDeCommande->numero_facture : ($vente->etape === 'Bon de commande' ? $vente->numero_facture : (optional($vente->bonLivraisonSource?->bonDeCommande)->numero_facture ?? ''))) !!}
     }
@@ -588,10 +589,9 @@ function fmtFcfa(n) {
  * visibles que dans le recapitulatif, sans qu'on sache a quelle ligne elles se
  * rattachaient.
  */
-function libelleTaxesLigne(r) {
-    if (!r.taxes || !r.taxes.length) return '';
-    const detail = r.taxes.map(t => `${t.nom} ${t.taux}%`).join(' · ');
-    return `<br><span style="font-size:10px;font-weight:500;color:var(--mu);">${detail}</span>`;
+function detailTaxesLigne(r) {
+    if (!r.taxes || !r.taxes.length) return '—';
+    return r.taxes.map(t => `${t.nom} ${t.taux}%`).join('<br>');
 }
 
 /**
@@ -781,6 +781,14 @@ function telechargerPdf() {
     // sans gain visible : 3 suffit pour du texte net a l'impression.
     var echelle = Math.min(3, Math.max(2, window.devicePixelRatio || 1) + 1);
 
+    // La capture doit partir du haut de la page : html2canvas se cale sur la
+    // position de défilement courante, ce qui décalait et rognait le document.
+    var defilementInitial = window.scrollY;
+    window.scrollTo(0, 0);
+
+    // On laisse html2canvas mesurer l'élément lui-même. Forcer une largeur
+    // fixe rognait la facture quand sa largeur réelle differait, d'où les
+    // bords coupés à gauche comme à droite.
     var opt = {
         margin:       [8, 8, 8, 8],
         filename:     (isDeliveryMode ? 'BL_' : 'Facture_') + DATA.vente.num + '.pdf',
@@ -793,8 +801,8 @@ function telechargerPdf() {
             letterRendering: true,
             scrollX: 0,
             scrollY: 0,
-            windowWidth: 794,
-            width: 794
+            windowWidth: element.scrollWidth,
+            windowHeight: element.scrollHeight
         },
         jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait', compress: true },
         pagebreak:    { mode: ['css', 'legacy'] }
@@ -803,6 +811,7 @@ function telechargerPdf() {
     function restaurer() {
         element.classList.remove('mode-export');
         if (controls) controls.style.display = '';
+        window.scrollTo(0, defilementInitial);
     }
 
     html2pdf().set(opt).from(element).save().then(restaurer).catch(function(err) {
@@ -944,6 +953,7 @@ function model1(d) {
                     ${isDeliveryMode ? '' : `
                     <th style="padding:9px 12px;text-align:right;color:#fff;background:${theme.color};font-weight:600;white-space:nowrap;">P.U. HT</th>
                     <th style="padding:9px 12px;text-align:right;color:#fff;background:${theme.color};font-weight:600;white-space:nowrap;">Rem. (%)</th>
+                    <th style="padding:9px 12px;text-align:right;color:#fff;background:${theme.color};font-weight:600;white-space:nowrap;">Autres taxes</th>
                     <th style="padding:9px 12px;text-align:right;color:#fff;background:${theme.color};font-weight:600;white-space:nowrap;">TVA</th>
                     <th style="padding:9px 12px;text-align:right;color:#fff;background:${theme.color};font-weight:600;white-space:nowrap;">Montant HT</th>
                     <th style="padding:9px 12px;text-align:right;color:#fff;background:${theme.color};font-weight:600;white-space:nowrap;">Total TTC</th>
@@ -953,12 +963,13 @@ function model1(d) {
             <tbody>
                 ${c.rows.map((r, i) => `<tr style="background:${i % 2 === 0 ? '#fff' : '#F9FAFB'}">
                     <td style="padding:9px 12px;color:var(--mu);font-weight:500;word-break:break-word;">${r.ref}</td>
-                    <td style="padding:9px 12px;font-weight:600;color:var(--tx)">${r.desc}${libelleTaxesLigne(r)}</td>
+                    <td style="padding:9px 12px;font-weight:600;color:var(--tx)">${r.desc}</td>
                     <td style="padding:9px 12px;text-align:center;color:var(--tx);white-space:nowrap;">${r.unite || 'Unité'}</td>
                     <td style="padding:9px 12px;text-align:right;color:var(--tx);white-space:nowrap;">${r.qty}</td>
                     ${isDeliveryMode ? '' : `
                     <td style="padding:9px 12px;text-align:right;color:var(--tx);white-space:nowrap;">${fmt(r.pu)}</td>
                     <td style="padding:9px 12px;text-align:right;color:${r.remise_taux > 0 ? '#dc2626' : 'var(--mu)'};white-space:nowrap;">${r.remise_taux || 0}%</td>
+                    <td style="padding:9px 12px;text-align:right;color:var(--mu);font-size:11px;">${detailTaxesLigne(r)}</td>
                     <td style="padding:9px 12px;text-align:right;color:var(--mu);white-space:nowrap;">${r.tva}%</td>
                     <td style="padding:9px 12px;text-align:right;color:var(--tx);white-space:nowrap;">${fmt(r.ht)}</td>
                     <td style="padding:9px 12px;text-align:right;font-weight:700;color:var(--tx);white-space:nowrap;">${fmt(r.ttc)}</td>
@@ -1073,6 +1084,7 @@ function model2(d) {
                         ${isDeliveryMode ? '' : `
                         <th style="padding:7px 6px;text-align:right;color:${theme.color};font-weight:700;white-space:nowrap;">P.U. HT</th>
                         <th style="padding:7px 6px;text-align:right;color:${theme.color};font-weight:700;white-space:nowrap;">Rem. (%)</th>
+                        <th style="padding:7px 6px;text-align:right;color:${theme.color};font-weight:700;white-space:nowrap;">Autres taxes</th>
                         <th style="padding:7px 6px;text-align:right;color:${theme.color};font-weight:700;white-space:nowrap;">TVA</th>
                         <th style="padding:7px 6px;text-align:right;color:${theme.color};font-weight:700;white-space:nowrap;">Montant HT</th>
                         <th style="padding:7px 0;text-align:right;color:${theme.color};font-weight:700;white-space:nowrap;">TTC</th>
@@ -1082,12 +1094,13 @@ function model2(d) {
                 <tbody>
                     ${c.rows.map(r => `<tr style="border-bottom:0.5px solid var(--border)">
                         <td style="padding:8px 0;color:var(--mu);font-weight:500;word-break:break-word;">${r.ref}</td>
-                        <td style="padding:8px 6px;color:var(--tx);font-weight:600;">${r.desc}${libelleTaxesLigne(r)}</td>
+                        <td style="padding:8px 6px;color:var(--tx);font-weight:600;">${r.desc}</td>
                         <td style="padding:8px 6px;text-align:center;color:var(--mu);white-space:nowrap;">${r.unite || 'Unité'}</td>
                         <td style="padding:8px 6px;text-align:right;color:var(--mu);white-space:nowrap;">${r.qty}</td>
                         ${isDeliveryMode ? '' : `
                         <td style="padding:8px 6px;text-align:right;color:var(--mu);white-space:nowrap;">${fmt(r.pu)}</td>
                         <td style="padding:8px 6px;text-align:right;color:${r.remise_taux > 0 ? '#dc2626' : 'var(--mu)'};white-space:nowrap;">${r.remise_taux || 0}%</td>
+                        <td style="padding:8px 6px;text-align:right;color:var(--mu);font-size:11px;">${detailTaxesLigne(r)}</td>
                         <td style="padding:8px 6px;text-align:right;color:var(--mu);white-space:nowrap;">${r.tva}%</td>
                         <td style="padding:8px 6px;text-align:right;color:var(--tx);white-space:nowrap;">${fmt(r.ht)}</td>
                         <td style="padding:8px 0;text-align:right;font-weight:700;color:var(--tx);white-space:nowrap;">${fmt(r.ttc)}</td>
@@ -1200,6 +1213,7 @@ function model3(d) {
                     ${isDeliveryMode ? '' : `
                     <th style="padding:9px 10px;text-align:right;border-bottom:2px solid ${theme.color};color:var(--tx);font-weight:700;white-space:nowrap;">P.U. HT</th>
                     <th style="padding:9px 10px;text-align:right;border-bottom:2px solid ${theme.color};color:var(--tx);font-weight:700;white-space:nowrap;">Rem. (%)</th>
+                    <th style="padding:9px 10px;text-align:right;border-bottom:2px solid ${theme.color};color:var(--tx);font-weight:700;white-space:nowrap;">Autres taxes</th>
                     <th style="padding:9px 10px;text-align:right;border-bottom:2px solid ${theme.color};color:var(--tx);font-weight:700;white-space:nowrap;">TVA</th>
                     <th style="padding:9px 10px;text-align:right;border-bottom:2px solid ${theme.color};color:var(--tx);font-weight:700;white-space:nowrap;">Montant HT</th>
                     <th style="padding:9px 10px;text-align:right;border-bottom:2px solid ${theme.color};color:var(--tx);font-weight:700;white-space:nowrap;">TTC</th>
@@ -1209,12 +1223,13 @@ function model3(d) {
             <tbody>
                 ${c.rows.map((r, i) => `<tr style="background:${i % 2 === 1 ? '#F9FAFB' : '#fff'}">
                     <td style="padding:9px 10px;color:var(--mu);font-size:11px;font-weight:500;word-break:break-word;">${r.ref}</td>
-                    <td style="padding:9px 10px;font-weight:600;color:var(--tx)">${r.desc}${libelleTaxesLigne(r)}</td>
+                    <td style="padding:9px 10px;font-weight:600;color:var(--tx)">${r.desc}</td>
                     <td style="padding:9px 10px;text-align:center;color:var(--tx);white-space:nowrap;">${r.unite || 'Unité'}</td>
                     <td style="padding:9px 10px;text-align:right;color:var(--tx);white-space:nowrap;">${r.qty}</td>
                     ${isDeliveryMode ? '' : `
                     <td style="padding:9px 10px;text-align:right;color:var(--mu);white-space:nowrap;">${fmt(r.pu)}</td>
                     <td style="padding:9px 10px;text-align:right;color:${r.remise_taux > 0 ? '#dc2626' : 'var(--mu)'};white-space:nowrap;">${r.remise_taux || 0}%</td>
+                    <td style="padding:9px 10px;text-align:right;color:var(--mu);font-size:11px;">${detailTaxesLigne(r)}</td>
                     <td style="padding:9px 10px;text-align:right;color:var(--mu);white-space:nowrap;">${r.tva}%</td>
                     <td style="padding:9px 10px;text-align:right;color:var(--tx);white-space:nowrap;">${fmt(r.ht)}</td>
                     <td style="padding:9px 10px;text-align:right;font-weight:700;color:var(--tx);white-space:nowrap;">${fmt(r.ttc)}</td>
@@ -1282,7 +1297,7 @@ function modelStandard(d) {
         rowsHtml = c.rows.map(r => `
             <tr style="background:#fff; color:#000;">
                 <td style="padding:8px 10px; border:1px solid #000; font-weight:500; word-break:break-word;">${r.ref}</td>
-                <td style="padding:8px 10px; border:1px solid #000; font-weight:700;">${r.desc}${libelleTaxesLigne(r)}</td>
+                <td style="padding:8px 10px; border:1px solid #000; font-weight:700;">${r.desc}</td>
                 <td style="padding:8px 10px; border:1px solid #000; text-align:right; white-space:nowrap;">${r.qty}</td>
                 <td style="padding:8px 10px; border:1px solid #000; text-align:center; white-space:nowrap;">${r.unite || 'Unité'}</td>
             </tr>
@@ -1291,11 +1306,11 @@ function modelStandard(d) {
         rowsHtml = c.rows.map(r => `
             <tr style="background:#fff; color:#000;">
                 <td style="padding:8px 10px; border:1px solid #000; font-weight:500; word-break:break-word;">${r.ref}</td>
-                <td style="padding:8px 10px; border:1px solid #000; font-weight:700;">${r.desc}${libelleTaxesLigne(r)}</td>
+                <td style="padding:8px 10px; border:1px solid #000; font-weight:700;">${r.desc}</td>
                 <td style="padding:8px 10px; border:1px solid #000; text-align:right; white-space:nowrap;">${fmt(r.pu)}${r.remise_taux > 0 ? `<br><span style="color:#dc2626;font-size:10px;">Remise ${r.remise_taux}%</span>` : ''}</td>
                 <td style="padding:8px 10px; border:1px solid #000; text-align:right; white-space:nowrap;">${r.qty}</td>
                 <td style="padding:8px 10px; border:1px solid #000; text-align:center; white-space:nowrap;">${r.unite || 'Unité'}</td>
-                <td style="padding:8px 10px; border:1px solid #000; text-align:right; color:#000; white-space:nowrap;">${r.code_tva || 'TVA'} (${r.tva}%)</td>
+                <td style="padding:8px 10px; border:1px solid #000; text-align:right; color:#000;">${r.code_tva || 'TVA'} (${r.tva}%)${(r.taxes || []).length ? '<br>' + detailTaxesLigne(r) : ''}</td>
                 <td style="padding:8px 10px; border:1px solid #000; text-align:right; color:#000; white-space:nowrap;">${r.remise_taux > 0 ? r.remise_taux + '%' : '0%'}</td>
                 <td style="padding:8px 10px; border:1px solid #000; text-align:right; font-weight:700; white-space:nowrap;">${fmt(r.ht)}</td>
             </tr>

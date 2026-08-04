@@ -23,6 +23,7 @@ class Achat extends Model
         'montant_ht',
         'montant_tva',
         'montant_ttc',
+        'montant_autres_taxes', // taxes parafiscales collectées, hors TVA
         'remise',          // montant de la remise globale, en francs
         'remise_taux',     // taux de la remise globale, en % → champ `discount` FNE
         'est_rne',         // → champ `isRne` FNE
@@ -71,6 +72,7 @@ class Achat extends Model
             'montant_ht'  => 'decimal:2',
             'montant_tva' => 'decimal:2',
             'montant_ttc' => 'decimal:2',
+            'montant_autres_taxes' => 'decimal:2',
             'remise'      => 'decimal:2',
             'remise_taux' => 'decimal:2',
             'est_rne'     => 'boolean',

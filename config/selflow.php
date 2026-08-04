@@ -53,6 +53,9 @@ return [
         'achat_defaut'          => '601000', // Achats (compte générique si le produit n'a pas de compte dédié)
         'tva_collectee'         => '443100', // État, TVA facturée sur ventes
         'tva_deductible'        => '445200', // État, TVA déductible sur achats
+        // Taxes parafiscales collectées pour le compte de l'État (GRA, AIRSI,
+        // DTD…) : une dette envers l'État, jamais du chiffre d'affaires.
+        'taxes_collectees'      => '447000', // État, autres impôts et taxes
         'caisse'                => '571000', // Caisse
         'banque_defaut'         => '521000', // Banque (si aucun journal banque dédié trouvé)
     ],

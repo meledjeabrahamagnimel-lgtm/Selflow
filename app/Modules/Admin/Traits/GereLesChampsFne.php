@@ -112,6 +112,52 @@ trait GereLesChampsFne
     }
 
     /**
+     * Montant total des taxes parafiscales d'une pièce.
+     *
+     * Deux niveaux, comme la FNE : celles propres à chaque article, assises sur
+     * son HT net, et celles portant sur le total TTC. Elles s'ajoutent à ce que
+     * paie le client sans être du chiffre d'affaires ni de la TVA — elles sont
+     * collectées pour le compte de l'État.
+     */
+    protected static function calculerAutresTaxes($request, float $totalTtc, float $ratioRemiseGlobale): float
+    {
+        $total = 0.0;
+
+        foreach ((array) $request->input('articles', []) as $article) {
+            $prix = 0.0;
+            $taxes = [];
+
+            if (!empty($article['produit_id'])) {
+                $produit = \App\Modules\Admin\Modeles\Produit::with('taxes')->find($article['produit_id']);
+                if (!$produit) {
+                    continue;
+                }
+                $prix  = (float) $produit->prix_vente;
+                $taxes = $produit->taxes->map(fn ($t) => ['taux' => (float) $t->taux])->all();
+            } else {
+                $prix  = floatval($article['prix_unitaire'] ?? 0);
+                $taxes = (array) ($article['taxes'] ?? []);
+            }
+
+            $remiseLigne = self::tauxBorne($article['remise_taux'] ?? 0);
+            $htNet = ($article['quantite'] ?? 0) * $prix * (1 - $remiseLigne / 100) * $ratioRemiseGlobale;
+
+            foreach ($taxes as $taxe) {
+                $total += $htNet * self::tauxBorne($taxe['taux'] ?? 0) / 100;
+            }
+        }
+
+        foreach ((array) $request->input('taxes_ttc', []) as $taxe) {
+            if (trim((string) ($taxe['nom'] ?? '')) === '') {
+                continue;
+            }
+            $total += $totalTtc * self::tauxBorne($taxe['taux'] ?? 0) / 100;
+        }
+
+        return round($total, 2);
+    }
+
+    /**
      * Enregistre les taxes sur le total TTC d'une pièce, en calculant le
      * montant de chacune à partir du TTC fourni.
      */
