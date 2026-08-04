@@ -123,7 +123,26 @@
         display: inline-block;
     }
 
+    /*
+     * Etat applique le temps de la capture PDF : largeur figee a une page A4
+     * (794 px a 96 dpi) et suppression des effets d'ecran, pour un rendu de
+     * page photocopiee.
+     */
+    .invoice.mode-export {
+        width: 794px !important;
+        max-width: 794px !important;
+        margin: 0 !important;
+        border: none !important;
+        border-radius: 0 !important;
+        box-shadow: none !important;
+    }
+
     /* CSS Impression */
+    @page {
+        size: A4 portrait;
+        margin: 10mm;
+    }
+
     @media print {
         * {
             -webkit-print-color-adjust: exact !important;
@@ -151,6 +170,15 @@
             margin: 0 !important;
             padding: 0 !important;
             border-radius: 0 !important;
+            overflow: visible !important;
+        }
+        /* Rien d'autre que la facture ne doit atterrir sur la feuille */
+        .controls-card, .page-header, nav, footer, .breadcrumb {
+            display: none !important;
+        }
+        /* Eviter qu'une ligne de tableau soit coupee en deux pages */
+        table, tr, td, th {
+            page-break-inside: avoid !important;
         }
     }
 </style>
@@ -522,6 +550,51 @@ function fmtFcfa(n) {
 }
 
 /**
+ * Libelles des codes TVA de la DGI.
+ */
+var LIBELLES_CODE_TVA = {
+    TVA:  'TVA normale',
+    TVAB: 'TVA taux reduit',
+    TVAC: 'TVA exo. conventionnelle',
+    TVAD: 'TVA exo. legale'
+};
+
+/**
+ * Ventile le chiffre d'affaires par code TVA reel.
+ *
+ * Le recapitulatif affichait une seule ligne « TVA normale 18,00% » quel que
+ * soit le contenu de la facture : une facture melangeant 18 %, 9 % et des
+ * articles exoneres etait donc presentee a tort comme entierement taxee a 18 %.
+ */
+function ventilerParCodeTva(c) {
+    var ratio = c.tot_ht > 0 ? c.tot_ht_net / c.tot_ht : 0;
+    var groupes = {};
+
+    c.rows.forEach(function (r) {
+        var code = r.code_tva || 'TVA';
+        if (!groupes[code]) {
+            groupes[code] = { code: code, taux: r.tva, base: 0, taxe: 0 };
+        }
+        groupes[code].base += r.ht * ratio;
+        groupes[code].taxe += r.ht * ratio * r.tva / 100;
+    });
+
+    return Object.values(groupes);
+}
+
+/**
+ * Libelle du total de TVA : le taux n'est affiche que s'il est unique sur la
+ * facture, sinon la mention resterait fausse des qu'un article differe.
+ */
+function libelleTotalTva(c) {
+    var taux = [...new Set(c.rows.map(r => parseFloat(r.tva || 0)))];
+    if (taux.length === 1) {
+        return 'TVA (' + String(taux[0]).replace('.', ',') + '%)';
+    }
+    return 'Total TVA';
+}
+
+/**
  * Lignes « Autres taxes » + « Net a payer » du recapitulatif, au format des
  * modeles 1 a 3 (blocs en <div>).
  */
@@ -638,25 +711,57 @@ function toggleDeliveryMode() {
     render();
 }
 
+/**
+ * Export PDF de la seule facture, en qualite « photocopie ».
+ *
+ * Trois causes de flou etaient reunies :
+ *   - la capture etait encodee en JPEG, dont la compression brouille le texte
+ *     fin ; on passe en PNG, sans perte ;
+ *   - la largeur capturee suivait celle de l'ecran (barre laterale comprise),
+ *     puis l'image etait etiree pour remplir l'A4 ; on fige desormais la
+ *     largeur de rendu a celle d'une page A4 a 96 dpi (794 px) ;
+ *   - l'echelle de rasterisation etait trop basse pour une impression.
+ *
+ * On neutralise aussi l'ombre et les coins arrondis le temps de la capture :
+ * une facture imprimee n'a ni l'un ni l'autre.
+ */
 function telechargerPdf() {
-    // Hide controls card temporarily
     var controls = document.querySelector('.controls-card');
     if (controls) controls.style.display = 'none';
 
     var element = document.querySelector('.invoice');
+    element.classList.add('mode-export');
+
+    // Une echelle plus elevee sur les grands documents alourdit le fichier
+    // sans gain visible : 3 suffit pour du texte net a l'impression.
+    var echelle = Math.min(3, Math.max(2, window.devicePixelRatio || 1) + 1);
+
     var opt = {
-        margin:       [5, 5, 5, 5],
+        margin:       [8, 8, 8, 8],
         filename:     (isDeliveryMode ? 'BL_' : 'Facture_') + DATA.vente.num + '.pdf',
-        image:        { type: 'jpeg', quality: 0.98 },
-        html2canvas:  { scale: 2.5, useCORS: true, logging: false },
-        jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' },
-        pagebreak:    { mode: 'avoid-all' }
+        image:        { type: 'png' },
+        html2canvas:  {
+            scale: echelle,
+            useCORS: true,
+            logging: false,
+            backgroundColor: '#ffffff',
+            letterRendering: true,
+            scrollX: 0,
+            scrollY: 0,
+            windowWidth: 794,
+            width: 794
+        },
+        jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait', compress: true },
+        pagebreak:    { mode: ['css', 'legacy'] }
     };
-    
-    html2pdf().set(opt).from(element).save().then(function() {
+
+    function restaurer() {
+        element.classList.remove('mode-export');
         if (controls) controls.style.display = '';
-    }).catch(function(err) {
-        if (controls) controls.style.display = '';
+    }
+
+    html2pdf().set(opt).from(element).save().then(restaurer).catch(function(err) {
+        restaurer();
         console.error(err);
     });
 }
@@ -830,7 +935,7 @@ function model1(d) {
                 <div style="display:flex;justify-content:space-between;padding:6px 0;font-size:12px;border-bottom:0.5px solid var(--border)"><span style="color:var(--mu)">Sous-total Brut HT</span><span>${fmtFcfa(c.tot_ht)}</span></div>
                 ${c.remiseGlobal > 0 ? `<div style="display:flex;justify-content:space-between;padding:6px 0;font-size:12px;border-bottom:0.5px solid var(--border);color:#dc2626;font-weight:600;"><span>Remise</span><span>-${fmtFcfa(c.remiseGlobal)}</span></div>` : ''}
                 <div style="display:flex;justify-content:space-between;padding:6px 0;font-size:12px;border-bottom:0.5px solid var(--border)"><span style="color:var(--mu)">Total Net HT</span><span>${fmtFcfa(c.tot_ht_net)}</span></div>
-                <div style="display:flex;justify-content:space-between;padding:6px 0;font-size:12px;border-bottom:0.5px solid var(--border)"><span style="color:var(--mu)">TVA (18%)</span><span>${fmtFcfa(c.tot_tva)}</span></div>
+                <div style="display:flex;justify-content:space-between;padding:6px 0;font-size:12px;border-bottom:0.5px solid var(--border)"><span style="color:var(--mu)">${libelleTotalTva(c)}</span><span>${fmtFcfa(c.tot_tva)}</span></div>
                 <div style="display:flex;justify-content:space-between;padding:10px 0 6px;font-size:15px;font-weight:800;color:var(--tx);border-top:1.5px solid ${theme.color};"><span>TOTAL TTC</span><span>${fmtFcfa(c.tot_ttc)}</span></div>
                 ${blocAutresTaxesDiv(c, theme.color)}
                 ${d.etape === 'Facture' ? `
@@ -952,7 +1057,7 @@ function model2(d) {
                     <div style="display:flex;justify-content:space-between;font-size:11px;padding:4px 0"><span style="color:var(--mu)">Brut HT</span><span>${fmtFcfa(c.tot_ht)}</span></div>
                     ${c.remiseGlobal > 0 ? `<div style="display:flex;justify-content:space-between;font-size:11px;padding:4px 0;color:#dc2626;font-weight:600;"><span>Remise</span><span>-${fmtFcfa(c.remiseGlobal)}</span></div>` : ''}
                     <div style="display:flex;justify-content:space-between;font-size:11px;padding:4px 0"><span style="color:var(--mu)">Net HT</span><span>${fmtFcfa(c.tot_ht_net)}</span></div>
-                    <div style="display:flex;justify-content:space-between;font-size:11px;padding:4px 0"><span style="color:var(--mu)">TVA 18%</span><span>${fmtFcfa(c.tot_tva)}</span></div>
+                    <div style="display:flex;justify-content:space-between;font-size:11px;padding:4px 0"><span style="color:var(--mu)">${libelleTotalTva(c)}</span><span>${fmtFcfa(c.tot_tva)}</span></div>
                     <div style="display:flex;justify-content:space-between;font-size:13px;font-weight:800;padding:6px 0 0;border-top:0.5px solid var(--border);margin-top:4px"><span style="color:var(--tx)">Total TTC</span><span style="color:${theme.color}">${fmtFcfa(c.tot_ttc)}</span></div>
                     ${blocAutresTaxesDiv(c, theme.color)}
                     ${d.etape === 'Facture' ? `
@@ -1082,7 +1187,7 @@ function model3(d) {
                 <div style="display:flex;justify-content:space-between;padding:4px 0;font-size:12px;border-bottom:0.5px solid var(--border)"><span style="color:var(--mu)">Sous-total Brut HT</span><span>${fmtFcfa(c.tot_ht)}</span></div>
                 ${c.remiseGlobal > 0 ? `<div style="display:flex;justify-content:space-between;padding:4px 0;font-size:12px;border-bottom:0.5px solid var(--border);color:#dc2626;font-weight:600;"><span>Remise</span><span>-${fmtFcfa(c.remiseGlobal)}</span></div>` : ''}
                 <div style="display:flex;justify-content:space-between;padding:4px 0;font-size:12px;border-bottom:0.5px solid var(--border)"><span style="color:var(--mu)">Total Net HT</span><span>${fmtFcfa(c.tot_ht_net)}</span></div>
-                <div style="display:flex;justify-content:space-between;padding:4px 0;font-size:12px;border-bottom:0.5px solid var(--border)"><span style="color:var(--mu)">TVA 18%</span><span>${fmtFcfa(c.tot_tva)}</span></div>
+                <div style="display:flex;justify-content:space-between;padding:4px 0;font-size:12px;border-bottom:0.5px solid var(--border)"><span style="color:var(--mu)">${libelleTotalTva(c)}</span><span>${fmtFcfa(c.tot_tva)}</span></div>
                 <div style="display:flex;justify-content:space-between;padding:8px;margin-top:4px;background:${theme.color};border-radius:6px">
                     <span style="font-size:13px;font-weight:700;color:#fff">Total TTC</span>
                     <span style="font-size:15px;font-weight:800;color:#fff">${fmtFcfa(c.tot_ttc)}</span>
@@ -1304,12 +1409,20 @@ function modelStandard(d) {
                         </tr>
                     </thead>
                     <tbody>
+                        ${ventilerParCodeTva(c).map(g => `
                         <tr>
-                            <td style="padding:5px 8px; border:1px solid #000;">${hasTva ? 'TVA normale' : 'TVA exo.lég - Pas de TVA sur HT'}</td>
-                            <td style="padding:5px 8px; border:1px solid #000; text-align:right;">${fmtFcfa(c.tot_ht_net)}</td>
-                            <td style="padding:5px 8px; border:1px solid #000; text-align:right;">${hasTva ? '18,00%' : '00,00% - D'}</td>
-                            <td style="padding:5px 8px; border:1px solid #000; text-align:right;">${fmtFcfa(c.tot_tva)}</td>
-                        </tr>
+                            <td style="padding:5px 8px; border:1px solid #000;">${LIBELLES_CODE_TVA[g.code] || g.code} — ${g.code}</td>
+                            <td style="padding:5px 8px; border:1px solid #000; text-align:right;">${fmtFcfa(g.base)}</td>
+                            <td style="padding:5px 8px; border:1px solid #000; text-align:right;">${Number(g.taux).toFixed(2).replace('.', ',')}%</td>
+                            <td style="padding:5px 8px; border:1px solid #000; text-align:right;">${fmtFcfa(g.taxe)}</td>
+                        </tr>`).join('')}
+                        ${c.lignes_autres_taxes.map(t => `
+                        <tr>
+                            <td style="padding:5px 8px; border:1px solid #000;">${t.nom}</td>
+                            <td style="padding:5px 8px; border:1px solid #000; text-align:right;">—</td>
+                            <td style="padding:5px 8px; border:1px solid #000; text-align:right;">—</td>
+                            <td style="padding:5px 8px; border:1px solid #000; text-align:right;">${fmtFcfa(t.montant)}</td>
+                        </tr>`).join('')}
                     </tbody>
                 </table>
             </div>

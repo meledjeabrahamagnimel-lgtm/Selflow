@@ -668,6 +668,48 @@ class FneDashboardControleur
             $batchSize = 15;
         }
 
+        // Compter tout de suite les pièces éligibles : autant le dire à
+        // l'utilisateur avant de lancer quoi que ce soit. `withoutGlobalScopes`
+        // neutralise le filtre de période stocké en session, qui restreindrait
+        // la plage de dates saisie dans le formulaire.
+        $eligibles = $flux === 'ventes'
+            ? Vente::withoutGlobalScopes()
+                ->where('normalise', false)
+                ->where('etape', 'Facture')
+                ->whereHas('pointDeVente', fn ($q) => $q->where('entreprise_id', $entreprise->id))
+                ->whereBetween('date_vente', [$dateDebut . ' 00:00:00', $dateFin . ' 23:59:59'])
+                ->count()
+            : Achat::withoutGlobalScopes()
+                ->where('normalise', false)
+                ->where('type_facture', 'bapa')
+                ->where('etape', 'Facture')
+                ->whereHas('pointDeVente', fn ($q) => $q->where('entreprise_id', $entreprise->id))
+                ->whereBetween('date_achat', [$dateDebut . ' 00:00:00', $dateFin . ' 23:59:59'])
+                ->count();
+
+        if ($eligibles === 0) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Aucun document non normalisé sur cette période.',
+            ], 422);
+        }
+
+        // Le suivi est écrit AVANT la mise en file : sans cela, tant qu'aucun
+        // worker n'a pris le job, le fichier de statut n'existe pas et
+        // l'interface conclut « idle », donnant l'impression que le bouton ne
+        // fait rien.
+        $statusPath = storage_path("app/fne_batch_{$entreprise->id}.json");
+        file_put_contents($statusPath, json_encode([
+            'status'           => 'queued',
+            'flux'             => $flux,
+            'total_to_process' => min($eligibles, $batchSize),
+            'processed_count'  => 0,
+            'current_invoice'  => null,
+            'error'            => null,
+            'queued_at'        => now()->toDateTimeString(),
+            'last_updated'     => now()->toDateTimeString(),
+        ]));
+
         \App\Jobs\BatchNormalisationJob::dispatch(
             $entreprise->id,
             $flux,
@@ -678,6 +720,7 @@ class FneDashboardControleur
 
         return response()->json([
             'success' => true,
+            'total_to_process' => min($eligibles, $batchSize),
             'message' => 'La normalisation en arrière-plan a été lancée.'
         ]);
     }
@@ -691,9 +734,22 @@ class FneDashboardControleur
             if (file_exists($statusPath)) {
                 $data = json_decode(file_get_contents($statusPath), true);
                 $data['status'] = 'cancelled';
+                $data['last_updated'] = now()->toDateTimeString();
                 file_put_contents($statusPath, json_encode($data));
                 return response()->json(['success' => true, 'message' => 'Demande d\'annulation prise en compte.']);
             }
+
+            return response()->json(['success' => true, 'message' => 'Aucun traitement en cours.']);
+        }
+
+        // Purge du suivi : permet a l'interface de repartir d'un etat neutre
+        // apres un traitement termine, annule ou en echec.
+        if ($request->input('reset') === '1') {
+            if (file_exists($statusPath)) {
+                unlink($statusPath);
+            }
+
+            return response()->json(['status' => 'idle', 'processed_count' => 0, 'total_to_process' => 0]);
         }
 
         if (!file_exists($statusPath)) {
@@ -704,7 +760,22 @@ class FneDashboardControleur
             ]);
         }
 
-        $data = json_decode(file_get_contents($statusPath), true);
+        $data = json_decode(file_get_contents($statusPath), true) ?: [];
+
+        // Un lot qui reste « queued » signifie qu'aucun worker de file
+        // d'attente ne tourne : le job attendra indefiniment. On le dit
+        // clairement plutot que de laisser la barre de progression tourner.
+        if (($data['status'] ?? null) === 'queued' && !empty($data['queued_at'])) {
+            $attenteSecondes = now()->diffInSeconds(\Carbon\Carbon::parse($data['queued_at']));
+            $data['waiting_seconds'] = $attenteSecondes;
+
+            if ($attenteSecondes > 30 && config('queue.default') !== 'sync') {
+                $data['worker_missing'] = true;
+                $data['error'] = 'Le traitement est en file d\'attente mais aucun worker ne le consomme. '
+                    . 'Lancez « php artisan queue:work » sur le serveur, ou passez QUEUE_CONNECTION=sync.';
+            }
+        }
+
         return response()->json($data);
     }
 }

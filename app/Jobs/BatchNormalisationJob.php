@@ -42,8 +42,14 @@ class BatchNormalisationJob implements ShouldQueue
         $statusPath = storage_path("app/fne_batch_{$this->entrepriseId}.json");
 
         // 1. Récupérer les documents non-normalisés
+        //    `withoutGlobalScopes()` est indispensable : le PeriodeScope filtre
+        //    sur la période active en SESSION. Dans un job de file d'attente il
+        //    n'y a pas de session, et en exécution synchrone il restreindrait
+        //    silencieusement la plage de dates demandée par l'utilisateur — le
+        //    lot ne trouvait alors aucun document a traiter.
         if ($this->flux === 'ventes') {
-            $invoices = Vente::where('normalise', false)
+            $invoices = Vente::withoutGlobalScopes()
+                ->where('normalise', false)
                 ->where('etape', 'Facture')
                 ->whereHas('pointDeVente', fn($q) => $q->where('entreprise_id', $this->entrepriseId))
                 ->whereBetween('date_vente', [$this->dateDebut . ' 00:00:00', $this->dateFin . ' 23:59:59'])
@@ -52,7 +58,8 @@ class BatchNormalisationJob implements ShouldQueue
                 ->limit($this->batchSize)
                 ->get();
         } else {
-            $invoices = Achat::where('normalise', false)
+            $invoices = Achat::withoutGlobalScopes()
+                ->where('normalise', false)
                 ->where('type_facture', 'bapa')
                 ->where('etape', 'Facture')
                 ->whereHas('pointDeVente', fn($q) => $q->where('entreprise_id', $this->entrepriseId))
@@ -184,5 +191,28 @@ class BatchNormalisationJob implements ShouldQueue
         $statusData['last_updated'] = now()->toDateTimeString();
         file_put_contents($statusPath, json_encode($statusData));
         Log::info("BatchNormalisationJob terminé avec succès.");
+    }
+
+    /**
+     * Echec definitif du job (exception non rattrapee, timeout, worker tue).
+     *
+     * Sans ce rappel, le fichier de suivi resterait indefiniment en « running »
+     * et la barre de progression tournerait dans le vide.
+     */
+    public function failed(\Throwable $exception): void
+    {
+        $statusPath = storage_path("app/fne_batch_{$this->entrepriseId}.json");
+
+        $statusData = file_exists($statusPath)
+            ? (json_decode(file_get_contents($statusPath), true) ?: [])
+            : [];
+
+        $statusData['status'] = 'failed';
+        $statusData['error'] = 'Le traitement s\'est interrompu : ' . $exception->getMessage();
+        $statusData['last_updated'] = now()->toDateTimeString();
+
+        file_put_contents($statusPath, json_encode($statusData));
+
+        Log::error('BatchNormalisationJob: echec definitif - ' . $exception->getMessage());
     }
 }
