@@ -200,13 +200,13 @@
     {{-- Top vendeurs du jour --}}
     <div class="card">
         <div class="card-header">
-            <h2><i class="fas fa-ranking-star" style="color:#f59e0b"></i> Top vendeurs — aujourd'hui</h2>
+            <h2><i class="fas fa-ranking-star" style="color:#f59e0b"></i> Top vendeurs — {{ $periodeLabel }}</h2>
         </div>
         <div class="card-body" style="padding:14px;">
             @if($topVendeurs->isEmpty())
             <div style="text-align:center; padding:24px; color:var(--text-3);">
                 <i class="fas fa-users" style="font-size:24px; opacity:.3;"></i>
-                <div style="margin-top:8px; font-size:13px;">Aucune vente aujourd'hui</div>
+                <div style="margin-top:8px; font-size:13px;">Aucune vente sur {{ $periodeLabel }}</div>
             </div>
             @else
             @php $maxV = $topVendeurs->max('total') ?: 1; @endphp

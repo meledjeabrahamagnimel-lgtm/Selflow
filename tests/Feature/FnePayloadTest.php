@@ -484,6 +484,31 @@ class FnePayloadTest extends TestCase
         );
     }
 
+    public function test_un_recu_remplace_par_sa_facture_sort_des_agregats(): void
+    {
+        // Sans cette regle, le recu et la facture qui en decoule porteraient
+        // les memes montants et doubleraient le chiffre d'affaires.
+        $recu    = $this->venteMinimale(['type_piece' => Vente::TYPE_RECU]);
+        $facture = $this->venteMinimale(['piece_liee_id' => $recu->id]);
+        $recu->update(['piece_liee_id' => $facture->id]);
+
+        $retenues = Vente::withoutGlobalScopes()->sansDoublonRecu()->pluck('id');
+
+        $this->assertContains($facture->id, $retenues);
+        $this->assertNotContains($recu->id, $retenues);
+        $this->assertTrue($recu->fresh()->estRemplaceParUneFacture());
+    }
+
+    public function test_un_recu_seul_reste_compte(): void
+    {
+        $recu = $this->venteMinimale(['type_piece' => Vente::TYPE_RECU]);
+
+        $this->assertContains(
+            $recu->id,
+            Vente::withoutGlobalScopes()->sansDoublonRecu()->pluck('id')
+        );
+    }
+
     /**
      * Vente d'une ligne, sans client ni remise : le socle des cas ci-dessus.
      */

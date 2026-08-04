@@ -1209,15 +1209,17 @@ class VenteControleur
     }
 
     /**
-     * Convertir une pièce d'un type vers l'autre : un reçu déjà émis donne une
-     * facture, et une facture donne un reçu.
+     * Établir la facture correspondant à un reçu déjà émis.
      *
-     * La pièce d'origine est conservée telle quelle — elle a pu être remise au
-     * client, voire normalisée : on ne la réécrit pas. La nouvelle pièce reprend
-     * ses informations et les deux se pointent mutuellement, de sorte que le
-     * registre affiche le reçu lié en face de la facture et inversement.
-     * La nouvelle pièce naît non normalisée : c'est un document distinct, qui
-     * doit obtenir sa propre certification auprès de la DGI.
+     * C'est le seul sens prévu par la DGI : les champs `isRne` et `rne` de
+     * l'API désignent « le numéro du reçu pour lequel la facture est émise ».
+     * Rien ne permet en revanche de rattacher un reçu à une facture antérieure,
+     * aussi ce sens n'est-il pas proposé.
+     *
+     * Le reçu d'origine est conservé tel quel — il a pu être remis au client :
+     * on ne le réécrit pas. La facture reprend ses informations, les deux
+     * pièces se pointent mutuellement, et la facture naît non normalisée
+     * puisqu'elle doit obtenir sa propre certification.
      */
     public function convertirPiece(Vente $vente): RedirectResponse
     {
@@ -1231,11 +1233,15 @@ class VenteControleur
             return back()->with('erreur', 'Seule une pièce validée peut être convertie.');
         }
 
-        if ($vente->pieceLiee) {
-            return back()->with('erreur', 'Cette pièce a déjà une contrepartie : ' . $vente->pieceLiee->numero_facture . '.');
+        if (!$vente->estRecu()) {
+            return back()->with('erreur', "Seul un reçu peut donner lieu à une facture. La DGI ne prévoit pas l'opération inverse.");
         }
 
-        $versRecu = !$vente->estRecu();
+        if ($vente->pieceLiee) {
+            return back()->with('erreur', 'Ce reçu a déjà donné lieu à la facture ' . $vente->pieceLiee->numero_facture . '.');
+        }
+
+        $versRecu = false;
         $nouvelleId = null;
 
         DB::transaction(function () use ($vente, $versRecu, &$nouvelleId) {
@@ -1246,9 +1252,13 @@ class VenteControleur
                 'qr_code_data', 'fichier_fne_pdf_url', 'fne_invoice_id',
             ]);
             $clone->numero_facture = \App\Modules\Admin\Services\NumerotationService::genererNumeroVente($entrepriseId, 'Facture');
-            $clone->type_piece     = $versRecu ? Vente::TYPE_RECU : Vente::TYPE_FACTURE;
+            $clone->type_piece     = Vente::TYPE_FACTURE;
             $clone->type_facture   = 'proformat';
             $clone->piece_liee_id  = $vente->id;
+            // La facture est émise pour ce reçu : c'est exactement ce que
+            // décrivent `isRne` et `rne` dans le payload de certification.
+            $clone->est_rne        = true;
+            $clone->numero_rne     = $vente->numero_fne ?: $vente->numero_facture;
             $clone->archived       = false;
             $clone->normalise      = false;
             $clone->numero_fne     = null;
@@ -1283,11 +1293,10 @@ class VenteControleur
             $nouvelleId = $clone->id;
         });
 
-        $libelle = $versRecu ? 'reçu' : 'facture';
         $route = request()->routeIs('caissier.*') ? 'caissier.ventes.imprimer' : 'admin.ventes.imprimer';
 
         return redirect()->route($route, $nouvelleId)
-            ->with('succes', "Un {$libelle} a été créé à partir de « {$vente->numero_facture} ». Il reste à le normaliser auprès de la DGI.");
+            ->with('succes', "La facture du reçu « {$vente->numero_facture} » a été établie. Elle reste à normaliser auprès de la DGI.");
     }
 
     /**

@@ -92,7 +92,9 @@ class FneDashboardControleur
         [$debut, $fin] = $this->resoudrePeriode($request);
         $pdvId = $request->input('pdv_id');
 
-        $ventesQuery = Vente::whereHas('pointDeVente', fn($q) => $q->where('entreprise_id', $entrepriseId))
+        // Un recu deja remplace par sa facture ne doit pas compter deux fois
+        $ventesQuery = Vente::sansDoublonRecu()
+            ->whereHas('pointDeVente', fn($q) => $q->where('entreprise_id', $entrepriseId))
             ->whereBetween('date_vente', [$debut, $fin])
             ->where('etape', 'Facture')
             ->where('normalise', true);
@@ -722,8 +724,13 @@ class FneDashboardControleur
             ], 400);
         }
 
-        if ($batchSize <= 0 || $batchSize > 100) {
-            $batchSize = 15;
+        // Un lancement porte au plus 15 documents : c'est la limite deja
+        // appliquee a la selection manuelle.
+        if ($batchSize < 1 || $batchSize > 15) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Le nombre de documents à normaliser doit être compris entre 1 et 15.',
+            ], 422);
         }
 
         // `withoutGlobalScopes` neutralise le filtre de période stocké en

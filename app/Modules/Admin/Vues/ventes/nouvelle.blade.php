@@ -142,6 +142,7 @@
                          data-unite="{{ $produit->unite ?? 'Unité' }}"
                          data-tva="{{ $produit->taux_tva }}"
                          data-remise="{{ $produit->remise_taux ?? 0 }}"
+                         data-taxes="{{ $produit->taxes->map(fn ($t) => ['nom' => $t->nom, 'taux' => (float) $t->taux])->toJson() }}"
                          onclick="ajouterAuPanier(this)">
                         <div class="produit-cat">{{ $produit->categorie }}</div>
                         <div class="produit-nom">{{ $produit->nom }}</div>
@@ -862,6 +863,9 @@ function ajouterAuPanier(card) {
     const tva       = parseFloat(card.dataset.tva || 18);
     // Remise par defaut du produit, reprise telle quelle sur la ligne
     const remise    = parseFloat(card.dataset.remise || 0);
+    // Taxes propres au produit : elles s'ajoutent au montant a payer
+    let taxesProduit = [];
+    try { taxesProduit = JSON.parse(card.dataset.taxes || '[]'); } catch (e) { taxesProduit = []; }
 
     if (panier[id]) {
         const nouvelleQte = panier[id].qte + 1;
@@ -875,9 +879,9 @@ function ajouterAuPanier(card) {
         }
     } else {
         if (stock <= 0) {
-            ouvrirModalRuptureVirtual(id, nom, prix, stock, stock_min, unite, tva, remise);
+            ouvrirModalRuptureVirtual(id, nom, prix, stock, stock_min, unite, tva, remise, taxesProduit);
         } else {
-            panier[id] = { nom, prix, qte: 1, stock, stock_minimum: stock_min, unite: unite, tva, remise_taux: remise, isVirtual: false };
+            panier[id] = { nom, prix, qte: 1, stock, stock_minimum: stock_min, unite: unite, tva, remise_taux: remise, taxes: taxesProduit, isVirtual: false };
             verifierLimiteMinimale(panier[id]);
             savePanier();
             renderPanier();
@@ -967,13 +971,13 @@ function ouvrirModalRupture(id, qte) {
 }
 
 // Ouvrir modal rupture virtuel
-function ouvrirModalRuptureVirtual(id, nom, prix, stock, stock_min, unite, tva, remise) {
+function ouvrirModalRuptureVirtual(id, nom, prix, stock, stock_min, unite, tva, remise, taxesProduit) {
     document.getElementById('ruptureNomProduit').textContent = nom;
     document.getElementById('ruptureQteDemandee').textContent = 1;
     document.getElementById('ruptureStockDispo').textContent = stock;
     
     document.getElementById('btnConfirmerRupture').onclick = function() {
-        panier[id] = { nom, prix, qte: 1, stock, stock_minimum: stock_min, unite: unite, tva, remise_taux: remise || 0, isVirtual: false };
+        panier[id] = { nom, prix, qte: 1, stock, stock_minimum: stock_min, unite: unite, tva, remise_taux: remise || 0, taxes: taxesProduit || [], isVirtual: false };
         fermerModalRupture();
         savePanier();
         renderPanier();
@@ -1065,11 +1069,12 @@ function renderPanier() {
             <div style="flex:1;">
                 <div class="item-nom">${item.nom}</div>
                 <div class="item-prix">${formatFcfa(item.prix)} × ${item.qte} = <strong>${formatFcfa(sousTotalNet)}</strong>${remiseLigne > 0 ? ` <span style="color:#dc2626;">(−${remiseLigne}%)</span>` : ''}</div>
+                ${(item.taxes || []).length ? `<div style="font-size:10px; color:var(--text-3);">${item.taxes.map(t => `${t.nom} ${t.taux}%`).join(' · ')}</div>` : ''}
                 <div style="margin-top: 5px; display: flex; align-items: center; gap: 6px;">
                     <span style="font-size: 11px; color: var(--text-3);">Unité:</span>
                     <input type="text" class="form-control form-control-sm" value="${item.unite || 'Unité'}" onchange="saisirUnite('${id}', this.value)" style="width: 80px; height: 22px; font-size: 11px; padding: 2px 6px; display: inline-block;">
                     <span style="font-size: 11px; color: var(--text-3);">Remise (%):</span>
-                    <input type="number" class="form-control form-control-sm" value="${remiseLigne}" min="0" max="100" step="0.01" onchange="saisirRemiseLigne('${id}', this.value)" style="width: 70px; height: 22px; font-size: 11px; padding: 2px 6px; display: inline-block;">
+                    <input type="number" class="form-control form-control-sm" value="${remiseLigne}" min="0" max="100" step="0.01" oninput="saisirRemiseLigne('${id}', this.value)" style="width: 70px; height: 22px; font-size: 11px; padding: 2px 6px; display: inline-block;">
                 </div>
             </div>
             <div class="qte-ctrl">
@@ -1148,7 +1153,42 @@ function saisirRemiseLigne(id, val) {
 
     panier[id].remise_taux = taux;
     savePanier();
-    renderPanier();
+
+    // On ne reconstruit pas le panier : cela rendrait la saisie impossible en
+    // remplaçant le champ à chaque frappe. Seuls les totaux et le sous-total de
+    // la ligne sont rafraîchis.
+    rafraichirSousTotalLigne(id);
+    majChampsArticles();
+    calculerTotaux();
+}
+
+/**
+ * Met à jour l'affichage « P.U. × Qté = Total » de la ligne concernée.
+ */
+function rafraichirSousTotalLigne(id) {
+    const item = panier[id];
+    if (!item) return;
+
+    const champ = document.querySelector(`#panierItems input[oninput*="saisirRemiseLigne('${id}'"]`);
+    const ligne = champ ? champ.closest('.panier-item') : null;
+    const affichage = ligne ? ligne.querySelector('.item-prix') : null;
+    if (!affichage) return;
+
+    const remise = parseFloat(item.remise_taux || 0);
+    const net = item.prix * item.qte * (1 - remise / 100);
+    affichage.innerHTML = `${formatFcfa(item.prix)} × ${item.qte} = <strong>${formatFcfa(net)}</strong>`
+        + (remise > 0 ? ` <span style="color:#dc2626;">−${remise}%</span>` : '');
+}
+
+/**
+ * Réécrit les champs cachés envoyés avec le formulaire, sans toucher au DOM
+ * visible du panier.
+ */
+function majChampsArticles() {
+    document.querySelectorAll('.article-input[name*="[remise_taux]"]').forEach((champ, rang) => {
+        const id = Object.keys(panier)[rang];
+        if (id !== undefined) champ.value = panier[id].remise_taux || 0;
+    });
 }
 
 // ─── Taxes sur total TTC (champ `customTaxes` de la FNE) ────────────────────
@@ -1231,8 +1271,19 @@ function calculerTotaux() {
 
     const totalTtc = totalHtNet + totalTva;
 
-    // Autres taxes : appliquées sur le total TTC
+    // Autres taxes. Deux niveaux, comme la FNE : celles propres a chaque
+    // article, calculees sur son HT net, et celles portant sur le total TTC.
     let totalAutresTaxes = 0;
+
+    Object.keys(panier).forEach(id => {
+        const item = panier[id];
+        const remiseLigne = parseFloat(item.remise_taux || 0);
+        const htNet = item.prix * item.qte * (1 - remiseLigne / 100) * ratio;
+        (item.taxes || []).forEach(t => {
+            totalAutresTaxes += htNet * (parseFloat(t.taux) || 0) / 100;
+        });
+    });
+
     document.querySelectorAll('#taxesTtcConteneur > div').forEach(ligne => {
         const taux = parseFloat(ligne.querySelectorAll('input')[1]?.value || 0);
         const montant = (isNaN(taux) ? 0 : Math.min(Math.max(taux, 0), 100)) / 100 * totalTtc;

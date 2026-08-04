@@ -749,7 +749,7 @@ function renderPanier() {
                     <span style="font-size: 11px; color: var(--text-3);">Unité:</span>
                     <input type="text" class="form-control form-control-sm" value="${item.unite || 'Unité'}" onchange="saisirUnite('${id}', this.value)" style="width: 80px; height: 22px; font-size: 11px; padding: 2px 6px; display: inline-block;">
                     <span style="font-size: 11px; color: var(--text-3);">Remise (%):</span>
-                    <input type="number" class="form-control form-control-sm" value="${remiseLigne}" min="0" max="100" step="0.01" onchange="saisirRemiseLigne('${id}', this.value)" style="width: 70px; height: 22px; font-size: 11px; padding: 2px 6px; display: inline-block;">
+                    <input type="number" class="form-control form-control-sm" value="${remiseLigne}" min="0" max="100" step="0.01" oninput="saisirRemiseLigne('${id}', this.value)" style="width: 70px; height: 22px; font-size: 11px; padding: 2px 6px; display: inline-block;">
                 </div>
             </div>
             <div class="qte-ctrl">
@@ -811,7 +811,42 @@ function saisirRemiseLigne(id, val) {
 
     panier[id].remise_taux = taux;
     savePanier();
-    renderPanier();
+
+    // On ne reconstruit pas le panier : cela rendrait la saisie impossible en
+    // remplaçant le champ à chaque frappe. Seuls les totaux et le sous-total de
+    // la ligne sont rafraîchis.
+    rafraichirSousTotalLigne(id);
+    majChampsArticles();
+    calculerTotaux();
+}
+
+/**
+ * Met à jour l'affichage « P.U. × Qté = Total » de la ligne concernée.
+ */
+function rafraichirSousTotalLigne(id) {
+    const item = panier[id];
+    if (!item) return;
+
+    const champ = document.querySelector(`#panierItems input[oninput*="saisirRemiseLigne('${id}'"]`);
+    const ligne = champ ? champ.closest('.panier-item') : null;
+    const affichage = ligne ? ligne.querySelector('.item-prix') : null;
+    if (!affichage) return;
+
+    const remise = parseFloat(item.remise_taux || 0);
+    const net = item.prix * item.qte * (1 - remise / 100);
+    affichage.innerHTML = `${formatFcfa(item.prix)} × ${item.qte} = <strong>${formatFcfa(net)}</strong>`
+        + (remise > 0 ? ` <span style="color:#dc2626;">−${remise}%</span>` : '');
+}
+
+/**
+ * Réécrit les champs cachés envoyés avec le formulaire, sans toucher au DOM
+ * visible du panier.
+ */
+function majChampsArticles() {
+    document.querySelectorAll('.article-input[name*="[remise_taux]"]').forEach((champ, rang) => {
+        const id = Object.keys(panier)[rang];
+        if (id !== undefined) champ.value = panier[id].remise_taux || 0;
+    });
 }
 
 // --- Taxes sur total TTC (champ `customTaxes` de la FNE) -------------------

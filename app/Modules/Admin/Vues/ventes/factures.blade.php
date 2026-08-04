@@ -578,13 +578,14 @@
                                            title="{{ $vente->pieceLiee->libelleTypeDocument() }} liée : {{ $vente->pieceLiee->numero_facture }}">
                                             <i class="fas fa-link"></i> {{ $vente->pieceLiee->numero_facture }}
                                         </a>
-                                    @else
+                                    @elseif($vente->estRecu())
+                                        {{-- Seul le sens reçu → facture est prévu par la DGI --}}
                                         <form method="POST" action="{{ $isCaissier ? route('caissier.ventes.convertir_piece', $vente) : route('admin.ventes.convertir_piece', $vente) }}" style="display:inline; margin:0;">
                                             @csrf
                                             <button type="submit" class="btn btn-sm"
                                                     style="background:#eef2ff; color:#4338ca; border:0.5px solid #c7d2fe; font-weight:700; font-size:11px; padding:4px 8px;"
-                                                    title="{{ $vente->estRecu() ? 'Établir la facture correspondant à ce reçu, en reprenant ses informations' : 'Établir le reçu correspondant à cette facture' }}">
-                                                <i class="fas fa-right-left"></i> &rarr; {{ $vente->estRecu() ? 'Facture' : 'Reçu' }}
+                                                    title="Établir la facture correspondant à ce reçu, en reprenant ses informations">
+                                                <i class="fas fa-file-invoice"></i> &rarr; Facture
                                             </button>
                                         </form>
                                     @endif
@@ -1638,8 +1639,9 @@ function annulerJobArrierePlan() {
                 </div>
                 <div class="form-group" style="margin-bottom: 16px;">
                     <label class="form-label" style="font-weight: 700; margin-bottom: 6px;">Nombre maximum à normaliser</label>
-                    <input type="number" name="batch_size" class="form-control" required min="1" max="100" value="15">
-                    <span style="font-size: 11px; color: var(--text-3);">Taille maximale du lot à traiter en arrière-plan.</span>
+                    <input type="number" name="batch_size" class="form-control" required min="1" max="15" step="1" value="15"
+                           oninput="if (this.value > 15) this.value = 15; if (this.value < 1 && this.value !== '') this.value = 1;">
+                    <span style="font-size: 11px; color: var(--text-3);">Entre 1 et 15 documents par lancement.</span>
                 </div>
                 <div id="modal-error-msg" style="display: none; background: #fef2f2; color: #dc2626; padding: 10px; border-radius: 6px; font-size: 12px; margin-top: 10px;"></div>
             </div>

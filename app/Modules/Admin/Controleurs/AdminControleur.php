@@ -30,10 +30,12 @@ class AdminControleur
         $filtreSemaine = $request->query('filtre_semaine', 'tous');
         $filtreJour    = $request->query('filtre_jour', 'tous');
 
-        $periodeLabel = "aujourd'hui";
+        $periodeLabel = session('active_periode_nom', 'période en cours');
 
         // ── Ventes personnelles ──────────────────────────────────────
-        $qVentes = Vente::where('utilisateur_id', $utilisateur->id);
+        // `sansDoublonRecu` ecarte les recus deja remplaces par leur facture :
+        // sans cela, le meme chiffre d'affaires serait compte deux fois.
+        $qVentes = Vente::sansDoublonRecu()->where('utilisateur_id', $utilisateur->id);
         // ── Achats personnels ─────────────────────────────────────────
         $qAchats = Achat::where('utilisateur_id', $utilisateur->id);
 
@@ -79,8 +81,9 @@ class AdminControleur
             $qVentes->whereYear('date_vente', $annee);
             $qAchats->whereYear('date_achat', $annee);
         } else {
-            $qVentes->whereDate('date_vente', $aujourd_hui);
-            $qAchats->whereDate('date_achat', $aujourd_hui);
+            // Aucun filtre : on s'en remet a la periode comptable active, que
+            // le PeriodeScope applique deja aux deux requetes.
+            $periodeLabel = session('active_periode_nom', 'période en cours');
         }
 
         if ($pointDeVenteId) {
@@ -94,7 +97,8 @@ class AdminControleur
         $montantAchatsJour = $qAchats->sum('montant_ttc');
 
         // ── Ventes de la période (via PeriodeScope) ───────────────────────────
-        $qVentesPeriode = Vente::where('utilisateur_id', $utilisateur->id)
+        $qVentesPeriode = Vente::sansDoublonRecu()
+            ->where('utilisateur_id', $utilisateur->id)
             ->where('etape', 'Facture');
         if ($pointDeVenteId) $qVentesPeriode->where('point_de_vente_id', $pointDeVenteId);
         $totalVentesPeriode = $qVentesPeriode->sum('montant_ttc');
@@ -179,7 +183,7 @@ class AdminControleur
         $filtreSemaine = $request->query('filtre_semaine', 'tous');
         $filtreJour    = $request->query('filtre_jour', 'tous');
 
-        $periodeLabel = "aujourd'hui";
+        $periodeLabel = session('active_periode_nom', 'période en cours');
 
         // ── CA global ─────────────────────────────────────────────────
         $qVentes = Vente::whereIn('point_de_vente_id', $pdvIds);
@@ -228,8 +232,9 @@ class AdminControleur
             $qVentes->whereYear('date_vente', $annee);
             $qAchats->whereYear('date_achat', $annee);
         } else {
-            $qVentes->whereDate('date_vente', $aujourd_hui);
-            $qAchats->whereDate('date_achat', $aujourd_hui);
+            // Aucun filtre : on s'en remet a la periode comptable active, que
+            // le PeriodeScope applique deja aux deux requetes.
+            $periodeLabel = session('active_periode_nom', 'période en cours');
         }
 
         if ($pointDeVenteId) {
@@ -243,7 +248,7 @@ class AdminControleur
         $montantAchatsJour = $qAchats->sum('montant_ttc');
 
         // ── CA global de la période (via PeriodeScope) ────────────────────────
-        $qVentesPeriode = Vente::whereIn('point_de_vente_id', $pdvIds)->where('etape', 'Facture');
+        $qVentesPeriode = Vente::sansDoublonRecu()->whereIn('point_de_vente_id', $pdvIds)->where('etape', 'Facture');
         if ($pointDeVenteId) $qVentesPeriode->where('point_de_vente_id', $pointDeVenteId);
         $totalVentesPeriode = $qVentesPeriode->sum('montant_ttc');
         $nbVentesPeriode    = $qVentesPeriode->count();
@@ -254,7 +259,7 @@ class AdminControleur
         $totalAchatsPeriode = $qAchatsPeriode->sum('montant_ttc');
 
         // ── Marge brute de la période ─────────────────────────────────────────
-        $qVentesHT  = Vente::whereIn('point_de_vente_id', $pdvIds)->where('etape', 'Facture');
+        $qVentesHT  = Vente::sansDoublonRecu()->whereIn('point_de_vente_id', $pdvIds)->where('etape', 'Facture');
         if ($pointDeVenteId) $qVentesHT->where('point_de_vente_id', $pointDeVenteId);
         $totalVentesHTPeriode = $qVentesHT->sum('montant_ht');
         $margeBrutePeriode    = $totalVentesHTPeriode - $totalAchatsPeriode;
@@ -310,15 +315,18 @@ class AdminControleur
             $jours7->push(['jour' => $date, 'total' => $found ? $found->total : 0, 'nb' => $found ? $found->nb : 0]);
         }
 
-        // ── Meilleurs vendeurs du jour ────────────────────────────────────────
+        // ── Meilleurs vendeurs sur la période affichée ────────────────────────
+        //    Le classement portait sur la seule journée, quel que soit le
+        //    filtre choisi : il suit désormais le même périmètre que les KPI.
+        $idsVentesFiltrees = (clone $qVentes)->pluck('id');
+
         $topVendeurs = DB::table('ventes')
             ->join('utilisateurs', 'utilisateurs.id', '=', 'ventes.utilisateur_id')
             ->select('ventes.utilisateur_id',
                 DB::raw("CONCAT(utilisateurs.prenom, ' ', utilisateurs.nom) as nom_employe"),
                 DB::raw('SUM(ventes.montant_ttc) as total'),
                 DB::raw('COUNT(*) as nb_ventes'))
-            ->whereIn('ventes.point_de_vente_id', $pdvIds)
-            ->whereDate('ventes.date_vente', $aujourd_hui)
+            ->whereIn('ventes.id', $idsVentesFiltrees)
             ->groupBy('ventes.utilisateur_id', 'utilisateurs.prenom', 'utilisateurs.nom')
             ->orderByDesc('total')
             ->limit(5)
