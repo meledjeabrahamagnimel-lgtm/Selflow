@@ -118,61 +118,7 @@
         padding: 8px 10px;
     }
 
-    /* Etat applique le temps de la capture PDF (voir telechargerPdf) */
-    .invoice.mode-export {
-        width: 794px !important;
-        max-width: 794px !important;
-        margin: 0 !important;
-        border: none !important;
-        border-radius: 0 !important;
-        box-shadow: none !important;
-        /* Sans cela, le masquage de debordement rogne le tableau a l'export */
-        overflow: visible !important;
-    }
-    .invoice.mode-export table { font-size: 10px !important; }
-    .invoice.mode-export th,
-    .invoice.mode-export td {
-        padding-left: 5px !important;
-        padding-right: 5px !important;
-        white-space: normal !important;
-        word-break: break-word;
-    }
-
-    @page {
-        size: A4 portrait;
-        margin: 10mm;
-    }
-
-    /* CSS Impression */
-    @media print {
-        * {
-            -webkit-print-color-adjust: exact !important;
-            print-color-adjust: exact !important;
-        }
-        .sidebar, header, .topbar, .no-print, .banner-alert, .user-dropdown-menu, .sidebar-logo, .sidebar-pdv {
-            display: none !important;
-        }
-        body, .main-wrap, .main-content, main {
-            margin: 0 !important;
-            padding: 0 !important;
-            background: #fff !important;
-            width: 100% !important;
-            max-width: 100% !important;
-            position: static !important;
-        }
-        .invoice-container {
-            padding: 0 !important;
-        }
-        .invoice {
-            border: none !important;
-            box-shadow: none !important;
-            max-width: 100% !important;
-            width: 100% !important;
-            margin: 0 !important;
-            padding: 0 !important;
-            border-radius: 0 !important;
-        }
-    }
+@include('admin::factures.partials.styles-impression')
 </style>
 @endsection
 
@@ -210,7 +156,8 @@
                     <i class="fas fa-rotate-left"></i> Générer un avoir
                 </button>
             @endif
-            <button class="print-btn main" onclick="telechargerPdf()">
+            <button class="print-btn main" onclick="telechargerPdf()"
+                    title="Dans la boîte de dialogue, choisissez la destination « Enregistrer au format PDF » pour obtenir le fichier.">
                 <i class="fas fa-download"></i> Télécharger PDF
             </button>
             <button class="print-btn" onclick="window.print()">
@@ -266,7 +213,6 @@
 @endsection
 
 @section('scripts')
-<script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
 <script>
 var curModel = 1;
 var isReceiptMode = false;
@@ -378,55 +324,12 @@ function toggleReceiptMode() {
     render();
 }
 
-/**
- * Export PDF du seul document, en qualite « photocopie » : PNG sans perte,
- * largeur figee a une page A4 (794 px a 96 dpi) et effets d'ecran neutralises.
- * Voir le meme traitement dans factures/vente.blade.php.
- */
-function telechargerPdf() {
-    var controls = document.querySelector('.controls-card');
-    if (controls) controls.style.display = 'none';
-
-    var element = document.querySelector('.invoice');
-    element.classList.add('mode-export');
-
-    // Capturer depuis le haut : html2canvas se cale sinon sur la position de
-    // defilement courante et rogne le document.
-    var defilementInitial = window.scrollY;
-    window.scrollTo(0, 0);
-
-    var echelle = Math.min(3, Math.max(2, window.devicePixelRatio || 1) + 1);
-
-    var opt = {
-        margin:       [8, 8, 8, 8],
-        filename:     (isReceiptMode ? 'BR_' : 'Achat_') + DATA.achat.num + '.pdf',
-        image:        { type: 'png' },
-        html2canvas:  {
-            scale: echelle,
-            useCORS: true,
-            logging: false,
-            backgroundColor: '#ffffff',
-            letterRendering: true,
-            scrollX: 0,
-            scrollY: 0,
-            windowWidth: element.scrollWidth,
-            windowHeight: element.scrollHeight
-        },
-        jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait', compress: true },
-        pagebreak:    { mode: ['css', 'legacy'] }
-    };
-
-    function restaurer() {
-        element.classList.remove('mode-export');
-        if (controls) controls.style.display = '';
-        window.scrollTo(0, defilementInitial);
-    }
-
-    html2pdf().set(opt).from(element).save().then(restaurer).catch(function(err) {
-        restaurer();
-        console.error(err);
-    });
+/** Nom de fichier propose par le navigateur dans la boite d'impression. */
+function nomFichierPdf() {
+    return (isReceiptMode ? 'BR_' : 'Achat_') + DATA.achat.num;
 }
+
+@include('admin::factures.partials.script-impression')
 
 function logoHtml(src, alt, maxH) {
     if (!src) return '';
