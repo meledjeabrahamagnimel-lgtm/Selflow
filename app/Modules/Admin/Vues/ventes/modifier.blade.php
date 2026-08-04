@@ -785,6 +785,7 @@ function renderPanier() {
                         <input type="number" class="form-control form-control-sm" value="${item.tva || 0}" min="0" max="100" step="0.01" oninput="saisirTvaLigne('${id}', this.value)" style="width: 64px;">
                     </label>
                 </div>
+                ${alerteTauxTva(item.tva)}
             </div>
             <div class="qte-ctrl">
                 <button type="button" class="qte-btn" onclick="changerQte('${id}', -1)">−</button>
@@ -843,6 +844,30 @@ function saisirUnite(id, val) {
  * différent (exonération conventionnelle, marché public…) : il reste donc
  * ajustable sur la pièce sans toucher au catalogue.
  */
+/**
+ * Taux de TVA acceptes par la facture normalisee.
+ *
+ * La FNE ne recoit pas un pourcentage mais un code (TVA 18 %, TVAB 9 %,
+ * TVAC / TVAD 0 %) et applique le taux attache a ce code. Un taux
+ * intermediaire n'a nulle part ou se ranger : la plateforme le taxerait a
+ * 18 % et la facture certifiee afficherait un montant different du notre.
+ */
+const TAUX_TVA_DGI = [18, 9, 0];
+
+function tauxTvaReconnu(taux) {
+    return TAUX_TVA_DGI.indexOf(Math.round(parseFloat(taux || 0) * 100) / 100) !== -1;
+}
+
+/** Avertissement affiche sous une ligne dont le taux de TVA sort du bareme. */
+function alerteTauxTva(taux) {
+    if (tauxTvaReconnu(taux)) return '';
+    return '<div style="font-size:10px;color:#b45309;background:#fef3c7;border-radius:4px;'
+         + 'padding:3px 6px;margin-top:4px;">'
+         + '<i class="fas fa-triangle-exclamation"></i> '
+         + 'Taux hors barème DGI (18 %, 9 % ou 0 %) : cette facture ne pourra pas être normalisée.'
+         + '</div>';
+}
+
 function saisirTvaLigne(id, val) {
     if (!panier[id]) return;
 

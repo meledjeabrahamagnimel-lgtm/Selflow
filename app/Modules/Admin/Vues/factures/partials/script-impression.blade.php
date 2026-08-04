@@ -4,64 +4,80 @@
     le nom du fichier propose, sans extension.
 --}}
 /**
- * Export PDF du seul document affiche.
+ * Impression / enregistrement PDF du seul document affiche.
  *
- * La capture d'ecran (html2canvas) est abandonnee : elle rasterisait la page,
- * d'ou un texte flou, une mise en page calquee sur la largeur de la fenetre —
- * donc deformee — et plusieurs secondes d'attente a chaque clic. Le moteur
- * d'impression du navigateur fait le meme travail en vectoriel, instantanement
- * et au format A4 exact. Dans la boite de dialogue, la destination
- * « Enregistrer au format PDF » produit le fichier.
+ * La capture d'ecran (html2canvas) a ete abandonnee : elle rasterisait la
+ * page, d'ou un texte flou, une mise en page calquee sur la largeur de la
+ * fenetre — donc deformee — et plusieurs secondes d'attente. Le moteur
+ * d'impression du navigateur fait le meme travail en vectoriel, au format A4
+ * exact et sans delai.
  *
- * Le masquage du reste de la page est fait en JavaScript plutot qu'en CSS :
- * la structure de la page varie d'un ecran a l'autre (admin, caissier,
- * apercu), et une liste de selecteurs finissait toujours par en oublier un.
- * On remonte donc jusqu'au <body> en masquant, a chaque etage, tout ce qui
- * n'est pas sur le chemin du document.
+ * Le document est recopie dans un cadre isole plutot qu'imprime depuis la
+ * page elle-meme. Deux raisons :
+ *   - rien de l'interface (barre laterale, boutons) n'a besoin d'etre masque,
+ *     et la structure de la page peut varier d'un ecran a l'autre sans risque ;
+ *   - l'en-tete que le navigateur ajoute a chaque feuille reprend l'adresse de
+ *     la page, d'ou les « 127.0.0.1:8003/admin/ventes/facture » imprimes sur
+ *     la facture. Une marge de page nulle supprime cet en-tete ; la marge
+ *     utile est alors portee par la feuille elle-meme.
  */
 function telechargerPdf() {
     var piece = document.querySelector('.invoice');
     if (!piece) return;
 
-    // Le navigateur propose le titre de l'onglet comme nom de fichier.
-    var titreInitial = document.title;
-    document.title = (typeof nomFichierPdf === 'function') ? nomFichierPdf() : titreInitial;
+    var titre = (typeof nomFichierPdf === 'function') ? nomFichierPdf() : document.title;
 
-    var restaurations = [];
-    var noeud = piece;
+    // Les feuilles de style de la page sont reprises telles quelles : le
+    // document doit s'imprimer exactement comme il s'affiche.
+    var styles = Array.prototype.map.call(
+        document.querySelectorAll('link[rel="stylesheet"], style'),
+        function (noeud) { return noeud.outerHTML; }
+    ).join('\n');
 
-    while (noeud.parentElement && noeud !== document.body) {
-        var parent = noeud.parentElement;
+    var page = '<!doctype html><html lang="fr"><head><meta charset="utf-8">'
+        + '<title>' + titre + '</title>'
+        + '<base href="' + document.baseURI + '">'
+        + styles
+        + '<style>'
+        // Marge nulle : c'est ce qui empeche le navigateur d'imprimer son
+        // en-tete (adresse de la page, date) et son pied de page (pagination).
+        + '@page { size: A4 portrait; margin: 0; }'
+        + 'html, body { margin: 0 !important; padding: 0 !important; background: #fff !important; }'
+        // La marge utile est portee par la feuille, que rien d'autre ne cible.
+        + '.feuille { padding: 12mm 10mm; }'
+        + '</style></head><body><div class="feuille">'
+        + piece.outerHTML
+        + '</div></body></html>';
 
-        Array.prototype.forEach.call(parent.children, function (frere) {
-            if (frere === noeud) return;
-            var ancienAffichage = frere.style.display;
-            frere.style.display = 'none';
-            restaurations.push(function () { frere.style.display = ancienAffichage; });
-        });
+    var cadre = document.createElement('iframe');
+    cadre.setAttribute('aria-hidden', 'true');
+    cadre.setAttribute('title', titre);
+    cadre.style.cssText = 'position:fixed;left:-9999px;top:0;width:210mm;height:297mm;border:0;';
 
-        if (parent !== document.body) {
-            parent.classList.add('chemin-impression');
-            (function (p) {
-                restaurations.push(function () { p.classList.remove('chemin-impression'); });
-            })(parent);
+    cadre.onload = function () {
+        var fenetre = cadre.contentWindow;
+        var termine = false;
+
+        function nettoyer() {
+            if (termine) return;
+            termine = true;
+            fenetre.removeEventListener('afterprint', nettoyer);
+            cadre.remove();
         }
 
-        noeud = parent;
-    }
+        fenetre.addEventListener('afterprint', nettoyer);
 
-    var dejaRestaure = false;
-    function restaurer() {
-        if (dejaRestaure) return;
-        dejaRestaure = true;
-        restaurations.forEach(function (annuler) { annuler(); });
-        document.title = titreInitial;
-        window.removeEventListener('afterprint', restaurer);
-    }
+        // Laisser au logo et aux polices le temps de s'afficher : imprimer
+        // trop tot sortait une facture sans son en-tete graphique.
+        setTimeout(function () {
+            fenetre.focus();
+            fenetre.print();
+            // Filet de securite : quelques navigateurs n'emettent jamais
+            // `afterprint`, et le cadre resterait alors dans la page.
+            setTimeout(nettoyer, 1000);
+        }, 300);
+    };
 
-    window.addEventListener('afterprint', restaurer);
-    window.print();
-
-    // Filet de securite : quelques navigateurs n'emettent jamais `afterprint`.
-    setTimeout(restaurer, 1000);
+    cadre.srcdoc = page;
+    document.body.appendChild(cadre);
 }

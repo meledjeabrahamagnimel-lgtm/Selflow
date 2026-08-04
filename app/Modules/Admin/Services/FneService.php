@@ -60,6 +60,18 @@ class FneService
         $parentInvoiceId = $vente->parent?->fne_invoice_id;
         $isAvoirRefund = $vente->type_facture === 'avoir' && !empty($parentInvoiceId);
 
+        // Un taux de TVA hors barème DGI ne peut pas être transmis : la FNE
+        // reçoit un code, pas un pourcentage, et applique le taux du code. Une
+        // ligne à 5 % partait donc sous le code `TVA` et ressortait taxée à
+        // 18 % sur la facture certifiée. Mieux vaut refuser que d'émettre une
+        // pièce dont les montants diffèrent de ceux établis ici.
+        //
+        // Le remboursement d'avoir échappe au contrôle : son payload ne porte
+        // que des identifiants de lignes et des quantités, aucun code de taxe.
+        if (!$isAvoirRefund && ($erreurTaux = self::controlerTauxTva($vente))) {
+            return $erreurTaux;
+        }
+
         if ($vente->type_facture === 'avoir' && empty($parentInvoiceId)) {
             return [
                 'success' => false,
@@ -488,6 +500,46 @@ class FneService
         }
 
         return \App\Modules\Admin\Modeles\Produit::deduireCodeTva($tauxLigne, $regimeImposition);
+    }
+
+    /**
+     * Refuse la normalisation si une ligne porte un taux de TVA que la DGI ne
+     * sait pas représenter.
+     *
+     * La FNE ne reçoit pas le pourcentage saisi : elle reçoit un code
+     * (`TVA` 18 %, `TVAB` 9 %, `TVAC` / `TVAD` 0 %) et applique le taux
+     * attaché à ce code. Un taux intermédiaire n'a donc nulle part où aller ;
+     * il partait jusqu'ici sous le code `TVA` et revenait taxé à 18 %, d'où
+     * une facture certifiée dont le total ne correspondait pas au nôtre.
+     *
+     * @return array|null Le résultat d'échec à retourner, ou null si tout va bien.
+     */
+    private static function controlerTauxTva(Vente $vente): ?array
+    {
+        $lignesFautives = [];
+
+        foreach ($vente->details as $detail) {
+            $taux = self::tauxTvaDeLaLigne($detail);
+            if (\App\Modules\Admin\Modeles\Produit::estTauxTvaReconnu($taux)) {
+                continue;
+            }
+
+            $libelle = $detail->libelle_virtuel ?: ($detail->produit?->nom ?? 'Article');
+            $lignesFautives[] = sprintf('%s (%s %%)', $libelle, rtrim(rtrim(number_format($taux, 2, ',', ' '), '0'), ','));
+        }
+
+        if (empty($lignesFautives)) {
+            return null;
+        }
+
+        return [
+            'success' => false,
+            'message' => 'Normalisation refusée : la DGI n\'accepte que les taux de TVA 18 %, 9 % et 0 %. '
+                . 'Les lignes suivantes portent un taux qu\'aucun code FNE ne représente — '
+                . 'transmises telles quelles, elles seraient taxées à 18 % par la plateforme et la facture '
+                . 'certifiée afficherait un montant différent du vôtre : ' . implode(', ', $lignesFautives) . '.',
+            'errors'  => ['taux_tva' => $lignesFautives],
+        ];
     }
 
     /**
