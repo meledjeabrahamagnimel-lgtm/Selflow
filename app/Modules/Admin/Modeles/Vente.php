@@ -28,6 +28,8 @@ class Vente extends Model
         'remise_taux',     // taux de la remise globale, en % → champ `discount` FNE
         'statut',
         'type_facture',
+        'type_piece',      // 'facture' ou 'recu' — nature du document commercial
+        'piece_liee_id',   // reçu <-> facture issue l'un de l'autre
         'est_rne',         // → champ `isRne` FNE
         'numero_rne',      // → champ `rne` FNE
         'pied_de_page',    // → champ `footer` FNE
@@ -134,6 +136,38 @@ class Vente extends Model
     public function parent(): BelongsTo
     {
         return $this->belongsTo(Vente::class, 'parent_id');
+    }
+
+    /**
+     * Natures possibles d'une pièce de vente.
+     */
+    public const TYPE_FACTURE = 'facture';
+    public const TYPE_RECU    = 'recu';
+
+    public function estRecu(): bool
+    {
+        return $this->type_piece === self::TYPE_RECU;
+    }
+
+    /**
+     * Reçu dont cette facture est issue, ou facture issue de ce reçu.
+     * Le lien est symétrique : les deux pièces se pointent mutuellement.
+     */
+    public function pieceLiee(): BelongsTo
+    {
+        return $this->belongsTo(Vente::class, 'piece_liee_id');
+    }
+
+    /**
+     * Libellé de la pièce, tel qu'affiché dans les registres.
+     */
+    public function libelleTypeDocument(): string
+    {
+        if ($this->type_facture === 'avoir') {
+            return 'Facture d\'avoir';
+        }
+
+        return $this->estRecu() ? 'Reçu' : 'Facture';
     }
 
     public function avoirs(): HasMany

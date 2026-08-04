@@ -93,12 +93,14 @@
             <th style="text-align:right;">TTC</th>
             <th>Statut DGI</th>
             <th>Site</th>
+            <th>Reçu lié</th>
+            <th>Fichier reçu</th>
             <th>Facture origine</th>
             <th style="text-align:center;">Actions</th>
         </tr>
     </thead>
     <tbody id="corps-table">
-        <tr><td colspan="11" style="text-align:center; padding:30px; color:var(--text-3);">Chargement...</td></tr>
+        <tr><td colspan="13" style="text-align:center; padding:30px; color:var(--text-3);">Chargement...</td></tr>
     </tbody>
 </table>
 
@@ -174,7 +176,7 @@ function rafraichirFactures() {
         page: page,
     });
 
-    document.getElementById('corps-table').innerHTML = '<tr><td colspan="11" style="text-align:center; padding:30px; color:var(--text-3);"><i class="fas fa-spinner fa-spin"></i> Chargement...</td></tr>';
+    document.getElementById('corps-table').innerHTML = '<tr><td colspan="13" style="text-align:center; padding:30px; color:var(--text-3);"><i class="fas fa-spinner fa-spin"></i> Chargement...</td></tr>';
 
     fetch("{{ route('admin.fne.factures.donnees') }}?" + params.toString())
         .then(r => r.json())
@@ -183,7 +185,7 @@ function rafraichirFactures() {
             const corps = document.getElementById('corps-table');
 
             if (d.documents.length === 0) {
-                corps.innerHTML = '<tr><td colspan="11" style="text-align:center; padding:30px; color:var(--text-3);">Aucun document pour cette période/catégorie.</td></tr>';
+                corps.innerHTML = '<tr><td colspan="13" style="text-align:center; padding:30px; color:var(--text-3);">Aucun document pour cette période/catégorie.</td></tr>';
             } else {
                 corps.innerHTML = d.documents.map(doc => `
                     <tr>
@@ -202,6 +204,12 @@ function rafraichirFactures() {
                             </span>
                         </td>
                         <td>${doc.pdv ?? '—'}</td>
+                        <td>${doc.recu_lie
+                            ? `<a href="${doc.recu_lie_url}" target="_blank" style="font-weight:600;">${doc.recu_lie}</a>`
+                            : '<span style="color:var(--text-3);">—</span>'}</td>
+                        <td style="text-align:center;">${doc.fichier_recu_url
+                            ? `<a href="${doc.fichier_recu_url}" target="_blank" class="btn btn-outline" style="padding:4px 8px; font-size:11px;" title="Ouvrir le reçu"><i class="fas fa-receipt"></i></a>`
+                            : '<span style="color:var(--text-3);">—</span>'}</td>
                         <td>
                             <div style="display:flex; gap:6px; align-items:center; justify-content:center;">
                                 <span style="font-weight:600; margin-right:4px;">${doc.facture_origine ? doc.facture_origine : doc.num_piece}</span>
@@ -245,7 +253,7 @@ function rafraichirFactures() {
             document.getElementById('btn-suivant').disabled = d.pagination.page_courante >= d.pagination.derniere_page;
         })
         .catch(() => {
-            document.getElementById('corps-table').innerHTML = '<tr><td colspan="11" style="text-align:center; padding:30px; color:#991b1b;">Erreur de chargement. Réessayez.</td></tr>';
+            document.getElementById('corps-table').innerHTML = '<tr><td colspan="13" style="text-align:center; padding:30px; color:#991b1b;">Erreur de chargement. Réessayez.</td></tr>';
         });
 }
 

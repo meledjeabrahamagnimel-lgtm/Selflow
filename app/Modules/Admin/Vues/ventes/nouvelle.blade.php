@@ -270,7 +270,8 @@
                     <input type="hidden" name="etape" id="etapeInput" value="Facture">
                     <div class="form-group">
                         <label class="form-label">Type de document</label>
-                        <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:8px; margin-bottom:4px;">
+                        <input type="hidden" name="type_piece" id="typePieceInput" value="facture">
+                        <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-bottom:4px;">
                             <button type="button" class="btn payment-toggle-btn" data-etape-vente="Devis" onclick="selectionnerEtapeVente(this)" style="justify-content:center; font-size:12px; padding:8px 4px;">
                                 <i class="fas fa-file-invoice"></i> Devis
                             </button>
@@ -279,6 +280,9 @@
                             </button>
                             <button type="button" class="btn payment-toggle-btn active" data-etape-vente="Facture" onclick="selectionnerEtapeVente(this)" style="justify-content:center; font-size:12px; padding:8px 4px;">
                                 <i class="fas fa-check-double"></i> Facture
+                            </button>
+                            <button type="button" class="btn payment-toggle-btn" data-etape-vente="Reçu" onclick="selectionnerEtapeVente(this)" style="justify-content:center; font-size:12px; padding:8px 4px;">
+                                <i class="fas fa-receipt"></i> Reçu
                             </button>
                         </div>
                         <small id="infoEtapeVente" style="color:var(--text-3); font-size:11px;">Mode facturation avec règlement</small>
@@ -535,14 +539,24 @@ function selectionnerEtapeVente(btn) {
     document.querySelectorAll('[data-etape-vente]').forEach(b => b.classList.remove('active'));
     btn.classList.add('active');
     const etape = btn.dataset.etapeVente;
-    document.getElementById('etapeInput').value = etape;
-    
+
+    // Un reçu suit exactement le circuit d'une facture (encaissement,
+    // comptabilité, normalisation) : seule la nature du document diffère.
+    const estRecu = etape === 'Reçu';
+    document.getElementById('etapeInput').value = estRecu ? 'Facture' : etape;
+    document.getElementById('typePieceInput').value = estRecu ? 'recu' : 'facture';
+
     const blocPaiement = document.getElementById('blocPaiementVente');
     const infoEtape = document.getElementById('infoEtapeVente');
     const labelBtn = document.getElementById('labelBtnValiderVente');
     const montantPayeInput = document.getElementById('montantPayeInput');
-    
-    if (etape === 'Facture') {
+
+    if (estRecu) {
+        blocPaiement.style.display = 'block';
+        infoEtape.textContent = 'Reçu encaissé, normalisable auprès de la DGI';
+        labelBtn.textContent = 'Valider et émettre le reçu';
+        montantPayeInput.removeAttribute('disabled');
+    } else if (etape === 'Facture') {
         blocPaiement.style.display = 'block';
         infoEtape.textContent = 'Mode facturation avec règlement';
         labelBtn.textContent = 'Valider et facturer';

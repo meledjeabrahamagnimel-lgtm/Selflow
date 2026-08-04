@@ -392,15 +392,20 @@ class FneDashboardControleur
         $parPage = 20;
 
         if ($flux === 'ventes') {
-            $query = Vente::with(['client', 'pointDeVente', 'parent'])
+            $query = Vente::with(['client', 'pointDeVente', 'parent', 'pieceLiee'])
                 ->whereHas('pointDeVente', fn($q) => $q->where('entreprise_id', $entreprise->id))
                 ->whereBetween('date_vente', [$debut, $fin])
                 ->where('etape', 'Facture');
 
+            // La nature du document vient de `type_piece`, choisie a la saisie.
+            // Auparavant elle etait deduite de l'absence de client, si bien
+            // qu'une vente au comptant apparaissait a tort comme un recu.
             $query = match ($categorie) {
                 'avoir_client' => $query->where('type_facture', 'avoir'),
-                'recu_recu'    => $query->where(function($q) { $q->whereNull('type_facture')->orWhere('type_facture', '!=', 'avoir'); })->whereNull('client_id'),
-                default        => $query->where(function($q) { $q->whereNull('type_facture')->orWhere('type_facture', '!=', 'avoir'); })->whereNotNull('client_id'),
+                'recu_recu'    => $query->where(function ($q) { $q->whereNull('type_facture')->orWhere('type_facture', '!=', 'avoir'); })
+                                        ->where('type_piece', Vente::TYPE_RECU),
+                default        => $query->where(function ($q) { $q->whereNull('type_facture')->orWhere('type_facture', '!=', 'avoir'); })
+                                        ->where('type_piece', '!=', Vente::TYPE_RECU),
             };
 
             if ($pdvId && $pdvId !== 'tous') $query->where('point_de_vente_id', $pdvId);
@@ -419,8 +424,16 @@ class FneDashboardControleur
 
                 return [
                     'id' => $v->id,
-                    'type_doc' => $v->type_facture === 'avoir' ? 'Facture Avoir' : ($v->client_id ? 'Facture' : 'Reçu'),
-                    'is_recu' => !$v->client_id,
+                    'type_doc' => $v->libelleTypeDocument(),
+                    'is_recu' => $v->estRecu(),
+                    // Reçu dont la facture est issue, ou facture issue du reçu
+                    'recu_lie' => $v->pieceLiee?->estRecu() ? $v->pieceLiee->numero_facture : null,
+                    'recu_lie_url' => $v->pieceLiee?->estRecu()
+                        ? route('admin.ventes.ticket', $v->pieceLiee->id)
+                        : null,
+                    'fichier_recu_url' => $v->estRecu()
+                        ? route('admin.ventes.ticket', $v->id)
+                        : null,
                     'num_piece' => $v->numero_facture,
                     'num_fne' => $v->numero_fne,
                     'tiers' => $v->client?->nom ?? 'Client de passage',
@@ -570,8 +583,7 @@ class FneDashboardControleur
                         continue;
                     }
 
-                    $estRne = ($vente->type_facture === 'RNE');
-                    $fneResult = \App\Modules\Admin\Services\FneService::normaliserFacture($vente, $estRne);
+                    $fneResult = \App\Modules\Admin\Services\FneService::normaliserFacture($vente);
 
                     if ($fneResult['success']) {
                         $updateData = [
@@ -582,9 +594,7 @@ class FneDashboardControleur
                             'fichier_fne_pdf_url' => $fneResult['pdf_url'] ?? null,
                         ];
 
-                        if ($estRne) {
-                            $updateData['type_facture'] = 'RNE';
-                        } elseif ($vente->type_facture !== 'avoir') {
+                        if ($vente->type_facture !== 'avoir') {
                             $updateData['type_facture'] = 'normale';
                         }
 

@@ -110,8 +110,7 @@ class BatchNormalisationJob implements ShouldQueue
 
             try {
                 if ($this->flux === 'ventes') {
-                    $estRne = ($invoice->type_facture === 'RNE');
-                    $fneResult = FneService::normaliserFacture($invoice, $estRne);
+                    $fneResult = FneService::normaliserFacture($invoice);
 
                     if ($fneResult['success']) {
                         $updateData = [
@@ -122,9 +121,7 @@ class BatchNormalisationJob implements ShouldQueue
                             'fichier_fne_pdf_url' => $fneResult['pdf_url'] ?? null,
                         ];
 
-                        if ($estRne) {
-                            $updateData['type_facture'] = 'RNE';
-                        } elseif ($invoice->type_facture !== 'avoir') {
+                        if ($invoice->type_facture !== 'avoir') {
                             $updateData['type_facture'] = 'normale';
                         }
 

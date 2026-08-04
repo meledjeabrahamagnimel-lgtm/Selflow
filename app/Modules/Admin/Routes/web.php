@@ -40,6 +40,8 @@ Route::prefix('admin')
 
             Route::get('/facture/{vente}', [VenteControleur::class, 'imprimer'])->name('imprimer');
             Route::get('/facture/{vente}/ticket', [VenteControleur::class, 'imprimerTicket'])->name('ticket');
+            // Conversion reçu <-> facture, dans les deux sens
+            Route::post('/{vente}/convertir-piece', [VenteControleur::class, 'convertirPiece'])->name('convertir_piece');
             Route::get('/{vente}/modifier',    [VenteControleur::class, 'modifierFormulaire'])->name('modifier');
             Route::put('/{vente}/modifier',    [VenteControleur::class, 'enregistrerModification'])->name('modifier.enregistrer');
             Route::post('/{vente}/confirmer',  [VenteControleur::class, 'confirmerCommande'])->name('confirmer');
@@ -336,6 +338,8 @@ Route::prefix('caissier')
 
             Route::get('/facture/{vente}', [VenteControleur::class, 'imprimer'])->name('imprimer');
             Route::get('/facture/{vente}/ticket', [VenteControleur::class, 'imprimerTicket'])->name('ticket');
+            // Conversion reçu <-> facture, dans les deux sens
+            Route::post('/{vente}/convertir-piece', [VenteControleur::class, 'convertirPiece'])->name('convertir_piece');
             Route::get('/{vente}/modifier',    [VenteControleur::class, 'modifierFormulaire'])->name('modifier');
             Route::put('/{vente}/modifier',    [VenteControleur::class, 'enregistrerModification'])->name('modifier.enregistrer');
             Route::post('/{vente}/normaliser', [VenteControleur::class, 'normaliser'])->name('normaliser');

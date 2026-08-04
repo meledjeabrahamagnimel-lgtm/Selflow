@@ -229,10 +229,29 @@
             @endif
 
 
-            @if($vente->etape === 'Facture' && !isset($bl))
-                <button type="button" class="print-btn" style="border-color:#cbd5e1; color:#94a3b8; background:#f1f5f9; cursor:not-allowed;" onclick="alert('En attente de la FNE')">
-                    <i class="fas fa-print"></i> Imprimer Ticket RNE
-                </button>
+            @if($vente->etape === 'Facture' && !isset($bl) && $vente->type_facture !== 'avoir')
+                @php
+                    $prefixeRoute = request()->routeIs('caissier.*') ? 'caissier' : 'admin';
+                @endphp
+
+                <a href="{{ route($prefixeRoute . '.ventes.ticket', $vente->id) }}" target="_blank" class="print-btn">
+                    <i class="fas fa-receipt"></i> {{ $vente->estRecu() ? 'Imprimer le reçu' : 'Aperçu reçu' }}
+                </a>
+
+                {{-- Conversion recu <-> facture, dans les deux sens --}}
+                @if($vente->pieceLiee)
+                    <a href="{{ route($prefixeRoute . '.ventes.imprimer', $vente->pieceLiee->id) }}" class="print-btn"
+                       title="Pièce liée déjà créée">
+                        <i class="fas fa-link"></i> {{ $vente->pieceLiee->libelleTypeDocument() }} {{ $vente->pieceLiee->numero_facture }}
+                    </a>
+                @else
+                    <button type="button" class="print-btn"
+                            onclick="executerAction('{{ route($prefixeRoute . '.ventes.convertir_piece', $vente->id) }}')"
+                            title="{{ $vente->estRecu() ? 'Établir la facture correspondant à ce reçu' : 'Établir le reçu correspondant à cette facture' }}">
+                        <i class="fas fa-right-left"></i>
+                        {{ $vente->estRecu() ? 'Créer la facture' : 'Créer le reçu' }}
+                    </button>
+                @endif
             @endif
             <button class="print-btn main" onclick="telechargerPdf()">
                 <i class="fas fa-download"></i> Télécharger PDF

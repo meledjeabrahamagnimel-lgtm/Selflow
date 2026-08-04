@@ -83,6 +83,7 @@ class VenteControleur
             'articles.*.unite'           => ['nullable', 'string', 'max:50'],
             'articles.*.prix_unitaire'   => ['nullable', 'numeric', 'min:0'],
             'articles.*.tva'             => ['nullable', 'numeric', 'min:0', 'max:100'],
+            'type_piece'                 => ['nullable', 'string', 'in:facture,recu'],
         ], self::reglesChampsFne()), array_merge([
             'articles.required' => 'Veuillez ajouter au moins un article au panier.',
         ], self::messagesChampsFne()));
@@ -226,6 +227,12 @@ class VenteControleur
                 'montant_ttc'             => $montantTtc,
                 'statut'                  => $statutVente,
                 'etape'                   => $etape,
+                // Nature du document : facture par defaut. Un encaissement en
+                // especes reste une facture ; seul le bouton « Recu » produit
+                // un recu.
+                'type_piece'              => $request->input('type_piece') === Vente::TYPE_RECU
+                    ? Vente::TYPE_RECU
+                    : Vente::TYPE_FACTURE,
                 'est_rne'                 => $request->boolean('est_rne'),
                 'numero_rne'              => $request->boolean('est_rne') ? trim($request->input('numero_rne')) : null,
                 'autres_mentions'         => self::mentionBornee($request->input('autres_mentions')),
@@ -623,6 +630,7 @@ class VenteControleur
             'articles.*.unite'           => ['nullable', 'string', 'max:50'],
             'articles.*.prix_unitaire'   => ['nullable', 'numeric', 'min:0'],
             'articles.*.tva'             => ['nullable', 'numeric', 'min:0', 'max:100'],
+            'type_piece'                 => ['nullable', 'string', 'in:facture,recu'],
         ], self::reglesChampsFne()), array_merge([
             'articles.required' => 'Veuillez ajouter au moins un article au panier.',
         ], self::messagesChampsFne()));
@@ -738,6 +746,9 @@ class VenteControleur
                 'remise_taux'       => $remiseTaux,
                 'montant_ttc'       => $montantTtc,
                 'statut'            => $statutVente,
+                'type_piece'        => $request->input('type_piece') === Vente::TYPE_RECU
+                    ? Vente::TYPE_RECU
+                    : $vente->type_piece,
                 'est_rne'           => $request->boolean('est_rne'),
                 'numero_rne'        => $request->boolean('est_rne') ? trim($request->input('numero_rne')) : null,
                 'autres_mentions'   => self::mentionBornee($request->input('autres_mentions')),
@@ -1179,6 +1190,88 @@ class VenteControleur
         $route = request()->routeIs('caissier.*') ? 'caissier.ventes.modifier' : 'admin.ventes.modifier';
         return redirect()->route($route, $nouvelleFactureId)
             ->with('succes', 'Bon de commande converti en facture. Veuillez renseigner le mode de paiement et valider.');
+    }
+
+    /**
+     * Convertir une pièce d'un type vers l'autre : un reçu déjà émis donne une
+     * facture, et une facture donne un reçu.
+     *
+     * La pièce d'origine est conservée telle quelle — elle a pu être remise au
+     * client, voire normalisée : on ne la réécrit pas. La nouvelle pièce reprend
+     * ses informations et les deux se pointent mutuellement, de sorte que le
+     * registre affiche le reçu lié en face de la facture et inversement.
+     * La nouvelle pièce naît non normalisée : c'est un document distinct, qui
+     * doit obtenir sa propre certification auprès de la DGI.
+     */
+    public function convertirPiece(Vente $vente): RedirectResponse
+    {
+        abort_unless($vente->pointDeVente->entreprise_id === Auth::user()->entreprise_id, 403);
+
+        if ($vente->type_facture === 'avoir') {
+            return back()->with('erreur', 'Un avoir ne peut pas être converti.');
+        }
+
+        if ($vente->etape !== 'Facture') {
+            return back()->with('erreur', 'Seule une pièce validée peut être convertie.');
+        }
+
+        if ($vente->pieceLiee) {
+            return back()->with('erreur', 'Cette pièce a déjà une contrepartie : ' . $vente->pieceLiee->numero_facture . '.');
+        }
+
+        $versRecu = !$vente->estRecu();
+        $nouvelleId = null;
+
+        DB::transaction(function () use ($vente, $versRecu, &$nouvelleId) {
+            $entrepriseId = $vente->pointDeVente->entreprise_id;
+
+            $clone = $vente->replicate([
+                'archived', 'normalise', 'numero_fne', 'signature_dgi',
+                'qr_code_data', 'fichier_fne_pdf_url', 'fne_invoice_id',
+            ]);
+            $clone->numero_facture = \App\Modules\Admin\Services\NumerotationService::genererNumeroVente($entrepriseId, 'Facture');
+            $clone->type_piece     = $versRecu ? Vente::TYPE_RECU : Vente::TYPE_FACTURE;
+            $clone->type_facture   = 'proformat';
+            $clone->piece_liee_id  = $vente->id;
+            $clone->archived       = false;
+            $clone->normalise      = false;
+            $clone->numero_fne     = null;
+            $clone->signature_dgi  = null;
+            $clone->qr_code_data   = null;
+            $clone->fichier_fne_pdf_url = null;
+            $clone->fne_invoice_id = null;
+            $clone->save();
+
+            // Les lignes sont recopiées sans les identifiants FNE de la pièce
+            // d'origine : ils appartiennent à sa certification, pas à celle-ci.
+            foreach ($vente->details as $detail) {
+                $nouveauDetail = $detail->replicate(['fne_invoice_item_id']);
+                $nouveauDetail->vente_id = $clone->id;
+                $nouveauDetail->fne_invoice_item_id = null;
+                $nouveauDetail->save();
+
+                foreach ($detail->taxes as $taxe) {
+                    $nouveauDetail->taxes()->create(['nom' => $taxe->nom, 'taux' => $taxe->taux]);
+                }
+            }
+
+            foreach ($vente->taxesPersonnalisees as $taxe) {
+                $clone->taxesPersonnalisees()->create([
+                    'nom' => $taxe->nom, 'taux' => $taxe->taux, 'montant' => $taxe->montant,
+                ]);
+            }
+
+            // Lien symétrique : chaque pièce désigne sa contrepartie
+            $vente->update(['piece_liee_id' => $clone->id]);
+
+            $nouvelleId = $clone->id;
+        });
+
+        $libelle = $versRecu ? 'reçu' : 'facture';
+        $route = request()->routeIs('caissier.*') ? 'caissier.ventes.imprimer' : 'admin.ventes.imprimer';
+
+        return redirect()->route($route, $nouvelleId)
+            ->with('succes', "Un {$libelle} a été créé à partir de « {$vente->numero_facture} ». Il reste à le normaliser auprès de la DGI.");
     }
 
     /**
