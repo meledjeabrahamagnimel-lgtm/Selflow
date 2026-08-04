@@ -84,6 +84,10 @@ class VenteControleur
             'articles.*.prix_unitaire'   => ['nullable', 'numeric', 'min:0'],
             'articles.*.tva'             => ['nullable', 'numeric', 'min:0', 'max:100'],
             'type_piece'                 => ['nullable', 'string', 'in:facture,recu'],
+            'articles.*.code_tva'        => ['nullable', 'string', 'in:TVA,TVAB,TVAC,TVAD'],
+            'articles.*.taxes'           => ['nullable', 'array'],
+            'articles.*.taxes.*.nom'     => ['required_with:articles.*.taxes.*.taux', 'string', 'max:100'],
+            'articles.*.taxes.*.taux'    => ['required_with:articles.*.taxes.*.nom', 'numeric', 'gt:0', 'max:100'],
         ], self::reglesChampsFne()), array_merge([
             'articles.required' => 'Veuillez ajouter au moins un article au panier.',
         ], self::messagesChampsFne()));
@@ -235,8 +239,6 @@ class VenteControleur
                     : Vente::TYPE_FACTURE,
                 'est_rne'                 => $request->boolean('est_rne'),
                 'numero_rne'              => $request->boolean('est_rne') ? trim($request->input('numero_rne')) : null,
-                'autres_mentions'         => self::mentionBornee($request->input('autres_mentions')),
-                'pied_de_page'            => self::mentionBornee($request->input('pied_de_page')),
             ]);
 
             // Taxes sur le total TTC (champ `customTaxes` de la FNE)
@@ -271,8 +273,12 @@ class VenteControleur
                     'montant_ttc'     => $ht + $tva,
                 ]);
 
-                // Instantané des taxes personnalisées du produit sur la ligne
+                // Taxes de la ligne : celles de la fiche produit, ou celles
+                // saisies directement sur une ligne libre.
                 self::copierTaxesProduitSurLigne($detail, $produit);
+                if (!$produit) {
+                    self::enregistrerTaxesDeLigne($detail, $article['taxes'] ?? []);
+                }
 
                 if ($produit && $etape === 'Facture' && $produit->estStockable()) {
                     $stockAvant = $produit->stockActuel($pointDeVenteId);
@@ -314,8 +320,13 @@ class VenteControleur
                 // Si pas de client enregistré ou client divers -> RNE (Reçu), sinon EV (Facture)
                 $estRne = empty($request->client_id) || ($request->client_id == 'divers');
 
-                // Normalisation FNE en arrière-plan (Section 18.5) — n'attendons pas la réponse HTTP
-                NormaliserFactureFne::dispatch($vente, $estRne);
+                // Un reçu n'est pas transmis à la FNE : la certification du reçu
+                // normalisé électronique attend les champs de mappage de la
+                // DGI. Il reste enregistré et normalisable rétroactivement.
+                if (!$vente->estRecu()) {
+                    // Normalisation FNE en arrière-plan (Section 18.5) — n'attendons pas la réponse HTTP
+                    NormaliserFactureFne::dispatch($vente, $estRne);
+                }
 
                 // Écritures de facturation (+ règlement immédiat le cas échéant).
                 // genererEcrituresVente() décide seule si la vente est comptant
@@ -466,7 +477,7 @@ class VenteControleur
             }
             $ventes = $blQuery->latest()->paginate(20);
         } else {
-            $baseQuery = Vente::with(['client', 'pointDeVente', 'details.produit']);
+            $baseQuery = Vente::with(['client', 'pointDeVente', 'details.produit', 'pieceLiee']);
 
             if ($type === 'avoir') {
                 $baseQuery->where('type_facture', 'avoir');
@@ -631,6 +642,10 @@ class VenteControleur
             'articles.*.prix_unitaire'   => ['nullable', 'numeric', 'min:0'],
             'articles.*.tva'             => ['nullable', 'numeric', 'min:0', 'max:100'],
             'type_piece'                 => ['nullable', 'string', 'in:facture,recu'],
+            'articles.*.code_tva'        => ['nullable', 'string', 'in:TVA,TVAB,TVAC,TVAD'],
+            'articles.*.taxes'           => ['nullable', 'array'],
+            'articles.*.taxes.*.nom'     => ['required_with:articles.*.taxes.*.taux', 'string', 'max:100'],
+            'articles.*.taxes.*.taux'    => ['required_with:articles.*.taxes.*.nom', 'numeric', 'gt:0', 'max:100'],
         ], self::reglesChampsFne()), array_merge([
             'articles.required' => 'Veuillez ajouter au moins un article au panier.',
         ], self::messagesChampsFne()));
@@ -751,8 +766,6 @@ class VenteControleur
                     : $vente->type_piece,
                 'est_rne'           => $request->boolean('est_rne'),
                 'numero_rne'        => $request->boolean('est_rne') ? trim($request->input('numero_rne')) : null,
-                'autres_mentions'   => self::mentionBornee($request->input('autres_mentions')),
-                'pied_de_page'      => self::mentionBornee($request->input('pied_de_page')),
             ]);
 
             self::enregistrerTaxesSurTtc($vente, $request->input('taxes_ttc', []), $montantTtc);
@@ -789,6 +802,9 @@ class VenteControleur
                 ]);
 
                 self::copierTaxesProduitSurLigne($detail, $produit);
+                if (!$produit) {
+                    self::enregistrerTaxesDeLigne($detail, $article['taxes'] ?? []);
+                }
 
                 if ($produit && $etaitFacturee && $produit->estStockable()) {
                     $stockAvant = $produit->stockActuel($pointDeVenteId);
@@ -1373,8 +1389,6 @@ class VenteControleur
             // Mentions du document d'avoir (impression locale uniquement)
             'est_rne'         => ['nullable', 'boolean'],
             'numero_rne'      => ['nullable', 'required_if:est_rne,1', 'string', 'max:64'],
-            'autres_mentions' => ['nullable', 'string', 'max:' . self::$longueurMaxMention],
-            'pied_de_page'    => ['nullable', 'string', 'max:' . self::$longueurMaxMention],
         ], [
             'numero_rne.required_if' => 'Veuillez saisir le numéro du reçu auquel cet avoir est rattaché.',
         ]);
@@ -1417,8 +1431,6 @@ class VenteControleur
                 'numero_rne'        => $request->boolean('est_rne')
                     ? trim((string) $request->input('numero_rne'))
                     : $parent->numero_rne,
-                'autres_mentions'   => self::mentionBornee($request->input('autres_mentions')) ?? $parent->autres_mentions,
-                'pied_de_page'      => self::mentionBornee($request->input('pied_de_page')) ?? $parent->pied_de_page,
             ]);
 
             $totalHt = 0;

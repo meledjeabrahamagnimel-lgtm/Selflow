@@ -250,26 +250,6 @@
                         </div>
                     </div>
 
-                    {{-- Mentions transmises a la FNE (`commercialMessage` et `footer`) --}}
-                    <div class="form-group">
-                        <label class="form-label">Autres mentions</label>
-                        <textarea name="autres_mentions" id="autresMentionsInput" class="form-control" rows="2"
-                                  maxlength="248" oninput="majCompteurMention('autresMentions')"
-                                  placeholder="Message commercial affiche sur la facture">{{ old('autres_mentions', $vente->autres_mentions ?? $entrepriseCourante->facture_autres_mentions) }}</textarea>
-                        <small style="color:var(--text-3); font-size:11px;">
-                            <span id="autresMentionsCompteur">0</span>/248 caracteres.
-                        </small>
-                    </div>
-                    <div class="form-group">
-                        <label class="form-label">Pied de page</label>
-                        <textarea name="pied_de_page" id="piedDePageInput" class="form-control" rows="2"
-                                  maxlength="248" oninput="majCompteurMention('piedDePage')"
-                                  placeholder="Texte affiche en bas de la facture">{{ old('pied_de_page', $vente->pied_de_page ?? $entrepriseCourante->pied_de_page_facture) }}</textarea>
-                        <small style="color:var(--text-3); font-size:11px;">
-                            <span id="piedDePageCompteur">0</span>/248 caracteres.
-                        </small>
-                    </div>
-
                     <div class="form-group">
                         <label class="form-label">Client (optionnel)</label>
                         <select name="client_id" class="form-control">
@@ -881,11 +861,6 @@ function basculerChampRne() {
     if (champ) champ.required = coche;
 }
 
-function majCompteurMention(prefixe) {
-    const champ    = document.getElementById(prefixe + 'Input');
-    const compteur = document.getElementById(prefixe + 'Compteur');
-    if (champ && compteur) compteur.textContent = champ.value.length;
-}
 
 /**
  * Ordre de calcul aligne sur le recapitulatif de la FNE :
@@ -943,8 +918,6 @@ function calculerTotaux() {
 
 document.addEventListener('DOMContentLoaded', function () {
     (window.taxesTtcInitiales || []).forEach(t => ajouterTaxeTtc(t.nom, t.taux));
-    majCompteurMention('autresMentions');
-    majCompteurMention('piedDePage');
 });
 
 function ouvrirModalNouvelleBanque() {
@@ -1029,4 +1002,23 @@ function toggleSaisieTvaCustom() {
     }
 }
 </script>
+
+{{-- Bornage immediat de tout taux saisi : aucune remise ni taxe ne peut sortir
+     de l'intervalle 0-100 %, regle imposee par la DGI. La validation serveur
+     reste la garantie ; ce script evite seulement a l'utilisateur de saisir une
+     valeur qui sera refusee. --}}
+<script>
+document.addEventListener('input', function (e) {
+    const champ = e.target;
+    if (champ.tagName !== 'INPUT' || champ.type !== 'number') return;
+    if (champ.max !== '100') return;
+
+    const valeur = parseFloat(champ.value);
+    if (isNaN(valeur)) return;
+
+    if (valeur > 100) champ.value = 100;
+    if (valeur < parseFloat(champ.min || 0)) champ.value = champ.min || 0;
+});
+</script>
+
 @endsection

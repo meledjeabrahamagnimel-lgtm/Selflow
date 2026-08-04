@@ -95,7 +95,7 @@ class AdminControleur
 
         // ── Ventes de la période (via PeriodeScope) ───────────────────────────
         $qVentesPeriode = Vente::where('utilisateur_id', $utilisateur->id)
-            ->where('statut', 'Facturée');
+            ->where('etape', 'Facture');
         if ($pointDeVenteId) $qVentesPeriode->where('point_de_vente_id', $pointDeVenteId);
         $totalVentesPeriode = $qVentesPeriode->sum('montant_ttc');
         $nbVentesPeriode    = $qVentesPeriode->count();
@@ -127,7 +127,7 @@ class AdminControleur
         $evolution7j = DB::table('ventes')
             ->select(DB::raw("DATE(date_vente) as jour"), DB::raw('SUM(montant_ttc) as total'), DB::raw('COUNT(*) as nb'))
             ->where('utilisateur_id', $utilisateur->id)
-            ->where('statut', 'Facturée')
+            ->where('etape', 'Facture')
             ->when($pointDeVenteId, fn($q) => $q->where('point_de_vente_id', $pointDeVenteId))
             ->whereBetween('date_vente', [now()->subDays(6)->toDateString(), $aujourd_hui])
             ->groupBy('jour')
@@ -149,7 +149,7 @@ class AdminControleur
                 DB::raw('SUM(vente_details.montant_ttc) as ca'),
                 DB::raw('SUM(vente_details.quantite) as qte'))
             ->where('ventes.utilisateur_id', $utilisateur->id)
-            ->where('ventes.statut', 'Facturée')
+            ->where('ventes.etape', 'Facture')
             ->when($pointDeVenteId, fn($q) => $q->where('ventes.point_de_vente_id', $pointDeVenteId))
             ->groupBy('vente_details.libelle_virtuel', 'vente_details.produit_id')
             ->orderByDesc('ca')
@@ -243,18 +243,18 @@ class AdminControleur
         $montantAchatsJour = $qAchats->sum('montant_ttc');
 
         // ── CA global de la période (via PeriodeScope) ────────────────────────
-        $qVentesPeriode = Vente::whereIn('point_de_vente_id', $pdvIds)->where('statut', 'Facturée');
+        $qVentesPeriode = Vente::whereIn('point_de_vente_id', $pdvIds)->where('etape', 'Facture');
         if ($pointDeVenteId) $qVentesPeriode->where('point_de_vente_id', $pointDeVenteId);
         $totalVentesPeriode = $qVentesPeriode->sum('montant_ttc');
         $nbVentesPeriode    = $qVentesPeriode->count();
 
         // ── Achats de la période ──────────────────────────────────────────────
-        $qAchatsPeriode = Achat::whereIn('point_de_vente_id', $pdvIds)->where('statut', 'Facturée');
+        $qAchatsPeriode = Achat::whereIn('point_de_vente_id', $pdvIds)->where('etape', 'Facture');
         if ($pointDeVenteId) $qAchatsPeriode->where('point_de_vente_id', $pointDeVenteId);
         $totalAchatsPeriode = $qAchatsPeriode->sum('montant_ttc');
 
         // ── Marge brute de la période ─────────────────────────────────────────
-        $qVentesHT  = Vente::whereIn('point_de_vente_id', $pdvIds)->where('statut', 'Facturée');
+        $qVentesHT  = Vente::whereIn('point_de_vente_id', $pdvIds)->where('etape', 'Facture');
         if ($pointDeVenteId) $qVentesHT->where('point_de_vente_id', $pointDeVenteId);
         $totalVentesHTPeriode = $qVentesHT->sum('montant_ht');
         $margeBrutePeriode    = $totalVentesHTPeriode - $totalAchatsPeriode;
@@ -296,7 +296,7 @@ class AdminControleur
         $evolution7j = DB::table('ventes')
             ->select(DB::raw("DATE(date_vente) as jour"), DB::raw('SUM(montant_ttc) as total'), DB::raw('COUNT(*) as nb'))
             ->whereIn('point_de_vente_id', $pdvIds)
-            ->where('statut', 'Facturée')
+            ->where('etape', 'Facture')
             ->when($pointDeVenteId, fn($q) => $q->where('point_de_vente_id', $pointDeVenteId))
             ->whereBetween('date_vente', [now()->subDays(6)->toDateString(), $aujourd_hui])
             ->groupBy('jour')
@@ -331,7 +331,7 @@ class AdminControleur
                 DB::raw('SUM(ventes.montant_ttc) as ca'),
                 DB::raw('COUNT(*) as nb'))
             ->whereIn('ventes.point_de_vente_id', $pdvIds)
-            ->where('ventes.statut', 'Facturée')
+            ->where('ventes.etape', 'Facture')
             ->groupBy('ventes.point_de_vente_id', 'points_de_vente.nom')
             ->orderByDesc('ca')
             ->get();

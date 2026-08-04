@@ -569,6 +569,17 @@ function fmtFcfa(n) {
 }
 
 /**
+ * Rappel des taxes propres a un article sous sa designation. Elles n'etaient
+ * visibles que dans le recapitulatif, sans qu'on sache a quelle ligne elles se
+ * rattachaient.
+ */
+function libelleTaxesLigne(r) {
+    if (!r.taxes || !r.taxes.length) return '';
+    const detail = r.taxes.map(t => `${t.nom} ${t.taux}%`).join(' · ');
+    return `<br><span style="font-size:10px;font-weight:500;color:var(--mu);">${detail}</span>`;
+}
+
+/**
  * Libelles des codes TVA de la DGI.
  */
 var LIBELLES_CODE_TVA = {
@@ -916,21 +927,25 @@ function model1(d) {
                     <th style="padding:9px 12px;text-align:center;color:#fff;background:${theme.color};font-weight:600;width:12%;white-space:nowrap;">Unité</th>
                     <th style="padding:9px 12px;text-align:right;color:#fff;background:${theme.color};font-weight:600;width:8%;white-space:nowrap;">Qté</th>
                     ${isDeliveryMode ? '' : `
-                    <th style="padding:9px 12px;text-align:right;color:#fff;background:${theme.color};font-weight:600;width:16%;white-space:nowrap;">P.U. HT</th>
-                    <th style="padding:9px 12px;text-align:right;color:#fff;background:${theme.color};font-weight:600;width:10%;white-space:nowrap;">TVA</th>
-                    <th style="padding:9px 12px;text-align:right;color:#fff;background:${theme.color};font-weight:600;width:18%;white-space:nowrap;">Total TTC</th>
+                    <th style="padding:9px 12px;text-align:right;color:#fff;background:${theme.color};font-weight:600;width:13%;white-space:nowrap;">P.U. HT</th>
+                    <th style="padding:9px 12px;text-align:right;color:#fff;background:${theme.color};font-weight:600;width:8%;white-space:nowrap;">Rem. (%)</th>
+                    <th style="padding:9px 12px;text-align:right;color:#fff;background:${theme.color};font-weight:600;width:8%;white-space:nowrap;">TVA</th>
+                    <th style="padding:9px 12px;text-align:right;color:#fff;background:${theme.color};font-weight:600;width:13%;white-space:nowrap;">Montant HT</th>
+                    <th style="padding:9px 12px;text-align:right;color:#fff;background:${theme.color};font-weight:600;width:15%;white-space:nowrap;">Total TTC</th>
                     `}
                 </tr>
             </thead>
             <tbody>
                 ${c.rows.map((r, i) => `<tr style="background:${i % 2 === 0 ? '#fff' : '#F9FAFB'}">
-                    <td style="padding:9px 12px;color:var(--mu);font-weight:500;white-space:nowrap;">${r.ref}</td>
-                    <td style="padding:9px 12px;font-weight:600;color:var(--tx)">${r.desc}</td>
+                    <td style="padding:9px 12px;color:var(--mu);font-weight:500;word-break:break-word;">${r.ref}</td>
+                    <td style="padding:9px 12px;font-weight:600;color:var(--tx)">${r.desc}${libelleTaxesLigne(r)}</td>
                     <td style="padding:9px 12px;text-align:center;color:var(--tx);white-space:nowrap;">${r.unite || 'Unité'}</td>
                     <td style="padding:9px 12px;text-align:right;color:var(--tx);white-space:nowrap;">${r.qty}</td>
                     ${isDeliveryMode ? '' : `
-                    <td style="padding:9px 12px;text-align:right;color:var(--tx);white-space:nowrap;">${fmt(r.pu)}${r.remise_taux > 0 ? `<br><span style="color:#dc2626;font-size:10px;">Remise ${r.remise_taux}%</span>` : ''}</td>
+                    <td style="padding:9px 12px;text-align:right;color:var(--tx);white-space:nowrap;">${fmt(r.pu)}</td>
+                    <td style="padding:9px 12px;text-align:right;color:${r.remise_taux > 0 ? '#dc2626' : 'var(--mu)'};white-space:nowrap;">${r.remise_taux || 0}%</td>
                     <td style="padding:9px 12px;text-align:right;color:var(--mu);white-space:nowrap;">${r.tva}%</td>
+                    <td style="padding:9px 12px;text-align:right;color:var(--tx);white-space:nowrap;">${fmt(r.ht)}</td>
                     <td style="padding:9px 12px;text-align:right;font-weight:700;color:var(--tx);white-space:nowrap;">${fmt(r.ttc)}</td>
                     `}
                 </tr>`).join('')}
@@ -1041,21 +1056,25 @@ function model2(d) {
                         <th style="padding:7px 6px;text-align:center;color:${theme.color};font-weight:700;width:12%;white-space:nowrap;">Unité</th>
                         <th style="padding:7px 6px;text-align:right;color:${theme.color};font-weight:700;width:10%;white-space:nowrap;">Qté</th>
                         ${isDeliveryMode ? '' : `
-                        <th style="padding:7px 6px;text-align:right;color:${theme.color};font-weight:700;width:18%;white-space:nowrap;">P.U. HT</th>
-                        <th style="padding:7px 6px;text-align:right;color:${theme.color};font-weight:700;width:10%;white-space:nowrap;">TVA</th>
-                        <th style="padding:7px 0;text-align:right;color:${theme.color};font-weight:700;width:20%;white-space:nowrap;">TTC</th>
+                        <th style="padding:7px 6px;text-align:right;color:${theme.color};font-weight:700;width:14%;white-space:nowrap;">P.U. HT</th>
+                        <th style="padding:7px 6px;text-align:right;color:${theme.color};font-weight:700;width:8%;white-space:nowrap;">Rem. (%)</th>
+                        <th style="padding:7px 6px;text-align:right;color:${theme.color};font-weight:700;width:8%;white-space:nowrap;">TVA</th>
+                        <th style="padding:7px 6px;text-align:right;color:${theme.color};font-weight:700;width:14%;white-space:nowrap;">Montant HT</th>
+                        <th style="padding:7px 0;text-align:right;color:${theme.color};font-weight:700;width:16%;white-space:nowrap;">TTC</th>
                         `}
                     </tr>
                 </thead>
                 <tbody>
                     ${c.rows.map(r => `<tr style="border-bottom:0.5px solid var(--border)">
-                        <td style="padding:8px 0;color:var(--mu);font-weight:500;white-space:nowrap;">${r.ref}</td>
-                        <td style="padding:8px 6px;color:var(--tx);font-weight:600;">${r.desc}</td>
+                        <td style="padding:8px 0;color:var(--mu);font-weight:500;word-break:break-word;">${r.ref}</td>
+                        <td style="padding:8px 6px;color:var(--tx);font-weight:600;">${r.desc}${libelleTaxesLigne(r)}</td>
                         <td style="padding:8px 6px;text-align:center;color:var(--mu);white-space:nowrap;">${r.unite || 'Unité'}</td>
                         <td style="padding:8px 6px;text-align:right;color:var(--mu);white-space:nowrap;">${r.qty}</td>
                         ${isDeliveryMode ? '' : `
-                        <td style="padding:8px 6px;text-align:right;color:var(--mu);white-space:nowrap;">${fmt(r.pu)}${r.remise_taux > 0 ? `<br><span style="color:#dc2626;font-size:10px;">Remise ${r.remise_taux}%</span>` : ''}</td>
+                        <td style="padding:8px 6px;text-align:right;color:var(--mu);white-space:nowrap;">${fmt(r.pu)}</td>
+                        <td style="padding:8px 6px;text-align:right;color:${r.remise_taux > 0 ? '#dc2626' : 'var(--mu)'};white-space:nowrap;">${r.remise_taux || 0}%</td>
                         <td style="padding:8px 6px;text-align:right;color:var(--mu);white-space:nowrap;">${r.tva}%</td>
+                        <td style="padding:8px 6px;text-align:right;color:var(--tx);white-space:nowrap;">${fmt(r.ht)}</td>
                         <td style="padding:8px 0;text-align:right;font-weight:700;color:var(--tx);white-space:nowrap;">${fmt(r.ttc)}</td>
                         `}
                     </tr>`).join('')}
@@ -1164,21 +1183,25 @@ function model3(d) {
                     <th style="padding:9px 10px;text-align:center;border-bottom:2px solid ${theme.color};color:var(--tx);font-weight:700;width:12%;white-space:nowrap;">Unité</th>
                     <th style="padding:9px 10px;text-align:right;border-bottom:2px solid ${theme.color};color:var(--tx);font-weight:700;width:10%;white-space:nowrap;">Qté</th>
                     ${isDeliveryMode ? '' : `
-                    <th style="padding:9px 10px;text-align:right;border-bottom:2px solid ${theme.color};color:var(--tx);font-weight:700;width:16%;white-space:nowrap;">P.U. HT</th>
-                    <th style="padding:9px 10px;text-align:right;border-bottom:2px solid ${theme.color};color:var(--tx);font-weight:700;width:10%;white-space:nowrap;">TVA</th>
-                    <th style="padding:9px 10px;text-align:right;border-bottom:2px solid ${theme.color};color:var(--tx);font-weight:700;width:17%;white-space:nowrap;">TTC</th>
+                    <th style="padding:9px 10px;text-align:right;border-bottom:2px solid ${theme.color};color:var(--tx);font-weight:700;width:13%;white-space:nowrap;">P.U. HT</th>
+                    <th style="padding:9px 10px;text-align:right;border-bottom:2px solid ${theme.color};color:var(--tx);font-weight:700;width:8%;white-space:nowrap;">Rem. (%)</th>
+                    <th style="padding:9px 10px;text-align:right;border-bottom:2px solid ${theme.color};color:var(--tx);font-weight:700;width:8%;white-space:nowrap;">TVA</th>
+                    <th style="padding:9px 10px;text-align:right;border-bottom:2px solid ${theme.color};color:var(--tx);font-weight:700;width:13%;white-space:nowrap;">Montant HT</th>
+                    <th style="padding:9px 10px;text-align:right;border-bottom:2px solid ${theme.color};color:var(--tx);font-weight:700;width:14%;white-space:nowrap;">TTC</th>
                     `}
                 </tr>
             </thead>
             <tbody>
                 ${c.rows.map((r, i) => `<tr style="background:${i % 2 === 1 ? '#F9FAFB' : '#fff'}">
-                    <td style="padding:9px 10px;color:var(--mu);font-size:11px;font-weight:500;white-space:nowrap;">${r.ref}</td>
-                    <td style="padding:9px 10px;font-weight:600;color:var(--tx)">${r.desc}</td>
+                    <td style="padding:9px 10px;color:var(--mu);font-size:11px;font-weight:500;word-break:break-word;">${r.ref}</td>
+                    <td style="padding:9px 10px;font-weight:600;color:var(--tx)">${r.desc}${libelleTaxesLigne(r)}</td>
                     <td style="padding:9px 10px;text-align:center;color:var(--tx);white-space:nowrap;">${r.unite || 'Unité'}</td>
                     <td style="padding:9px 10px;text-align:right;color:var(--tx);white-space:nowrap;">${r.qty}</td>
                     ${isDeliveryMode ? '' : `
-                    <td style="padding:9px 10px;text-align:right;color:var(--mu);white-space:nowrap;">${fmt(r.pu)}${r.remise_taux > 0 ? `<br><span style="color:#dc2626;font-size:10px;">Remise ${r.remise_taux}%</span>` : ''}</td>
+                    <td style="padding:9px 10px;text-align:right;color:var(--mu);white-space:nowrap;">${fmt(r.pu)}</td>
+                    <td style="padding:9px 10px;text-align:right;color:${r.remise_taux > 0 ? '#dc2626' : 'var(--mu)'};white-space:nowrap;">${r.remise_taux || 0}%</td>
                     <td style="padding:9px 10px;text-align:right;color:var(--mu);white-space:nowrap;">${r.tva}%</td>
+                    <td style="padding:9px 10px;text-align:right;color:var(--tx);white-space:nowrap;">${fmt(r.ht)}</td>
                     <td style="padding:9px 10px;text-align:right;font-weight:700;color:var(--tx);white-space:nowrap;">${fmt(r.ttc)}</td>
                     `}
                 </tr>`).join('')}
@@ -1243,8 +1266,8 @@ function modelStandard(d) {
     if (isDeliveryMode) {
         rowsHtml = c.rows.map(r => `
             <tr style="background:#fff; color:#000;">
-                <td style="padding:8px 10px; border:1px solid #000; font-weight:500; white-space:nowrap;">${r.ref}</td>
-                <td style="padding:8px 10px; border:1px solid #000; font-weight:700;">${r.desc}</td>
+                <td style="padding:8px 10px; border:1px solid #000; font-weight:500; word-break:break-word;">${r.ref}</td>
+                <td style="padding:8px 10px; border:1px solid #000; font-weight:700;">${r.desc}${libelleTaxesLigne(r)}</td>
                 <td style="padding:8px 10px; border:1px solid #000; text-align:right; white-space:nowrap;">${r.qty}</td>
                 <td style="padding:8px 10px; border:1px solid #000; text-align:center; white-space:nowrap;">${r.unite || 'Unité'}</td>
             </tr>
@@ -1252,8 +1275,8 @@ function modelStandard(d) {
     } else {
         rowsHtml = c.rows.map(r => `
             <tr style="background:#fff; color:#000;">
-                <td style="padding:8px 10px; border:1px solid #000; font-weight:500; white-space:nowrap;">${r.ref}</td>
-                <td style="padding:8px 10px; border:1px solid #000; font-weight:700;">${r.desc}</td>
+                <td style="padding:8px 10px; border:1px solid #000; font-weight:500; word-break:break-word;">${r.ref}</td>
+                <td style="padding:8px 10px; border:1px solid #000; font-weight:700;">${r.desc}${libelleTaxesLigne(r)}</td>
                 <td style="padding:8px 10px; border:1px solid #000; text-align:right; white-space:nowrap;">${fmt(r.pu)}${r.remise_taux > 0 ? `<br><span style="color:#dc2626;font-size:10px;">Remise ${r.remise_taux}%</span>` : ''}</td>
                 <td style="padding:8px 10px; border:1px solid #000; text-align:right; white-space:nowrap;">${r.qty}</td>
                 <td style="padding:8px 10px; border:1px solid #000; text-align:center; white-space:nowrap;">${r.unite || 'Unité'}</td>

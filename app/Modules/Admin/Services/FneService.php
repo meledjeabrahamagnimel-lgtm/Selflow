@@ -46,6 +46,17 @@ class FneService
             ];
         }
 
+        // La certification d'un reçu normalisé électronique (RNE) suppose des
+        // champs de mappage que la DGI n'a pas encore communiqués : mieux vaut
+        // le dire que d'envoyer un payload de facture pour un reçu.
+        if ($vente->estRecu()) {
+            return [
+                'success' => false,
+                'message' => 'La normalisation des reçus est en attente : la FNE n\'a pas encore fourni les champs de mappage du reçu normalisé électronique (RNE). Le reçu reste enregistré et pourra être normalisé rétroactivement.',
+                'errors'  => ['rne_mapping' => 'En attente des champs de mappage RNE'],
+            ];
+        }
+
         $parentInvoiceId = $vente->parent?->fne_invoice_id;
         $isAvoirRefund = $vente->type_facture === 'avoir' && !empty($parentInvoiceId);
 

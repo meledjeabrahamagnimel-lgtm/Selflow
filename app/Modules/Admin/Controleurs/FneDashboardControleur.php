@@ -602,7 +602,10 @@ class FneDashboardControleur
         foreach ($ids as $id) {
             try {
                 if ($flux === 'ventes') {
-                    $vente = Vente::whereHas('pointDeVente', fn($q) => $q->where('entreprise_id', $entreprise->id))
+                    // Sans `withoutGlobalScopes`, une piece hors de la periode
+                    // active en session est introuvable et le lot s'arrete.
+                    $vente = Vente::withoutGlobalScopes()
+                        ->whereHas('pointDeVente', fn($q) => $q->where('entreprise_id', $entreprise->id))
                         ->find($id);
 
                     if (!$vente) {
@@ -650,7 +653,8 @@ class FneDashboardControleur
                         break;
                     }
                 } else {
-                    $achat = Achat::whereHas('pointDeVente', fn($q) => $q->where('entreprise_id', $entreprise->id))
+                    $achat = Achat::withoutGlobalScopes()
+                        ->whereHas('pointDeVente', fn($q) => $q->where('entreprise_id', $entreprise->id))
                         ->find($id);
 
                     if (!$achat) {
@@ -693,6 +697,16 @@ class FneDashboardControleur
         ]);
     }
 
+    /**
+     * Préparer une normalisation par période.
+     *
+     * Le traitement passait par une file d'attente : sans worker
+     * (`php artisan queue:work`), le job n'était jamais consommé et l'écran
+     * restait indéfiniment sur « En attente de traitement ». On renvoie
+     * désormais la liste des pièces concernées, que l'interface fait traiter
+     * par tranches successives via `batchNormaliser` — le même chemin,
+     * synchrone et éprouvé, que la sélection manuelle.
+     */
     public function scheduleBatch(Request $request): JsonResponse
     {
         $entreprise = Auth::user()->entreprise;
@@ -712,60 +726,39 @@ class FneDashboardControleur
             $batchSize = 15;
         }
 
-        // Compter tout de suite les pièces éligibles : autant le dire à
-        // l'utilisateur avant de lancer quoi que ce soit. `withoutGlobalScopes`
-        // neutralise le filtre de période stocké en session, qui restreindrait
-        // la plage de dates saisie dans le formulaire.
-        $eligibles = $flux === 'ventes'
+        // `withoutGlobalScopes` neutralise le filtre de période stocké en
+        // session, qui restreindrait la plage de dates saisie au formulaire.
+        $ids = $flux === 'ventes'
             ? Vente::withoutGlobalScopes()
                 ->where('normalise', false)
                 ->where('etape', 'Facture')
                 ->whereHas('pointDeVente', fn ($q) => $q->where('entreprise_id', $entreprise->id))
                 ->whereBetween('date_vente', [$dateDebut . ' 00:00:00', $dateFin . ' 23:59:59'])
-                ->count()
+                ->orderBy('date_vente')->orderBy('id')
+                ->limit($batchSize)
+                ->pluck('id')
             : Achat::withoutGlobalScopes()
                 ->where('normalise', false)
                 ->where('type_facture', 'bapa')
                 ->where('etape', 'Facture')
                 ->whereHas('pointDeVente', fn ($q) => $q->where('entreprise_id', $entreprise->id))
                 ->whereBetween('date_achat', [$dateDebut . ' 00:00:00', $dateFin . ' 23:59:59'])
-                ->count();
+                ->orderBy('date_achat')->orderBy('id')
+                ->limit($batchSize)
+                ->pluck('id');
 
-        if ($eligibles === 0) {
+        if ($ids->isEmpty()) {
             return response()->json([
                 'success' => false,
                 'message' => 'Aucun document non normalisé sur cette période.',
             ], 422);
         }
 
-        // Le suivi est écrit AVANT la mise en file : sans cela, tant qu'aucun
-        // worker n'a pris le job, le fichier de statut n'existe pas et
-        // l'interface conclut « idle », donnant l'impression que le bouton ne
-        // fait rien.
-        $statusPath = storage_path("app/fne_batch_{$entreprise->id}.json");
-        file_put_contents($statusPath, json_encode([
-            'status'           => 'queued',
-            'flux'             => $flux,
-            'total_to_process' => min($eligibles, $batchSize),
-            'processed_count'  => 0,
-            'current_invoice'  => null,
-            'error'            => null,
-            'queued_at'        => now()->toDateTimeString(),
-            'last_updated'     => now()->toDateTimeString(),
-        ]));
-
-        \App\Jobs\BatchNormalisationJob::dispatch(
-            $entreprise->id,
-            $flux,
-            $dateDebut,
-            $dateFin,
-            $batchSize
-        );
-
         return response()->json([
             'success' => true,
-            'total_to_process' => min($eligibles, $batchSize),
-            'message' => 'La normalisation en arrière-plan a été lancée.'
+            'flux'    => $flux,
+            'ids'     => $ids->values(),
+            'total'   => $ids->count(),
         ]);
     }
 

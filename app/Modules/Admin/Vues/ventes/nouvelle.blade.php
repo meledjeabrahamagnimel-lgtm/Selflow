@@ -236,26 +236,6 @@
                         </div>
                     </div>
 
-                    {{-- Mentions transmises à la FNE (`commercialMessage` et `footer`) --}}
-                    <div class="form-group">
-                        <label class="form-label">Autres mentions</label>
-                        <textarea name="autres_mentions" id="autresMentionsInput" class="form-control" rows="2"
-                                  maxlength="248" oninput="majCompteurMention('autresMentions')"
-                                  placeholder="Message commercial affiché sur la facture">{{ old('autres_mentions', $entrepriseCourante->facture_autres_mentions) }}</textarea>
-                        <small style="color:var(--text-3); font-size:11px;">
-                            <span id="autresMentionsCompteur">0</span>/248 caractères — prérempli depuis les paramètres de l'entreprise.
-                        </small>
-                    </div>
-                    <div class="form-group">
-                        <label class="form-label">Pied de page</label>
-                        <textarea name="pied_de_page" id="piedDePageInput" class="form-control" rows="2"
-                                  maxlength="248" oninput="majCompteurMention('piedDePage')"
-                                  placeholder="Texte affiché en bas de la facture">{{ old('pied_de_page', $entrepriseCourante->pied_de_page_facture) }}</textarea>
-                        <small style="color:var(--text-3); font-size:11px;">
-                            <span id="piedDePageCompteur">0</span>/248 caractères.
-                        </small>
-                    </div>
-
                     <div class="form-group">
                         <label class="form-label">Client (optionnel)</label>
                         <select name="client_id" class="form-control">
@@ -286,6 +266,13 @@
                             </button>
                         </div>
                         <small id="infoEtapeVente" style="color:var(--text-3); font-size:11px;">Mode facturation avec règlement</small>
+                        <div id="avertissementRne" style="display:none; margin-top:8px; padding:10px 12px; background:#fffbeb; border:1px solid #fcd34d; border-radius:8px; font-size:11px; color:#92400e; line-height:1.5;">
+                            <i class="fas fa-triangle-exclamation"></i>
+                            <strong>Normalisation RNE en attente.</strong>
+                            Le reçu sera enregistré et imprimable, mais sa certification auprès de la DGI
+                            reste suspendue tant que la FNE n'a pas fourni les champs de mappage du reçu
+                            normalisé électronique. Il pourra être normalisé rétroactivement.
+                        </div>
                     </div>
 
                     {{-- Mode de paiement style buttons --}}
@@ -441,6 +428,37 @@
                     </div>
                 </div>
             </div>
+
+            {{-- Memes possibilites que pour un article du catalogue : remise de
+                 ligne et taxes personnalisees transmises a la FNE. --}}
+            <div style="display:grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+                <div class="form-group">
+                    <label class="form-label">Remise (%)</label>
+                    <input type="number" id="saisieRemiseInput" class="form-control" value="0" min="0" max="100" step="0.01" placeholder="0">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Code TVA DGI</label>
+                    <select id="saisieCodeTvaInput" class="form-control">
+                        <option value="">Déduit du taux et du régime</option>
+                        @foreach(\App\Modules\Admin\Modeles\Produit::CODES_TVA as $code => $infos)
+                            <option value="{{ $code }}">{{ $infos['libelle'] }}</option>
+                        @endforeach
+                    </select>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">Autres taxes</label>
+                <div id="saisieTaxesConteneur" style="display:flex; flex-direction:column; gap:8px;"></div>
+                <button type="button" class="btn btn-outline btn-sm" onclick="ajouterTaxeSaisieLibre()"
+                        style="margin-top:8px; font-size:12px;">
+                    <i class="fas fa-plus"></i> Ajouter d'autres taxes
+                </button>
+                <small style="display:block; margin-top:6px; color:var(--text-3); font-size:11px;">
+                    Taux strictement supérieur à 0 et au plus égal à 100 %.
+                </small>
+            </div>
+
             <div style="display:flex; justify-content:flex-end; gap:12px; margin-top:24px;">
                 <button type="button" class="btn btn-outline" onclick="fermerSaisieLibre()">Annuler</button>
                 <button type="button" class="btn btn-info" onclick="ajouterSaisieLibre(null, false)">Ajouter et continuer</button>
@@ -551,9 +569,15 @@ function selectionnerEtapeVente(btn) {
     const labelBtn = document.getElementById('labelBtnValiderVente');
     const montantPayeInput = document.getElementById('montantPayeInput');
 
+    // Le reçu est bien enregistré comme tel : il ne bascule pas en facture.
+    // Sa certification RNE reste en revanche suspendue tant que la FNE n'a pas
+    // communiqué les champs de mappage du reçu normalisé électronique.
+    const avertissement = document.getElementById('avertissementRne');
+    if (avertissement) avertissement.style.display = estRecu ? 'block' : 'none';
+
     if (estRecu) {
         blocPaiement.style.display = 'block';
-        infoEtape.textContent = 'Reçu encaissé, normalisable auprès de la DGI';
+        infoEtape.textContent = 'Reçu encaissé — normalisation RNE en attente des champs de mappage FNE';
         labelBtn.textContent = 'Valider et émettre le reçu';
         montantPayeInput.removeAttribute('disabled');
     } else if (etape === 'Facture') {
@@ -735,6 +759,44 @@ function fermerSaisieLibre() {
     }
 }
 
+/**
+ * Borne un taux saisi entre 0 et 100 : aucune remise ni taxe ne peut sortir
+ * de cet intervalle, c'est la regle imposee par la DGI.
+ */
+function bornerTaux(valeur) {
+    let taux = parseFloat(valeur);
+    if (isNaN(taux) || taux < 0) return 0;
+    return Math.min(taux, 100);
+}
+
+function ajouterTaxeSaisieLibre(nom, taux) {
+    const conteneur = document.getElementById('saisieTaxesConteneur');
+    if (!conteneur) return;
+
+    const ligne = document.createElement('div');
+    ligne.style.cssText = 'display:flex; gap:8px; align-items:center;';
+    ligne.innerHTML = `
+        <input type="text" class="form-control taxe-nom" placeholder="Nom (ex : GRA)" maxlength="100"
+               value="${nom ? String(nom).replace(/"/g, '&quot;') : ''}" style="flex:2;">
+        <input type="number" class="form-control taxe-taux" placeholder="Taux (%)" min="0.01" max="100" step="0.01"
+               value="${taux !== undefined ? taux : ''}" style="flex:1;">
+        <button type="button" class="remove-btn" title="Supprimer" onclick="this.closest('div').remove()">
+            <i class="fas fa-trash"></i>
+        </button>
+    `;
+    conteneur.appendChild(ligne);
+}
+
+function lireTaxesSaisieLibre() {
+    const taxes = [];
+    document.querySelectorAll('#saisieTaxesConteneur > div').forEach(ligne => {
+        const nom  = ligne.querySelector('.taxe-nom')?.value.trim();
+        const taux = bornerTaux(ligne.querySelector('.taxe-taux')?.value);
+        if (nom && taux > 0) taxes.push({ nom, taux });
+    });
+    return taxes;
+}
+
 function ajouterSaisieLibre(e, fermer = true) {
     if (e) e.preventDefault();
     
@@ -755,10 +817,19 @@ function ajouterSaisieLibre(e, fermer = true) {
     const qte = parseInt(qteInput.value);
     const unite = uniteInput.value.trim() || 'Unité';
     const tva = parseFloat(tvaInput.value || 18);
-    
+
+    // Remise de ligne et taxes propres a la saisie libre, comme pour un
+    // article du catalogue.
+    const remise = bornerTaux(document.getElementById('saisieRemiseInput')?.value);
+    const codeTva = document.getElementById('saisieCodeTvaInput')?.value || '';
+    const taxes = lireTaxesSaisieLibre();
+
     const id = 'v_' + Date.now();
-    panier[id] = { nom, prix, qte, stock: 99999, stock_minimum: 0, unite, tva, remise_taux: 0, isVirtual: true };
-    
+    panier[id] = {
+        nom, prix, qte, stock: 99999, stock_minimum: 0, unite, tva,
+        remise_taux: remise, code_tva: codeTva, taxes: taxes, isVirtual: true
+    };
+
     if (fermer) {
         fermerSaisieLibre();
     } else {
@@ -767,6 +838,9 @@ function ajouterSaisieLibre(e, fermer = true) {
         qteInput.value = '1';
         uniteInput.value = 'Unité';
         tvaInput.value = '18';
+        document.getElementById('saisieRemiseInput').value = '0';
+        document.getElementById('saisieCodeTvaInput').value = '';
+        document.getElementById('saisieTaxesConteneur').innerHTML = '';
         var select = document.getElementById('saisieTvaInputSelect');
         if (select) {
             select.value = '18';
@@ -1010,7 +1084,7 @@ function renderPanier() {
         container.appendChild(div);
 
         const form = document.getElementById('formVente');
-        ['produit_id', 'quantite', 'libelle_virtuel', 'prix_unitaire', 'unite', 'tva', 'remise_taux'].forEach(field => {
+        ['produit_id', 'quantite', 'libelle_virtuel', 'prix_unitaire', 'unite', 'tva', 'remise_taux', 'code_tva'].forEach(field => {
             const input = document.createElement('input');
             input.type = 'hidden';
             input.name = `articles[${idx}][${field}]`;
@@ -1029,10 +1103,25 @@ function renderPanier() {
                 input.value = item.tva || 0;
             } else if (field === 'remise_taux') {
                 input.value = item.remise_taux || 0;
+            } else if (field === 'code_tva') {
+                input.value = item.code_tva || '';
             }
 
             input.className = 'article-input';
             form.appendChild(input);
+        });
+
+        // Taxes personnalisées saisies sur une ligne libre : celles d'un
+        // article du catalogue sont reprises côté serveur depuis sa fiche.
+        (item.taxes || []).forEach((taxe, rang) => {
+            [['nom', taxe.nom], ['taux', taxe.taux]].forEach(([champ, valeur]) => {
+                const input = document.createElement('input');
+                input.type = 'hidden';
+                input.name = `articles[${idx}][taxes][${rang}][${champ}]`;
+                input.value = valeur;
+                input.className = 'article-input';
+                form.appendChild(input);
+            });
         });
     });
 
@@ -1110,11 +1199,6 @@ function basculerChampRne() {
     if (champ) champ.required = coche;
 }
 
-function majCompteurMention(prefixe) {
-    const champ    = document.getElementById(prefixe + 'Input');
-    const compteur = document.getElementById(prefixe + 'Compteur');
-    if (champ && compteur) compteur.textContent = champ.value.length;
-}
 
 /**
  * Ordre de calcul aligné sur le récapitulatif de la FNE :
@@ -1172,8 +1256,6 @@ function calculerTotaux() {
 }
 
 document.addEventListener('DOMContentLoaded', function () {
-    majCompteurMention('autresMentions');
-    majCompteurMention('piedDePage');
 });
 
 function ouvrirModalNouvelleBanque() {
@@ -1273,4 +1355,23 @@ function toggleSaisieTvaCustom() {
     }
 }
 </script>
+
+{{-- Bornage immediat de tout taux saisi : aucune remise ni taxe ne peut sortir
+     de l'intervalle 0-100 %, regle imposee par la DGI. La validation serveur
+     reste la garantie ; ce script evite seulement a l'utilisateur de saisir une
+     valeur qui sera refusee. --}}
+<script>
+document.addEventListener('input', function (e) {
+    const champ = e.target;
+    if (champ.tagName !== 'INPUT' || champ.type !== 'number') return;
+    if (champ.max !== '100') return;
+
+    const valeur = parseFloat(champ.value);
+    if (isNaN(valeur)) return;
+
+    if (valeur > 100) champ.value = 100;
+    if (valeur < parseFloat(champ.min || 0)) champ.value = champ.min || 0;
+});
+</script>
+
 @endsection
