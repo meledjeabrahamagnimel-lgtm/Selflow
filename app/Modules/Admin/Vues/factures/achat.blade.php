@@ -241,6 +241,11 @@ var DATA = {
         montant_ht: {{ $achat->montant_ht }},
         montant_tva: 0,
         montant_ttc: {{ $achat->montant_ttc }},
+        // Droit de timbre du sur un bordereau d'achat regle en especes. La
+        // facture d'achat et le bordereau portent sur la meme operation : ils
+        // doivent annoncer le meme montant a payer.
+        timbre_fiscal: {{ (float) \App\Modules\Admin\Services\TimbreQuittanceService::pourAchat($achat) }},
+        timbre_bareme: {{ $achat->fne_timbre_fiscal === null ? 'true' : 'false' }},
         fournisseur: {
             nom: {!! json_encode($achat->fournisseur?->nom ?? 'Fournisseur divers') !!},
             telephone: {!! json_encode($achat->fournisseur?->telephone ?? '') !!},
@@ -329,6 +334,48 @@ function nomFichierPdf() {
 }
 
 @include('admin::factures.partials.script-impression')
+
+/**
+ * Droit de timbre de quittance sur un bordereau d'achat.
+ *
+ * La DGI l'applique aussi aux bordereaux : sur celui du 5 aout 2026, un total
+ * HT de 13 200 F regle en especes s'est vu ajouter 100 F, montant exact de la
+ * deuxieme tranche de l'article 873 du CGI. Sur un achat, l'article 875 met
+ * le droit a la charge du debiteur : c'est l'entreprise qui l'acquitte.
+ *
+ * Tant que la piece n'est pas certifiee, le montant vient du bareme et
+ * l'intitule le precise.
+ */
+function libelleTimbreAchat(d) {
+    return d.timbre_bareme
+        ? 'Timbre de quittance (barème, avant certification)'
+        : 'Timbre de quittance';
+}
+
+function blocTimbreAchat(d) {
+    if (!d.timbre_fiscal || d.timbre_fiscal <= 0) return '';
+    return `
+    <div style="display:flex;justify-content:space-between;padding:6px 0;font-size:12px;border-bottom:0.5px solid var(--border)">
+        <span style="color:var(--mu)">${libelleTimbreAchat(d)}</span><span>${fmtFcfa(d.timbre_fiscal)}</span>
+    </div>
+    <div style="display:flex;justify-content:space-between;padding:8px 0 6px;font-size:14px;font-weight:800;">
+        <span>NET A PAYER</span><span>${fmtFcfa(d.montant_ttc + d.timbre_fiscal)}</span>
+    </div>`;
+}
+
+/** Meme bloc, en lignes de tableau pour le modele standard. */
+function blocTimbreAchatTr(d, colonnes) {
+    if (!d.timbre_fiscal || d.timbre_fiscal <= 0) return '';
+    return `
+            <tr style="background:#fff; color:#000;">
+                <td colspan="${colonnes}" style="padding:6px 10px; border:1px solid #000; text-align:right; font-weight:600;">${libelleTimbreAchat(d)}</td>
+                <td style="padding:6px 10px; border:1px solid #000; text-align:right; font-weight:600; white-space:nowrap;">${fmt(d.timbre_fiscal)}</td>
+            </tr>
+            <tr style="background:#fff; color:#000;">
+                <td colspan="${colonnes}" style="padding:6px 10px; border:1px solid #000; text-align:right; font-weight:900; text-transform:uppercase;">Net a payer</td>
+                <td style="padding:6px 10px; border:1px solid #000; text-align:right; font-weight:900; white-space:nowrap;">${fmt(d.montant_ttc + d.timbre_fiscal)}</td>
+            </tr>`;
+}
 
 function logoHtml(src, alt, maxH) {
     if (!src) return '';
@@ -488,6 +535,7 @@ function model1(d) {
             <div style="flex:1;"></div>
             <div style="width:240px">
                 <div style="display:flex;justify-content:space-between;padding:10px 0 6px;font-size:15px;font-weight:800;color:var(--tx);border-top:1.5px solid ${theme.color};"><span>TOTAL TTC</span><span>${fmtFcfa(d.montant_ttc)}</span></div>
+                ${blocTimbreAchat(d)}
             </div>
         </div>
         <div style="border-top:0.5px solid var(--border);padding-top:14px;display:flex;justify-content:space-between;align-items:flex-end">
@@ -584,6 +632,7 @@ function model2(d) {
             <div style="display:flex;justify-content:flex-end;margin-bottom:14px">
                 <div style="width:220px;background:var(--white);border-radius:8px;padding:10px 12px;border:0.5px solid var(--border)">
                     <div style="display:flex;justify-content:space-between;font-size:13px;font-weight:800;padding:6px 0 0;margin-top:4px"><span style="color:var(--tx)">Total TTC</span><span style="color:${theme.color}">${fmtFcfa(d.montant_ttc)}</span></div>
+                    ${blocTimbreAchat(d)}
                 </div>
             </div>
             <div style="font-size:11px;color:var(--mu)">Généré automatiquement par <strong>Selflow</strong></div>
@@ -696,6 +745,7 @@ function model3(d) {
                     <span style="font-size:13px;font-weight:700;color:#fff">Total TTC</span>
                     <span style="font-size:15px;font-weight:800;color:#fff">${fmtFcfa(d.montant_ttc)}</span>
                 </div>
+                ${blocTimbreAchat(d)}
             </div>
         </div>
         <div style="border-top:0.5px solid var(--border);padding-top:12px;display:flex;justify-content:space-between;align-items:center">
@@ -744,6 +794,7 @@ function modelStandard(d) {
                 <td colspan="5" style="padding:6px 10px; border:1px solid #000; text-align:right; font-weight:700; text-transform:uppercase;">TOTAL TTC</td>
                 <td style="padding:6px 10px; border:1px solid #000; text-align:right; font-weight:700; white-space:nowrap;">${fmt(d.montant_ttc)}</td>
             </tr>
+            ${blocTimbreAchatTr(d, 5)}
         `;
     }
 

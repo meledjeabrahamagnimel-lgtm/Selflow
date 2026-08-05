@@ -224,8 +224,11 @@
                     <th style="text-align:center; width:60px;">Unité</th>
                     <th style="text-align:right; width:120px;">Prix unitaire</th>
                     <th style="text-align:right; width:80px;">Remise (%)</th>
-                    <th style="text-align:right; width:110px;">Autres taxes</th>
-                    <th style="text-align:right; width:120px;">Total Net</th>
+                    {{-- Pas de colonne de taxes : le payload d'un bordereau ne
+                         transmet ni `taxes` ni `customTaxes`. La DGI n'en
+                         retient donc aucune, et la colonne annoncait des
+                         montants qui ne figurent pas sur la piece certifiee. --}}
+                    <th style="text-align:right; width:130px;">Montant HT</th>
                 </tr>
             </thead>
             <tbody>
@@ -236,13 +239,6 @@
                         <td style="text-align:center;">{{ $d->unite }}</td>
                         <td style="text-align:right;">{{ number_format($d->prix_unitaire, 0, ',', ' ') }} F</td>
                         <td style="text-align:right;">{{ rtrim(rtrim(number_format((float) ($d->remise_taux ?? 0), 2, ',', ' '), '0'), ',') }} %</td>
-                        <td style="text-align:right; font-size:10px;">
-                            @forelse($d->taxes as $taxe)
-                                {{ $taxe->nom }} {{ rtrim(rtrim(number_format((float) $taxe->taux, 2, ',', ' '), '0'), ',') }} %@if(!$loop->last)<br>@endif
-                            @empty
-                                —
-                            @endforelse
-                        </td>
                         <td style="text-align:right; font-weight:700;">{{ number_format($d->montant_ttc, 0, ',', ' ') }} F</td>
                     </tr>
                 @endforeach
@@ -253,7 +249,7 @@
         <div style="display:flex; justify-content:flex-end; margin-bottom:40px;">
             <table style="width:280px; border-collapse:collapse; font-size:13px;">
                 <tr style="border-bottom:1px solid #000;">
-                    <td style="padding:6px 0; font-weight:600;">Montant d'achat brut</td>
+                    <td style="padding:6px 0; font-weight:600;">Total HT</td>
                     <td style="padding:6px 0; text-align:right; font-weight:700;">
                         {{-- Le brut est bien celui d'avant remise : afficher ici le
                              montant deja net, suivi d'une ligne « Remise », laissait
@@ -271,25 +267,29 @@
                     <td style="padding:6px 0; font-weight:600;">TVA (Exonéré art. BAPA)</td>
                     <td style="padding:6px 0; text-align:right; font-weight:700;">0 F</td>
                 </tr>
-                @foreach($achat->taxesPersonnalisees as $taxe)
+                {{-- Les taxes personnalisees ne figurent pas sur un bordereau :
+                     le payload de la DGI n'en prevoit aucune pour ce type de
+                     piece — ni `taxes` ni `customTaxes`, ni sur la ligne ni a
+                     la racine. Les afficher ici et les ajouter au net creerait
+                     un ecart avec le bordereau certifie. --}}
+                @php
+                    $timbreBapa = \App\Modules\Admin\Services\TimbreQuittanceService::pourAchat($achat);
+                @endphp
+                @if($timbreBapa > 0)
                 <tr style="border-bottom:1px solid #000;">
-                    <td style="padding:6px 0; font-weight:600;">{{ $taxe->nom }} ({{ rtrim(rtrim(number_format((float) $taxe->taux, 2, ',', ' '), '0'), ',') }} %)</td>
-                    <td style="padding:6px 0; text-align:right; font-weight:700;">{{ number_format($taxe->montant, 0, ',', ' ') }} F</td>
-                </tr>
-                @endforeach
-                {{-- Droit de timbre : sur un bordereau d'achat, il n'est jamais
-                     etabli au bareme. Seule la plateforme le decide, et son
-                     montant nous parvient dans `invoice.fiscalStamp`. --}}
-                @if(($achat->fne_timbre_fiscal ?? 0) > 0)
-                <tr style="border-bottom:1px solid #000;">
-                    <td style="padding:6px 0; font-weight:600;">Timbre de quittance</td>
-                    <td style="padding:6px 0; text-align:right; font-weight:700;">{{ number_format($achat->fne_timbre_fiscal, 0, ',', ' ') }} F</td>
+                    <td style="padding:6px 0; font-weight:600;">
+                        Timbre de quittance
+                        @if($achat->fne_timbre_fiscal === null)
+                            <span style="font-weight:400; font-size:10px;">(barème, avant certification)</span>
+                        @endif
+                    </td>
+                    <td style="padding:6px 0; text-align:right; font-weight:700;">{{ number_format($timbreBapa, 0, ',', ' ') }} F</td>
                 </tr>
                 @endif
                 <tr style="background:#f1f5f9; font-weight:800; font-size:15px; border:1px solid #000;">
                     <td style="padding:8px 10px;">Montant Net à Payer</td>
                     <td style="padding:8px 10px; text-align:right; color:var(--navy);">
-                        {{ number_format($achat->montant_ttc + $achat->taxesPersonnalisees->sum('montant') + ($achat->fne_timbre_fiscal ?? 0), 0, ',', ' ') }} FCFA
+                        {{ number_format($achat->montant_ttc + $timbreBapa, 0, ',', ' ') }} FCFA
                     </td>
                 </tr>
             </table>

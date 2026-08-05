@@ -120,6 +120,44 @@ class TimbreQuittanceService
         return self::montantDu((float) $vente->montant_ttc);
     }
 
+    /**
+     * Timbre retenu pour un bordereau d'achat.
+     *
+     * La DGI l'applique aussi aux bordereaux : sur celui du 5 août 2026, un
+     * total HT de 13 200 F réglé en espèces s'est vu ajouter 100 F, montant
+     * exact de la deuxième tranche de l'article 873.
+     *
+     * L'article 875 mettant le droit à la charge du débiteur, c'est ici
+     * l'entreprise qui l'acquitte : sur un achat, c'est elle qui paie.
+     *
+     * Seuls les bordereaux sont concernés, à l'exclusion des factures d'achat
+     * ordinaires : elles ne sont pas certifiées, la quittance émane du
+     * fournisseur et non de nous, et rien ne permettrait de vérifier le
+     * montant retenu.
+     */
+    public static function pourAchat($achat): float
+    {
+        if ($achat->fne_timbre_fiscal !== null) {
+            return (float) $achat->fne_timbre_fiscal;
+        }
+
+        if (($achat->type_facture ?? null) !== 'bapa') {
+            return 0.0;
+        }
+
+        $entreprise = $achat->pointDeVente?->entreprise;
+
+        if (!$entreprise || !$entreprise->timbre_quittance) {
+            return 0.0;
+        }
+
+        if (!self::reglementEnEspeces($achat->mode_paiement)) {
+            return 0.0;
+        }
+
+        return self::montantDu((float) $achat->montant_ttc);
+    }
+
     /** Le timbre affiché vient-il de la plateforme, ou du barème ? */
     public static function provenance(Vente $vente): string
     {

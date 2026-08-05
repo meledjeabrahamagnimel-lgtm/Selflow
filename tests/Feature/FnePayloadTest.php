@@ -648,6 +648,59 @@ class FnePayloadTest extends TestCase
         }
     }
 
+    public function test_un_bordereau_d_achat_supporte_le_timbre_de_quittance(): void
+    {
+        $this->entreprise->update(['timbre_quittance' => true]);
+
+        // Bordereau certifie le 5 aout 2026 : 13 200 F HT regles en especes,
+        // 100 F de timbre retenus par la DGI — deuxieme tranche de l'article
+        // 873. La plateforme applique donc bien le bareme aux bordereaux.
+        $achat = $this->achatBapaMinimal();
+        $achat->update(['mode_paiement' => 'Caisse', 'montant_ttc' => 13_200]);
+
+        $this->assertSame(
+            100.0,
+            \App\Modules\Admin\Services\TimbreQuittanceService::pourAchat($achat->fresh())
+        );
+    }
+
+    public function test_une_facture_d_achat_ordinaire_ne_porte_pas_de_timbre(): void
+    {
+        $this->entreprise->update(['timbre_quittance' => true]);
+
+        // Elle n'est pas certifiee, la quittance emane du fournisseur et non
+        // de nous : rien ne permettrait de verifier le montant retenu.
+        $achat = $this->achatBapaMinimal();
+        $achat->update(['type_facture' => 'normale', 'mode_paiement' => 'Caisse', 'montant_ttc' => 13_200]);
+
+        $this->assertSame(
+            0.0,
+            \App\Modules\Admin\Services\TimbreQuittanceService::pourAchat($achat->fresh())
+        );
+    }
+
+    public function test_un_bordereau_ne_transmet_ni_tva_ni_taxes_personnalisees(): void
+    {
+        $this->simulerReponseFne();
+
+        FneService::normaliserAchatBapa($this->achatBapaMinimal());
+
+        $payload = $this->payloadEnvoye();
+
+        // Le json de reference d'un bordereau ne comporte ni `taxes` ni
+        // `customTaxes`, ni sur la ligne ni a la racine : la DGI n'en retient
+        // aucune. Le document ne doit donc en afficher aucune non plus.
+        $this->assertArrayNotHasKey('customTaxes', $payload);
+        foreach ($payload['items'] as $ligne) {
+            $this->assertArrayNotHasKey('taxes', $ligne);
+            $this->assertArrayNotHasKey('customTaxes', $ligne);
+            $this->assertSame(
+                ['reference', 'description', 'quantity', 'amount', 'discount', 'measurementUnit'],
+                array_keys($ligne)
+            );
+        }
+    }
+
     // ─── Alerte de stickers ──────────────────────────────────────────────
 
     public function test_l_alerte_stickers_se_declenche_au_seuil_et_chiffre_le_reste(): void
