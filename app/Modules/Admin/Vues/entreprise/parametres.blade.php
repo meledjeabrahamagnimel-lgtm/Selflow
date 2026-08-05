@@ -19,16 +19,20 @@
     @endif
 
     @if(!$entreprise->estInscriptionComplete())
-    <div style="display:flex;align-items:center;justify-content:space-between;gap:16px;background:#FFFBEB;border:1px solid #FCD34D;border-radius:12px;padding:16px 20px;margin-bottom:22px;color:#92400E;flex-wrap:wrap;">
-        <div style="display:flex;align-items:center;gap:12px;">
-            <span style="font-size:18px;color:#D97706;"><i class="fas fa-triangle-exclamation"></i></span>
-            <div>
-                <h4 style="font-weight:700;font-size:14px;margin-bottom:2px;">Inscription incomplète</h4>
-                <p style="font-size:12px;color:#B45309;">Remplissez les champs marqués <span style="color:#DC2626;font-weight:700;">*</span> pour finaliser l'inscription et débloquer toutes les fonctionnalités.</p>
+        <div
+            style="display:flex;align-items:center;justify-content:space-between;gap:16px;background:#FFFBEB;border:1px solid #FCD34D;border-radius:12px;padding:16px 20px;margin-bottom:22px;color:#92400E;flex-wrap:wrap;">
+            <div style="display:flex;align-items:center;gap:12px;">
+                <span style="font-size:18px;color:#D97706;"><i class="fas fa-triangle-exclamation"></i></span>
+                <div>
+                    <h4 style="font-weight:700;font-size:14px;margin-bottom:2px;">Inscription incomplète</h4>
+                    <p style="font-size:12px;color:#B45309;">Remplissez les champs marqués <span
+                            style="color:#DC2626;font-weight:700;">*</span> pour finaliser l'inscription et débloquer toutes les
+                        fonctionnalités.</p>
+                </div>
             </div>
+            <span
+                style="background:#FCD34D;color:#92400E;padding:4px 12px;border-radius:20px;font-size:11px;font-weight:700;">{{ $entreprise->nom === '[PENDING_ONBOARDING]' ? 'Démarrage' : 'En cours' }}</span>
         </div>
-        <span style="background:#FCD34D;color:#92400E;padding:4px 12px;border-radius:20px;font-size:11px;font-weight:700;">{{ $entreprise->nom === '[PENDING_ONBOARDING]' ? 'Démarrage' : 'En cours' }}</span>
-    </div>
     @endif
 
     <form method="POST" action="{{ route('admin.entreprise.parametres.enregistrer') }}" enctype="multipart/form-data">
@@ -61,28 +65,32 @@
                         {{-- Informations Gérant — pré-remplies depuis les infos de connexion --}}
                         <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
                             <div class="form-group" style="margin-bottom:0;">
-                                <label class="form-label">Nom du Gérant / Représentant <span style="color:var(--danger)">*</span></label>
+                                <label class="form-label">Nom du Gérant / Représentant <span
+                                        style="color:var(--danger)">*</span></label>
                                 <input type="text" name="gerant_nom" class="form-control"
-                                    value="{{ old('gerant_nom', $entreprise->gerant_nom ?: $user->nom) }}" placeholder="Ex: Koné">
+                                    value="{{ old('gerant_nom', $entreprise->gerant_nom ?: $user->nom) }}"
+                                    placeholder="Ex: Koné">
                             </div>
                             <div class="form-group" style="margin-bottom:0;">
-                                <label class="form-label">Prénom du Gérant <span style="color:var(--danger)">*</span></label>
+                                <label class="form-label">Prénom du Gérant <span
+                                        style="color:var(--danger)">*</span></label>
                                 <input type="text" name="gerant_prenom" class="form-control"
-                                    value="{{ old('gerant_prenom', $entreprise->gerant_prenom ?: $user->prenom) }}" placeholder="Ex: Mamadou">
+                                    value="{{ old('gerant_prenom', $entreprise->gerant_prenom ?: $user->prenom) }}"
+                                    placeholder="Ex: Mamadou">
                             </div>
                         </div>
                         <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
                             <div class="form-group" style="margin-bottom:0;">
-                                <label class="form-label">Fonction du Gérant <span style="color:var(--danger)">*</span></label>
+                                <label class="form-label">Fonction du Gérant <span
+                                        style="color:var(--danger)">*</span></label>
                                 <input type="text" name="gerant_fonction" class="form-control"
                                     value="{{ old('gerant_fonction', $entreprise->gerant_fonction) }}"
                                     placeholder="Ex: Directeur Général / Gérant">
                             </div>
                             <div class="form-group" style="margin-bottom:0;">
                                 <label class="form-label">E-mail du gérant</label>
-                                <input type="email" class="form-control"
-                                    value="{{ $user->email }}"
-                                    disabled style="background:var(--bg3);cursor:not-allowed;" title="Email du compte connecté">
+                                <input type="email" class="form-control" value="{{ $user->email }}" disabled
+                                    style="background:var(--bg3);cursor:not-allowed;" title="Email du compte connecté">
                             </div>
                         </div>
 
@@ -109,7 +117,8 @@
                         <div class="form-group">
                             <label class="form-label">
                                 RCCM <span style="color:var(--danger)">*</span>
-                                <span style="font-size:10px;color:var(--text-3);font-weight:400;"> — Registre du Commerce et du Crédit Mobilier</span>
+                                <span style="font-size:10px;color:var(--text-3);font-weight:400;"> — Registre du Commerce et
+                                    du Crédit Mobilier</span>
                             </label>
                             <input type="text" name="rccm" class="form-control" value="{{ old('rccm', $entreprise->rccm) }}"
                                 placeholder="Ex: CI-ABJ-03-2021-B13-05438">
@@ -127,12 +136,14 @@
                     <div style="display:flex;flex-direction:column;gap:14px;">
                         <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
                             <div class="form-group" style="margin-bottom:0;">
-                                <label class="form-label">NCC — N° Compte Contribuable <span style="color:var(--danger)">*</span></label>
-                                <input type="text" name="ncc" class="form-control" value="{{ old('ncc', $entreprise->ncc) }}"
-                                    placeholder="Ex: 2169728N">
+                                <label class="form-label">NCC — N° Compte Contribuable <span
+                                        style="color:var(--danger)">*</span></label>
+                                <input type="text" name="ncc" class="form-control"
+                                    value="{{ old('ncc', $entreprise->ncc) }}" placeholder="Ex: 2169728N">
                             </div>
                             <div class="form-group" style="margin-bottom:0;">
-                                <label class="form-label">Régime d'imposition <span style="color:var(--danger)">*</span></label>
+                                <label class="form-label">Régime d'imposition <span
+                                        style="color:var(--danger)">*</span></label>
                                 <select name="regime_imposition" class="form-control">
                                     <option value="">— Choisir un régime —</option>
                                     <option value="TEE" {{ old('regime_imposition', $entreprise->regime_imposition) === 'TEE' ? 'selected' : '' }}>TEE — Taxe sur Entreprise Existante</option>
@@ -144,14 +155,16 @@
                         </div>
                         <div class="form-group">
                             <label class="form-label">Centre des impôts <span style="color:var(--danger)">*</span></label>
-                            <input type="text" name="centre_impots" class="form-control" value="{{ old('centre_impots', $entreprise->centre_impots) }}"
+                            <input type="text" name="centre_impots" class="form-control"
+                                value="{{ old('centre_impots', $entreprise->centre_impots) }}"
                                 placeholder="Ex: 2 PLATEAUX 3">
                         </div>
                         <div class="form-group">
                             <label class="form-label">Références bancaires</label>
                             <textarea name="ref_bancaire" class="form-control" rows="3"
                                 placeholder="Ex: Établissement : SGBCI — N° compte : 00123456789">{{ old('ref_bancaire', $entreprise->ref_bancaire) }}</textarea>
-                            <small style="color:var(--text-3);font-size:11px;">Ces informations apparaîtront en bas de vos factures.</small>
+                            <small style="color:var(--text-3);font-size:11px;">Ces informations apparaîtront en bas de vos
+                                factures.</small>
                         </div>
                         {{-- === LIAISON COMPTAFLOW === --}}
                         <div
@@ -225,31 +238,31 @@
 
                 {{-- ── Section DGI & Local ── --}}
                 <div class="card" style="padding:24px;">
-                    <div style="font-size:12px;font-weight:700;color:var(--text-2);text-transform:uppercase;letter-spacing:.5px;margin-bottom:16px;display:flex;align-items:center;gap:8px;">
+                    <div
+                        style="font-size:12px;font-weight:700;color:var(--text-2);text-transform:uppercase;letter-spacing:.5px;margin-bottom:16px;display:flex;align-items:center;gap:8px;">
                         <i class="fas fa-map-marker-alt" style="color:var(--primary);"></i> DGI & Local professionnel
                     </div>
                     <div style="display:flex;flex-direction:column;gap:14px;">
 
                         <div class="form-group">
                             {{-- L'IDU n'est pas exige par l'API FNE : aucun champ du
-                                 referentiel ne le reprend. L'asterisque laissait croire
-                                 le contraire et bloquait des entreprises qui n'en ont
-                                 pas. --}}
+                            referentiel ne le reprend. L'asterisque laissait croire
+                            le contraire et bloquait des entreprises qui n'en ont
+                            pas. --}}
                             <label class="form-label">
                                 IDU — Identifiant Unique DGI
                             </label>
-                            <input type="text" name="idu" class="form-control"
-                                value="{{ old('idu', $entreprise->idu) }}"
+                            <input type="text" name="idu" class="form-control" value="{{ old('idu', $entreprise->idu) }}"
                                 placeholder="Ex: CI-001-2025-A123456">
-                            <small style="color:var(--text-3);font-size:11px;">Cet identifiant apparaît sur chaque facture normalisée FNE.</small>
+                            <small style="color:var(--text-3);font-size:11px;">Cet identifiant apparaît sur chaque facture
+                                normalisée FNE.</small>
                         </div>
 
                         <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
                             <div class="form-group" style="margin-bottom:0;">
                                 <label class="form-label">Commune</label>
                                 <input type="text" name="commune" class="form-control"
-                                    value="{{ old('commune', $entreprise->commune) }}"
-                                    placeholder="Ex: COCODY">
+                                    value="{{ old('commune', $entreprise->commune) }}" placeholder="Ex: COCODY">
                             </div>
                             <div class="form-group" style="margin-bottom:0;">
                                 <label class="form-label">Quartier</label>
@@ -281,7 +294,8 @@
                                 <input type="number" name="sticker_solde_alerte" class="form-control"
                                     value="{{ old('sticker_solde_alerte', $entreprise->sticker_solde_alerte ?? 5) }}"
                                     min="1" max="9999" style="max-width:120px;">
-                                <small style="color:var(--text-3);font-size:12px;">sticker(s) restants → notification d'alerte</small>
+                                <small style="color:var(--text-3);font-size:12px;">sticker(s) restants → notification
+                                    d'alerte</small>
                             </div>
                         </div>
 
@@ -399,16 +413,18 @@
                 </div>
 
                 {{-- ── Procédure de conformité FNE ──
-                     Ce qui suit n'est pas un rappel decoratif : chaque point
-                     correspond a un cas ou une facture part chez la DGI avec
-                     des montants ou des mentions differents de ceux etablis
-                     ici. On les a tous rencontres a la mise au point. --}}
+                Ce qui suit n'est pas un rappel decoratif : chaque point
+                correspond a un cas ou une facture part chez la DGI avec
+                des montants ou des mentions differents de ceux etablis
+                ici. On les a tous rencontres a la mise au point. --}}
                 <div class="card" style="padding:24px;">
-                    <div style="font-size:12px;font-weight:700;color:var(--text-2);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px;display:flex;align-items:center;gap:8px;">
-                        <i class="fas fa-clipboard-check" style="color:var(--primary);"></i> Procédure à suivre — conformité FNE
+                    <div
+                        style="font-size:12px;font-weight:700;color:var(--text-2);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px;display:flex;align-items:center;gap:8px;">
+                        <i class="fas fa-clipboard-check" style="color:var(--primary);"></i> Procédure à suivre — conformité
+                        FNE
                     </div>
                     <p style="font-size:12px;color:var(--text-3);line-height:1.6;margin-bottom:16px;">
-                        Selflow établit vos factures, la DGI les certifie. Les deux doivent
+                        Selflow établit vos factures et les certifient directement aupres de la DGI . Les deux doivent
                         dire la même chose. Ces six points sont ceux qui, s'ils sont négligés,
                         font diverger la facture certifiée de la vôtre.
                     </p>
@@ -418,57 +434,63 @@
                         // n'a aucun moyen de juger de ce qu'il risque a la sauter.
                         $etapesConformite = [
                             [
-                                'titre'  => 'Renseigner l\'identité fiscale complète',
-                                'texte'  => 'NCC, régime d\'imposition, RCCM et centre des impôts. Le NCC identifie votre entreprise auprès de la plateforme : sans lui, aucune facture n\'est certifiée.',
-                                'fait'   => !empty($entreprise->ncc) && !empty($entreprise->regime_imposition) && !empty($entreprise->rccm),
+                                'titre' => 'Renseigner l\'identité fiscale complète',
+                                'texte' => 'NCC, régime d\'imposition, RCCM et centre des impôts. Le NCC identifie votre entreprise auprès de la plateforme : sans lui, aucune facture n\'est certifiée.',
+                                'fait' => !empty($entreprise->ncc) && !empty($entreprise->regime_imposition) && !empty($entreprise->rccm),
                             ],
                             [
-                                'titre'  => 'Nommer les points de vente à l\'identique',
-                                'texte'  => 'Le nom saisi dans Selflow est transmis tel quel à la FNE, qui refuse la facture s\'il ne correspond à aucun point de vente déclaré sur votre espace.',
-                                'fait'   => null,
+                                'titre' => 'Nommer les points de vente à l\'identique',
+                                'texte' => 'Le nom saisi dans Selflow est transmis tel quel à la FNE, qui refuse la facture s\'il ne correspond à aucun point de vente déclaré sur votre espace.',
+                                'fait' => null,
                             ],
                             [
-                                'titre'  => 'N\'utiliser que les taux de TVA du barème DGI',
-                                'texte'  => '18 %, 9 % ou 0 %. La FNE ne reçoit pas un pourcentage mais un code, et applique le taux attaché à ce code : un taux intermédiaire serait taxé à 18 % sur la facture certifiée.',
-                                'fait'   => null,
+                                'titre' => 'N\'utiliser que les taux de TVA du barème DGI',
+                                'texte' => '18 %, 9 % ou 0 %. La FNE ne reçoit pas un pourcentage mais un code, et applique le taux attaché à ce code : un taux intermédiaire serait taxé à 18 % sur la facture certifiée.',
+                                'fait' => null,
                             ],
                             [
-                                'titre'  => 'Saisir le NCC des clients professionnels',
-                                'texte'  => 'Une facture B2B sans NCC client est rejetée par la plateforme. Sans NCC, la vente relève du B2C.',
-                                'fait'   => null,
+                                'titre' => 'Saisir le NCC des clients professionnels',
+                                'texte' => 'Une facture B2B sans NCC client est rejetée par la plateforme. Sans NCC, la vente relève du B2C.',
+                                'fait' => null,
                             ],
                             [
-                                'titre'  => 'Reporter ici les options cochées sur votre espace FNE',
-                                'texte'  => 'Timbre de quittance et BAPA se règlent sur la plateforme, et l\'API ne permet pas de les lire. Si la case ci-dessous est cochée alors qu\'elle ne l\'est pas chez la DGI, vous encaisserez un timbre que la plateforme ne retiendra pas.',
-                                'fait'   => null,
+                                'titre' => 'Reporter ici les options cochées sur votre espace FNE',
+                                'texte' => 'Timbre de quittance et BAPA se règlent sur la plateforme, et l\'API ne permet pas de les lire. Si la case ci-dessous est cochée alors qu\'elle ne l\'est pas chez la DGI, vous encaisserez un timbre que la plateforme ne retiendra pas.',
+                                'fait' => null,
                             ],
                             [
-                                'titre'  => 'Surveiller le solde de stickers',
-                                'texte'  => 'La certification consomme un sticker par pièce. À zéro, plus rien n\'est normalisé. Le solde figure sur la page Gestion FNE, tel que la plateforme l\'a renvoyé à la dernière certification.',
-                                'fait'   => null,
+                                'titre' => 'Surveiller le solde de stickers',
+                                'texte' => 'La certification consomme un sticker par pièce. À zéro, plus rien n\'est normalisé. Le solde figure sur la page Gestion FNE, tel que la plateforme l\'a renvoyé à la dernière certification.',
+                                'fait' => null,
                             ],
                         ];
                     @endphp
 
-                    <ol style="list-style:none;padding:0;margin:0;display:flex;flex-direction:column;gap:12px;counter-reset:etape;">
+                    <ol
+                        style="list-style:none;padding:0;margin:0;display:flex;flex-direction:column;gap:12px;counter-reset:etape;">
                         @foreach($etapesConformite as $etape)
                             <li style="display:flex;gap:12px;align-items:flex-start;">
-                                <span style="flex-shrink:0;width:22px;height:22px;border-radius:50%;background:{{ $etape['fait'] === true ? '#d1fae5' : 'var(--bg3)' }};border:1px solid {{ $etape['fait'] === true ? '#6ee7b7' : 'var(--border)' }};display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:{{ $etape['fait'] === true ? '#047857' : 'var(--text-3)' }};margin-top:1px;">
-                                    @if($etape['fait'] === true)<i class="fas fa-check" style="font-size:9px;"></i>@else{{ $loop->iteration }}@endif
+                                <span
+                                    style="flex-shrink:0;width:22px;height:22px;border-radius:50%;background:{{ $etape['fait'] === true ? '#d1fae5' : 'var(--bg3)' }};border:1px solid {{ $etape['fait'] === true ? '#6ee7b7' : 'var(--border)' }};display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:{{ $etape['fait'] === true ? '#047857' : 'var(--text-3)' }};margin-top:1px;">
+                                    @if($etape['fait'] === true)<i class="fas fa-check"
+                                    style="font-size:9px;"></i>@else{{ $loop->iteration }}@endif
                                 </span>
                                 <div>
                                     <div style="font-weight:600;font-size:13px;color:var(--text);">{{ $etape['titre'] }}</div>
-                                    <div style="font-size:12px;color:var(--text-3);line-height:1.6;margin-top:2px;">{{ $etape['texte'] }}</div>
+                                    <div style="font-size:12px;color:var(--text-3);line-height:1.6;margin-top:2px;">
+                                        {{ $etape['texte'] }}</div>
                                 </div>
                             </li>
                         @endforeach
                     </ol>
 
-                    <div style="margin-top:16px;padding:12px 14px;background:#fffbeb;border:1px solid #fcd34d;border-radius:8px;font-size:12px;color:#92400e;line-height:1.6;">
+                    <div
+                        style="margin-top:16px;padding:12px 14px;background:#fffbeb;border:1px solid #fcd34d;border-radius:8px;font-size:12px;color:#92400e;line-height:1.6;">
                         <strong><i class="fas fa-scale-balanced"></i> Droit de timbre de quittance</strong> —
                         barème de l'article 873 du Code général des impôts, appliqué aux règlements
                         en espèces. Il est dû par le client (article 875) : vous le collectez pour l'État.
-                        <div style="margin-top:8px;display:grid;grid-template-columns:1fr auto;gap:2px 16px;font-family:ui-monospace,monospace;font-size:11px;">
+                        <div
+                            style="margin-top:8px;display:grid;grid-template-columns:1fr auto;gap:2px 16px;font-family:ui-monospace,monospace;font-size:11px;">
                             <span>0 – 5 000</span><span style="text-align:right;">0 F</span>
                             <span>5 001 – 100 000</span><span style="text-align:right;">100 F</span>
                             <span>100 001 – 500 000</span><span style="text-align:right;">500 F</span>
@@ -484,17 +506,19 @@
                 </div>
 
                 {{-- ── Options fiscales ──
-                     Ces deux cases existent aussi dans les paramètres de la
-                     plateforme FNE, et c'est là qu'elles font foi. L'API ne les
-                     expose pas : Selflow ne peut ni les lire ni les modifier.
-                     Elles servent donc à noter ici l'état constaté chez la DGI,
-                     en attendant que l'API le communique. --}}
+                Ces deux cases existent aussi dans les paramètres de la
+                plateforme FNE, et c'est là qu'elles font foi. L'API ne les
+                expose pas : Selflow ne peut ni les lire ni les modifier.
+                Elles servent donc à noter ici l'état constaté chez la DGI,
+                en attendant que l'API le communique. --}}
                 <div class="card" style="padding:24px;">
-                    <div style="font-size:12px;font-weight:700;color:var(--text-2);text-transform:uppercase;letter-spacing:.5px;margin-bottom:16px;display:flex;align-items:center;gap:8px;">
+                    <div
+                        style="font-size:12px;font-weight:700;color:var(--text-2);text-transform:uppercase;letter-spacing:.5px;margin-bottom:16px;display:flex;align-items:center;gap:8px;">
                         <i class="fas fa-check-square" style="color:var(--primary);"></i> Options fiscales
                     </div>
 
-                    <div style="font-size:12px;color:var(--text-3);line-height:1.6;margin-bottom:14px;padding:10px 12px;background:#eff6ff;border-radius:8px;border:1px solid #bfdbfe;">
+                    <div
+                        style="font-size:12px;color:var(--text-3);line-height:1.6;margin-bottom:14px;padding:10px 12px;background:#eff6ff;border-radius:8px;border:1px solid #bfdbfe;">
                         <i class="fas fa-circle-info" style="color:#2563eb;"></i>
                         Ces options se règlent sur la <strong>plateforme FNE</strong>, et c'est
                         là qu'elles s'appliquent. Reportez ici l'état que vous y avez
@@ -503,14 +527,15 @@
 
                     <div style="display:flex;flex-direction:column;gap:14px;">
 
-                        <label style="display:flex;align-items:flex-start;gap:12px;cursor:pointer;padding:14px;background:var(--bg3);border-radius:10px;border:1px solid var(--border);">
-                            <input type="checkbox" name="timbre_quittance" value="1"
-                                {{ old('timbre_quittance', $entreprise->timbre_quittance) ? 'checked' : '' }}
+                        <label
+                            style="display:flex;align-items:flex-start;gap:12px;cursor:pointer;padding:14px;background:var(--bg3);border-radius:10px;border:1px solid var(--border);">
+                            <input type="checkbox" name="timbre_quittance" value="1" {{ old('timbre_quittance', $entreprise->timbre_quittance) ? 'checked' : '' }}
                                 style="margin-top:3px;width:16px;height:16px;cursor:pointer;">
                             <div>
                                 <div style="font-weight:600;font-size:13px;color:var(--text);">
                                     Timbre de quittance
-                                    <span style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:#1d4ed8;background:#dbeafe;border-radius:4px;padding:1px 6px;margin-left:6px;">Informatif</span>
+                                    <span
+                                        style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:#1d4ed8;background:#dbeafe;border-radius:4px;padding:1px 6px;margin-left:6px;">Informatif</span>
                                 </div>
                                 <div style="font-size:12px;color:var(--text-3);margin-top:2px;">
                                     Rappel de l'option cochée sur votre espace FNE. Le timbre est
@@ -520,12 +545,12 @@
                             </div>
                         </label>
 
-                        <label style="display:flex;align-items:flex-start;gap:12px;cursor:pointer;padding:14px;background:var(--bg3);border-radius:10px;border:1px solid var(--border);">
-                            <input type="checkbox" name="bapa" value="1"
-                                {{ old('bapa', $entreprise->bapa) ? 'checked' : '' }}
-                                style="margin-top:3px;width:16px;height:16px;cursor:pointer;">
+                        <label
+                            style="display:flex;align-items:flex-start;gap:12px;cursor:pointer;padding:14px;background:var(--bg3);border-radius:10px;border:1px solid var(--border);">
+                            <input type="checkbox" name="bapa" value="1" {{ old('bapa', $entreprise->bapa) ? 'checked' : '' }} style="margin-top:3px;width:16px;height:16px;cursor:pointer;">
                             <div>
-                                <div style="font-weight:600;font-size:13px;color:var(--text);">Bordereau d'Achat de Produits Agricoles (BAPA)</div>
+                                <div style="font-weight:600;font-size:13px;color:var(--text);">Bordereau d'Achat de Produits
+                                    Agricoles (BAPA)</div>
                                 <div style="font-size:12px;color:var(--text-3);margin-top:2px;">
                                     Ouvre les bordereaux d'achat auprès de producteurs locaux.
                                     Vérifiez que l'option est également cochée sur votre espace
@@ -539,7 +564,8 @@
 
                 {{-- ── Impression des factures ── --}}
                 <div class="card" style="padding:24px;">
-                    <div style="font-size:12px;font-weight:700;color:var(--text-2);text-transform:uppercase;letter-spacing:.5px;margin-bottom:16px;display:flex;align-items:center;gap:8px;">
+                    <div
+                        style="font-size:12px;font-weight:700;color:var(--text-2);text-transform:uppercase;letter-spacing:.5px;margin-bottom:16px;display:flex;align-items:center;gap:8px;">
                         <i class="fas fa-print" style="color:var(--primary);"></i> Impression des factures
                     </div>
                     <div style="display:flex;flex-direction:column;gap:14px;">
@@ -555,8 +581,8 @@
                         </div>
                         <div class="form-group">
                             <label class="form-label">Autres mentions légales</label>
-                            <textarea name="facture_autres_mentions" id="factureAutresMentionsInput" class="form-control" rows="3"
-                                maxlength="248" oninput="majCompteurParametre('factureAutresMentions')"
+                            <textarea name="facture_autres_mentions" id="factureAutresMentionsInput" class="form-control"
+                                rows="3" maxlength="248" oninput="majCompteurParametre('factureAutresMentions')"
                                 placeholder="Ex: Capital social : 1 000 000 FCFA — Forme juridique : SARL">{{ old('facture_autres_mentions', $entreprise->facture_autres_mentions) }}</textarea>
                             <small style="color:var(--text-3);font-size:11px;">
                                 Mentions additionnelles : capital social, forme juridique, etc. Transmises à la DGI.
@@ -564,7 +590,7 @@
                             </small>
                             <script>
                                 function majCompteurParametre(prefixe) {
-                                    const champ    = document.getElementById(prefixe + 'Input');
+                                    const champ = document.getElementById(prefixe + 'Input');
                                     const compteur = document.getElementById(prefixe + 'Compteur');
                                     if (champ && compteur) compteur.textContent = champ.value.length;
                                 }
@@ -579,27 +605,31 @@
 
                 {{-- ── Secteurs d'activité ── --}}
                 <div class="card" style="padding:24px;">
-                    <div style="font-size:12px;font-weight:700;color:var(--text-2);text-transform:uppercase;letter-spacing:.5px;margin-bottom:16px;display:flex;align-items:center;gap:8px;">
-                        <i class="fas fa-briefcase" style="color:var(--primary);"></i> Secteurs d'activité <span style="color:var(--danger);">*</span>
+                    <div
+                        style="font-size:12px;font-weight:700;color:var(--text-2);text-transform:uppercase;letter-spacing:.5px;margin-bottom:16px;display:flex;align-items:center;gap:8px;">
+                        <i class="fas fa-briefcase" style="color:var(--primary);"></i> Secteurs d'activité <span
+                            style="color:var(--danger);">*</span>
                     </div>
-                    <p style="font-size:12px;color:var(--text-3);margin-bottom:14px;">Sélectionnez tous les secteurs qui correspondent à votre activité principale.</p>
+                    <p style="font-size:12px;color:var(--text-3);margin-bottom:14px;">Sélectionnez tous les secteurs qui
+                        correspondent à votre activité principale.</p>
                     @php
                         $secteursDispo = ['Commercial', 'Industriel', 'Services', 'Agricole', 'Artisanat', 'BTP / Construction', 'Restauration / Hôtellerie', 'Santé', 'Transport / Logistique', 'Technologies / Numérique', 'Éducation / Formation', 'Autre'];
                         $secteursActifs = $entreprise->secteur_activite ?? [];
                     @endphp
                     <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
                         @foreach($secteursDispo as $secteur)
-                        <label style="display:flex;align-items:center;gap:8px;padding:9px 12px;background:var(--bg3);border-radius:8px;cursor:pointer;font-size:13px;border:1px solid var(--border);transition:all .15s;"
-                            onmouseover="this.style.borderColor='var(--primary)';this.style.background='#EBF2FC'"
-                            onmouseout="this.style.borderColor='var(--border)';this.style.background='var(--bg3)'">
-                            <input type="checkbox" name="secteurs_activite[]" value="{{ $secteur }}"
-                                {{ in_array($secteur, old('secteurs_activite', $secteursActifs)) ? 'checked' : '' }}
-                                style="width:15px;height:15px;cursor:pointer;accent-color:var(--primary);">
-                            <span>{{ $secteur }}</span>
-                        </label>
+                            <label
+                                style="display:flex;align-items:center;gap:8px;padding:9px 12px;background:var(--bg3);border-radius:8px;cursor:pointer;font-size:13px;border:1px solid var(--border);transition:all .15s;"
+                                onmouseover="this.style.borderColor='var(--primary)';this.style.background='#EBF2FC'"
+                                onmouseout="this.style.borderColor='var(--border)';this.style.background='var(--bg3)'">
+                                <input type="checkbox" name="secteurs_activite[]" value="{{ $secteur }}" {{ in_array($secteur, old('secteurs_activite', $secteursActifs)) ? 'checked' : '' }}
+                                    style="width:15px;height:15px;cursor:pointer;accent-color:var(--primary);">
+                                <span>{{ $secteur }}</span>
+                            </label>
                         @endforeach
                     </div>
-                    @error('secteurs_activite') <small style="color:var(--danger);margin-top:6px;display:block;">{{ $message }}</small> @enderror
+                    @error('secteurs_activite') <small
+                    style="color:var(--danger);margin-top:6px;display:block;">{{ $message }}</small> @enderror
                 </div>
 
             </div>{{-- /colonne gauche --}}
