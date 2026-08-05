@@ -346,15 +346,14 @@
 
                     @if($aCompteFne === false)
                         <div style="padding:12px 14px;background:#eff6ff;border:1px solid #bfdbfe;border-radius:8px;font-size:12.5px;color:#1e40af;line-height:1.7;margin-bottom:14px;">
-                            <strong>Pour ouvrir votre compte</strong>, inscrivez votre entreprise sur
-                            <a href="http://54.247.95.108" target="_blank" rel="noopener" style="color:#1d4ed8;">la plateforme FNE</a>,
-                            puis demandez l'accès à l'API par courriel à
-                            <strong>support.fne@dgi.gouv.ci</strong>. La DGI valide vos premières
-                            factures avant de délivrer la clé de production, qui apparaît ensuite
-                            dans l'onglet <em>Paramétrage</em> de votre espace.
+                            <strong>Nous nous chargeons de l'inscription pour vous.</strong>
+                            Renseignez simplement les informations ci-dessous : ce sont celles
+                            que la DGI exige pour ouvrir un compte, et elles serviront à créer
+                            votre espace FNE.
                             <br>
-                            Les informations ci-dessous vous seront demandées : rassemblez-les
-                            d'abord, vous les saisirez une seule fois.
+                            Les éléments qui n'existent pas encore — clé API, numéro de compte
+                            attribué par la plateforme — seront complétés une fois le compte
+                            ouvert. Vous n'avez aucune démarche à faire de votre côté.
                         </div>
                     @elseif($aCompteFne === true)
                         <div style="padding:12px 14px;background:#fffbeb;border:1px solid #fcd34d;border-radius:8px;font-size:12.5px;color:#92400e;line-height:1.7;margin-bottom:14px;">
@@ -392,7 +391,7 @@
                             @endforeach
                         </div>
                         <p style="font-size:11.5px;color:var(--text-3);line-height:1.6;margin-top:12px;">
-                            La clé API, elle, n'est pas saisie ici : elle est enregistrée par
+                            La clé API n'est pas saisie ici : elle est enregistrée par
                             l'administrateur Selflow une fois délivrée par la DGI.
                         </p>
                     @endif

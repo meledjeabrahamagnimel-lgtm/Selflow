@@ -502,6 +502,10 @@ var DATA = {
         type_facture: {!! json_encode($vente->type_facture) !!},
         parent_ref: {!! json_encode($vente->parent ? $vente->parent->numero_facture : null) !!},
         parent_fne: {!! json_encode($vente->parent ? $vente->parent->numero_fne : null) !!},
+        // Timbre acquitte sur la facture d'origine. Il n'est pas recredite par
+        // l'avoir — la DGI ne prevoit aucun champ pour cela — mais le taire
+        // laisserait croire a une erreur de calcul.
+        parent_timbre: {{ $vente->parent ? (float) \App\Modules\Admin\Services\TimbreQuittanceService::pourVente($vente->parent) : 0 }},
         raison_avoir: {!! json_encode($vente->raison_avoir) !!},
         qr_code_data: {!! json_encode($vente->qr_code_data) !!},
         // Encodage graphique du jeton de verification renvoye par la FNE.
@@ -907,10 +911,21 @@ function blocCertificationFne(d) {
 
 function getAvoirBlock(d) {
     if (d.type_facture !== 'avoir') return '';
+
+    // Le droit de timbre suit la quittance, pas la marchandise : il est du sur
+    // l'acte qui a constate l'encaissement, et l'annulation de la vente ne
+    // defait pas cet acte. La plateforme le confirme — sa reponse de
+    // remboursement ne comporte aucun champ de timbre. L'avoir credite donc
+    // le TTC sans le timbre, et le dit plutot que de laisser un ecart
+    // inexplique entre les deux pieces.
+    var mentionTimbre = d.parent_timbre > 0
+        ? `<br><span style="font-size:10.5px;">Le droit de timbre de ${fmtFcfa(d.parent_timbre)} acquitté sur la facture d'origine n'est pas recrédité : il est dû sur la quittance émise, que l'annulation ne défait pas.</span>`
+        : '';
+
     return `
     <div style="background:#fff7ed; border:1px solid #ffedd5; border-left:4px solid #ea580c; border-radius:8px; padding:10px 14px; margin-bottom:14px; font-size:11px; line-height:1.4; color:#c2410c; text-align:left;">
         <i class="fas fa-circle-info" style="margin-right:4px;"></i> Facture d'avoir émise en référence à la facture d'origine <strong>${d.parent_ref}</strong>${d.parent_fne ? ` (N° Fiscal DGI: ${d.parent_fne})` : ''}.<br>
-        <strong>Motif :</strong> ${d.raison_avoir}
+        <strong>Motif :</strong> ${d.raison_avoir}${mentionTimbre}
     </div>
     `;
 }
