@@ -274,7 +274,6 @@ var COMPANY = {
     email: {!! json_encode($entreprise->email ?? '') !!},
     rccm: {!! json_encode($entreprise->rccm ?? '') !!},
     ncc: {!! json_encode($entreprise->ncc ?? '') !!},
-    cc: {!! json_encode($entreprise->compte_contribuable ?? '') !!},
     regime: {!! json_encode($entreprise->regime_imposition ?? '') !!},
     centre_impots: {!! json_encode($entreprise->centre_impots ?? '') !!},
     ref_bancaire: {!! json_encode($entreprise->ref_bancaire ?? '') !!},
@@ -342,7 +341,6 @@ function fiscalLinesSeller(sep) {
     if (COMPANY.regime)        lines.push('Régime : ' + COMPANY.regime);
     if (COMPANY.centre_impots) lines.push('Centre : ' + COMPANY.centre_impots);
     if (COMPANY.rccm)          lines.push('RCCM : ' + COMPANY.rccm);
-    if (COMPANY.cc)            lines.push('CC : ' + COMPANY.cc);
     return lines.join(sep || ' · ');
 }
 
@@ -647,7 +645,6 @@ function model3(d) {
                 ${COMPANY.regime ? `<span>Rég. : <strong style="color:var(--tx)">${COMPANY.regime}</strong></span>` : ''}
                 ${COMPANY.centre_impots ? `<span>Centre : <strong style="color:var(--tx)">${COMPANY.centre_impots}</strong></span>` : ''}
                 ${COMPANY.rccm ? `<span>RCCM : <strong style="color:var(--tx)">${COMPANY.rccm}</strong></span>` : ''}
-                ${COMPANY.cc ? `<span>CC : <strong style="color:var(--tx)">${COMPANY.cc}</strong></span>` : ''}
             </div>
         </div>
 

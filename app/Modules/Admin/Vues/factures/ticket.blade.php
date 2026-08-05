@@ -246,12 +246,19 @@
 <div class="divider"></div>
 
 @if($estNormalise)
-<div class="qr-container">
-    <span style="font-size: 8px; font-weight: bold;">VÉRIFICATION DGI</span>
-    @if($vente->qr_code_data)
-        <span style="font-size: 8px; word-break: break-all;" class="text-center">{{ $vente->qr_code_data }}</span>
-    @endif
-</div>
+    {{-- Signature electronique de la DGI : code QR, visuel FNE, numerotation.
+         Le code QR encode le jeton de verification renvoye par la plateforme
+         (« token : code de verification a convertir en QR code »). --}}
+    @php $qrTicket = \App\Modules\Admin\Services\QrCodeFneService::imageDeVerification($vente->qr_code_data, 150); @endphp
+    <div class="qr-container">
+        <span style="font-size: 8px; font-weight: bold;">VÉRIFICATION DGI</span>
+        @if($qrTicket)
+            <img src="{{ $qrTicket }}" alt="Code de vérification FNE" style="width:150px; height:150px; margin:4px 0;">
+        @endif
+        @if($vente->qr_code_data)
+            <span style="font-size: 8px; word-break: break-all;" class="text-center">{{ $vente->qr_code_data }}</span>
+        @endif
+    </div>
 @endif
 
 @php

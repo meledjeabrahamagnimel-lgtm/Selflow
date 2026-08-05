@@ -509,6 +509,36 @@ class FnePayloadTest extends TestCase
         ];
     }
 
+    // ─── Code QR de vérification ─────────────────────────────────────────
+
+    public function test_le_code_qr_encode_le_jeton_renvoye_par_la_plateforme(): void
+    {
+        $jeton = 'http://54.247.95.108/fr/verification/019fcdcb-1139-7009-8e13-8d6a258cbf84';
+
+        $image = \App\Modules\Admin\Services\QrCodeFneService::imageDeVerification($jeton);
+
+        $this->assertNotNull($image);
+        $this->assertStringStartsWith('data:image/svg+xml;base64,', $image);
+
+        $svg = base64_decode(substr($image, strlen('data:image/svg+xml;base64,')));
+        $this->assertStringContainsString('<svg', $svg);
+
+        // Marge de quatre modules : la norme ISO/IEC 18004 l'impose, et sans
+        // elle beaucoup de lecteurs ne trouvent plus les motifs de repérage.
+        $matrice = \App\Modules\Admin\Services\QrCodeFneService::matrice($jeton);
+        preg_match('/viewBox="0 0 (\d+) \1"/', $svg, $vue);
+        $this->assertSame(count($matrice) + 8, (int) $vue[1]);
+    }
+
+    public function test_aucune_image_n_est_produite_sans_jeton_de_la_plateforme(): void
+    {
+        // Une pièce non certifiée ne porte aucune marque : un code fabriqué
+        // par nos soins ne certifierait rien.
+        $this->assertNull(\App\Modules\Admin\Services\QrCodeFneService::imageDeVerification(null));
+        $this->assertNull(\App\Modules\Admin\Services\QrCodeFneService::imageDeVerification(''));
+        $this->assertNull(\App\Modules\Admin\Services\QrCodeFneService::imageDeVerification('   '));
+    }
+
     // ─── Avoirs : reprise fidèle de la facture d'origine ─────────────────
 
     public function test_un_avoir_reprend_le_taux_de_tva_et_la_remise_de_la_ligne_creditee(): void

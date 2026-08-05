@@ -504,6 +504,11 @@ var DATA = {
         parent_fne: {!! json_encode($vente->parent ? $vente->parent->numero_fne : null) !!},
         raison_avoir: {!! json_encode($vente->raison_avoir) !!},
         qr_code_data: {!! json_encode($vente->qr_code_data) !!},
+        // Encodage graphique du jeton de verification renvoye par la FNE.
+        // « token | string | Code de verification a convertir en QR code »
+        // (procedure d'integration DGI). Vide tant que la piece n'est pas
+        // certifiee : rien n'est fabrique en l'absence de jeton.
+        qr_code_image: {!! json_encode(\App\Modules\Admin\Services\QrCodeFneService::imageDeVerification($vente->qr_code_data)) !!},
         numero_fne: {!! json_encode($vente->numero_fne) !!},
         signature_dgi: {!! json_encode($vente->signature_dgi) !!},
         moyen_bancaire: {!! json_encode($vente->moyen_bancaire) !!},
@@ -581,7 +586,6 @@ var COMPANY = {
     email: {!! json_encode($entreprise->email ?? '') !!},
     rccm: {!! json_encode($entreprise->rccm ?? '') !!},
     ncc: {!! json_encode($entreprise->ncc ?? '') !!},
-    cc: {!! json_encode($entreprise->compte_contribuable ?? '') !!},
     regime: {!! json_encode($entreprise->regime_imposition ?? '') !!},
     centre_impots: {!! json_encode($entreprise->centre_impots ?? '') !!},
     ref_bancaire: {!! json_encode($entreprise->ref_bancaire ?? '') !!},
@@ -845,7 +849,6 @@ function fiscalLinesSeller(sep) {
     if (COMPANY.regime)        lines.push('Régime : ' + COMPANY.regime);
     if (COMPANY.centre_impots) lines.push('Centre : ' + COMPANY.centre_impots);
     if (COMPANY.rccm)          lines.push('RCCM : ' + COMPANY.rccm);
-    if (COMPANY.cc)            lines.push('CC : ' + COMPANY.cc);
     return lines.join(sep || ' · ');
 }
 
@@ -864,16 +867,20 @@ function fiscalLinesClient(c, sep) {
 /**
  * Signature électronique exigée par la DGI sur toute pièce certifiée.
  *
- * Seules les données renvoyées par la plateforme sont reproduites : le numéro
- * normalisé et l'adresse de vérification. Aucun visuel n'est fabriqué ici — un
- * code produit par nos soins ne certifierait rien.
+ * La procédure d'intégration la définit « en trois éléments : le QR Code, le
+ * visuel FNE et le format de la numérotation » — les trois figurent ici.
+ *
+ * Rien n'est inventé pour autant : le code QR n'est que l'encodage graphique
+ * du jeton renvoyé par la plateforme, que le référentiel décrit comme le
+ * « code de vérification à convertir en QR code ». Sans jeton, pas d'image.
  */
 function blocCertificationFne(d) {
     if (!d.normalise || !d.numero_fne) return '';
 
     return `
     <div style="display:flex; align-items:center; gap:14px; border:1px solid var(--border); border-radius:8px; padding:12px 14px; margin-top:16px; background:#fff;">
-        <img src="/logo-FNE.png" style="height:52px; object-fit:contain;" alt="Facture normalisée électronique">
+        ${d.qr_code_image ? `<img src="${d.qr_code_image}" style="width:110px; height:110px; flex-shrink:0;" alt="Code de vérification FNE">` : ''}
+        <img src="/logo-FNE.png" style="height:52px; object-fit:contain; flex-shrink:0;" alt="Facture normalisée électronique">
         <div style="font-size:10px; line-height:1.6; color:var(--tx); word-break:break-all;">
             <div style="font-weight:800; text-transform:uppercase; letter-spacing:.04em;">Facture normalisée électronique</div>
             <div>N° FNE : <strong style="font-family:monospace;">${d.numero_fne}</strong></div>
@@ -1038,7 +1045,7 @@ function model1(d) {
                 ${blocAutresTaxesDiv(c, theme.color)}
                 ${d.etape === 'Facture' ? `
                 <div style="display:flex;justify-content:space-between;padding:6px 0;font-size:12px;border-bottom:0.5px solid var(--border)"><span style="color:var(--mu)">Montant Réglé</span><span>${fmtFcfa(d.deja_paye)}</span></div>
-                <div style="display:flex;justify-content:space-between;padding:6px 0;font-size:12px;color:${d.deja_paye < c.tot_ttc ? '#dc2626' : '#059669'};font-weight:700;"><span style="text-transform:uppercase;">Reste à payer</span><span>${fmtFcfa(Math.max(0, c.tot_ttc - d.deja_paye))}</span></div>
+                <div style="display:flex;justify-content:space-between;padding:6px 0;font-size:12px;color:${d.deja_paye < c.net_a_payer ? '#dc2626' : '#059669'};font-weight:700;"><span style="text-transform:uppercase;">Reste à payer</span><span>${fmtFcfa(Math.max(0, c.net_a_payer - d.deja_paye))}</span></div>
                 ` : ''}
             </div>
         </div>
@@ -1168,7 +1175,7 @@ function model2(d) {
                     ${blocAutresTaxesDiv(c, theme.color)}
                     ${d.etape === 'Facture' ? `
                     <div style="display:flex;justify-content:space-between;font-size:11px;padding:4px 0;border-top:0.5px solid var(--border);margin-top:4px"><span style="color:var(--mu)">Montant Réglé</span><span>${fmtFcfa(d.deja_paye)}</span></div>
-                    <div style="display:flex;justify-content:space-between;font-size:11px;padding:4px 0;font-weight:700;color:${d.deja_paye < c.tot_ttc ? '#dc2626' : '#059669'}"><span>Reste à payer</span><span>${fmtFcfa(Math.max(0, c.tot_ttc - d.deja_paye))}</span></div>
+                    <div style="display:flex;justify-content:space-between;font-size:11px;padding:4px 0;font-weight:700;color:${d.deja_paye < c.net_a_payer ? '#dc2626' : '#059669'}"><span>Reste à payer</span><span>${fmtFcfa(Math.max(0, c.net_a_payer - d.deja_paye))}</span></div>
                     ` : ''}
                 </div>
             </div>
@@ -1239,7 +1246,6 @@ function model3(d) {
                 ${COMPANY.regime ? `<span>Rég. : <strong style="color:var(--tx)">${COMPANY.regime}</strong></span>` : ''}
                 ${COMPANY.centre_impots ? `<span>Centre : <strong style="color:var(--tx)">${COMPANY.centre_impots}</strong></span>` : ''}
                 ${COMPANY.rccm ? `<span>RCCM : <strong style="color:var(--tx)">${COMPANY.rccm}</strong></span>` : ''}
-                ${COMPANY.cc ? `<span>CC : <strong style="color:var(--tx)">${COMPANY.cc}</strong></span>` : ''}
             </div>
         </div>
 
@@ -1309,7 +1315,7 @@ function model3(d) {
                 ${blocAutresTaxesDiv(c, theme.color)}
                 ${d.etape === 'Facture' ? `
                 <div style="display:flex;justify-content:space-between;padding:6px 8px;font-size:12px;border-bottom:0.5px solid var(--border)"><span style="color:var(--mu)">Montant Réglé</span><span style="font-weight:600;">${fmtFcfa(d.deja_paye)}</span></div>
-                <div style="display:flex;justify-content:space-between;padding:6px 8px;font-size:12px;color:${d.deja_paye < c.tot_ttc ? '#dc2626' : '#059669'};font-weight:700;"><span>Reste à payer</span><span>${fmtFcfa(Math.max(0, c.tot_ttc - d.deja_paye))}</span></div>
+                <div style="display:flex;justify-content:space-between;padding:6px 8px;font-size:12px;color:${d.deja_paye < c.net_a_payer ? '#dc2626' : '#059669'};font-weight:700;"><span>Reste à payer</span><span>${fmtFcfa(Math.max(0, c.net_a_payer - d.deja_paye))}</span></div>
                 ` : ''}
             </div>
         </div>
@@ -1398,8 +1404,8 @@ function modelStandard(d) {
                 <td style="padding:6px 10px; border:1px solid #000; text-align:right; font-weight:700; white-space:nowrap;">${fmt(d.deja_paye)}</td>
             </tr>
             <tr style="background:#fff; color:#000;">
-                <td colspan="7" style="padding:6px 10px; border:1px solid #000; text-align:right; font-weight:900; text-transform:uppercase; color:${d.deja_paye < c.tot_ttc ? '#dc2626' : '#000'};">RESTE A PAYER</td>
-                <td style="padding:6px 10px; border:1px solid #000; text-align:right; font-weight:900; color:${d.deja_paye < c.tot_ttc ? '#dc2626' : '#000'}; white-space:nowrap;">${fmt(Math.max(0, c.tot_ttc - d.deja_paye))}</td>
+                <td colspan="7" style="padding:6px 10px; border:1px solid #000; text-align:right; font-weight:900; text-transform:uppercase; color:${d.deja_paye < c.net_a_payer ? '#dc2626' : '#000'};">RESTE A PAYER</td>
+                <td style="padding:6px 10px; border:1px solid #000; text-align:right; font-weight:900; color:${d.deja_paye < c.net_a_payer ? '#dc2626' : '#000'}; white-space:nowrap;">${fmt(Math.max(0, c.net_a_payer - d.deja_paye))}</td>
             </tr>
             ` : ''}
         `;
@@ -1415,7 +1421,7 @@ function modelStandard(d) {
                 <div style="border: 1.5px solid #000; border-radius: 8px; padding: 12px; margin-bottom: 12px;">
                     <div style="font-size:14px; font-weight:800; text-transform:uppercase; margin-bottom:4px;">${COMPANY.nom}</div>
                     <div>NCC : <strong>${COMPANY.ncc || '—'}</strong></div>
-                    <div>Compte contribuable : <strong>${COMPANY.cc || '—'}</strong></div>
+                    <div>Compte contribuable : <strong>${COMPANY.ncc || '—'}</strong></div>
                     <div>Régime d'imposition : <strong>${COMPANY.regime || '—'}</strong></div>
                     <div>Centre des impôts : <strong>${COMPANY.centre_impots || '—'}</strong></div>
                 </div>

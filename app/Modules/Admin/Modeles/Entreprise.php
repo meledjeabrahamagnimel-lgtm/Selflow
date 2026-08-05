@@ -108,7 +108,10 @@ class Entreprise extends Model
         return !empty($this->regime_imposition)
             && !empty($this->adresse)
             && !empty($this->rccm)
-            && !empty($this->compte_contribuable)
+            // Le compte contribuable (CC) a été retiré des paramètres : il
+            // désignait le même numéro que le NCC, saisi deux fois pour rien.
+            // C'est donc le NCC qui conditionne désormais la complétude.
+            && !empty($this->ncc)
             && !empty($this->gerant_fonction)
             && is_array($this->secteur_activite)
             && count($this->secteur_activite) > 0;

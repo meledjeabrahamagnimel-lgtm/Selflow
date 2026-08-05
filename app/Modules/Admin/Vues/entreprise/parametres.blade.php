@@ -148,11 +148,6 @@
                                 placeholder="Ex: 2 PLATEAUX 3">
                         </div>
                         <div class="form-group">
-                            <label class="form-label">N° Compte Contribuable (CC) <span style="color:var(--danger)">*</span></label>
-                            <input type="text" name="compte_contribuable" class="form-control" value="{{ old('compte_contribuable', $entreprise->compte_contribuable) }}"
-                                placeholder="Ex: 1864699 A">
-                        </div>
-                        <div class="form-group">
                             <label class="form-label">Références bancaires</label>
                             <textarea name="ref_bancaire" class="form-control" rows="3"
                                 placeholder="Ex: Établissement : SGBCI — N° compte : 00123456789">{{ old('ref_bancaire', $entreprise->ref_bancaire) }}</textarea>
@@ -236,8 +231,12 @@
                     <div style="display:flex;flex-direction:column;gap:14px;">
 
                         <div class="form-group">
+                            {{-- L'IDU n'est pas exige par l'API FNE : aucun champ du
+                                 referentiel ne le reprend. L'asterisque laissait croire
+                                 le contraire et bloquait des entreprises qui n'en ont
+                                 pas. --}}
                             <label class="form-label">
-                                IDU — Identifiant Unique DGI <span style="color:#E53E3E">*</span>
+                                IDU — Identifiant Unique DGI
                             </label>
                             <input type="text" name="idu" class="form-control"
                                 value="{{ old('idu', $entreprise->idu) }}"
@@ -461,7 +460,6 @@
                                 ['Régime', $entreprise->regime_imposition],
                                 ['Centre des impôts', $entreprise->centre_impots],
                                 ['RCCM', $entreprise->rccm],
-                                ['CC', $entreprise->compte_contribuable],
                                 ['Téléphone', $entreprise->telephone],
                                 ['E-mail', $entreprise->email],
                             ];

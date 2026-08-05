@@ -142,7 +142,9 @@
                 </h1>
                 <div style="font-size:11px; line-height:1.5; color:#333;">
                     <strong>NCC :</strong> {{ $achat->pointDeVente->entreprise->ncc ?: '—' }}<br>
-                    <strong>Compte contribuable :</strong> {{ $achat->pointDeVente->entreprise->compte_contribuable ?: '—' }}<br>
+                    {{-- Le « compte contribuable » et le NCC designent le meme numero :
+                         seul le NCC est conserve, pour eviter deux valeurs divergentes. --}}
+                    <strong>Compte contribuable :</strong> {{ $achat->pointDeVente->entreprise->ncc ?: '—' }}<br>
                     <strong>RCCM :</strong> {{ $achat->pointDeVente->entreprise->rccm ?: '—' }}<br>
                     <strong>Régime :</strong> {{ $achat->pointDeVente->entreprise->regime_imposition ?: '—' }}<br>
                     <strong>Centre des impôts :</strong> {{ $achat->pointDeVente->entreprise->centre_impots ?: '—' }}<br>
@@ -163,7 +165,14 @@
                     
                     {{-- Affichage FNE/BAPA DGI officiel --}}
                     @if($achat->normalise)
+                        {{-- Signature electronique de la DGI : code QR, visuel FNE,
+                             numerotation. Le code QR n'est que l'encodage du jeton
+                             de verification renvoye par la plateforme. --}}
+                        @php $qrBapa = \App\Modules\Admin\Services\QrCodeFneService::imageDeVerification($achat->qr_code_data, 110); @endphp
                         <div style="margin-top:15px; display:flex; gap: 10px; align-items: center; justify-content:flex-end;">
+                            @if($qrBapa)
+                                <img src="{{ $qrBapa }}" alt="Code de vérification FNE" style="width:110px; height:110px;">
+                            @endif
                             <div style="width:80px; height:80px; display:flex; align-items:center; justify-content:center;">
                                 <img src="/dgi-stamp.png" style="max-height:100%; max-width:100%; object-fit:contain;" alt="Visuel FNE">
                             </div>
