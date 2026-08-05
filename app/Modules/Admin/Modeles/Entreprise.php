@@ -48,6 +48,8 @@ class Entreprise extends Model
         'fne_mode_facturation',
         'fne_solde_provision',
         'fne_solde_maj_at',
+        // null tant que la question n'a pas ete posee (voir migration).
+        'possede_compte_fne',
         'timbre_quittance',
         'bapa',
         'pied_de_page_facture',
@@ -63,6 +65,7 @@ class Entreprise extends Model
         'fne_sticker_balance' => 'integer',
         'fne_solde_provision' => 'decimal:2',
         'fne_solde_maj_at'    => 'datetime',
+        'possede_compte_fne'  => 'boolean',
     ];
 
     public function pointsDeVente(): HasMany

@@ -288,6 +288,116 @@
                     </div>
                 </div>
 
+                {{-- ── Compte sur la plateforme FNE ──
+                     Pose la question une fois, puis affiche ce qui manque selon
+                     la reponse : reporter les informations d'un espace existant,
+                     ou rassembler celles qu'il faut pour l'ouvrir. --}}
+                @php
+                    $aCompteFne = $entreprise->possede_compte_fne;
+
+                    // Informations que la plateforme exige, et qui doivent
+                    // concorder avec celles de l'espace FNE : ce sont elles que
+                    // le payload de certification transporte.
+                    $infosFne = [
+                        ['champ' => 'Raison sociale', 'valeur' => $entreprise->nom !== '[PENDING_ONBOARDING]' ? $entreprise->nom : null,
+                         'note'  => 'Transmise comme « établissement » à chaque certification.'],
+                        ['champ' => 'NCC — Numéro de Compte Contribuable', 'valeur' => $entreprise->ncc,
+                         'note'  => 'Identifie l\'entreprise auprès de la plateforme. Sans lui, rien n\'est certifié.'],
+                        ['champ' => 'Régime d\'imposition', 'valeur' => $entreprise->regime_imposition,
+                         'note'  => 'Détermine le code de TVA appliqué aux articles exonérés (TVAC ou TVAD).'],
+                        ['champ' => 'RCCM', 'valeur' => $entreprise->rccm,
+                         'note'  => 'Registre du Commerce et du Crédit Mobilier, exigé à l\'inscription.'],
+                        ['champ' => 'Centre des impôts', 'valeur' => $entreprise->centre_impots,
+                         'note'  => 'Celui dont dépend l\'entreprise ; figure sur vos documents fiscaux.'],
+                        ['champ' => 'Adresse de l\'établissement', 'valeur' => $entreprise->adresse,
+                         'note'  => 'Adresse physique du siège, telle que déclarée à la DGI.'],
+                        ['champ' => 'Téléphone', 'valeur' => $entreprise->telephone,
+                         'note'  => 'Contact de l\'entreprise.'],
+                        ['champ' => 'Adresse e-mail', 'valeur' => $entreprise->email,
+                         'note'  => 'Reçoit les notifications de la plateforme à chaque facture émise.'],
+                        ['champ' => 'Gérant : nom, prénom et fonction', 'valeur' => trim(($entreprise->gerant_nom ?? '') . ' ' . ($entreprise->gerant_prenom ?? '')) ?: null,
+                         'note'  => 'Représentant légal déclaré.'],
+                        ['champ' => 'Points de vente', 'valeur' => $entreprise->pointsDeVente()->count() > 0 ? $entreprise->pointsDeVente()->count() . ' déclaré(s)' : null,
+                         'note'  => 'Leur nom doit être identique des deux côtés : la FNE refuse une facture dont le point de vente lui est inconnu.'],
+                    ];
+                    $manquants = collect($infosFne)->filter(fn ($i) => blank($i['valeur']))->count();
+                @endphp
+
+                <div class="card" style="padding:24px;">
+                    <div style="font-size:12px;font-weight:700;color:var(--text-2);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px;display:flex;align-items:center;gap:8px;">
+                        <i class="fas fa-id-card-clip" style="color:var(--primary);"></i> Compte sur la plateforme FNE
+                    </div>
+
+                    <p style="font-size:12px;color:var(--text-3);line-height:1.6;margin-bottom:14px;">
+                        Selflow établit vos factures, la plateforme FNE les certifie. Les deux
+                        doivent connaître la même entreprise, sous les mêmes noms.
+                    </p>
+
+                    <div style="display:flex;gap:10px;margin-bottom:16px;flex-wrap:wrap;">
+                        <label style="display:flex;align-items:center;gap:8px;padding:10px 14px;border-radius:8px;border:1px solid {{ $aCompteFne === true ? 'var(--primary)' : 'var(--border)' }};background:{{ $aCompteFne === true ? '#eff6ff' : 'var(--bg3)' }};cursor:pointer;font-size:13px;font-weight:600;">
+                            <input type="radio" name="possede_compte_fne" value="1" {{ $aCompteFne === true ? 'checked' : '' }} onchange="this.form.requestSubmit ? null : null">
+                            J'ai déjà un compte FNE
+                        </label>
+                        <label style="display:flex;align-items:center;gap:8px;padding:10px 14px;border-radius:8px;border:1px solid {{ $aCompteFne === false ? 'var(--primary)' : 'var(--border)' }};background:{{ $aCompteFne === false ? '#eff6ff' : 'var(--bg3)' }};cursor:pointer;font-size:13px;font-weight:600;">
+                            <input type="radio" name="possede_compte_fne" value="0" {{ $aCompteFne === false ? 'checked' : '' }}>
+                            Je n'en ai pas encore
+                        </label>
+                    </div>
+
+                    @if($aCompteFne === false)
+                        <div style="padding:12px 14px;background:#eff6ff;border:1px solid #bfdbfe;border-radius:8px;font-size:12.5px;color:#1e40af;line-height:1.7;margin-bottom:14px;">
+                            <strong>Pour ouvrir votre compte</strong>, inscrivez votre entreprise sur
+                            <a href="http://54.247.95.108" target="_blank" rel="noopener" style="color:#1d4ed8;">la plateforme FNE</a>,
+                            puis demandez l'accès à l'API par courriel à
+                            <strong>support.fne@dgi.gouv.ci</strong>. La DGI valide vos premières
+                            factures avant de délivrer la clé de production, qui apparaît ensuite
+                            dans l'onglet <em>Paramétrage</em> de votre espace.
+                            <br>
+                            Les informations ci-dessous vous seront demandées : rassemblez-les
+                            d'abord, vous les saisirez une seule fois.
+                        </div>
+                    @elseif($aCompteFne === true)
+                        <div style="padding:12px 14px;background:#fffbeb;border:1px solid #fcd34d;border-radius:8px;font-size:12.5px;color:#92400e;line-height:1.7;margin-bottom:14px;">
+                            <strong>Reportez ici les informations de votre espace FNE, à l'identique.</strong>
+                            Un écart — une raison sociale abrégée, un point de vente nommé
+                            autrement — et la plateforme rejette la facture ou la certifie sous
+                            un autre libellé que le vôtre.
+                        </div>
+                    @endif
+
+                    @if($aCompteFne !== null)
+                        <div style="font-size:12px;font-weight:700;color:var(--text-2);margin-bottom:10px;">
+                            Informations requises
+                            @if($manquants > 0)
+                                <span style="font-weight:600;color:#b45309;">— {{ $manquants }} à compléter</span>
+                            @else
+                                <span style="font-weight:600;color:#047857;">— toutes renseignées</span>
+                            @endif
+                        </div>
+                        <div style="display:flex;flex-direction:column;gap:8px;">
+                            @foreach($infosFne as $info)
+                                @php $renseigne = filled($info['valeur']); @endphp
+                                <div style="display:flex;gap:10px;align-items:flex-start;padding:9px 11px;border-radius:8px;background:{{ $renseigne ? '#f8fafc' : '#fffbeb' }};border:1px solid {{ $renseigne ? 'var(--border)' : '#fde68a' }};">
+                                    <i class="fas {{ $renseigne ? 'fa-circle-check' : 'fa-circle-exclamation' }}" style="color:{{ $renseigne ? '#10b981' : '#d97706' }};font-size:13px;margin-top:2px;"></i>
+                                    <div style="flex:1;min-width:0;">
+                                        <div style="font-size:12.5px;font-weight:600;color:var(--text);">
+                                            {{ $info['champ'] }}
+                                            @if($renseigne)
+                                                <span style="font-weight:500;color:var(--text-3);"> · {{ \Illuminate\Support\Str::limit($info['valeur'], 40) }}</span>
+                                            @endif
+                                        </div>
+                                        <div style="font-size:11.5px;color:var(--text-3);line-height:1.5;margin-top:1px;">{{ $info['note'] }}</div>
+                                    </div>
+                                </div>
+                            @endforeach
+                        </div>
+                        <p style="font-size:11.5px;color:var(--text-3);line-height:1.6;margin-top:12px;">
+                            La clé API, elle, n'est pas saisie ici : elle est enregistrée par
+                            l'administrateur Selflow une fois délivrée par la DGI.
+                        </p>
+                    @endif
+                </div>
+
                 {{-- ── Procédure de conformité FNE ──
                      Ce qui suit n'est pas un rappel decoratif : chaque point
                      correspond a un cas ou une facture part chez la DGI avec

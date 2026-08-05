@@ -610,6 +610,57 @@ class FnePayloadTest extends TestCase
         $this->assertSame(0.0, $vente->timbre_quittance);
     }
 
+    // ─── Alerte de stickers ──────────────────────────────────────────────
+
+    public function test_l_alerte_stickers_se_declenche_au_seuil_et_chiffre_le_reste(): void
+    {
+        $this->entreprise->update([
+            'fne_mode_facturation' => 'stickers',
+            'sticker_solde_alerte' => 5,
+            'fne_sticker_balance'  => 3,
+        ]);
+
+        $alerte = \App\Modules\Admin\Services\AlerteStickersService::pour($this->entreprise->fresh());
+
+        $this->assertNotNull($alerte);
+        $this->assertSame('bas', $alerte['niveau']);
+        $this->assertSame(3, $alerte['pieces_restantes']);
+        $this->assertSame(60.0, $alerte['valeur']); // 3 vignettes a 20 F
+    }
+
+    public function test_un_solde_epuise_est_signale_autrement_qu_un_solde_bas(): void
+    {
+        // A zero, ce n'est plus un avertissement : la plateforme refuse de
+        // certifier, et les ventes cessent d'etre normalisees.
+        $this->entreprise->update([
+            'fne_mode_facturation' => 'stickers',
+            'sticker_solde_alerte' => 5,
+            'fne_sticker_balance'  => 0,
+        ]);
+
+        $alerte = \App\Modules\Admin\Services\AlerteStickersService::pour($this->entreprise->fresh());
+
+        $this->assertSame('epuise', $alerte['niveau']);
+    }
+
+    public function test_aucune_alerte_au_dessus_du_seuil_ni_en_mode_provision(): void
+    {
+        $this->entreprise->update([
+            'fne_mode_facturation' => 'stickers',
+            'sticker_solde_alerte' => 5,
+            'fne_sticker_balance'  => 40,
+        ]);
+        $this->assertNull(\App\Modules\Admin\Services\AlerteStickersService::pour($this->entreprise->fresh()));
+
+        // En mode provision, la DGI decompte des francs : le nombre de
+        // vignettes n'a pas de sens et l'alerte n'a rien a surveiller.
+        $this->entreprise->update([
+            'fne_mode_facturation' => 'provision',
+            'fne_sticker_balance'  => 0,
+        ]);
+        $this->assertNull(\App\Modules\Admin\Services\AlerteStickersService::pour($this->entreprise->fresh()));
+    }
+
     // ─── Code QR de vérification ─────────────────────────────────────────
 
     public function test_le_code_qr_encode_le_jeton_renvoye_par_la_plateforme(): void

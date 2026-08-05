@@ -393,6 +393,44 @@
             body.sidebar-open .sidebar { transform: translateX(0); }
             .stats-grid { grid-template-columns: 1fr; }
         }
+
+        /* ── Alerte de stickers ──
+           Deployable, presente sur toutes les pages tant que le stock est bas.
+           Elle n'est pas refermable definitivement : un stock epuise arrete la
+           certification, ce n'est pas un detail qu'on ecarte d'un clic. */
+        .alerte-stickers {
+            margin: 0 0 18px;
+            border-radius: 10px;
+            border: 1px solid #FDE68A;
+            background: #FFFBEB;
+            color: #92400E;
+            overflow: hidden;
+        }
+        .alerte-stickers.epuise {
+            border-color: #FECACA;
+            background: #FEF2F2;
+            color: #991B1B;
+        }
+        .alerte-stickers > summary {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 12px 16px;
+            cursor: pointer;
+            font-size: 13px;
+            font-weight: 600;
+            list-style: none;
+        }
+        .alerte-stickers > summary::-webkit-details-marker { display: none; }
+        .alerte-stickers > summary .chevron { margin-left: auto; transition: transform .15s; }
+        .alerte-stickers[open] > summary .chevron { transform: rotate(180deg); }
+        .alerte-stickers .detail {
+            padding: 0 16px 14px 42px;
+            font-size: 12.5px;
+            font-weight: 400;
+            line-height: 1.7;
+        }
+        .alerte-stickers .detail strong { font-weight: 700; }
     </style>
     @yield('styles')
 </head>
@@ -855,6 +893,54 @@
                 @foreach($errors->all() as $e) <div>{{ $e }}</div> @endforeach
             </div>
         </div>
+        @endif
+
+        {{-- Alerte de stickers. Placee ici plutot que dans chaque vue : le
+             stock peut tomber a zero pendant n'importe quelle action, et
+             l'utilisateur doit le voir ou qu'il se trouve. --}}
+        @php
+            $alerteStickers = \App\Modules\Admin\Services\AlerteStickersService::pour(
+                Auth::user()?->entreprise
+            );
+        @endphp
+        @if($alerteStickers)
+            <details class="alerte-stickers {{ $alerteStickers['niveau'] === 'epuise' ? 'epuise' : '' }}" open>
+                <summary>
+                    <i class="fas {{ $alerteStickers['niveau'] === 'epuise' ? 'fa-circle-exclamation' : 'fa-triangle-exclamation' }}"></i>
+                    @if($alerteStickers['niveau'] === 'epuise')
+                        Stickers épuisés — plus aucune facture ne peut être normalisée
+                    @else
+                        Solde de stickers bas : {{ $alerteStickers['solde'] }} restant(s)
+                        (seuil d'alerte : {{ $alerteStickers['seuil'] }})
+                    @endif
+                    <i class="fas fa-chevron-down chevron"></i>
+                </summary>
+                <div class="detail">
+                    @if($alerteStickers['niveau'] === 'epuise')
+                        La plateforme FNE refuse de certifier sans sticker. Vos ventes
+                        continuent d'être enregistrées dans Selflow, mais elles
+                        <strong>ne sont plus normalisées</strong> : elles ne portent ni numéro
+                        FNE, ni code de vérification, et ne sont donc pas conformes
+                        tant que le stock n'est pas reconstitué.
+                    @else
+                        Il vous reste de quoi certifier
+                        <strong>{{ $alerteStickers['pieces_restantes'] }} pièce(s)</strong>,
+                        soit une valeur de
+                        <strong>{{ number_format($alerteStickers['valeur'], 0, ',', ' ') }} FCFA</strong>
+                        (une vignette par facture, avoir ou bordereau, à
+                        {{ number_format((float) config('selflow.sticker_prix_unitaire', 20), 0, ',', ' ') }} F l'unité).
+                        <br>
+                        Une fois à zéro, la plateforme refusera de certifier : vos ventes
+                        resteront enregistrées mais <strong>ne seront plus normalisées</strong>,
+                        sans numéro FNE ni code de vérification.
+                    @endif
+                    <br>
+                    Rechargez votre solde depuis votre espace FNE
+                    (<em>Gestion des stickers</em>). Le solde affiché ici est celui
+                    renvoyé lors de la dernière certification : il se met à jour à la
+                    suivante.
+                </div>
+            </details>
         @endif
 
         @yield('contenu')

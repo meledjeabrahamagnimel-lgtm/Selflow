@@ -46,6 +46,26 @@ return [
     | fournisseur type) peut le faire via son propre plan comptable, ces
     | valeurs ne servent que de filet de sécurité.
     */
+    /*
+    |--------------------------------------------------------------------------
+    | Stickers FNE
+    |--------------------------------------------------------------------------
+    |
+    | Prix unitaire d'un sticker de certification, en francs CFA. La plateforme
+    | ne le transmet nulle part : elle ne renvoie qu'un nombre de vignettes
+    | restantes. Ce tarif sert uniquement a convertir un solde en valeur pour
+    | l'alerte de reapprovisionnement — il n'entre dans aucun montant de
+    | facture. A ajuster ici si la DGI le revise, plutot qu'en dur dans le code.
+    |
+    */
+    'sticker_prix_unitaire' => env('SELFLOW_STICKER_PRIX', 20),
+
+    /*
+    | Seuil d'alerte par defaut, en nombre de stickers. Chaque entreprise peut
+    | le redefinir dans ses parametres (`entreprises.sticker_solde_alerte`).
+    */
+    'sticker_seuil_alerte_defaut' => env('SELFLOW_STICKER_SEUIL', 5),
+
     'plan_comptable_defaut' => [
         'client_collectif'      => '411000', // Clients
         'fournisseur_collectif' => '401000', // Fournisseurs

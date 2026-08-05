@@ -86,6 +86,7 @@ class EntrepriseControleur
             'commune'                => ['nullable', 'string', 'max:100'],
             'quartier'               => ['nullable', 'string', 'max:100'],
             'sticker_solde_alerte'   => ['nullable', 'integer', 'min:1', 'max:9999'],
+            'possede_compte_fne'     => ['nullable', 'in:0,1'],
             // 248 caractères : longueur maximale acceptée par la FNE pour les
             // champs `footer` et `commercialMessage`. Le texte est ramené à une
             // seule ligne juste avant (voir normaliserMentions) : un copier-
@@ -115,6 +116,11 @@ class EntrepriseControleur
 
         // Checkboxes (non transmises si non cochées)
         $data['timbre_quittance'] = $request->boolean('timbre_quittance');
+
+        // Trois etats : la question peut n'avoir pas encore ete posee.
+        if ($request->filled('possede_compte_fne')) {
+            $data['possede_compte_fne'] = $request->input('possede_compte_fne') === '1';
+        }
         $data['bapa']             = $request->boolean('bapa');
 
         $syncKeyChanged = $request->filled('comptaflow_sync_key') && ($request->comptaflow_sync_key !== $entreprise->comptaflow_sync_key);
