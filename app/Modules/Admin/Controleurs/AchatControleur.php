@@ -30,17 +30,16 @@ class AchatControleur
         $entreprise  = Auth::user()->entreprise;
         $fournisseurs = Fournisseur::obtenirFournisseursPrioritaires($entreprise->id);
         $produits     = Produit::where('entreprise_id', $entreprise->id)->orderBy('nom')->get();
-        $pointDeVenteId = session('point_de_vente_actif_id') 
-            ?? Auth::user()->point_de_vente_id 
-            ?? (\App\Modules\Admin\Modeles\PointDeVente::firstOrCreate([
-                'entreprise_id' => $entreprise->id,
-                'nom'           => 'Siège',
-            ], [
-                'ville'         => 'Abidjan',
-                'commune'       => 'Cocody',
-                'responsable'   => 'Superviseur',
-                'statut'        => 'Ouvert',
-            ]))->id;
+        // Repli sur un point de vente EXISTANT plutot que sur un « Siege » cree
+        // a la volee : un point de vente inconnu de la plateforme FNE fait
+        // rejeter toute normalisation avec « Point of sale is invalid », et
+        // l'utilisateur n'a aucun moyen de deviner qu'une fiche fantome a ete
+        // creee dans son dos.
+        $pointDeVenteId = session('point_de_vente_actif_id')
+            ?? Auth::user()->point_de_vente_id
+            ?? \App\Modules\Admin\Modeles\PointDeVente::where('entreprise_id', $entreprise->id)
+                ->orderBy('id')
+                ->value('id');
         $banques = CodeJournal::where('type', 'Banque')
             ->where('entreprise_id', $entreprise->id)
             ->orderBy('intitule')
@@ -52,17 +51,27 @@ class AchatControleur
     public function enregistrer(Request $request): RedirectResponse
     {
         $entreprise = Auth::user()->entreprise;
-        $pointDeVenteId = session('point_de_vente_actif_id') 
-            ?? Auth::user()->point_de_vente_id 
-            ?? (\App\Modules\Admin\Modeles\PointDeVente::firstOrCreate([
-                'entreprise_id' => $entreprise->id,
-                'nom'           => 'Siège',
-            ], [
-                'ville'         => 'Abidjan',
-                'commune'       => 'Cocody',
-                'responsable'   => 'Superviseur',
-                'statut'        => 'Ouvert',
-            ]))->id;
+        // Repli sur un point de vente EXISTANT plutot que sur un « Siege » cree
+        // a la volee : un point de vente inconnu de la plateforme FNE fait
+        // rejeter toute normalisation avec « Point of sale is invalid », et
+        // l'utilisateur n'a aucun moyen de deviner qu'une fiche fantome a ete
+        // creee dans son dos.
+        $pointDeVenteId = session('point_de_vente_actif_id')
+            ?? Auth::user()->point_de_vente_id
+            ?? \App\Modules\Admin\Modeles\PointDeVente::where('entreprise_id', $entreprise->id)
+                ->orderBy('id')
+                ->value('id');
+
+        // Sans point de vente, aucune piece ne peut etre etablie ni certifiee.
+        // Mieux vaut le dire que de laisser echouer l'enregistrement sur une
+        // contrainte de base de donnees.
+        if (!$pointDeVenteId) {
+            return back()->withErrors([
+                'point_de_vente' => 'Aucun point de vente n\'est enregistré. Créez-le d\'abord, '
+                    . 'en le nommant exactement comme sur votre espace FNE : la plateforme rejette '
+                    . 'toute pièce dont le point de vente lui est inconnu.',
+            ])->withInput();
+        }
 
         $isBapa = $request->input('type_facture') === 'bapa';
 

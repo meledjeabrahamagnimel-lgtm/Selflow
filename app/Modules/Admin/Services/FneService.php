@@ -215,7 +215,8 @@ class FneService
                 Log::error("FNE API Error - Code: " . $response->status() . " Body: " . $response->body());
                 return [
                     'success' => false,
-                    'message' => 'La normalisation DGI a échoué (HTTP ' . $response->status() . ') : ' . ($response->json('message') ?? $response->body()),
+                    'message' => 'La normalisation DGI a échoué (HTTP ' . $response->status() . ') : '
+                        . self::messageRejet($response->json(), $payload),
                     'errors'  => ['api_error' => $response->body()],
                 ];
             }
@@ -361,10 +362,13 @@ class FneService
             ->post($apiUrl, $payload);
 
             if (!$response->successful()) {
-                Log::error("FNE BAPA API Error - Code: " . $response->status() . " Body: " . $response->body());
+                Log::error("FNE BAPA API Error - Code: " . $response->status() . " Body: " . $response->body()
+                    . " | pointOfSale=" . json_encode($payload['pointOfSale'] ?? null)
+                    . " establishment=" . json_encode($payload['establishment'] ?? null));
                 return [
                     'success' => false,
-                    'message' => 'La normalisation DGI du BAPA a échoué (HTTP ' . $response->status() . ') : ' . ($response->json('message') ?? $response->body()),
+                    'message' => 'La normalisation DGI du BAPA a échoué (HTTP ' . $response->status() . ') : '
+                        . self::messageRejet($response->json(), $payload),
                     'errors'  => ['api_error' => $response->body()],
                 ];
             }
@@ -497,6 +501,57 @@ class FneService
             'crédit', 'credit', 'deferred', 'à terme', 'a terme', 'terme' => 'deferred',
             // Par défaut (sécurité)
             default => 'cash',
+        };
+    }
+
+    /**
+     * Traduit le rejet de la plateforme en une phrase exploitable.
+     *
+     * La FNE répond « Bad Request Exception » et range le détail utile dans un
+     * objet `errors` indexé par nom de champ :
+     *
+     *     {"errors": {"pointOfSale": {"invalid": "Point of sale is invalid"}}}
+     *
+     * Seul le message générique remontait jusqu'à l'utilisateur ; le champ en
+     * cause n'était lisible que dans le journal. On nomme donc le champ, la
+     * valeur envoyée, et — pour les rejets récurrents — ce qu'il faut vérifier.
+     */
+    private static function messageRejet(?array $reponse, array $payload): string
+    {
+        $general = $reponse['message'] ?? 'Réponse illisible de la plateforme.';
+        $champs  = $reponse['errors'] ?? [];
+
+        if (!is_array($champs) || empty($champs)) {
+            return $general;
+        }
+
+        $details = [];
+        foreach ($champs as $champ => $raisons) {
+            $raison = is_array($raisons) ? implode(', ', $raisons) : (string) $raisons;
+            $valeur = $payload[$champ] ?? null;
+
+            $details[] = sprintf(
+                '%s (valeur envoyée : %s) — %s%s',
+                $champ,
+                is_scalar($valeur) && $valeur !== '' ? '« ' . $valeur . ' »' : 'vide',
+                $raison,
+                self::pisteDeCorrection($champ)
+            );
+        }
+
+        return $general . ' — ' . implode(' ; ', $details);
+    }
+
+    /** Cause la plus fréquente pour les champs que la plateforme rejette souvent. */
+    private static function pisteDeCorrection(string $champ): string
+    {
+        return match ($champ) {
+            'pointOfSale' => '. Le nom du point de vente doit être déclaré à l\'identique '
+                . 'sur votre espace FNE — même orthographe, mêmes accents, mêmes espaces. '
+                . 'Vérifiez aussi que ce point de vente est autorisé pour ce type de pièce.',
+            'clientNcc'   => '. Le NCC est obligatoire pour une facturation B2B.',
+            'establishment' => '. Le nom de l\'établissement doit correspondre à celui déclaré à la DGI.',
+            default => '',
         };
     }
 
