@@ -212,8 +212,14 @@
             <label class="tax-toggle-row" id="row-tdt" style="margin-top:10px;">
                 <input type="checkbox" id="cfg-tdt-active" onchange="mettreAJourResume()">
                 <div>
-                    <div class="lbl-main"><i class="fas fa-money-bill" style="color:#10b981;margin-right:6px;"></i>TDT — Taxe sur les Droits de Timbre</div>
-                    <div class="lbl-sub">Taux : 1,5% sur paiements espèces &gt; 5 000 FCFA. S'applique par facture ligne à ligne.</div>
+                    <div class="lbl-main">
+                        <i class="fas fa-money-bill" style="color:#10b981;margin-right:6px;"></i>TDT — Taxe sur les Droits de Timbre
+                        <span style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:#1d4ed8;background:#dbeafe;border-radius:4px;padding:1px 6px;margin-left:6px;">Informatif</span>
+                    </div>
+                    {{-- Ce reglage ne declenche ni ne calcule quoi que ce soit : le
+                         timbre est applique par la DGI seule, a la normalisation, et
+                         son montant nous parvient dans `invoice.fiscalStamp`. --}}
+                    <div class="lbl-sub">Rappel de l'option cochée sur votre espace FNE. Le timbre est décidé et chiffré par la DGI à la normalisation : ce réglage ne modifie aucun montant.</div>
                 </div>
             </label>
 

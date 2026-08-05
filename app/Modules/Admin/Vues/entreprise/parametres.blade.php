@@ -288,11 +288,24 @@
                     </div>
                 </div>
 
-                {{-- ── Options fiscales ── --}}
+                {{-- ── Options fiscales ──
+                     Ces deux cases existent aussi dans les paramètres de la
+                     plateforme FNE, et c'est là qu'elles font foi. L'API ne les
+                     expose pas : Selflow ne peut ni les lire ni les modifier.
+                     Elles servent donc à noter ici l'état constaté chez la DGI,
+                     en attendant que l'API le communique. --}}
                 <div class="card" style="padding:24px;">
                     <div style="font-size:12px;font-weight:700;color:var(--text-2);text-transform:uppercase;letter-spacing:.5px;margin-bottom:16px;display:flex;align-items:center;gap:8px;">
                         <i class="fas fa-check-square" style="color:var(--primary);"></i> Options fiscales
                     </div>
+
+                    <div style="font-size:12px;color:var(--text-3);line-height:1.6;margin-bottom:14px;padding:10px 12px;background:#eff6ff;border-radius:8px;border:1px solid #bfdbfe;">
+                        <i class="fas fa-circle-info" style="color:#2563eb;"></i>
+                        Ces options se règlent sur la <strong>plateforme FNE</strong>, et c'est
+                        là qu'elles s'appliquent. Reportez ici l'état que vous y avez
+                        constaté : l'API ne le communique pas encore.
+                    </div>
+
                     <div style="display:flex;flex-direction:column;gap:14px;">
 
                         <label style="display:flex;align-items:flex-start;gap:12px;cursor:pointer;padding:14px;background:var(--bg3);border-radius:10px;border:1px solid var(--border);">
@@ -300,8 +313,15 @@
                                 {{ old('timbre_quittance', $entreprise->timbre_quittance) ? 'checked' : '' }}
                                 style="margin-top:3px;width:16px;height:16px;cursor:pointer;">
                             <div>
-                                <div style="font-weight:600;font-size:13px;color:var(--text);">Timbre de quittance</div>
-                                <div style="font-size:12px;color:var(--text-3);margin-top:2px;">Applique le droit de timbre (TDT 1,5%) sur les paiements en espèces supérieurs à 5 000 FCFA.</div>
+                                <div style="font-weight:600;font-size:13px;color:var(--text);">
+                                    Timbre de quittance
+                                    <span style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:#1d4ed8;background:#dbeafe;border-radius:4px;padding:1px 6px;margin-left:6px;">Informatif</span>
+                                </div>
+                                <div style="font-size:12px;color:var(--text-3);margin-top:2px;">
+                                    Rappel de l'option cochée sur votre espace FNE. Le timbre est
+                                    calculé et appliqué par la DGI seule, à la normalisation :
+                                    cocher ou décocher ici ne change aucun montant.
+                                </div>
                             </div>
                         </label>
 
@@ -311,7 +331,11 @@
                                 style="margin-top:3px;width:16px;height:16px;cursor:pointer;">
                             <div>
                                 <div style="font-weight:600;font-size:13px;color:var(--text);">Bordereau d'Achat de Produits Agricoles (BAPA)</div>
-                                <div style="font-size:12px;color:var(--text-3);margin-top:2px;">Activez cette option si votre entreprise réalise des achats de produits agricoles auprès de producteurs locaux.</div>
+                                <div style="font-size:12px;color:var(--text-3);margin-top:2px;">
+                                    Ouvre les bordereaux d'achat auprès de producteurs locaux.
+                                    Vérifiez que l'option est également cochée sur votre espace
+                                    FNE, sans quoi la plateforme refusera les bordereaux.
+                                </div>
                             </div>
                         </label>
 
