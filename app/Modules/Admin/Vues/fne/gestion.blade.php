@@ -307,10 +307,14 @@ function appliquerKpis(d) {
         `${d.stickers_consommes} pièce(s) certifiée(s) auprès de la DGI`;
 
     // Timbre de quittance
+    // Timbre de quittance : uniquement ce que la DGI a reellement retenu.
+    // L'estimation locale a ete retiree — la plateforme applique un montant
+    // forfaitaire que le calcul « TTC x taux » ne reproduisait pas, et le
+    // declenchement depend d'un reglage que l'API n'expose pas.
     document.getElementById('k-timbre').textContent = formatF(d.timbre_quittance);
-    document.getElementById('k-timbre-sub').textContent = d.timbre_source === 'dgi'
-        ? `${d.timbre_quantite} timbre(s) réellement appliqué(s) par la DGI`
-        : `${d.timbre_quantite} timbre(s) estimé(s) selon votre configuration fiscale`;
+    document.getElementById('k-timbre-sub').textContent =
+        `${d.timbre_quantite} timbre(s) appliqué(s) par la DGI`
+        + (d.timbre_inconnu > 0 ? ` · ${d.timbre_inconnu} pièce(s) sans retour de timbre` : '');
 
     document.getElementById('k-v-factures-n').textContent = d.ventes.factures.nombre;
     document.getElementById('k-v-factures-m').textContent = formatF(d.ventes.factures.montant);

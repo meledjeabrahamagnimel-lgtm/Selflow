@@ -117,26 +117,29 @@ class FneDashboardControleur
         if ($pdvId && $pdvId !== 'tous') $achatsQuery->where('point_de_vente_id', $pdvId);
 
         // 4. Timbre de quittance de la période.
-        //    Le timbre réellement appliqué est celui que la plateforme renvoie
-        //    dans `invoice.fiscalStamp` ; l'estimation locale ne sert que pour
-        //    les pièces certifiées avant que ce retour ne soit conservé.
+        //
+        //    Seule la DGI le décide. Le payload de certification ne comporte
+        //    aucun champ de timbre — `fiscalStamp` n'apparaît que dans la
+        //    RÉPONSE — et le déclenchement dépend d'un réglage coché sur la
+        //    plateforme, que l'API n'expose pas.
+        //
+        //    L'estimation locale (montant TTC × taux) a donc été retirée :
+        //    elle produisait des chiffres démentis par les pièces certifiées.
+        //    Sur les factures de contrôle du 4 août 2026, la DGI a appliqué
+        //    100 F sur un TTC de 16 700 comme sur un TTC de 29 382 — un
+        //    montant forfaitaire, là où le calcul local annonçait 250 F et
+        //    441 F. Une facture Cash de 270 900 F n'a, elle, reçu aucun
+        //    timbre : la règle « espèces au-delà du seuil » ne suffit pas
+        //    à prédire le déclenchement.
+        //
+        //    On ne rapporte donc que ce que la plateforme a réellement retenu.
         $timbreDgi = (clone $ventesQuery)->whereNotNull('fne_timbre_fiscal');
-        $timbre_montant_dgi  = (float) (clone $timbreDgi)->sum('fne_timbre_fiscal');
-        $timbre_quantite_dgi = (clone $timbreDgi)->where('fne_timbre_fiscal', '>', 0)->count();
+        $timbre_montant  = (float) (clone $timbreDgi)->sum('fne_timbre_fiscal');
+        $timbre_quantite = (clone $timbreDgi)->where('fne_timbre_fiscal', '>', 0)->count();
 
-        $timbre_montant = 0;
-        $timbre_quantite = 0;
-        if ($taxConfig && $taxConfig->tdt_active) {
-            $ventesEspeces = (clone $ventesQuery)
-                ->where('mode_paiement', 'Caisse')
-                ->where('montant_ttc', '>', (float) $taxConfig->tdt_seuil)
-                ->get();
-            
-            $timbre_quantite = $ventesEspeces->count();
-            $timbre_montant = $ventesEspeces->sum(function($v) use ($taxConfig) {
-                return round($v->montant_ttc * ($taxConfig->tdt_taux / 100), 2);
-            });
-        }
+        // Pièces certifiées dont la réponse ne portait pas encore ce retour :
+        // leur timbre éventuel est inconnu, et le compteur le signale.
+        $timbre_inconnu = (clone $ventesQuery)->whereNull('fne_timbre_fiscal')->count();
 
         // La distinction facture / reçu vient de `type_piece`. Elle était
         // auparavant deduite de la presence d'un client, si bien qu'une vente
@@ -172,9 +175,9 @@ class FneDashboardControleur
             'stickers_solde'    => $stickers_solde,
             'stickers_achats'   => $stickers_achats,
             'stickers_consommes'=> $stickers_consommes,
-            'timbre_quittance'  => $timbre_montant_dgi > 0 ? $timbre_montant_dgi : $timbre_montant,
-            'timbre_quantite'   => $timbre_quantite_dgi > 0 ? $timbre_quantite_dgi : $timbre_quantite,
-            'timbre_source'     => $timbre_montant_dgi > 0 ? 'dgi' : 'estimation',
+            'timbre_quittance'  => $timbre_montant,
+            'timbre_quantite'   => $timbre_quantite,
+            'timbre_inconnu'    => $timbre_inconnu,
 
             // Indicateurs tires des reponses de certification
             'alertes_stickers'  => (clone $ventesQuery)->where('fne_alerte_stickers', true)->count()
