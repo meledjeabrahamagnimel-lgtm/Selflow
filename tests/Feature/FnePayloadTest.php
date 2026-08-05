@@ -571,6 +571,24 @@ class FnePayloadTest extends TestCase
         $this->assertSame(270_900.0, $vente->net_a_payer);
     }
 
+    public function test_un_avoir_ne_porte_jamais_de_timbre(): void
+    {
+        $this->entreprise->update(['timbre_quittance' => true]);
+
+        // Le timbre frappe la quittance, l'acte qui constate un encaissement ;
+        // un avoir constate l'inverse. La plateforme le confirme : la réponse
+        // de remboursement ne comporte aucun champ `fiscalStamp`, là où celles
+        // de vente et de bordereau d'achat en ont un.
+        $avoir = $this->venteMinimale([
+            'mode_paiement' => 'Caisse',
+            'montant_ttc'   => 270_900,
+            'type_facture'  => 'avoir',
+        ]);
+
+        $this->assertSame(0.0, $avoir->timbre_quittance);
+        $this->assertSame(270_900.0, $avoir->net_a_payer);
+    }
+
     public function test_le_timbre_entre_dans_le_net_a_payer(): void
     {
         $this->entreprise->update(['timbre_quittance' => true]);

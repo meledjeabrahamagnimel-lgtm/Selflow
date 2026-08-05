@@ -68,11 +68,15 @@ class TimbreQuittanceService
     /**
      * Le timbre s'applique-t-il à cette vente ?
      *
-     * Deux conditions cumulatives :
+     * Trois conditions cumulatives :
      *
-     *  - le règlement est en espèces. Le timbre frappe la quittance, c'est-à-dire
-     *    la pièce qui constate un versement de sommes ; un règlement par banque
-     *    ou par mobile money laisse sa propre trace et n'en relève pas ;
+     *  - la pièce n'est pas un avoir. Le timbre frappe la quittance, l'acte qui
+     *    constate un encaissement ; un avoir constate l'inverse. La plateforme
+     *    le confirme : la réponse de remboursement ne comporte aucun champ
+     *    `fiscalStamp`, là où celles de vente et de bordereau d'achat en ont un ;
+     *
+     *  - le règlement est en espèces. Un règlement par banque ou par mobile
+     *    money laisse sa propre trace et ne relève pas de la quittance ;
      *
      *  - l'option est déclarée active dans les paramètres. Elle reflète la case
      *    cochée sur la plateforme FNE : c'est là que la DGI décide d'appliquer
@@ -82,6 +86,10 @@ class TimbreQuittanceService
      */
     public static function estApplicable(Vente $vente): bool
     {
+        if ($vente->type_facture === 'avoir') {
+            return false;
+        }
+
         $entreprise = $vente->pointDeVente?->entreprise;
 
         if (!$entreprise || !$entreprise->timbre_quittance) {

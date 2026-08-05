@@ -288,6 +288,91 @@
                     </div>
                 </div>
 
+                {{-- ── Procédure de conformité FNE ──
+                     Ce qui suit n'est pas un rappel decoratif : chaque point
+                     correspond a un cas ou une facture part chez la DGI avec
+                     des montants ou des mentions differents de ceux etablis
+                     ici. On les a tous rencontres a la mise au point. --}}
+                <div class="card" style="padding:24px;">
+                    <div style="font-size:12px;font-weight:700;color:var(--text-2);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px;display:flex;align-items:center;gap:8px;">
+                        <i class="fas fa-clipboard-check" style="color:var(--primary);"></i> Procédure à suivre — conformité FNE
+                    </div>
+                    <p style="font-size:12px;color:var(--text-3);line-height:1.6;margin-bottom:16px;">
+                        Selflow établit vos factures, la DGI les certifie. Les deux doivent
+                        dire la même chose. Ces six points sont ceux qui, s'ils sont négligés,
+                        font diverger la facture certifiée de la vôtre.
+                    </p>
+
+                    @php
+                        // Chaque etape porte son motif : sans lui, l'utilisateur
+                        // n'a aucun moyen de juger de ce qu'il risque a la sauter.
+                        $etapesConformite = [
+                            [
+                                'titre'  => 'Renseigner l\'identité fiscale complète',
+                                'texte'  => 'NCC, régime d\'imposition, RCCM et centre des impôts. Le NCC identifie votre entreprise auprès de la plateforme : sans lui, aucune facture n\'est certifiée.',
+                                'fait'   => !empty($entreprise->ncc) && !empty($entreprise->regime_imposition) && !empty($entreprise->rccm),
+                            ],
+                            [
+                                'titre'  => 'Nommer les points de vente à l\'identique',
+                                'texte'  => 'Le nom saisi dans Selflow est transmis tel quel à la FNE, qui refuse la facture s\'il ne correspond à aucun point de vente déclaré sur votre espace.',
+                                'fait'   => null,
+                            ],
+                            [
+                                'titre'  => 'N\'utiliser que les taux de TVA du barème DGI',
+                                'texte'  => '18 %, 9 % ou 0 %. La FNE ne reçoit pas un pourcentage mais un code, et applique le taux attaché à ce code : un taux intermédiaire serait taxé à 18 % sur la facture certifiée.',
+                                'fait'   => null,
+                            ],
+                            [
+                                'titre'  => 'Saisir le NCC des clients professionnels',
+                                'texte'  => 'Une facture B2B sans NCC client est rejetée par la plateforme. Sans NCC, la vente relève du B2C.',
+                                'fait'   => null,
+                            ],
+                            [
+                                'titre'  => 'Reporter ici les options cochées sur votre espace FNE',
+                                'texte'  => 'Timbre de quittance et BAPA se règlent sur la plateforme, et l\'API ne permet pas de les lire. Si la case ci-dessous est cochée alors qu\'elle ne l\'est pas chez la DGI, vous encaisserez un timbre que la plateforme ne retiendra pas.',
+                                'fait'   => null,
+                            ],
+                            [
+                                'titre'  => 'Surveiller le solde de stickers',
+                                'texte'  => 'La certification consomme un sticker par pièce. À zéro, plus rien n\'est normalisé. Le solde figure sur la page Gestion FNE, tel que la plateforme l\'a renvoyé à la dernière certification.',
+                                'fait'   => null,
+                            ],
+                        ];
+                    @endphp
+
+                    <ol style="list-style:none;padding:0;margin:0;display:flex;flex-direction:column;gap:12px;counter-reset:etape;">
+                        @foreach($etapesConformite as $etape)
+                            <li style="display:flex;gap:12px;align-items:flex-start;">
+                                <span style="flex-shrink:0;width:22px;height:22px;border-radius:50%;background:{{ $etape['fait'] === true ? '#d1fae5' : 'var(--bg3)' }};border:1px solid {{ $etape['fait'] === true ? '#6ee7b7' : 'var(--border)' }};display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:{{ $etape['fait'] === true ? '#047857' : 'var(--text-3)' }};margin-top:1px;">
+                                    @if($etape['fait'] === true)<i class="fas fa-check" style="font-size:9px;"></i>@else{{ $loop->iteration }}@endif
+                                </span>
+                                <div>
+                                    <div style="font-weight:600;font-size:13px;color:var(--text);">{{ $etape['titre'] }}</div>
+                                    <div style="font-size:12px;color:var(--text-3);line-height:1.6;margin-top:2px;">{{ $etape['texte'] }}</div>
+                                </div>
+                            </li>
+                        @endforeach
+                    </ol>
+
+                    <div style="margin-top:16px;padding:12px 14px;background:#fffbeb;border:1px solid #fcd34d;border-radius:8px;font-size:12px;color:#92400e;line-height:1.6;">
+                        <strong><i class="fas fa-scale-balanced"></i> Droit de timbre de quittance</strong> —
+                        barème de l'article 873 du Code général des impôts, appliqué aux règlements
+                        en espèces. Il est dû par le client (article 875) : vous le collectez pour l'État.
+                        <div style="margin-top:8px;display:grid;grid-template-columns:1fr auto;gap:2px 16px;font-family:ui-monospace,monospace;font-size:11px;">
+                            <span>0 – 5 000</span><span style="text-align:right;">0 F</span>
+                            <span>5 001 – 100 000</span><span style="text-align:right;">100 F</span>
+                            <span>100 001 – 500 000</span><span style="text-align:right;">500 F</span>
+                            <span>500 001 – 1 000 000</span><span style="text-align:right;">1 000 F</span>
+                            <span>1 000 001 – 5 000 000</span><span style="text-align:right;">2 000 F</span>
+                            <span>au-delà de 5 000 000</span><span style="text-align:right;">5 000 F</span>
+                        </div>
+                        <div style="margin-top:8px;">
+                            Ni les avoirs ni les bordereaux d'achat n'en relèvent : le timbre frappe
+                            la quittance, l'acte qui constate un encaissement.
+                        </div>
+                    </div>
+                </div>
+
                 {{-- ── Options fiscales ──
                      Ces deux cases existent aussi dans les paramètres de la
                      plateforme FNE, et c'est là qu'elles font foi. L'API ne les

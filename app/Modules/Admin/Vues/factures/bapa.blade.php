@@ -274,10 +274,19 @@
                     <td style="padding:6px 0; text-align:right; font-weight:700;">{{ number_format($taxe->montant, 0, ',', ' ') }} F</td>
                 </tr>
                 @endforeach
+                {{-- Droit de timbre : sur un bordereau d'achat, il n'est jamais
+                     etabli au bareme. Seule la plateforme le decide, et son
+                     montant nous parvient dans `invoice.fiscalStamp`. --}}
+                @if(($achat->fne_timbre_fiscal ?? 0) > 0)
+                <tr style="border-bottom:1px solid #000;">
+                    <td style="padding:6px 0; font-weight:600;">Timbre de quittance</td>
+                    <td style="padding:6px 0; text-align:right; font-weight:700;">{{ number_format($achat->fne_timbre_fiscal, 0, ',', ' ') }} F</td>
+                </tr>
+                @endif
                 <tr style="background:#f1f5f9; font-weight:800; font-size:15px; border:1px solid #000;">
                     <td style="padding:8px 10px;">Montant Net à Payer</td>
                     <td style="padding:8px 10px; text-align:right; color:var(--navy);">
-                        {{ number_format($achat->montant_ttc + $achat->taxesPersonnalisees->sum('montant'), 0, ',', ' ') }} FCFA
+                        {{ number_format($achat->montant_ttc + $achat->taxesPersonnalisees->sum('montant') + ($achat->fne_timbre_fiscal ?? 0), 0, ',', ' ') }} FCFA
                     </td>
                 </tr>
             </table>
