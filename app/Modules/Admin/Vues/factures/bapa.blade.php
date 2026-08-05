@@ -255,7 +255,10 @@
                 <tr style="border-bottom:1px solid #000;">
                     <td style="padding:6px 0; font-weight:600;">Montant d'achat brut</td>
                     <td style="padding:6px 0; text-align:right; font-weight:700;">
-                        {{ number_format($achat->montant_ttc, 0, ',', ' ') }} F
+                        {{-- Le brut est bien celui d'avant remise : afficher ici le
+                             montant deja net, suivi d'une ligne « Remise », laissait
+                             croire a une double deduction. --}}
+                        {{ number_format($achat->montant_ttc + ($achat->remise ?? 0), 0, ',', ' ') }} F
                     </td>
                 </tr>
                 @if(($achat->remise ?? 0) > 0)

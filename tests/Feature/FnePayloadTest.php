@@ -358,7 +358,12 @@ class FnePayloadTest extends TestCase
         $this->assertSame('0709080765', $payload['clientPhone']);
         $this->assertSame('info@cgo.ci', $payload['clientEmail']);
         $this->assertSame('Ali Hassan', $payload['clientSellerName']);
-        $this->assertArrayNotHasKey('clientNcc', $payload);
+
+        // Le json de reference omet `clientNcc`, mais la plateforme le valide
+        // desormais comme une chaine : son absence provoquait un HTTP 400
+        // « clientNcc must be a string ». Un tiers non immatricule n'en a pas,
+        // d'ou la chaine vide.
+        $this->assertSame('', $payload['clientNcc']);
 
         $this->assertTrue($payload['isRne']);
         $this->assertSame('9606123E25000000002', $payload['rne']);
@@ -610,6 +615,39 @@ class FnePayloadTest extends TestCase
         $this->assertSame(0.0, $vente->timbre_quittance);
     }
 
+    // ─── Bordereau d'achat (BAPA) ────────────────────────────────────────
+
+    public function test_le_payload_bapa_porte_un_ncc_client_meme_vide(): void
+    {
+        $this->simulerReponseFne();
+
+        $achat = $this->achatBapaMinimal();
+        FneService::normaliserAchatBapa($achat);
+
+        $payload = $this->payloadEnvoye();
+
+        // La plateforme valide `clientNcc` comme une chaine, meme sur un
+        // bordereau ou le tiers n'est justement pas immatricule. Son absence
+        // provoquait un rejet « clientNcc must be a string » (HTTP 400).
+        $this->assertArrayHasKey('clientNcc', $payload);
+        $this->assertIsString($payload['clientNcc']);
+    }
+
+    public function test_un_bordereau_d_achat_ne_transmet_aucune_taxe(): void
+    {
+        $this->simulerReponseFne();
+
+        FneService::normaliserAchatBapa($this->achatBapaMinimal());
+
+        $payload = $this->payloadEnvoye();
+
+        // Un achat aupres d'un tiers non immatricule ne supporte pas de TVA :
+        // les lignes ne portent donc aucun code de taxe.
+        foreach ($payload['items'] as $ligne) {
+            $this->assertArrayNotHasKey('taxes', $ligne);
+        }
+    }
+
     // ─── Alerte de stickers ──────────────────────────────────────────────
 
     public function test_l_alerte_stickers_se_declenche_au_seuil_et_chiffre_le_reste(): void
@@ -830,6 +868,42 @@ class FnePayloadTest extends TestCase
     /**
      * Vente d'une ligne, sans client ni remise : le socle des cas ci-dessus.
      */
+    /** Bordereau d'achat minimal aupres d'un tiers non immatricule. */
+    private function achatBapaMinimal(): Achat
+    {
+        $fournisseur = Fournisseur::create([
+            'entreprise_id' => $this->entreprise->id,
+            'nom'           => 'TIERS NON IMMATRICULE',
+            'telephone'     => '0709080765',
+            'email'         => 'tiers@exemple.ci',
+        ]);
+
+        $achat = Achat::create([
+            'point_de_vente_id' => $this->pointDeVente->id,
+            'fournisseur_id'    => $fournisseur->id,
+            'numero_facture'    => 'BAPA-' . uniqid(),
+            'date_achat'        => now()->toDateString(),
+            'mode_paiement'     => 'Caisse',
+            'montant_ht'        => 12000,
+            'montant_tva'       => 0,
+            'montant_ttc'       => 12000,
+            'type_facture'      => 'bapa',
+            'etape'             => 'Facture',
+        ]);
+
+        AchatDetail::create([
+            'achat_id'      => $achat->id,
+            'produit_id'    => $this->creerProduit(['reference' => 'ref-' . uniqid()])->id,
+            'quantite'      => 1,
+            'unite'         => 'sac',
+            'prix_unitaire' => 12000,
+            'montant_tva'   => 0,
+            'montant_ttc'   => 12000,
+        ]);
+
+        return $achat->fresh();
+    }
+
     private function venteMinimale(array $attributs = [], ?Produit $produit = null): Vente
     {
         $produit ??= $this->creerProduit(['reference' => 'ref-' . uniqid()]);

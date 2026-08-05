@@ -113,7 +113,7 @@ class AchatControleur
             ]);
         }
 
-        $achat = DB::transaction(function () use ($request, $pointDeVenteId, $entreprise) {
+        $achat = DB::transaction(function () use ($request, $pointDeVenteId, $entreprise, $isBapa) {
             $montantHt  = 0;
             $montantTva = 0;
             $etape = $request->input('etape', 'Facture');
@@ -127,8 +127,15 @@ class AchatControleur
                 $ht = (float)$article['quantite'] * (float)$article['prix_unitaire'] * (1 - $remiseLigne / 100);
                 $montantHt += $ht;
 
-                // Récupérer le taux TVA du produit sélectionné
-                if (!empty($article['produit_id'])) {
+                // Récupérer le taux TVA du produit sélectionné.
+                //
+                // Un bordereau d'achat en est exempté : il constate un achat
+                // auprès d'un tiers non immatriculé, qui ne facture aucune TVA.
+                // Le taux du catalogue s'appliquait pourtant, et le document
+                // affichait des lignes TTC sous un total annoncé « exonéré ».
+                // Le payload envoyé à la FNE ne portant aucune taxe pour ce
+                // type de pièce, le bordereau certifié divergeait du nôtre.
+                if (!$isBapa && !empty($article['produit_id'])) {
                     $produit = Produit::find($article['produit_id']);
                     $tauxTva = $produit ? (float)($produit->taux_tva ?? 0) : 0;
                     if ($tauxTva > 0) {
@@ -196,8 +203,9 @@ class AchatControleur
                 $produit = !empty($article['produit_id']) ? Produit::lockForUpdate()->find($article['produit_id']) : null;
                 $remiseLigne = self::tauxBorne($article['remise_taux'] ?? 0);
                 $ht      = (float)$article['quantite'] * (float)$article['prix_unitaire'] * (1 - $remiseLigne / 100);
+                // Exonération du bordereau d'achat : voir le calcul du total.
                 $tvaDeLigne = 0;
-                if ($produit) {
+                if (!$isBapa && $produit) {
                     $tauxTvaProduit = (float)($produit->taux_tva ?? 0);
                     if ($tauxTvaProduit > 0) {
                         $tvaDeLigne = round($ht * ($tauxTvaProduit / 100), 2);

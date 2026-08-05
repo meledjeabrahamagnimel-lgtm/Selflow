@@ -328,6 +328,12 @@ class FneService
             'template'            => 'B2B',
             'isRne'               => $bordereauRattacheAUnRecu,
             'rne'                 => $bordereauRattacheAUnRecu ? trim((string) ($achat->numero_rne ?? '')) : '',
+            // La plateforme valide `clientNcc` comme une chaine, meme sur un
+            // bordereau d'achat ou le tiers n'est justement pas immatricule :
+            // son absence provoquait un rejet
+            // « clientNcc must be a string » (HTTP 400). On envoie donc une
+            // chaine vide, qui dit exactement ce qu'il en est.
+            'clientNcc'           => preg_replace('/[^0-9A-Z]/', '', strtoupper((string) ($fournisseur?->ncc ?? ''))),
             'clientCompanyName'   => $fournisseur?->nom ?? '',
             'clientPhone'         => preg_replace('/[^0-9]/', '', $fournisseur?->telephone ?? ''),
             'clientEmail'         => $fournisseur?->email ?? '',
