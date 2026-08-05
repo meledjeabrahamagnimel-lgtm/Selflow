@@ -206,7 +206,21 @@ class Vente extends Model
      */
     public function getNetAPayerAttribute(): float
     {
-        return (float) $this->montant_ttc + (float) ($this->montant_autres_taxes ?? 0);
+        return (float) $this->montant_ttc
+            + (float) ($this->montant_autres_taxes ?? 0)
+            + $this->timbre_quittance;
+    }
+
+    /**
+     * Droit de timbre de quittance dû sur cette vente.
+     *
+     * Le montant retenu par la plateforme fait foi dès qu'elle l'a renvoyé ;
+     * avant certification, il est établi au barème de l'article 873 du CGI.
+     * Voir TimbreQuittanceService.
+     */
+    public function getTimbreQuittanceAttribute(): float
+    {
+        return \App\Modules\Admin\Services\TimbreQuittanceService::pourVente($this);
     }
 
     /**

@@ -556,9 +556,11 @@ var DATA = {
         statut: {!! json_encode($vente->statut) !!},
         deja_paye: {{ $vente->type_facture === 'avoir' ? $vente->montant_ttc : ($dejaPaye ?? 0) }},
         autres_taxes_montant: {{ (float) ($vente->montant_autres_taxes ?? 0) }},
-        // Droit de timbre applique par la DGI sur les paiements en especes.
-        // Seule la plateforme le calcule : il n'existe qu'apres normalisation.
-        timbre_fiscal: {{ (float) ($vente->fne_timbre_fiscal ?? 0) }},
+        // Droit de timbre de quittance. Le montant renvoye par la plateforme
+        // fait foi ; avant normalisation, il est etabli au bareme de
+        // l'article 873 du CGI (voir TimbreQuittanceService).
+        timbre_fiscal: {{ (float) \App\Modules\Admin\Services\TimbreQuittanceService::pourVente($vente) }},
+        timbre_provenance: {!! json_encode(\App\Modules\Admin\Services\TimbreQuittanceService::provenance($vente)) !!},
         ref_bl: {!! json_encode(isset($bl) ? $bl->numero_bl : ($vente->etape === 'Bon de commande' ? ($vente->bonLivraison?->numero_bl ?? '') : ($vente->bonLivraisonSource?->numero_bl ?? ''))) !!},
         ref_bc: {!! json_encode(isset($bl) ? $bl->bonDeCommande->numero_facture : ($vente->etape === 'Bon de commande' ? $vente->numero_facture : (optional($vente->bonLivraisonSource?->bonDeCommande)->numero_facture ?? ''))) !!}
     }
@@ -691,6 +693,20 @@ function libelleTotalTva(c) {
  * Lignes « Autres taxes » + « Net a payer » du recapitulatif, au format des
  * modeles 1 a 3 (blocs en <div>).
  */
+/**
+ * Intitule du droit de timbre.
+ *
+ * Tant que la piece n'est pas certifiee, le montant vient du bareme de
+ * l'article 873 du CGI : c'est une estimation, fidele au texte mais que la
+ * plateforme n'a pas encore confirmee. Le dire evite qu'un ecart de tranche
+ * passe pour une erreur de caisse.
+ */
+function libelleTimbre(c) {
+    return c.timbre_provenance === 'dgi'
+        ? 'Timbre de quittance'
+        : 'Timbre de quittance (barème, avant certification)';
+}
+
 function blocAutresTaxesDiv(c, couleur) {
     if (c.tot_autres_taxes <= 0 && c.timbre <= 0) return '';
 
@@ -699,7 +715,7 @@ function blocAutresTaxesDiv(c, couleur) {
     ).join('');
 
     if (c.timbre > 0) {
-        lignes += `<div style="display:flex;justify-content:space-between;padding:6px 0;font-size:12px;border-bottom:0.5px solid var(--border)"><span style="color:var(--mu)">Timbre de quittance</span><span>${fmtFcfa(c.timbre)}</span></div>`;
+        lignes += `<div style="display:flex;justify-content:space-between;padding:6px 0;font-size:12px;border-bottom:0.5px solid var(--border)"><span style="color:var(--mu)">${libelleTimbre(c)}</span><span>${fmtFcfa(c.timbre)}</span></div>`;
     }
 
     return lignes +
@@ -717,7 +733,7 @@ function blocAutresTaxesTr(c, colonnes) {
                 <td style="padding:6px 10px; border:1px solid #000; text-align:right; font-weight:600; white-space:nowrap;">${fmt(t.montant)}</td>
             </tr>`).join('') + (c.timbre > 0 ? `
             <tr>
-                <td colspan="${colonnes}" style="padding:6px 10px; border:1px solid #000; text-align:right; font-weight:600;">Timbre de quittance</td>
+                <td colspan="${colonnes}" style="padding:6px 10px; border:1px solid #000; text-align:right; font-weight:600;">${libelleTimbre(c)}</td>
                 <td style="padding:6px 10px; border:1px solid #000; text-align:right; font-weight:600; white-space:nowrap;">${fmt(c.timbre)}</td>
             </tr>` : '') + `
             <tr>
@@ -934,6 +950,7 @@ function getThemeColors() {
 
 function model1(d) {
     var c = calcItems(d.items, d.remise, d.taxes_ttc, d.timbre_fiscal);
+    c.timbre_provenance = d.timbre_provenance;
     var theme = getThemeColors();
     var sColor = statusColor(d.statut, theme.color);
     var title = getDocTitle(d);
@@ -1064,6 +1081,7 @@ function model1(d) {
 
 function model2(d) {
     var c = calcItems(d.items, d.remise, d.taxes_ttc, d.timbre_fiscal);
+    c.timbre_provenance = d.timbre_provenance;
     var theme = getThemeColors();
     var sColor = statusColor(d.statut, theme.color);
     var title = getDocTitle(d);
@@ -1192,6 +1210,7 @@ function model2(d) {
 
 function model3(d) {
     var c = calcItems(d.items, d.remise, d.taxes_ttc, d.timbre_fiscal);
+    c.timbre_provenance = d.timbre_provenance;
     var theme = getThemeColors();
     var sColor = statusColor(d.statut, theme.color);
     var title = getDocTitle(d);
@@ -1336,6 +1355,7 @@ function model3(d) {
 
 function modelStandard(d) {
     var c = calcItems(d.items, d.remise, d.taxes_ttc, d.timbre_fiscal);
+    c.timbre_provenance = d.timbre_provenance;
     var isNorm = d.normalise;
     var title = getDocTitle(d);
     var hasTva = d.items.some(r => r.tva > 0);
@@ -1551,7 +1571,7 @@ function modelStandard(d) {
                         </tr>`).join('')}
                         ${c.timbre > 0 ? `
                         <tr>
-                            <td style="padding:5px 8px; border:1px solid #000;">Timbre de quittance</td>
+                            <td style="padding:5px 8px; border:1px solid #000;">${libelleTimbre(c)}</td>
                             <td style="padding:5px 8px; border:1px solid #000; text-align:right;">—</td>
                             <td style="padding:5px 8px; border:1px solid #000; text-align:right;">—</td>
                             <td style="padding:5px 8px; border:1px solid #000; text-align:right;">${fmtFcfa(c.timbre)}</td>

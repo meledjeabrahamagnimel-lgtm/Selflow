@@ -230,6 +230,12 @@
                     </div>
                     <div class="total-row"><span>Total TTC</span><span id="totalTtc">0 F</span></div>
                     <div class="total-row"><span>Autres taxes</span><span id="totalAutresTaxes">0 F</span></div>
+                    {{-- Droit de timbre de quittance, bareme de l'article 873 du CGI.
+                         N'apparait que sur un reglement en especes, et seulement si
+                         l'option est declaree active dans les parametres. --}}
+                    <div class="total-row" id="ligneTimbre" style="display:none;">
+                        <span>Timbre de quittance</span><span id="totalTimbre">0 F</span>
+                    </div>
                     <div class="total-row grand"><span>Net à payer</span><span id="netAPayer">0 F</span></div>
                 </div>
 
@@ -675,6 +681,10 @@ function selectionnerModePaiement(btn) {
         montantInput.placeholder = "Saisir le montant reçu / payé";
         labelMontant.innerHTML   = 'Montant à encaisser / reçu <span style="color:var(--danger)">*</span>';
     }
+
+    // Le droit de timbre ne frappe que les reglements en especes : changer de
+    // mode de paiement le fait apparaitre ou disparaitre du net a payer.
+    calculerTotaux();
 }
 
 function changerDevise(code) {
@@ -1369,6 +1379,35 @@ function basculerChampRne() {
  * Ordre de calcul aligné sur le récapitulatif de la FNE :
  *   Total HT → remise ligne → remise globale → TVA → TTC → autres taxes.
  */
+/**
+ * Droit de timbre de quittance — bareme de l'article 873 du CGI.
+ *
+ * Meme table que TimbreQuittanceService cote serveur, qui fait foi. Le calcul
+ * est repris ici pour que le caissier voie la somme a encaisser sans attendre
+ * la normalisation. Les bornes sont inclusives : 5 000 F n'est pas timbre.
+ */
+const BAREME_TIMBRE = [
+    [5000, 0], [100000, 100], [500000, 500], [1000000, 1000], [5000000, 2000],
+];
+const TIMBRE_TRANCHE_SUPERIEURE = 5000;
+
+/** L'option est declaree active dans les parametres de l'entreprise. */
+const TIMBRE_DECLARE_ACTIF = {{ Auth::user()->entreprise->timbre_quittance ? 'true' : 'false' }};
+
+function timbreDeQuittance(sommeEncaissee, modePaiement) {
+    if (!TIMBRE_DECLARE_ACTIF || sommeEncaissee <= 0) return 0;
+
+    // Le timbre frappe la quittance, c'est-a-dire la piece qui constate un
+    // versement d'especes. Un reglement par banque laisse sa propre trace.
+    const especes = ['caisse', 'especes', 'espèces', 'cash'];
+    if (!especes.includes(String(modePaiement || '').toLowerCase().trim())) return 0;
+
+    for (const [plafond, droit] of BAREME_TIMBRE) {
+        if (sommeEncaissee <= plafond) return droit;
+    }
+    return TIMBRE_TRANCHE_SUPERIEURE;
+}
+
 function calculerTotaux() {
     let totalHt = 0;
 
@@ -1423,11 +1462,20 @@ function calculerTotaux() {
     document.getElementById('totalTva').textContent         = formatFcfa(totalTva);
     document.getElementById('totalTtc').textContent         = formatFcfa(totalTtc);
     document.getElementById('totalAutresTaxes').textContent = formatFcfa(totalAutresTaxes);
-    document.getElementById('netAPayer').textContent        = formatFcfa(totalTtc + totalAutresTaxes);
+
+    // Le timbre porte sur la somme reellement encaissee, taxes comprises.
+    const modePaiement = document.getElementById('modePaiementInput')?.value;
+    const timbre = timbreDeQuittance(totalTtc + totalAutresTaxes, modePaiement);
+    const ligneTimbre = document.getElementById('ligneTimbre');
+    if (ligneTimbre) ligneTimbre.style.display = timbre > 0 ? '' : 'none';
+    document.getElementById('totalTimbre').textContent = formatFcfa(timbre);
+
+    const netAPayer = totalTtc + totalAutresTaxes + timbre;
+    document.getElementById('netAPayer').textContent = formatFcfa(netAPayer);
 
     const inputMontant = document.getElementById('montantPayeInput');
     if (inputMontant) {
-        inputMontant.placeholder = `${Math.round(totalTtc)}`;
+        inputMontant.placeholder = `${Math.round(netAPayer)}`;
     }
 }
 

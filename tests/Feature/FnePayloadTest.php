@@ -509,6 +509,89 @@ class FnePayloadTest extends TestCase
         ];
     }
 
+    // ─── Droit de timbre de quittance (article 873 du CGI) ───────────────
+
+    #[\PHPUnit\Framework\Attributes\DataProvider('baremeArticle873')]
+    public function test_le_bareme_legal_du_timbre_de_quittance(float $somme, float $attendu): void
+    {
+        $this->assertSame(
+            $attendu,
+            \App\Modules\Admin\Services\TimbreQuittanceService::montantDu($somme)
+        );
+    }
+
+    public static function baremeArticle873(): array
+    {
+        return [
+            // Tranche 0 – 5 000 : aucun droit. La borne est inclusive.
+            'somme nulle'          => [0.0, 0.0],
+            'borne haute exoneree' => [5_000.0, 0.0],
+            // Tranche 5 001 – 100 000 : 100 F. Les deux factures certifiees
+            // par la DGI le 4 aout 2026 y tombaient — 16 700 et 29 382 F —
+            // et ont bien recu 100 F.
+            'premier franc taxe'   => [5_001.0, 100.0],
+            'facture 16 700'       => [16_700.0, 100.0],
+            'facture 29 382'       => [29_382.0, 100.0],
+            'borne haute 100 000'  => [100_000.0, 100.0],
+            // Tranche 100 001 – 500 000 : 500 F. La facture de 270 900 F
+            // relevait de cette tranche.
+            'facture 270 900'      => [270_900.0, 500.0],
+            'borne haute 500 000'  => [500_000.0, 500.0],
+            'tranche 1 000 000'    => [750_000.0, 1_000.0],
+            'tranche 5 000 000'    => [3_000_000.0, 2_000.0],
+            'au-dela de 5 000 000' => [8_000_000.0, 5_000.0],
+        ];
+    }
+
+    public function test_le_timbre_ne_frappe_que_les_reglements_en_especes(): void
+    {
+        $this->entreprise->update(['timbre_quittance' => true]);
+
+        $especes = $this->venteMinimale(['mode_paiement' => 'Caisse', 'montant_ttc' => 23600]);
+        $this->assertSame(100.0, $especes->timbre_quittance);
+
+        // Un virement laisse sa propre trace : la quittance ne s'y applique pas.
+        $virement = $this->venteMinimale(['mode_paiement' => 'Banque', 'montant_ttc' => 23600]);
+        $this->assertSame(0.0, $virement->timbre_quittance);
+    }
+
+    public function test_le_montant_renvoye_par_la_plateforme_prime_sur_le_bareme(): void
+    {
+        $this->entreprise->update(['timbre_quittance' => true]);
+
+        // Barème : 500 F pour cette tranche. Mais la DGI a retenu 0 — l'option
+        // était décochée sur la plateforme au moment de la certification.
+        $vente = $this->venteMinimale([
+            'mode_paiement'     => 'Caisse',
+            'montant_ttc'       => 270_900,
+            'fne_timbre_fiscal' => 0,
+        ]);
+
+        $this->assertSame(0.0, $vente->timbre_quittance);
+        $this->assertSame(270_900.0, $vente->net_a_payer);
+    }
+
+    public function test_le_timbre_entre_dans_le_net_a_payer(): void
+    {
+        $this->entreprise->update(['timbre_quittance' => true]);
+
+        $vente = $this->venteMinimale(['mode_paiement' => 'Caisse', 'montant_ttc' => 16_700]);
+
+        $this->assertSame(16_800.0, $vente->net_a_payer);
+    }
+
+    public function test_sans_option_declaree_aucun_timbre_n_est_annonce(): void
+    {
+        // La case reflete le reglage de la plateforme FNE : sans elle, annoncer
+        // un timbre reviendrait a reclamer au client une somme que la DGI ne
+        // retiendra pas.
+        $this->entreprise->update(['timbre_quittance' => false]);
+
+        $vente = $this->venteMinimale(['mode_paiement' => 'Caisse', 'montant_ttc' => 16_700]);
+
+        $this->assertSame(0.0, $vente->timbre_quittance);
+    }
+
     // ─── Code QR de vérification ─────────────────────────────────────────
 
     public function test_le_code_qr_encode_le_jeton_renvoye_par_la_plateforme(): void
