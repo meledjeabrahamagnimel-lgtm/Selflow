@@ -27,31 +27,7 @@
 
 @section('contenu')
 
-<div class="fne-filtres">
-    <div class="form-group">
-        <label>Période</label>
-        <select id="f-periode-type" class="form-control" onchange="rafraichirSituation()">
-            <option value="jour">Jour</option>
-            <option value="semaine">Semaine</option>
-            <option value="mois" selected>Mois</option>
-            <option value="annee">Année</option>
-        </select>
-    </div>
-    <div class="form-group">
-        <label>Date de référence</label>
-        <input type="date" id="f-date" class="form-control" value="{{ date('Y-m-d') }}" onchange="rafraichirSituation()">
-    </div>
-    <div class="form-group">
-        <label>Point de vente</label>
-        <select id="f-pdv" class="form-control" onchange="rafraichirSituation()">
-            <option value="tous">Tous les sites</option>
-            @foreach($pointsDeVente as $pdv)
-                <option value="{{ $pdv->id }}">{{ $pdv->nom }}</option>
-            @endforeach
-        </select>
-    </div>
-    <button class="btn btn-primary" onclick="rafraichirSituation()"><i class="fas fa-rotate"></i> Actualiser</button>
-</div>
+@include('admin::fne.partials.filtre-periode', ['onChange' => 'rafraichirSituation()'])
 
 <div class="kpi-grid">
     <div class="kpi-card"><div class="lbl">Chiffre d'affaires réel (TTC)</div><div class="val" id="k-ca">0 F</div><div class="sub">Normalisé + non normalisé, avoirs déduits</div></div>
@@ -134,11 +110,7 @@ function appliquerDonneesSituation(d) {
 }
 
 function rafraichirSituation() {
-    const params = new URLSearchParams({
-        periode_type: document.getElementById('f-periode-type').value,
-        date: document.getElementById('f-date').value,
-        pdv_id: document.getElementById('f-pdv').value,
-    });
+    const params = parametresFiltreFne();
 
     fetch("{{ route('admin.fne.situation.donnees') }}?" + params.toString())
         .then(r => r.json())

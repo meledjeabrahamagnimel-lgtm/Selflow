@@ -495,7 +495,9 @@ function updateWeeksSelect() {
             semaineSelect.innerHTML += `<option value="${s}">Semaine ${s}</option>`;
         }
     } else {
-        const year = new Date().getFullYear();
+        // Annee de l'exercice ouvert, et non celle de l'horloge du navigateur :
+        // c'est elle qui donne son sens au numero de semaine cote serveur.
+        const year = {{ (int) date('Y', strtotime(session('active_periode_debut') ?: 'now')) }};
         const m = parseInt(moisVal) - 1;
         const weeks = new Set();
         const firstDay = new Date(year, m, 1);

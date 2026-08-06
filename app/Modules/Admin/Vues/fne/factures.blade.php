@@ -34,35 +34,10 @@
 
 @section('contenu')
 
-<div class="fne-filtres">
-    <div class="form-group">
-        <label>Période</label>
-        <select id="f-periode-type" class="form-control" onchange="page=1;rafraichirFactures();">
-            <option value="jour">Jour</option>
-            <option value="semaine">Semaine</option>
-            <option value="mois" selected>Mois</option>
-            <option value="annee">Année</option>
-        </select>
-    </div>
-    <div class="form-group">
-        <label>Date de référence</label>
-        <input type="date" id="f-date" class="form-control" value="{{ date('Y-m-d') }}" onchange="page=1;rafraichirFactures();">
-    </div>
-    <div class="form-group">
-        <label>Point de vente</label>
-        <select id="f-pdv" class="form-control" onchange="page=1;rafraichirFactures();">
-            <option value="tous">Tous les sites</option>
-            @foreach($pointsDeVente as $pdv)
-                <option value="{{ $pdv->id }}">{{ $pdv->nom }}</option>
-            @endforeach
-        </select>
-    </div>
-    <div class="form-group" style="flex:1; min-width:220px;">
-        <label>Recherche (n° pièce, n° FNE, tiers)</label>
-        <input type="text" id="f-recherche" class="form-control" placeholder="Rechercher..." oninput="page=1;debouncedRafraichir();">
-    </div>
-    <button class="btn btn-primary" onclick="page=1;rafraichirFactures();"><i class="fas fa-rotate"></i> Actualiser</button>
-</div>
+@include('admin::fne.partials.filtre-periode', [
+    'onChange' => 'page=1;rafraichirFactures();',
+    'avant'    => 'admin::fne.partials.champ-recherche',
+])
 
 <div class="flux-toggle">
     <button id="btn-flux-ventes" class="active" onclick="changerFlux('ventes')"><i class="fas fa-arrow-down" style="color:#10b981;"></i> Ventes</button>
@@ -166,15 +141,11 @@ function pagePrecedente() { if (page > 1) { page--; rafraichirFactures(); } }
 function pageSuivante() { if (page < dernierePagination.derniere_page) { page++; rafraichirFactures(); } }
 
 function rafraichirFactures() {
-    const params = new URLSearchParams({
-        flux: flux,
-        categorie: categorie,
-        periode_type: document.getElementById('f-periode-type').value,
-        date: document.getElementById('f-date').value,
-        pdv_id: document.getElementById('f-pdv').value,
-        recherche: document.getElementById('f-recherche').value,
-        page: page,
-    });
+    const params = parametresFiltreFne();
+    params.set('flux', flux);
+    params.set('categorie', categorie);
+    params.set('recherche', document.getElementById('f-recherche').value);
+    params.set('page', page);
 
     document.getElementById('corps-table').innerHTML = '<tr><td colspan="13" style="text-align:center; padding:30px; color:var(--text-3);"><i class="fas fa-spinner fa-spin"></i> Chargement...</td></tr>';
 

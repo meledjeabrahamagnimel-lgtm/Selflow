@@ -7,6 +7,7 @@ use App\Modules\Admin\Modeles\MouvementStock;
 use App\Modules\Admin\Modeles\Produit;
 use App\Modules\Admin\Modeles\TresorerieJournal;
 use App\Modules\Admin\Modeles\Vente;
+use App\Modules\Admin\Services\FiltrePeriodeService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -17,6 +18,22 @@ use Illuminate\View\View;
 class AdminControleur
 {
     /**
+     * Somme d'une colonne de montant, avoirs deduits.
+     *
+     * Un avoir annule tout ou partie d'une piece : son montant se retranche du
+     * total. Les tableaux de bord l'additionnaient, si bien qu'annuler une
+     * vente faisait monter le chiffre d'affaires. Les ecrans FNE, eux, le
+     * deduisaient deja — d'ou des montants differents d'une page a l'autre.
+     *
+     * @param  \Illuminate\Database\Eloquent\Builder  $query
+     */
+    private static function montantNetDesAvoirs($query, string $colonne = 'montant_ttc'): float
+    {
+        return (float) (clone $query)->where('type_facture', '!=', 'avoir')->sum($colonne)
+             - (float) (clone $query)->where('type_facture', 'avoir')->sum($colonne);
+    }
+
+    /**
      * Afficher le tableau de bord de l'administrateur (activité personnelle).
      */
     public function tableauDeBord(Request $request): View
@@ -26,83 +43,37 @@ class AdminControleur
         $pointDeVenteId = session('point_de_vente_actif_id');
         $aujourd_hui    = now()->toDateString();
 
-        $filtreMois    = $request->query('filtre_mois', 'tous');
-        $filtreSemaine = $request->query('filtre_semaine', 'tous');
-        $filtreJour    = $request->query('filtre_jour', 'tous');
-
-        $periodeLabel = session('active_periode_nom', 'période en cours');
-
         // ── Ventes personnelles ──────────────────────────────────────
         // `sansDoublonRecu` ecarte les recus deja remplaces par leur facture :
         // sans cela, le meme chiffre d'affaires serait compte deux fois.
-        $qVentes = Vente::sansDoublonRecu()->where('utilisateur_id', $utilisateur->id);
+        $qVentes = Vente::sansDoublonRecu()->where('utilisateur_id', $utilisateur->id)->where('etape', 'Facture');
         // ── Achats personnels ─────────────────────────────────────────
-        $qAchats = Achat::where('utilisateur_id', $utilisateur->id);
+        $qAchats = Achat::where('utilisateur_id', $utilisateur->id)->where('etape', 'Facture');
 
-        if ($filtreMois !== 'tous' || $filtreSemaine !== 'tous' || $filtreJour !== 'tous') {
-            $debutPeriode = session('active_periode_debut');
-            $annee = $debutPeriode ? date('Y', strtotime($debutPeriode)) : date('Y');
-
-            if ($filtreMois !== 'tous') {
-                $qVentes->whereMonth('date_vente', $filtreMois);
-                $qAchats->whereMonth('date_achat', $filtreMois);
-                $moisNoms = ['Janvier','Février','Mars','Avril','Mai','Juin','Juillet','Août','Septembre','Octobre','Novembre','Décembre'];
-                $periodeLabel = $moisNoms[$filtreMois - 1] ?? 'Mois ' . $filtreMois;
-            }
-            if ($filtreJour !== 'tous') {
-                $qVentes->whereDay('date_vente', $filtreJour);
-                $qAchats->whereDay('date_achat', $filtreJour);
-                $periodeLabel = $filtreMois !== 'tous' ? $filtreJour . ' ' . $periodeLabel : 'Jour ' . $filtreJour;
-            }
-            if ($filtreSemaine !== 'tous') {
-                $qVentes->whereRaw('WEEK(date_vente, 1) = ?', [$filtreSemaine]);
-                $qAchats->whereRaw('WEEK(date_achat, 1) = ?', [$filtreSemaine]);
-                
-                if ($filtreMois !== 'tous') {
-                    $weeks = [];
-                    $firstDay = new \DateTime("$annee-$filtreMois-01");
-                    $lastDay = (clone $firstDay)->modify('last day of this month');
-                    for ($d = clone $firstDay; $d <= $lastDay; $d->modify('+1 day')) {
-                        $tempDate = clone $d;
-                        $tempDate->modify('this Monday');
-                        $weekNo = (int)$tempDate->format('W');
-                        if (!in_array($weekNo, $weeks)) {
-                            $weeks[] = $weekNo;
-                        }
-                    }
-                    sort($weeks);
-                    $relativeIdx = array_search((int)$filtreSemaine, $weeks);
-                    $periodeLabel = "Semaine " . ($relativeIdx !== false ? ($relativeIdx + 1) : $filtreSemaine);
-                } else {
-                    $periodeLabel = "Semaine " . $filtreSemaine;
-                }
-            }
-
-            $qVentes->whereYear('date_vente', $annee);
-            $qAchats->whereYear('date_achat', $annee);
-        } else {
-            // Aucun filtre : on s'en remet a la periode comptable active, que
-            // le PeriodeScope applique deja aux deux requetes.
-            $periodeLabel = session('active_periode_nom', 'période en cours');
-        }
+        // Un seul resolveur pour tous les tableaux de bord, FNE compris : voir
+        // FiltrePeriodeService. Chaque ecran resolvait sa periode a sa maniere,
+        // et deux pages ouvertes cote a cote annonçaient des chiffres
+        // differents pour ce que l'utilisateur croyait etre le meme perimetre.
+        FiltrePeriodeService::appliquer($qVentes, 'date_vente', $request);
+        FiltrePeriodeService::appliquer($qAchats, 'date_achat', $request);
+        $periodeLabel = FiltrePeriodeService::libelle($request);
 
         if ($pointDeVenteId) {
             $qVentes->where('point_de_vente_id', $pointDeVenteId);
             $qAchats->where('point_de_vente_id', $pointDeVenteId);
         }
 
-        $ventesAujourdhui  = $qVentes->get();
-        $montantVentesJour = $ventesAujourdhui->sum('montant_ttc');
-        $nbVentesJour      = $ventesAujourdhui->count();
-        $montantAchatsJour = $qAchats->sum('montant_ttc');
+        $montantVentesJour = self::montantNetDesAvoirs($qVentes);
+        $nbVentesJour      = (clone $qVentes)->where('type_facture', '!=', 'avoir')->count();
+        $montantAchatsJour = self::montantNetDesAvoirs($qAchats);
 
         // ── Ventes de la période (via PeriodeScope) ───────────────────────────
         $qVentesPeriode = Vente::sansDoublonRecu()
             ->where('utilisateur_id', $utilisateur->id)
             ->where('etape', 'Facture');
         if ($pointDeVenteId) $qVentesPeriode->where('point_de_vente_id', $pointDeVenteId);
-        $totalVentesPeriode = $qVentesPeriode->sum('montant_ttc');
-        $nbVentesPeriode    = $qVentesPeriode->count();
+        $totalVentesPeriode = self::montantNetDesAvoirs($qVentesPeriode);
+        $nbVentesPeriode    = (clone $qVentesPeriode)->where('type_facture', '!=', 'avoir')->count();
 
         // ── Solde trésorerie personnel ────────────────────────────────────────
         $qTreso = TresorerieJournal::where('utilisateur_id', $utilisateur->id);
@@ -179,89 +150,48 @@ class AdminControleur
 
         $pdvIds = $entreprise->pointsDeVente()->pluck('id');
 
-        $filtreMois    = $request->query('filtre_mois', 'tous');
-        $filtreSemaine = $request->query('filtre_semaine', 'tous');
-        $filtreJour    = $request->query('filtre_jour', 'tous');
-
-        $periodeLabel = session('active_periode_nom', 'période en cours');
-
         // ── CA global ─────────────────────────────────────────────────
-        $qVentes = Vente::whereIn('point_de_vente_id', $pdvIds);
+        // `sansDoublonRecu` ecarte les recus deja remplaces par leur facture, et
+        // `etape = Facture` ecarte devis et bons de commande : sans ces deux
+        // conditions, un devis en attente et un recu deja converti gonflaient le
+        // chiffre d'affaires. Les ecrans FNE les appliquent depuis toujours ;
+        // les deux pages annoncaient donc des montants differents.
+        $qVentes = Vente::sansDoublonRecu()->whereIn('point_de_vente_id', $pdvIds)->where('etape', 'Facture');
         // ── Achats globaux ────────────────────────────────────────────
-        $qAchats = Achat::whereIn('point_de_vente_id', $pdvIds);
+        $qAchats = Achat::whereIn('point_de_vente_id', $pdvIds)->where('etape', 'Facture');
 
-        if ($filtreMois !== 'tous' || $filtreSemaine !== 'tous' || $filtreJour !== 'tous') {
-            $debutPeriode = session('active_periode_debut');
-            $annee = $debutPeriode ? date('Y', strtotime($debutPeriode)) : date('Y');
-
-            if ($filtreMois !== 'tous') {
-                $qVentes->whereMonth('date_vente', $filtreMois);
-                $qAchats->whereMonth('date_achat', $filtreMois);
-                $moisNoms = ['Janvier','Février','Mars','Avril','Mai','Juin','Juillet','Août','Septembre','Octobre','Novembre','Décembre'];
-                $periodeLabel = $moisNoms[$filtreMois - 1] ?? 'Mois ' . $filtreMois;
-            }
-            if ($filtreJour !== 'tous') {
-                $qVentes->whereDay('date_vente', $filtreJour);
-                $qAchats->whereDay('date_achat', $filtreJour);
-                $periodeLabel = $filtreMois !== 'tous' ? $filtreJour . ' ' . $periodeLabel : 'Jour ' . $filtreJour;
-            }
-            if ($filtreSemaine !== 'tous') {
-                $qVentes->whereRaw('WEEK(date_vente, 1) = ?', [$filtreSemaine]);
-                $qAchats->whereRaw('WEEK(date_achat, 1) = ?', [$filtreSemaine]);
-                
-                if ($filtreMois !== 'tous') {
-                    $weeks = [];
-                    $firstDay = new \DateTime("$annee-$filtreMois-01");
-                    $lastDay = (clone $firstDay)->modify('last day of this month');
-                    for ($d = clone $firstDay; $d <= $lastDay; $d->modify('+1 day')) {
-                        $tempDate = clone $d;
-                        $tempDate->modify('this Monday');
-                        $weekNo = (int)$tempDate->format('W');
-                        if (!in_array($weekNo, $weeks)) {
-                            $weeks[] = $weekNo;
-                        }
-                    }
-                    sort($weeks);
-                    $relativeIdx = array_search((int)$filtreSemaine, $weeks);
-                    $periodeLabel = "Semaine " . ($relativeIdx !== false ? ($relativeIdx + 1) : $filtreSemaine);
-                } else {
-                    $periodeLabel = "Semaine " . $filtreSemaine;
-                }
-            }
-
-            $qVentes->whereYear('date_vente', $annee);
-            $qAchats->whereYear('date_achat', $annee);
-        } else {
-            // Aucun filtre : on s'en remet a la periode comptable active, que
-            // le PeriodeScope applique deja aux deux requetes.
-            $periodeLabel = session('active_periode_nom', 'période en cours');
-        }
+        // Meme resolveur que le tableau de bord personnel et que les ecrans FNE.
+        FiltrePeriodeService::appliquer($qVentes, 'date_vente', $request);
+        FiltrePeriodeService::appliquer($qAchats, 'date_achat', $request);
+        $periodeLabel = FiltrePeriodeService::libelle($request);
 
         if ($pointDeVenteId) {
             $qVentes->where('point_de_vente_id', $pointDeVenteId);
             $qAchats->where('point_de_vente_id', $pointDeVenteId);
         }
 
-        $ventesAujourdhui  = $qVentes->get();
-        $montantVentesJour = $ventesAujourdhui->sum('montant_ttc');
-        $nbVentesJour      = $ventesAujourdhui->count();
-        $montantAchatsJour = $qAchats->sum('montant_ttc');
+        // Un avoir annule tout ou partie d'une facture : il se retranche du
+        // chiffre d'affaires. Il etait additionne, si bien qu'annuler une vente
+        // faisait monter le CA au lieu de le faire baisser.
+        $montantVentesJour = self::montantNetDesAvoirs($qVentes);
+        $nbVentesJour      = (clone $qVentes)->where('type_facture', '!=', 'avoir')->count();
+        $montantAchatsJour = self::montantNetDesAvoirs($qAchats);
 
         // ── CA global de la période (via PeriodeScope) ────────────────────────
         $qVentesPeriode = Vente::sansDoublonRecu()->whereIn('point_de_vente_id', $pdvIds)->where('etape', 'Facture');
         if ($pointDeVenteId) $qVentesPeriode->where('point_de_vente_id', $pointDeVenteId);
-        $totalVentesPeriode = $qVentesPeriode->sum('montant_ttc');
-        $nbVentesPeriode    = $qVentesPeriode->count();
+        $totalVentesPeriode = self::montantNetDesAvoirs($qVentesPeriode);
+        $nbVentesPeriode    = (clone $qVentesPeriode)->where('type_facture', '!=', 'avoir')->count();
 
         // ── Achats de la période ──────────────────────────────────────────────
         $qAchatsPeriode = Achat::whereIn('point_de_vente_id', $pdvIds)->where('etape', 'Facture');
         if ($pointDeVenteId) $qAchatsPeriode->where('point_de_vente_id', $pointDeVenteId);
-        $totalAchatsPeriode = $qAchatsPeriode->sum('montant_ttc');
+        $totalAchatsPeriode = self::montantNetDesAvoirs($qAchatsPeriode);
 
         // ── Marge brute de la période ─────────────────────────────────────────
         $qVentesHT  = Vente::sansDoublonRecu()->whereIn('point_de_vente_id', $pdvIds)->where('etape', 'Facture');
         if ($pointDeVenteId) $qVentesHT->where('point_de_vente_id', $pointDeVenteId);
-        $totalVentesHTPeriode = $qVentesHT->sum('montant_ht');
+        $totalVentesHTPeriode = self::montantNetDesAvoirs($qVentesHT, 'montant_ht');
         $margeBrutePeriode    = $totalVentesHTPeriode - $totalAchatsPeriode;
         $tauxMargePeriode     = $totalVentesHTPeriode > 0
             ? round(($margeBrutePeriode / $totalVentesHTPeriode) * 100, 1)

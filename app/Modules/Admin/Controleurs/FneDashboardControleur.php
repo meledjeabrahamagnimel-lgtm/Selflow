@@ -10,6 +10,7 @@ use App\Modules\Admin\Modeles\OrdreProduction;
 use App\Modules\Admin\Modeles\TransfertStock;
 use App\Modules\Admin\Modeles\EcritureComptable;
 use App\Modules\Admin\Modeles\TaxConfiguration;
+use App\Modules\Admin\Services\FiltrePeriodeService;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Auth;
@@ -120,15 +121,15 @@ class FneDashboardControleur
         // Un recu deja remplace par sa facture ne doit pas compter deux fois
         $ventesQuery = Vente::sansDoublonRecu()
             ->whereHas('pointDeVente', fn($q) => $q->where('entreprise_id', $entrepriseId))
-            ->whereBetween('date_vente', [$debut, $fin])
             ->where('etape', 'Facture')
             ->where('normalise', true);
+        $this->filtrerPeriode($ventesQuery, 'date_vente', $request);
         if ($pdvId && $pdvId !== 'tous') $ventesQuery->where('point_de_vente_id', $pdvId);
 
         $achatsQuery = Achat::whereHas('pointDeVente', fn($q) => $q->where('entreprise_id', $entrepriseId))
-            ->whereBetween('date_achat', [$debut, $fin])
             ->where('etape', 'Facture')
             ->where('normalise', true);
+        $this->filtrerPeriode($achatsQuery, 'date_achat', $request);
         if ($pdvId && $pdvId !== 'tous') $achatsQuery->where('point_de_vente_id', $pdvId);
 
         // 4. Timbre de quittance de la période.
@@ -178,8 +179,8 @@ class FneDashboardControleur
         // Proforma : devis et bons de commande de la periode. Ils ne sont pas
         // normalises, donc hors de $ventesQuery ; le compteur restait a zero.
         $proformaVente = Vente::whereHas('pointDeVente', fn($q) => $q->where('entreprise_id', $entrepriseId))
-            ->whereBetween('date_vente', [$debut, $fin])
             ->whereIn('etape', ['Devis', 'Bon de commande']);
+        $this->filtrerPeriode($proformaVente, 'date_vente', $request);
         if ($pdvId && $pdvId !== 'tous') $proformaVente->where('point_de_vente_id', $pdvId);
 
         $facturesAchat = (clone $achatsQuery)->where(function($q) { $q->whereNull('type_facture')->orWhereNotIn('type_facture', ['avoir', 'bapa']); });
@@ -191,7 +192,7 @@ class FneDashboardControleur
         $totalRemiseVente = (clone $ventesQuery)->where('type_facture', '!=', 'avoir')->sum('remise');
 
         return [
-            'periode' => ['debut' => $debut->toDateString(), 'fin' => $fin->toDateString()],
+            'periode' => ['debut' => $debut->toDateString(), 'fin' => $fin->toDateString(), 'libelle' => FiltrePeriodeService::libelle($request)],
 
             // Indicateurs propres à la plateforme DGI
             'mode_facturation'  => $mode_facturation,
@@ -352,14 +353,17 @@ class FneDashboardControleur
         [$debut, $fin] = $this->resoudrePeriode($request);
         $pdvId = $request->input('pdv_id');
 
-        $ventesQuery = Vente::whereHas('pointDeVente', fn($q) => $q->where('entreprise_id', $entrepriseId))
-            ->whereBetween('date_vente', [$debut, $fin])
+        // `sansDoublonRecu` manquait ici, alors qu'il est applique partout
+        // ailleurs : un recu deja remplace par sa facture etait compte deux fois.
+        $ventesQuery = Vente::sansDoublonRecu()
+            ->whereHas('pointDeVente', fn($q) => $q->where('entreprise_id', $entrepriseId))
             ->where('etape', 'Facture');
+        $this->filtrerPeriode($ventesQuery, 'date_vente', $request);
         if ($pdvId && $pdvId !== 'tous') $ventesQuery->where('point_de_vente_id', $pdvId);
 
         $achatsQuery = Achat::whereHas('pointDeVente', fn($q) => $q->where('entreprise_id', $entrepriseId))
-            ->whereBetween('date_achat', [$debut, $fin])
             ->where('etape', 'Facture');
+        $this->filtrerPeriode($achatsQuery, 'date_achat', $request);
         if ($pdvId && $pdvId !== 'tous') $achatsQuery->where('point_de_vente_id', $pdvId);
 
         $caReel = (clone $ventesQuery)->where('type_facture', '!=', 'avoir')->sum('montant_ttc')
@@ -368,46 +372,60 @@ class FneDashboardControleur
                     - (clone $achatsQuery)->where('type_facture', 'avoir')->sum('montant_ttc');
 
         // Trésorerie nette encaissée sur la période (entrées - sorties réellement mouvementées)
-        $tresoQuery = TresorerieJournal::whereHas('pointDeVente', fn($q) => $q->where('entreprise_id', $entrepriseId))
-            ->whereBetween('date_operation', [$debut, $fin]);
+        $tresoQuery = TresorerieJournal::whereHas('pointDeVente', fn($q) => $q->where('entreprise_id', $entrepriseId));
+        $this->filtrerPeriode($tresoQuery, 'date_operation', $request);
         if ($pdvId && $pdvId !== 'tous') $tresoQuery->where('point_de_vente_id', $pdvId);
         $entrees = (clone $tresoQuery)->sum('montant_entree');
         $sorties = (clone $tresoQuery)->sum('montant_sortie');
 
+        // Taux de conformite : part des ventes certifiees dans les ventes emises.
+        //
+        // Il etait rapporte au chiffre d'affaires reel, dont les avoirs sont
+        // deduits, alors que son numerateur les ignore. Avec 502 382 F d'avoirs
+        // sur la periode, le rapport montait a 145,9 % — un taux de conformite
+        // superieur a 100 % n'ayant aucun sens. Les deux termes portent
+        // desormais sur le meme perimetre : les ventes hors avoirs.
         $ventesNormalisees = (clone $ventesQuery)->where('normalise', true)->where('type_facture', '!=', 'avoir')->sum('montant_ttc');
-        $tauxConformite = $caReel > 0 ? round(($ventesNormalisees / $caReel) * 100, 1) : 0;
+        $ventesEmises      = (clone $ventesQuery)->where('type_facture', '!=', 'avoir')->sum('montant_ttc');
+        $tauxConformite    = $ventesEmises > 0 ? round(($ventesNormalisees / $ventesEmises) * 100, 1) : 0;
 
         // Déclaré vs non déclaré (vente)
         $venteNormaliseesCount = (clone $ventesQuery)->where('normalise', true)->where('type_facture', '!=', 'avoir')->count();
         $venteNonNormaliseesCount = (clone $ventesQuery)->where('normalise', false)->where('type_facture', '!=', 'avoir')->count();
         $venteNonNormaliseesMontant = (clone $ventesQuery)->where('normalise', false)->where('type_facture', '!=', 'avoir')->sum('montant_ttc');
+        // Total de la ligne : la somme de ses deux colonnes. Le chiffre
+        // d'affaires reel y figurait, avoirs deduits, si bien que le total
+        // etait inferieur a la somme affichee juste a sa gauche.
+        $venteTotalMontant = $ventesNormalisees + $venteNonNormaliseesMontant;
 
         // Déclaré vs non déclaré (achat)
         $achatNormaliseesCount = (clone $achatsQuery)->where('normalise', true)->where('type_facture', '!=', 'avoir')->count();
         $achatNonNormaliseesCount = (clone $achatsQuery)->where('normalise', false)->where('type_facture', '!=', 'avoir')->count();
         $achatNonNormaliseesMontant = (clone $achatsQuery)->where('normalise', false)->where('type_facture', '!=', 'avoir')->sum('montant_ttc');
+        $achatNormaliseesMontant = (clone $achatsQuery)->where('normalise', true)->where('type_facture', '!=', 'avoir')->sum('montant_ttc');
+        $achatTotalMontant = $achatNormaliseesMontant + $achatNonNormaliseesMontant;
 
         // Stock : ordres de production (comptés + valorisés via les écritures de production)
-        $ordresProduction = OrdreProduction::whereHas('pointDeVente', fn($q) => $q->where('entreprise_id', $entrepriseId))
-            ->whereBetween('date_production', [$debut, $fin]);
+        $ordresProduction = OrdreProduction::whereHas('pointDeVente', fn($q) => $q->where('entreprise_id', $entrepriseId));
+        $this->filtrerPeriode($ordresProduction, 'date_production', $request);
         if ($pdvId && $pdvId !== 'tous') $ordresProduction->where('point_de_vente_id', $pdvId);
         $nbOrdresProduction = (clone $ordresProduction)->count();
 
-        $valeurProduite = EcritureComptable::whereHas('operation', function ($q) use ($entrepriseId, $debut, $fin) {
+        $valeurProduite = EcritureComptable::whereHas('operation', function ($q) use ($entrepriseId, $request) {
                 $q->where('entreprise_id', $entrepriseId)
-                  ->where('type_operation', 'Production')
-                  ->whereBetween('date_operation', [$debut, $fin]);
+                  ->where('type_operation', 'Production');
+                $this->filtrerPeriode($q, 'date_operation', $request);
             })
             ->where('compte_debit', '351100')
             ->sum('debit');
 
         $transfertsQuery = TransfertStock::whereHas('produit', fn($q) => $q->where('entreprise_id', $entrepriseId))
-            ->where('statut', 'Validé')
-            ->whereBetween('approuve_le', [$debut, $fin]);
+            ->where('statut', 'Validé');
+        $this->filtrerPeriode($transfertsQuery, 'approuve_le', $request);
         $nbTransferts = (clone $transfertsQuery)->count();
 
         return [
-            'periode' => ['debut' => $debut->toDateString(), 'fin' => $fin->toDateString()],
+            'periode' => ['debut' => $debut->toDateString(), 'fin' => $fin->toDateString(), 'libelle' => FiltrePeriodeService::libelle($request)],
 
             'ca_reel' => $caReel,
             'achats_reel' => $achatsReel,
@@ -420,12 +438,12 @@ class FneDashboardControleur
                 'ventes' => [
                     'normalisees' => ['nombre' => $venteNormaliseesCount, 'montant' => $ventesNormalisees],
                     'non_normalisees' => ['nombre' => $venteNonNormaliseesCount, 'montant' => $venteNonNormaliseesMontant],
-                    'total' => ['nombre' => $venteNormaliseesCount + $venteNonNormaliseesCount, 'montant' => $caReel],
+                    'total' => ['nombre' => $venteNormaliseesCount + $venteNonNormaliseesCount, 'montant' => $venteTotalMontant],
                 ],
                 'achats' => [
-                    'normalises' => ['nombre' => $achatNormaliseesCount, 'montant' => (clone $achatsQuery)->where('normalise', true)->where('type_facture', '!=', 'avoir')->sum('montant_ttc')],
+                    'normalises' => ['nombre' => $achatNormaliseesCount, 'montant' => $achatNormaliseesMontant],
                     'non_normalises' => ['nombre' => $achatNonNormaliseesCount, 'montant' => $achatNonNormaliseesMontant],
-                    'total' => ['nombre' => $achatNormaliseesCount + $achatNonNormaliseesCount, 'montant' => $achatsReel],
+                    'total' => ['nombre' => $achatNormaliseesCount + $achatNonNormaliseesCount, 'montant' => $achatTotalMontant],
                 ],
             ],
 
@@ -457,13 +475,12 @@ class FneDashboardControleur
      * Endpoint JSON paginé/filtré consommé par la page Factures & Reçus
      * (rendu instantané côté client, sans recharger la page).
      *
-     * Paramètres attendus : flux (ventes|achats), categorie, periode_type,
-     * date, pdv_id, recherche, page.
+     * Paramètres attendus : flux (ventes|achats), categorie, filtre_mois,
+     * filtre_semaine, filtre_jour, pdv_id, recherche, page.
      */
     public function facturesJson(Request $request): JsonResponse
     {
         $entreprise = Auth::user()->entreprise;
-        [$debut, $fin] = $this->resoudrePeriode($request);
         $flux = $request->input('flux', 'ventes');
         $categorie = $request->input('categorie', 'emis');
         $pdvId = $request->input('pdv_id');
@@ -473,8 +490,8 @@ class FneDashboardControleur
         if ($flux === 'ventes') {
             $query = Vente::with(['client', 'pointDeVente', 'parent', 'pieceLiee'])
                 ->whereHas('pointDeVente', fn($q) => $q->where('entreprise_id', $entreprise->id))
-                ->whereBetween('date_vente', [$debut, $fin])
                 ->where('etape', 'Facture');
+            $this->filtrerPeriode($query, 'date_vente', $request);
 
             // La nature du document vient de `type_piece`, choisie a la saisie.
             // Auparavant elle etait deduite de l'absence de client, si bien
@@ -532,8 +549,8 @@ class FneDashboardControleur
         } else {
             $query = Achat::with(['fournisseur', 'pointDeVente', 'parent'])
                 ->whereHas('pointDeVente', fn($q) => $q->where('entreprise_id', $entreprise->id))
-                ->whereBetween('date_achat', [$debut, $fin])
                 ->where('etape', 'Facture');
+            $this->filtrerPeriode($query, 'date_achat', $request);
 
             $query = match ($categorie) {
                 'avoir_fournisseur' => $query->where('type_facture', 'avoir'),
@@ -598,25 +615,29 @@ class FneDashboardControleur
     // ─────────────────────────────────────────────────────────────────
 
     /**
+     * Restreindre une requete a la periode retenue.
+     *
+     * Les ecrans FNE prenaient auparavant un type de periode et une date de
+     * reference, sans considerer l'exercice comptable ouvert : deux pages
+     * ouvertes cote a cote annoncaient des chiffres differents pour ce que
+     * l'utilisateur croyait etre le meme perimetre. Ils passent desormais par
+     * le meme resolveur que le tableau de bord general.
+     *
+     * @param  \Illuminate\Database\Eloquent\Builder|\Illuminate\Database\Query\Builder  $query
+     */
+    private function filtrerPeriode($query, string $colonneDate, Request $request)
+    {
+        return FiltrePeriodeService::appliquer($query, $colonneDate, $request);
+    }
+
+    /**
+     * Bornes englobantes de la periode, pour l'afficher — jamais pour filtrer.
+     *
      * @return array{0: Carbon, 1: Carbon}
      */
     private function resoudrePeriode(Request $request): array
     {
-        $type = $request->input('periode_type', 'mois');
-        $date = $request->input('date', now()->toDateString());
-
-        try {
-            $carbon = Carbon::parse($date);
-        } catch (\Throwable $e) {
-            $carbon = now();
-        }
-
-        return match ($type) {
-            'jour'   => [$carbon->copy()->startOfDay(), $carbon->copy()->endOfDay()],
-            'semaine'=> [$carbon->copy()->startOfWeek(), $carbon->copy()->endOfWeek()],
-            'annee'  => [$carbon->copy()->startOfYear(), $carbon->copy()->endOfYear()],
-            default  => [$carbon->copy()->startOfMonth(), $carbon->copy()->endOfMonth()],
-        };
+        return FiltrePeriodeService::intervalle($request);
     }
 
     // ─────────────────────────────────────────────────────────────────

@@ -59,49 +59,10 @@
 @section('contenu')
 
 {{-- ── Barre filtres + bouton Configuration Fiscale ── --}}
-<div class="fne-filtres">
-    <div class="form-group">
-        <label>Période</label>
-        <select id="f-periode-type" class="form-control" onchange="rafraichirFneGestion()">
-            <option value="jour">Jour</option>
-            <option value="semaine">Semaine</option>
-            <option value="mois" selected>Mois</option>
-            <option value="annee">Année</option>
-        </select>
-    </div>
-    <div class="form-group">
-        <label>Date de référence</label>
-        <input type="date" id="f-date" class="form-control" value="{{ date('Y-m-d') }}" onchange="rafraichirFneGestion()">
-    </div>
-    <div class="form-group">
-        <label>Point de vente</label>
-        <select id="f-pdv" class="form-control" onchange="rafraichirFneGestion()">
-            <option value="tous">Tous les sites</option>
-            @foreach($pointsDeVente as $pdv)
-                <option value="{{ $pdv->id }}">{{ $pdv->nom }}</option>
-            @endforeach
-        </select>
-    </div>
-    <button class="btn btn-primary" onclick="rafraichirFneGestion()"><i class="fas fa-rotate"></i> Actualiser</button>
-
-    {{-- Badge config fiscale + bouton --}}
-    <div style="margin-left:auto; display:flex; align-items:center; gap:10px;">
-        @if($taxConfig)
-            <span class="config-badge configured">
-                <i class="fas fa-check-circle"></i>
-                Config. fiscale active
-                @if($taxConfig->categorie === 'CAS_A') — CAS A @else — CAS B @endif
-            </span>
-        @else
-            <span class="config-badge not-configured">
-                <i class="fas fa-exclamation-circle"></i> Config. fiscale non définie
-            </span>
-        @endif
-        <button class="btn btn-outline" onclick="ouvrirModalConfig()" style="white-space:nowrap;">
-            <i class="fas fa-cog"></i> Configuration Fiscale
-        </button>
-    </div>
-</div>
+@include('admin::fne.partials.filtre-periode', [
+    'onChange' => 'rafraichirFneGestion()',
+    'apres'    => 'admin::fne.partials.badge-config-fiscale',
+])
 
 {{-- ── Cartes Stickers & Timbres (récupérées en temps réel depuis la base / API) ── --}}
 <div class="section-titre"><i class="fas fa-stamp"></i> Stickers &amp; Timbres (plateforme DGI)</div>
@@ -278,11 +239,7 @@ function formatF(n) {
 }
 
 function rafraichirFneGestion() {
-    const params = new URLSearchParams({
-        periode_type: document.getElementById('f-periode-type').value,
-        date: document.getElementById('f-date').value,
-        pdv_id: document.getElementById('f-pdv').value,
-    });
+    const params = parametresFiltreFne();
 
     fetch("{{ route('admin.fne.gestion.donnees') }}?" + params.toString())
         .then(r => r.json())
