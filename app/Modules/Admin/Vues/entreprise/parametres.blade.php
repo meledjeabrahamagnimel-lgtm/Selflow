@@ -147,6 +147,11 @@
                                 <select name="regime_imposition" class="form-control">
                                     <option value="">— Choisir un régime —</option>
                                     <option value="TEE" {{ old('regime_imposition', $entreprise->regime_imposition) === 'TEE' ? 'selected' : '' }}>TEE — Taxe sur Entreprise Existante</option>
+                                    {{-- TCE et RME manquaient : la DGI les cite pourtant
+                                         parmi les regimes ouvrant droit a l'exoneration
+                                         legale, aux cotes du TEE. --}}
+                                    <option value="TCE" {{ old('regime_imposition', $entreprise->regime_imposition) === 'TCE' ? 'selected' : '' }}>TCE — Taxe Communale de l'Entreprenant</option>
+                                    <option value="RME" {{ old('regime_imposition', $entreprise->regime_imposition) === 'RME' ? 'selected' : '' }}>RME — Régime des Microentreprises</option>
                                     <option value="RNE" {{ old('regime_imposition', $entreprise->regime_imposition) === 'RNE' ? 'selected' : '' }}>RNE — Régime du Négoce et de l'Exportation</option>
                                     <option value="RSI" {{ old('regime_imposition', $entreprise->regime_imposition) === 'RSI' ? 'selected' : '' }}>RSI — Régime Simplifié d'Imposition</option>
                                     <option value="RNI" {{ old('regime_imposition', $entreprise->regime_imposition) === 'RNI' ? 'selected' : '' }}>RNI — Régime Normal d'Imposition</option>

@@ -204,7 +204,7 @@
                 <input type="checkbox" id="cfg-tse-active">
                 <div>
                     <div class="lbl-main"><i class="fas fa-building" style="color:#f59e0b;margin-right:6px;"></i>TSE — Taxe Spéciale sur l'Entreprise</div>
-                    <div class="lbl-sub">Taux : 0,1% du CA HT (CAS A uniquement). Désactivée automatiquement en CAS B (TEE / RNE).</div>
+                    <div class="lbl-sub">Taux : 0,1% du CA HT (CAS A uniquement). Désactivée automatiquement en CAS B (non-assujettis à la TVA).</div>
                 </div>
             </label>
 

@@ -235,7 +235,7 @@ class FneDashboardControleur
         return response()->json([
             'regime'     => $regime,
             'categorie'  => $categorie,
-            'label_categorie' => $categorie === 'CAS_A' ? 'CAS A — Assujetti TVA (RNI / RSI)' : 'CAS B — Non-assujetti (TEE / RNE)',
+            'label_categorie' => $categorie === 'CAS_A' ? 'CAS A — Assujetti TVA (RNI / RSI)' : 'CAS B — Non-assujetti (TEE, TCE, RME…)',
             'tva_active' => $config?->tva_active ?? false,
             'tva_taux'   => $config?->tva_taux   ?? 18.00,
             'tse_active' => $config?->tse_active ?? false,
@@ -266,7 +266,7 @@ class FneDashboardControleur
         $regime    = $entreprise->regime_imposition;
         $categorie = TaxConfiguration::categorieDepuisRegime($regime);
 
-        // Règle métier : TSE interdite en CAS B (TEE / RNE)
+        // Règle métier : TSE interdite en CAS B (non-assujettis)
         if ($categorie === 'CAS_B') {
             $validated['tse_active'] = false;
         }

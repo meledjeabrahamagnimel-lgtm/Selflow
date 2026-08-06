@@ -273,7 +273,12 @@ class FnePayloadTest extends TestCase
             'taux reduit'                      => [9.0,  'RNI', 'TVAB'],
             'exoneration conventionnelle'      => [0.0,  'RNI', 'TVAC'],
             'exoneration legale (regime TEE)'  => [0.0,  'TEE', 'TVAD'],
-            'exoneration legale (regime RNE)'  => [0.0,  'RNE', 'TVAD'],
+            'exoneration legale (regime TCE)'  => [0.0,  'TCE', 'TVAD'],
+            'exoneration legale (regime RME)'  => [0.0,  'RME', 'TVAD'],
+            // « RNE » figurait ici, alors que la DGI ne le cite dans aucune de
+            // ses deux listes : le sigle designe le recu normalise, pas un
+            // regime. Une exoneration y est donc conventionnelle.
+            'RNE n\'ouvre pas l\'exoneration legale' => [0.0, 'RNE', 'TVAC'],
         ];
     }
 
@@ -303,6 +308,52 @@ class FnePayloadTest extends TestCase
         ]);
 
         $this->assertSame('TVAC', $produit->codeTvaFne('RNI'));
+    }
+
+    // ─── Conformite au referentiel d'interfacage ─────────────────────────
+
+    #[\PHPUnit\Framework\Attributes\DataProvider('regimesEtCodesExoneration')]
+    public function test_les_regimes_d_exoneration_legale_suivent_ceux_de_la_dgi(string $regime, string $attendu): void
+    {
+        // La facture certifiee libelle le code D ainsi, mot pour mot :
+        // « TVA exo.lég - Pas de TVA sur HT 00,00% - D (TEE, TCE, Microentreprise) ».
+        $this->assertSame($attendu, Produit::deduireCodeTva(0.0, $regime));
+    }
+
+    public static function regimesEtCodesExoneration(): array
+    {
+        return [
+            'TEE — exoneration legale'   => ['TEE', 'TVAD'],
+            'TCE — exoneration legale'   => ['TCE', 'TVAD'],
+            'RME — exoneration legale'   => ['RME', 'TVAD'],
+            // Assujettis : une exoneration a 0 % y est conventionnelle.
+            'RNI — conventionnelle'      => ['RNI', 'TVAC'],
+            'RSI — conventionnelle'      => ['RSI', 'TVAC'],
+            'sans regime'                => ['', 'TVAC'],
+        ];
+    }
+
+    #[\PHPUnit\Framework\Attributes\DataProvider('modesDePaiementDuLexique')]
+    public function test_tous_les_modes_de_paiement_du_lexique_sont_traduits(string $saisi, string $attendu): void
+    {
+        $this->simulerReponseFne();
+
+        FneService::normaliserFacture($this->venteMinimale(['mode_paiement' => $saisi]));
+
+        $this->assertSame($attendu, $this->payloadEnvoye()['paymentMethod']);
+    }
+
+    public static function modesDePaiementDuLexique(): array
+    {
+        // Annexe 1 du referentiel : les six valeurs admises par la plateforme.
+        return [
+            'especes'       => ['Caisse', 'cash'],
+            'carte'         => ['Carte', 'card'],
+            'cheque'        => ['Chèque', 'check'],
+            'mobile money'  => ['Mobile Money', 'mobile-money'],
+            'virement'      => ['Virement', 'transfer'],
+            'a terme'       => ['Crédit', 'deferred'],
+        ];
     }
 
     // ─── Bordereau d'achat (BAPA) ────────────────────────────────────────

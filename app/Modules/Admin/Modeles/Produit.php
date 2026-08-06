@@ -56,14 +56,27 @@ class Produit extends Model
         'TVA'  => ['taux' => 18.0, 'libelle' => 'TVA — Taux normal 18 %'],
         'TVAB' => ['taux' => 9.0,  'libelle' => 'TVAB — Taux réduit 9 %'],
         'TVAC' => ['taux' => 0.0,  'libelle' => 'TVAC — Exonération conventionnelle 0 %'],
-        'TVAD' => ['taux' => 0.0,  'libelle' => 'TVAD — Exonération légale 0 % (TEE / RNE)'],
+        'TVAD' => ['taux' => 0.0,  'libelle' => 'TVAD — Exonération légale 0 % (TEE, TCE, microentreprise)'],
     ];
 
     /**
      * Régimes d'imposition pour lesquels une exonération à 0 % relève de
      * l'exonération LÉGALE (TVAD) et non conventionnelle (TVAC).
+     *
+     * La liste vient de la DGI elle-même. Le lexique de la procédure
+     * d'interfaçage décrit TVAD comme « TVA exec leg de 0% pour TEE et RME »,
+     * et une facture certifiée le libelle ainsi, mot pour mot :
+     *
+     *     TVA exo.lég - Pas de TVA sur HT 00,00% - D (TEE, TCE, Microentreprise)
+     *
+     * Trois régimes, donc : TEE, TCE et le régime des microentreprises (RME).
+     * Le code retenait « RNE », qui ne figure dans aucun des deux — vraisem-
+     * blablement une confusion avec le reçu normalisé électronique, qui porte
+     * le même sigle. Le montant ne changeait pas (les deux codes valent 0 %),
+     * mais la facture partait sous une qualification d'exonération que la DGI
+     * ne reconnaît pas pour ce régime.
      */
-    public const REGIMES_EXONERATION_LEGALE = ['TEE', 'RNE'];
+    public const REGIMES_EXONERATION_LEGALE = ['TEE', 'TCE', 'RME'];
 
     /**
      * Code TVA DGI à transmettre à la FNE pour ce produit.

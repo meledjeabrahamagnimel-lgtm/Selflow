@@ -74,6 +74,6 @@ class TaxConfiguration extends Model
     {
         return $this->categorie === 'CAS_A'
             ? 'CAS A — Assujetti TVA (RNI / RSI)'
-            : 'CAS B — Non-assujetti (TEE / RNE)';
+            : 'CAS B — Non-assujetti (TEE, TCE, RME…)';
     }
 }

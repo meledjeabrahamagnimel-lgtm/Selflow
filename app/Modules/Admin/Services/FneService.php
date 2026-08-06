@@ -34,9 +34,15 @@ class FneService
         // Clé API FNE propre à CETTE entreprise (gérée par le superadmin)
         $credential = $entreprise->fneCredential;
         $apiKey = $credential?->cleActive();
-        $apiBaseUrl = $credential && $credential->statut === 'validee'
-            ? rtrim(config('selflow.fne_api_url_production', 'https://fne.dgi.gouv.ci'), '/')
-            : rtrim(config('selflow.fne_api_url_sandbox', 'https://fne-sandbox.dgi.gouv.ci'), '/');
+        // L'adresse de production n'est pas publique : la DGI la transmet apres
+        // validation des specimens. Tant qu'elle n'est pas renseignee, on reste
+        // sur l'environnement de test plutot que d'appeler un hote invente.
+        $apiBaseUrl = rtrim(
+            ($credential && $credential->statut === 'validee' && config('selflow.fne_api_url_production'))
+                ? config('selflow.fne_api_url_production')
+                : config('selflow.fne_api_url_sandbox', 'http://54.247.95.108/ws'),
+            '/'
+        );
 
         if (empty($apiKey)) {
             return [
@@ -288,9 +294,15 @@ class FneService
 
         $credential = $entreprise->fneCredential;
         $apiKey = $credential?->cleActive();
-        $apiBaseUrl = $credential && $credential->statut === 'validee'
-            ? rtrim(config('selflow.fne_api_url_production', 'https://fne.dgi.gouv.ci'), '/')
-            : rtrim(config('selflow.fne_api_url_sandbox', 'https://fne-sandbox.dgi.gouv.ci'), '/');
+        // L'adresse de production n'est pas publique : la DGI la transmet apres
+        // validation des specimens. Tant qu'elle n'est pas renseignee, on reste
+        // sur l'environnement de test plutot que d'appeler un hote invente.
+        $apiBaseUrl = rtrim(
+            ($credential && $credential->statut === 'validee' && config('selflow.fne_api_url_production'))
+                ? config('selflow.fne_api_url_production')
+                : config('selflow.fne_api_url_sandbox', 'http://54.247.95.108/ws'),
+            '/'
+        );
 
         if (empty($apiKey)) {
             return [
@@ -644,7 +656,7 @@ class FneService
      *
      * @deprecated Utiliser Produit::deduireCodeTva(), qui distingue TVAC
      *             (exonération conventionnelle) de TVAD (exonération légale
-     *             TEE / RNE) — les deux valant 0 %.
+     *             TEE, TCE, RME) — les deux valant 0 %.
      */
     private static function devinerCodeTaxe(float $taux, ?string $regime = null): string
     {

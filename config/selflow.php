@@ -88,7 +88,21 @@ return [
     | exclusivement par le superadmin. Ces URLs sont communes à toutes les
     | entreprises (seule la clé change), donc centralisées ici.
     */
-    'fne_api_url_sandbox'    => env('FNE_API_URL_SANDBOX', 'https://fne-sandbox.dgi.gouv.ci'),
-    'fne_api_url_production' => env('FNE_API_URL_PRODUCTION', 'https://fne.dgi.gouv.ci'),
+    /*
+    | Adresse de l'environnement de TEST, telle que publiee par la DGI dans la
+    | procedure d'interfacage : « URL test : http://54.247.95.108/ws ». La
+    | valeur inscrite ici auparavant, https://fne-sandbox.dgi.gouv.ci, ne
+    | figure dans aucun document — un environnement neuf, sans variable
+    | d'environnement, appelait donc un hote inexistant.
+    */
+    'fne_api_url_sandbox'    => env('FNE_API_URL_SANDBOX', 'http://54.247.95.108/ws'),
+
+    /*
+    | L'adresse de PRODUCTION n'est pas publique : la DGI la transmet a chaque
+    | entreprise apres validation de ses specimens de factures. Elle doit donc
+    | etre renseignee dans l'environnement, faute de quoi la normalisation
+    | continuerait de viser le bac a sable sans le dire.
+    */
+    'fne_api_url_production' => env('FNE_API_URL_PRODUCTION', ''),
 
 ];
