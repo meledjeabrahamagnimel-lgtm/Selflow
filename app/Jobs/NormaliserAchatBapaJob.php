@@ -54,13 +54,16 @@ class NormaliserAchatBapaJob implements ShouldQueue
                 $achat = Achat::find($this->achat->id);
 
                 if ($achat) {
+                    // Retours de la plateforme (timbre, montants, alerte de
+                    // stickers) : conserves pour les ventes, ils etaient perdus
+                    // pour les bordereaux.
                     $achat->update([
                         'normalise'     => true,
                         'numero_fne'    => $fneResult['numero_recu'],
                         'signature_dgi' => $fneResult['signature'] ?? null,
                         'qr_code_data'  => $fneResult['qr_code_data'],
                         'fichier_fne_pdf_url' => $fneResult['pdf_url'] ?? null,
-                    ]);
+                    ] + FneService::colonnesRetoursFne($fneResult));
 
                     Log::info("NormaliserAchatBapaJob: Normalisation BAPA réussie - Achat #{$achat->id} → FNE: {$fneResult['numero_recu']}");
                 }

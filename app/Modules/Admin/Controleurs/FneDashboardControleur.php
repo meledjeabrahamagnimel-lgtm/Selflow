@@ -692,13 +692,19 @@ class FneDashboardControleur
                     $fneResult = \App\Modules\Admin\Services\FneService::normaliserAchatBapa($achat);
 
                     if ($fneResult['success']) {
+                        // Les retours de la plateforme — timbre applique, montants
+                        // retenus, alerte de stickers, horodatage — etaient conserves
+                        // pour les ventes mais perdus pour les bordereaux. Or la DGI
+                        // applique aussi un timbre aux bordereaux : sans cela, le
+                        // document continuait d'afficher l'estimation au bareme au
+                        // lieu du montant reellement retenu.
                         $achat->update([
                             'normalise'     => true,
                             'numero_fne'    => $fneResult['numero_recu'],
                             'signature_dgi' => $fneResult['signature'] ?? null,
                             'qr_code_data'  => $fneResult['qr_code_data'],
                             'fichier_fne_pdf_url' => $fneResult['pdf_url'] ?? null,
-                        ]);
+                        ] + \App\Modules\Admin\Services\FneService::colonnesRetoursFne($fneResult));
                         $successCount++;
                     } else {
                         $errors[] = "Erreur sur l'achat {$achat->numero_facture} : " . ($fneResult['message'] ?? 'Erreur inconnue');

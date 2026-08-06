@@ -152,13 +152,16 @@ class BatchNormalisationJob implements ShouldQueue
                     $fneResult = FneService::normaliserAchatBapa($invoice);
 
                     if ($fneResult['success']) {
+                        // Retours de la plateforme (timbre, montants, alerte de
+                        // stickers) : conserves pour les ventes, ils etaient perdus
+                        // pour les bordereaux.
                         $invoice->update([
                             'normalise'     => true,
                             'numero_fne'    => $fneResult['numero_recu'],
                             'signature_dgi' => $fneResult['signature'] ?? null,
                             'qr_code_data'  => $fneResult['qr_code_data'],
                             'fichier_fne_pdf_url' => $fneResult['pdf_url'] ?? null,
-                        ]);
+                        ] + FneService::colonnesRetoursFne($fneResult));
                     } else {
                         // Échec de la normalisation : on arrête
                         $statusData['status'] = 'failed';
