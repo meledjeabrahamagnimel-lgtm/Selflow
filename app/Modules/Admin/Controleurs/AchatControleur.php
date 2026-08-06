@@ -390,7 +390,7 @@ class AchatControleur
         }
         if (request()->filled('dgi_filtre')) {
             $dgiFiltre = request('dgi_filtre');
-            $baseQuery->where('normalise', $dgi_filtre === 'oui');
+            $baseQuery->where('normalise', $dgiFiltre === 'oui');
         }
         if (request()->filled('date_debut')) {
             $baseQuery->whereDate('date_achat', '>=', request('date_debut'));
