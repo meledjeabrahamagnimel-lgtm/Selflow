@@ -95,8 +95,23 @@ class FneDashboardControleur
         $solde_provision  = (float) ($ent?->fne_solde_provision ?? 0);
         $solde_maj_at     = $ent?->fne_solde_maj_at;
 
-        // 3. Stickers achetés (quantité) = Solde + Consommés. Le calcul n'a de
-        //    sens qu'en mode stickers : une provision se compte en francs.
+        // 3. Solde exprime dans les deux unites.
+        //
+        //    La plateforme renvoie soit un nombre de vignettes, soit une
+        //    provision en francs — jamais les deux. Le prix unitaire n'etant
+        //    transmis nulle part, la conversion s'appuie sur le tarif inscrit
+        //    en configuration (20 F). C'est donc une equivalence, pas un relevé,
+        //    et l'affichage le presente comme telle.
+        $prixSticker = max(1, (float) config('selflow.sticker_prix_unitaire', 20));
+
+        if ($mode_facturation === 'provision') {
+            $solde_valeur   = $solde_provision;
+            $stickers_solde = (int) floor($solde_provision / $prixSticker);
+        } else {
+            $solde_valeur = $stickers_solde * $prixSticker;
+        }
+
+        // Stickers achetes = solde + consommes, dans les deux modes.
         $stickers_achats = $stickers_solde + $stickers_consommes;
 
         [$debut, $fin] = $this->resoudrePeriode($request);
@@ -141,6 +156,16 @@ class FneDashboardControleur
         // leur timbre éventuel est inconnu, et le compteur le signale.
         $timbre_inconnu = (clone $ventesQuery)->whereNull('fne_timbre_fiscal')->count();
 
+        // Montants compares : ceux de Selflow et ceux retenus par la DGI, sur
+        // les seules pieces dont la reponse de certification les a rapportes.
+        $comparables = (clone $ventesQuery)->whereNotNull('fne_montant_ttc');
+        $ttcSelflow  = (float) (clone $comparables)->sum('montant_ttc');
+        $ttcDgi      = (float) (clone $comparables)->sum('fne_montant_ttc');
+
+        $comparablesTva = (clone $ventesQuery)->whereNotNull('fne_montant_tva');
+        $tvaSelflow     = (float) (clone $comparablesTva)->sum('montant_tva');
+        $tvaDgi         = (float) (clone $comparablesTva)->sum('fne_montant_tva');
+
         // La distinction facture / reçu vient de `type_piece`. Elle était
         // auparavant deduite de la presence d'un client, si bien qu'une vente
         // au comptant gonflait le compteur des reçus.
@@ -171,6 +196,10 @@ class FneDashboardControleur
             // Indicateurs propres à la plateforme DGI
             'mode_facturation'  => $mode_facturation,
             'solde_provision'   => $solde_provision,
+            'solde_valeur'      => round($solde_valeur, 2),
+            'sticker_prix'      => $prixSticker,
+            'stickers_consommes_valeur' => round($stickers_consommes * $prixSticker, 2),
+            'stickers_achats_valeur'    => round($stickers_achats * $prixSticker, 2),
             'solde_maj_at'      => $solde_maj_at?->toDateTimeString(),
             'stickers_solde'    => $stickers_solde,
             'stickers_achats'   => $stickers_achats,
@@ -182,16 +211,16 @@ class FneDashboardControleur
             // Indicateurs tires des reponses de certification
             'alertes_stickers'  => (clone $ventesQuery)->where('fne_alerte_stickers', true)->count()
                                    + (clone $achatsQuery)->where('fne_alerte_stickers', true)->count(),
-            'ecart_tva_dgi'     => round(
-                (float) (clone $ventesQuery)->whereNotNull('fne_montant_tva')->sum('fne_montant_tva')
-                - (float) (clone $ventesQuery)->whereNotNull('fne_montant_tva')->sum('montant_tva'),
-                2
-            ),
-            'ecart_ttc_dgi'     => round(
-                (float) (clone $ventesQuery)->whereNotNull('fne_montant_ttc')->sum('fne_montant_ttc')
-                - (float) (clone $ventesQuery)->whereNotNull('fne_montant_ttc')->sum('montant_ttc'),
-                2
-            ),
+            // Ecarts avec la plateforme. Les deux termes de la comparaison sont
+            // exposes, pas seulement leur difference : un ecart de 2 637 F ne
+            // dit rien tant qu'on ignore s'il porte sur 10 000 F ou sur deux
+            // millions, ni de quel cote penche la divergence.
+            'tva_selflow'       => round($tvaSelflow, 2),
+            'tva_dgi'           => round($tvaDgi, 2),
+            'ecart_tva_dgi'     => round($tvaDgi - $tvaSelflow, 2),
+            'ttc_selflow'       => round($ttcSelflow, 2),
+            'ttc_dgi'           => round($ttcDgi, 2),
+            'ecart_ttc_dgi'     => round($ttcDgi - $ttcSelflow, 2),
             'pieces_controlees' => (clone $ventesQuery)->whereNotNull('fne_montant_ttc')->count(),
 
             'ventes' => [

@@ -14,6 +14,16 @@
     .kpi-card .val { font-size:24px; font-weight:800; color:var(--text-1); }
     .kpi-card .sub { font-size:12px; color:var(--text-3); margin-top:4px; }
 
+    /* Carte de comparaison : nos montants, ceux de la DGI, puis l'ecart.
+       L'ecart seul ne se juge pas — il faut voir sur quoi il porte. */
+    .kpi-card .comparaison { display:flex; flex-direction:column; gap:2px; }
+    .kpi-card .comparaison > div { display:flex; justify-content:space-between; align-items:baseline; gap:12px; }
+    .kpi-card .comparaison span { font-size:12px; color:var(--text-3); }
+    .kpi-card .comparaison strong { font-size:15px; font-weight:700; color:var(--text-1); font-variant-numeric:tabular-nums; }
+    .kpi-card .comparaison .ecart { border-top:1px solid var(--border); margin-top:5px; padding-top:5px; }
+    .kpi-card .comparaison .ecart span { font-weight:700; color:var(--text-2); }
+    .kpi-card .comparaison .ecart strong { font-size:19px; font-weight:800; }
+
     .section-titre { font-size:14px; font-weight:700; color:var(--text-1); text-transform:uppercase; letter-spacing:.4px; margin:26px 0 14px; display:flex; align-items:center; gap:8px; }
 
     .doc-table { width:100%; border-collapse:collapse; background:#fff; border:1px solid var(--border); border-radius:14px; overflow:hidden; }
@@ -99,7 +109,7 @@
     {{-- Le mode de facturation (stickers ou provision) se coche dans les
          paramètres de la DGI et l'API n'expose aucun champ pour le lire. Il se
          constate à chaque certification, selon le solde renvoyé. --}}
-    <div class="kpi-card"><div class="lbl" id="k-solde-lbl">Solde DGI</div><div class="val" id="k-stickers-solde">—</div><div class="sub" id="k-stickers-solde-sub">En attente d'une première normalisation</div></div>
+    <div class="kpi-card"><div class="lbl" id="k-solde-lbl">Stickers disponibles</div><div class="val" id="k-stickers-solde">—</div><div class="sub" id="k-stickers-solde-sub">En attente d'une première normalisation</div></div>
     <div class="kpi-card"><div class="lbl">Stickers achetés</div><div class="val" id="k-stickers-achats">—</div><div class="sub" id="k-stickers-achats-sub">Total acheté Mobile Money</div></div>
     <div class="kpi-card"><div class="lbl">Stickers consommés</div><div class="val" id="k-stickers-consommes">0</div><div class="sub" id="k-stickers-consommes-sub">Total utilisé pour normalisation</div></div>
     <div class="kpi-card"><div class="lbl">Timbre de quittance</div><div class="val" id="k-timbre">0 F</div><div class="sub" id="k-timbre-sub">Droits de timbre fiscaux collectés</div></div>
@@ -119,14 +129,25 @@
         <div class="val" id="k-alertes-stickers">0</div>
         <div class="sub">Pièces certifiées avec une alerte renvoyée par la DGI</div>
     </div>
+    {{-- Les deux termes de la comparaison precedent l'ecart : un ecart de
+         2 637 F ne dit rien tant qu'on ignore s'il porte sur 10 000 F ou sur
+         deux millions. --}}
     <div class="kpi-card">
-        <div class="lbl">Écart TVA vs DGI</div>
-        <div class="val" id="k-ecart-tva">0 F</div>
+        <div class="lbl">TVA — Selflow vs DGI</div>
+        <div class="comparaison">
+            <div><span>Selflow</span><strong id="k-tva-selflow">0 F</strong></div>
+            <div><span>DGI</span><strong id="k-tva-dgi">0 F</strong></div>
+            <div class="ecart"><span>Écart</span><strong id="k-ecart-tva">0 F</strong></div>
+        </div>
         <div class="sub" id="k-ecart-tva-sub">Comparaison de nos montants à ceux retenus par la plateforme</div>
     </div>
     <div class="kpi-card">
-        <div class="lbl">Écart TTC vs DGI</div>
-        <div class="val" id="k-ecart-ttc">0 F</div>
+        <div class="lbl">TTC — Selflow vs DGI</div>
+        <div class="comparaison">
+            <div><span>Selflow</span><strong id="k-ttc-selflow">0 F</strong></div>
+            <div><span>DGI</span><strong id="k-ttc-dgi">0 F</strong></div>
+            <div class="ecart"><span>Écart</span><strong id="k-ecart-ttc">0 F</strong></div>
+        </div>
         <div class="sub" id="k-ecart-ttc-sub">—</div>
     </div>
 </div>
@@ -230,7 +251,11 @@
                 </div>
                 <div class="r-row"><span>TVA (18%)</span><span id="r-tva">Non activée</span></div>
                 <div class="r-row"><span>TSE (0,1% du CA HT)</span><span id="r-tse">Non activée</span></div>
-                <div class="r-row"><span>TDT (1,5% espèces &gt; 5 000 F)</span><span id="r-tdt">Non activée</span></div>
+                {{-- Le resume annoncait encore « 1,5 % especes > 5 000 F »,
+                     taux qui ne figure dans aucun texte : l'article 873 du CGI
+                     fixe un bareme forfaitaire par tranche, et c'est la DGI qui
+                     applique le timbre a la normalisation. --}}
+                <div class="r-row"><span>TDT — timbre de quittance</span><span id="r-tdt">Non déclarée</span></div>
             </div>
 
             {{-- Feedback --}}
@@ -272,45 +297,47 @@ function appliquerKpis(d) {
     // normalisee, on l'ignore et on le dit — un « 0 » ressemblerait a une
     // panne ou a un solde epuise.
     //
-    // La valeur en francs d'un solde de stickers n'est plus affichee : le prix
-    // unitaire n'est transmis nulle part et le chiffre precedent (× 20 F)
-    // etait une supposition presentee comme un fait.
+    // Le solde est exprime dans les deux unites : la quantite en valeur
+    // principale, l'equivalent en francs juste dessous. La plateforme ne
+    // renvoie qu'une des deux — jamais le prix unitaire — et la conversion
+    // s'appuie sur le tarif inscrit en configuration. L'affichage le dit :
+    // c'est une equivalence, pas un releve.
     const majDate = d.solde_maj_at ? ` · relevé le ${d.solde_maj_at}` : '';
+    const prix = d.sticker_prix ?? 20;
+    const tarif = `à ${formatF(prix)} l'unité`;
 
-    if (d.mode_facturation === 'stickers') {
-        document.getElementById('k-solde-lbl').textContent = 'Solde Stickers';
-        document.getElementById('k-stickers-solde').textContent = d.stickers_solde;
+    if (d.mode_facturation === 'stickers' || d.mode_facturation === 'provision') {
+        const releve = d.mode_facturation === 'stickers'
+            ? `${d.stickers_solde} vignette(s) relevée(s)`
+            : `provision de ${formatF(d.solde_provision)} relevée`;
+
+        document.getElementById('k-solde-lbl').textContent = 'Stickers disponibles';
+        document.getElementById('k-stickers-solde').textContent =
+            `${d.stickers_solde} · ${formatF(d.solde_valeur)}`;
         document.getElementById('k-stickers-solde-sub').textContent =
-            `${d.stickers_solde} sticker(s) disponible(s)${majDate}`;
+            `${releve}, ${tarif}${majDate}`;
 
-        document.getElementById('k-stickers-achats').textContent = d.stickers_achats;
+        document.getElementById('k-stickers-achats').textContent =
+            `${d.stickers_achats} · ${formatF(d.stickers_achats_valeur)}`;
         document.getElementById('k-stickers-achats-sub').textContent =
-            `${d.stickers_achats} sticker(s) acheté(s) : solde + consommés`;
-    } else if (d.mode_facturation === 'provision') {
-        document.getElementById('k-solde-lbl').textContent = 'Provision DGI';
-        document.getElementById('k-stickers-solde').textContent = formatF(d.solde_provision);
-        document.getElementById('k-stickers-solde-sub').textContent =
-            `Facturation à la provision : les stickers sont désactivés${majDate}`;
-
-        document.getElementById('k-stickers-achats').textContent = '—';
-        document.getElementById('k-stickers-achats-sub').textContent =
-            'Sans objet : la DGI décompte une provision, pas des vignettes';
+            `Solde + consommés, ${tarif}`;
     } else {
-        document.getElementById('k-solde-lbl').textContent = 'Solde DGI';
+        document.getElementById('k-solde-lbl').textContent = 'Stickers disponibles';
         document.getElementById('k-stickers-solde').textContent = '—';
         document.getElementById('k-stickers-solde-sub').textContent =
-            'Mode inconnu : la DGI ne le communique qu\'en réponse à une normalisation';
+            'Solde inconnu : la DGI ne le communique qu\'en réponse à une normalisation';
 
         document.getElementById('k-stickers-achats').textContent = '—';
         document.getElementById('k-stickers-achats-sub').textContent =
-            'Connu une fois le mode de facturation constaté';
+            'Connu une fois le premier solde relevé';
     }
 
     // Stickers consommés : une pièce certifiée = une vignette, quel que soit
     // le mode. Le décompte reste valable.
-    document.getElementById('k-stickers-consommes').textContent = d.stickers_consommes;
+    document.getElementById('k-stickers-consommes').textContent =
+        `${d.stickers_consommes} · ${formatF(d.stickers_consommes_valeur)}`;
     document.getElementById('k-stickers-consommes-sub').textContent =
-        `${d.stickers_consommes} pièce(s) certifiée(s) auprès de la DGI`;
+        `${d.stickers_consommes} pièce(s) certifiée(s), ${tarif}`;
 
     // Timbre de quittance
     // Timbre de quittance : uniquement ce que la DGI a reellement retenu.
@@ -338,14 +365,20 @@ function appliquerKpis(d) {
     const ecartTva = d.ecart_tva_dgi ?? 0;
     const ecartTtc = d.ecart_ttc_dgi ?? 0;
 
-    document.getElementById('k-ecart-tva').textContent = formatF(ecartTva);
-    document.getElementById('k-ecart-tva').style.color = Math.abs(ecartTva) > 1 ? '#dc2626' : '';
+    // Chaque carte porte les deux montants compares, puis leur ecart : un
+    // ecart isole ne se juge pas sans savoir sur quelle assiette il porte.
+    document.getElementById('k-tva-selflow').textContent = formatF(d.tva_selflow ?? 0);
+    document.getElementById('k-tva-dgi').textContent     = formatF(d.tva_dgi ?? 0);
+    document.getElementById('k-ecart-tva').textContent   = formatF(ecartTva);
+    document.getElementById('k-ecart-tva').style.color   = Math.abs(ecartTva) > 1 ? '#dc2626' : '#059669';
     document.getElementById('k-ecart-tva-sub').textContent = controlees > 0
         ? `${controlees} pièce(s) comparée(s) aux montants de la DGI`
         : 'Aucune pièce certifiée ne remonte encore ses montants';
 
-    document.getElementById('k-ecart-ttc').textContent = formatF(ecartTtc);
-    document.getElementById('k-ecart-ttc').style.color = Math.abs(ecartTtc) > 1 ? '#dc2626' : '';
+    document.getElementById('k-ttc-selflow').textContent = formatF(d.ttc_selflow ?? 0);
+    document.getElementById('k-ttc-dgi').textContent     = formatF(d.ttc_dgi ?? 0);
+    document.getElementById('k-ecart-ttc').textContent   = formatF(ecartTtc);
+    document.getElementById('k-ecart-ttc').style.color   = Math.abs(ecartTtc) > 1 ? '#dc2626' : '#059669';
     document.getElementById('k-ecart-ttc-sub').textContent = Math.abs(ecartTtc) > 1
         ? 'Un écart signale une divergence de calcul à corriger'
         : 'Nos montants concordent avec ceux de la plateforme';
@@ -439,7 +472,9 @@ function mettreAJourResume() {
     document.getElementById('r-tva').style.color  = tva ? '#10b981' : 'var(--text-3)';
     document.getElementById('r-tse').textContent = tse ? '✓ 0,1% du CA HT' : 'Non activée';
     document.getElementById('r-tse').style.color  = tse ? '#10b981' : 'var(--text-3)';
-    document.getElementById('r-tdt').textContent = tdt ? '✓ 1,5% espèces > 5 000 F' : 'Non activée';
+    document.getElementById('r-tdt').textContent = tdt
+        ? '✓ Barème art. 873 (espèces)'
+        : 'Non déclarée';
     document.getElementById('r-tdt').style.color  = tdt ? '#10b981' : 'var(--text-3)';
 }
 
