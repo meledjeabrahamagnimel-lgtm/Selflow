@@ -33,7 +33,7 @@
     <div class="kpi-card"><div class="lbl">Chiffre d'affaires réel (TTC)</div><div class="val" id="k-ca">0 F</div><div class="sub">Normalisé + non normalisé, avoirs déduits</div></div>
     <div class="kpi-card"><div class="lbl">Achats réels (TTC)</div><div class="val" id="k-achats">0 F</div><div class="sub">Normalisé + non normalisé, avoirs déduits</div></div>
     <div class="kpi-card"><div class="lbl">Trésorerie nette encaissée</div><div class="val" id="k-treso">0 F</div><div class="sub"><span id="k-treso-detail">—</span></div></div>
-    <div class="kpi-card"><div class="lbl">Taux de conformité FNE</div><div class="val"><span id="k-taux" class="taux-badge">0%</span></div><div class="sub">Ventes normalisées / CA réel</div></div>
+    <div class="kpi-card"><div class="lbl">Taux de conformité FNE</div><div class="val"><span id="k-taux" class="taux-badge">0%</span></div><div class="sub">Ventes normalisées / ventes émises, hors avoirs</div></div>
 </div>
 
 <div class="section-titre"><i class="fas fa-file-circle-check"></i> Déclaré vs Non déclaré</div>

@@ -143,12 +143,19 @@ class AdminControleur
      */
     public function tableauDeBordGeneral(Request $request): View
     {
-        $utilisateur    = Auth::user();
-        $entreprise     = $utilisateur->entreprise;
-        $pointDeVenteId = session('point_de_vente_actif_id');
-        $aujourd_hui    = now()->toDateString();
+        $utilisateur = Auth::user();
+        $entreprise  = $utilisateur->entreprise;
+        $aujourd_hui = now()->toDateString();
 
         $pdvIds = $entreprise->pointsDeVente()->pluck('id');
+
+        // Cet ecran couvre l'entreprise entiere : le site vient du filtre, et
+        // non du point de vente actif de la session. Il en heritait sans le
+        // dire, si bien qu'un « tableau de bord general » annoncant trois
+        // points de vente n'en totalisait qu'un — et contredisait la Situation
+        // Generale, qui part de « Tous les sites ».
+        $pdvFiltre      = $request->query('pdv_id', 'tous');
+        $pointDeVenteId = ($pdvFiltre && $pdvFiltre !== 'tous') ? (int) $pdvFiltre : null;
 
         // ── CA global ─────────────────────────────────────────────────
         // `sansDoublonRecu` ecarte les recus deja remplaces par leur facture, et
@@ -177,21 +184,18 @@ class AdminControleur
         $nbVentesJour      = (clone $qVentes)->where('type_facture', '!=', 'avoir')->count();
         $montantAchatsJour = self::montantNetDesAvoirs($qAchats);
 
-        // ── CA global de la période (via PeriodeScope) ────────────────────────
-        $qVentesPeriode = Vente::sansDoublonRecu()->whereIn('point_de_vente_id', $pdvIds)->where('etape', 'Facture');
-        if ($pointDeVenteId) $qVentesPeriode->where('point_de_vente_id', $pointDeVenteId);
-        $totalVentesPeriode = self::montantNetDesAvoirs($qVentesPeriode);
-        $nbVentesPeriode    = (clone $qVentesPeriode)->where('type_facture', '!=', 'avoir')->count();
+        // ── Marge brute et panier moyen, sur la periode retenue ───────────────
+        //
+        // Ces indicateurs ignoraient le filtre : ils portaient toujours sur
+        // l'exercice entier, si bien que choisir un mois laissait le second
+        // bandeau immobile a cote d'un premier qui, lui, bougeait. Ils suivent
+        // desormais le meme perimetre que les cartes de chiffre d'affaires,
+        // dont ils reprennent directement les totaux.
+        $totalVentesPeriode = $montantVentesJour;
+        $nbVentesPeriode    = $nbVentesJour;
+        $totalAchatsPeriode = $montantAchatsJour;
 
-        // ── Achats de la période ──────────────────────────────────────────────
-        $qAchatsPeriode = Achat::whereIn('point_de_vente_id', $pdvIds)->where('etape', 'Facture');
-        if ($pointDeVenteId) $qAchatsPeriode->where('point_de_vente_id', $pointDeVenteId);
-        $totalAchatsPeriode = self::montantNetDesAvoirs($qAchatsPeriode);
-
-        // ── Marge brute de la période ─────────────────────────────────────────
-        $qVentesHT  = Vente::sansDoublonRecu()->whereIn('point_de_vente_id', $pdvIds)->where('etape', 'Facture');
-        if ($pointDeVenteId) $qVentesHT->where('point_de_vente_id', $pointDeVenteId);
-        $totalVentesHTPeriode = self::montantNetDesAvoirs($qVentesHT, 'montant_ht');
+        $totalVentesHTPeriode = self::montantNetDesAvoirs($qVentes, 'montant_ht');
         $margeBrutePeriode    = $totalVentesHTPeriode - $totalAchatsPeriode;
         $tauxMargePeriode     = $totalVentesHTPeriode > 0
             ? round(($margeBrutePeriode / $totalVentesHTPeriode) * 100, 1)
@@ -210,7 +214,10 @@ class AdminControleur
             ->get();
 
         // ── Solde trésorerie global ───────────────────────────────────────────
+        // Il ignorait le filtre, la ou la Situation Generale l'applique : les
+        // deux ecrans annoncaient des decaissements differents.
         $qTreso = TresorerieJournal::whereIn('point_de_vente_id', $pdvIds);
+        FiltrePeriodeService::appliquer($qTreso, 'date_operation', $request);
         if ($pointDeVenteId) $qTreso->where('point_de_vente_id', $pointDeVenteId);
         $totalEncaissements = $qTreso->sum('montant_entree');
         $totalDecaissements = $qTreso->sum('montant_sortie');
@@ -248,7 +255,10 @@ class AdminControleur
         // ── Meilleurs vendeurs sur la période affichée ────────────────────────
         //    Le classement portait sur la seule journée, quel que soit le
         //    filtre choisi : il suit désormais le même périmètre que les KPI.
-        $idsVentesFiltrees = (clone $qVentes)->pluck('id');
+        //    Les avoirs sont ecartes du classement comme du camembert : un
+        //    montant negatif attribue a un vendeur ou a un site n'a pas de sens
+        //    dans un palmares ni dans une part de camembert.
+        $idsVentesFiltrees = (clone $qVentes)->where('type_facture', '!=', 'avoir')->pluck('id');
 
         $topVendeurs = DB::table('ventes')
             ->join('utilisateurs', 'utilisateurs.id', '=', 'ventes.utilisateur_id')
@@ -263,13 +273,15 @@ class AdminControleur
             ->get();
 
         // ── CA par PDV sur la période ─────────────────────────────────────────
+        //    Le camembert totalisait toutes les ventes de la base : hors
+        //    periode comptable, hors filtre, avoirs compris et recus comptes
+        //    deux fois. Il porte desormais sur les memes pieces que les KPI.
         $caPdvPeriode = DB::table('ventes')
             ->join('points_de_vente', 'points_de_vente.id', '=', 'ventes.point_de_vente_id')
             ->select('points_de_vente.nom as pdv_nom',
                 DB::raw('SUM(ventes.montant_ttc) as ca'),
                 DB::raw('COUNT(*) as nb'))
-            ->whereIn('ventes.point_de_vente_id', $pdvIds)
-            ->where('ventes.etape', 'Facture')
+            ->whereIn('ventes.id', $idsVentesFiltrees)
             ->groupBy('ventes.point_de_vente_id', 'points_de_vente.nom')
             ->orderByDesc('ca')
             ->get();

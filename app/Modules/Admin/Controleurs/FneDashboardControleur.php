@@ -163,6 +163,13 @@ class FneDashboardControleur
         $ttcSelflow  = (float) (clone $comparables)->sum('montant_ttc');
         $ttcDgi      = (float) (clone $comparables)->sum('fne_montant_ttc');
 
+        // Timbre retenu sur ces memes pieces. La carte le montre a cote de
+        // l'ecart : le droit de timbre est du par le debiteur en sus du prix
+        // (art. 875 du CGI) et Selflow ne le porte pas dans `montant_ttc`. Sans
+        // ce reperage, un ecart parfaitement legitime etait presente comme
+        // « une divergence de calcul a corriger ».
+        $timbreComparables = (float) (clone $comparables)->sum('fne_timbre_fiscal');
+
         $comparablesTva = (clone $ventesQuery)->whereNotNull('fne_montant_tva');
         $tvaSelflow     = (float) (clone $comparablesTva)->sum('montant_tva');
         $tvaDgi         = (float) (clone $comparablesTva)->sum('fne_montant_tva');
@@ -222,6 +229,7 @@ class FneDashboardControleur
             'ttc_selflow'       => round($ttcSelflow, 2),
             'ttc_dgi'           => round($ttcDgi, 2),
             'ecart_ttc_dgi'     => round($ttcDgi - $ttcSelflow, 2),
+            'timbre_comparables' => round($timbreComparables, 2),
             'pieces_controlees' => (clone $ventesQuery)->whereNotNull('fne_montant_ttc')->count(),
 
             'ventes' => [

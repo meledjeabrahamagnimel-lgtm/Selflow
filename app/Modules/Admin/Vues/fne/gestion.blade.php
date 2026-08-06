@@ -107,6 +107,11 @@
         <div class="comparaison">
             <div><span>Selflow</span><strong id="k-ttc-selflow">0 F</strong></div>
             <div><span>DGI</span><strong id="k-ttc-dgi">0 F</strong></div>
+            {{-- Le droit de timbre est dû par le débiteur en sus du prix
+                 (art. 875 du CGI) : il gonfle le total de la DGI sans figurer
+                 dans le TTC de Selflow. L'afficher évite de prendre un écart
+                 légitime pour une erreur de calcul. --}}
+            <div><span>dont timbre DGI</span><strong id="k-ttc-timbre">0 F</strong></div>
             <div class="ecart"><span>Écart</span><strong id="k-ecart-ttc">0 F</strong></div>
         </div>
         <div class="sub" id="k-ecart-ttc-sub">—</div>
@@ -332,13 +337,19 @@ function appliquerKpis(d) {
         ? `${controlees} pièce(s) comparée(s) aux montants de la DGI`
         : 'Aucune pièce certifiée ne remonte encore ses montants';
 
+    // Le timbre est du en sus du prix : il explique une part de l'ecart, et le
+    // residuel est le seul qui interroge vraiment le calcul.
+    const timbre    = d.timbre_comparables ?? 0;
+    const residuel  = ecartTtc - timbre;
+
     document.getElementById('k-ttc-selflow').textContent = formatF(d.ttc_selflow ?? 0);
     document.getElementById('k-ttc-dgi').textContent     = formatF(d.ttc_dgi ?? 0);
+    document.getElementById('k-ttc-timbre').textContent  = formatF(timbre);
     document.getElementById('k-ecart-ttc').textContent   = formatF(ecartTtc);
-    document.getElementById('k-ecart-ttc').style.color   = Math.abs(ecartTtc) > 1 ? '#dc2626' : '#059669';
-    document.getElementById('k-ecart-ttc-sub').textContent = Math.abs(ecartTtc) > 1
-        ? 'Un écart signale une divergence de calcul à corriger'
-        : 'Nos montants concordent avec ceux de la plateforme';
+    document.getElementById('k-ecart-ttc').style.color   = Math.abs(residuel) > 1 ? '#dc2626' : '#059669';
+    document.getElementById('k-ecart-ttc-sub').textContent = Math.abs(residuel) > 1
+        ? `Dont ${formatF(timbre)} de timbre dû en sus du prix ; reste ${formatF(residuel)} à expliquer`
+        : 'L\'écart correspond au timbre de quittance retenu par la DGI';
     document.getElementById('k-v-ht').textContent = formatF(d.ventes.total_ht);
     document.getElementById('k-v-tva').textContent = formatF(d.ventes.total_tva);
     document.getElementById('k-v-ttc').textContent = formatF(d.ventes.total_ttc);

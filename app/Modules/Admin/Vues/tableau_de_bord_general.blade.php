@@ -62,6 +62,17 @@
         @endfor
     </select>
 
+    {{-- Point de vente : cet ecran couvre l'entreprise entiere, tous sites
+         confondus. Il heritait auparavant, sans le dire, du site actif de la
+         session — un « tableau de bord general » qui n'annoncait qu'un site
+         sur trois, et qui contredisait la Situation Generale. --}}
+    <select id="filtre-pdv" style="padding:7px 12px;border:1.5px solid #E5E7EB;border-radius:8px;font-size:13px;font-family:inherit;color:#374151;background:#fff;cursor:pointer;outline:none;" onchange="appliquerFiltresTdb()">
+        <option value="tous">Tous les sites</option>
+        @foreach($pointsDeVente as $pdv)
+            <option value="{{ $pdv->id }}">{{ $pdv->nom }}</option>
+        @endforeach
+    </select>
+
     <button onclick="reinitialiserFiltresTdb()" style="padding:7px 14px;border-radius:8px;background:none;border:1.5px solid #E5E7EB;color:#6B7280;font-size:12.5px;font-weight:600;cursor:pointer;font-family:inherit;" title="Réinitialiser">
         <i class="fas fa-rotate-left"></i> Reset
     </button>
@@ -127,24 +138,21 @@
     </div>
 </div>
 
-{{-- ── KPI LIGNE 2 : PÉRIODE ───────────────────────────────────────────── --}}
+{{-- ── KPI LIGNE 2 : RENTABILITÉ ───────────────────────────────────────────
+     Le chiffre d'affaires et les achats figuraient ici une seconde fois. Les
+     deux bandeaux portant desormais sur la meme periode, les cartes etaient
+     rigoureusement identiques a celles du dessus ; ne restent que les
+     indicateurs qui disent autre chose. --}}
 <div style="margin-bottom:8px; font-size:10.5px; font-weight:700; color:var(--text-3); text-transform:uppercase; letter-spacing:1px;">
-    <i class="fas fa-calendar-range"></i> Période · {{ session('active_periode_nom', '—') }}
+    <i class="fas fa-calendar-range"></i> Rentabilité · {{ $periodeLabel }}
 </div>
-<div style="display:grid; grid-template-columns: repeat(4,1fr); gap:14px; margin-bottom:24px;">
+<div style="display:grid; grid-template-columns: repeat(3,1fr); gap:14px; margin-bottom:24px;">
     <div class="tdb-kpi tdb-kpi-blue">
         <div class="tdb-kpi-icon"><i class="fas fa-chart-line"></i></div>
         <div>
-            <div class="tdb-kpi-val">{{ number_format($totalVentesPeriode, 0, ',', ' ') }} <span>FCFA</span></div>
-            <div class="tdb-kpi-lbl">CA TTC période</div>
-            <div class="tdb-kpi-sub">{{ $nbVentesPeriode }} ventes facturées</div>
-        </div>
-    </div>
-    <div class="tdb-kpi tdb-kpi-red">
-        <div class="tdb-kpi-icon"><i class="fas fa-receipt"></i></div>
-        <div>
-            <div class="tdb-kpi-val">{{ number_format($totalAchatsPeriode, 0, ',', ' ') }} <span>FCFA</span></div>
-            <div class="tdb-kpi-lbl">Achats TTC période</div>
+            <div class="tdb-kpi-val">{{ number_format($totalVentesHTPeriode, 0, ',', ' ') }} <span>FCFA</span></div>
+            <div class="tdb-kpi-lbl">CA HT</div>
+            <div class="tdb-kpi-sub">Assiette de la marge · {{ $nbVentesPeriode }} vente{{ $nbVentesPeriode > 1 ? 's' : '' }}</div>
         </div>
     </div>
     <div class="tdb-kpi {{ $margeBrutePeriode >= 0 ? 'tdb-kpi-green' : 'tdb-kpi-danger' }}">
@@ -533,7 +541,10 @@ function appliquerFiltresTdb() {
     const semaine = semaineSelect.value;
     const jour    = jourSelect.value;
 
-    localStorage.setItem(TDB_KEY, JSON.stringify({ mois, semaine, jour }));
+    const pdvSelect = document.getElementById('filtre-pdv');
+    const pdv = pdvSelect ? pdvSelect.value : 'tous';
+
+    localStorage.setItem(TDB_KEY, JSON.stringify({ mois, semaine, jour, pdv }));
 
     const actifs = [];
     if (mois    !== 'tous') actifs.push(moisSelect.options[moisSelect.selectedIndex].text);
@@ -548,6 +559,7 @@ function appliquerFiltresTdb() {
     url.searchParams.set('filtre_mois',    mois);
     url.searchParams.set('filtre_semaine', semaine);
     url.searchParams.set('filtre_jour',    jour);
+    url.searchParams.set('pdv_id',         pdv);
     window.location.href = url.toString();
 }
 
@@ -556,12 +568,15 @@ function reinitialiserFiltresTdb() {
     document.getElementById('filtre-mois').value    = 'tous';
     document.getElementById('filtre-semaine').value = 'tous';
     document.getElementById('filtre-jour').value    = 'tous';
+    const pdvReset = document.getElementById('filtre-pdv');
+    if (pdvReset) pdvReset.value = 'tous';
     afficherBadge([]);
 
     const url = new URL(window.location.href);
     url.searchParams.delete('filtre_mois');
     url.searchParams.delete('filtre_semaine');
     url.searchParams.delete('filtre_jour');
+    url.searchParams.delete('pdv_id');
     window.location.href = url.toString();
 }
 
@@ -582,8 +597,18 @@ function afficherBadge(actifs) {
     const moisUrl    = urlParams.get('filtre_mois');
     const semaineUrl = urlParams.get('filtre_semaine');
     const jourUrl    = urlParams.get('filtre_jour');
+    const pdvUrl     = urlParams.get('pdv_id');
 
-    if (moisUrl || semaineUrl || jourUrl) {
+    // Le site retenu se relit dans l'URL : c'est lui que le serveur a applique.
+    const appliquerPdv = (valeur) => {
+        const champ = document.getElementById('filtre-pdv');
+        if (champ && valeur) champ.value = valeur;
+        return champ && valeur && valeur !== 'tous'
+            ? champ.options[champ.selectedIndex]?.text
+            : null;
+    };
+
+    if (moisUrl || semaineUrl || jourUrl || pdvUrl) {
         if (moisUrl)    document.getElementById('filtre-mois').value    = moisUrl;
         updateWeeksSelect();
         if (semaineUrl) document.getElementById('filtre-semaine').value = semaineUrl;
@@ -592,6 +617,8 @@ function afficherBadge(actifs) {
         if (moisUrl    && moisUrl !== 'tous')    actifs.push(document.getElementById('filtre-mois').options[document.getElementById('filtre-mois').selectedIndex].text);
         if (semaineUrl && semaineUrl !== 'tous') actifs.push('Semaine ' + semaineUrl);
         if (jourUrl    && jourUrl !== 'tous')    actifs.push('Jour ' + jourUrl);
+        const sitePdv = appliquerPdv(pdvUrl);
+        if (sitePdv) actifs.push(sitePdv);
         afficherBadge(actifs);
         return;
     }
@@ -602,7 +629,7 @@ function afficherBadge(actifs) {
         return;
     }
     try {
-        const { mois, semaine, jour } = JSON.parse(saved);
+        const { mois, semaine, jour, pdv } = JSON.parse(saved);
         if (mois)    document.getElementById('filtre-mois').value    = mois;
         updateWeeksSelect();
         if (semaine) document.getElementById('filtre-semaine').value = semaine;
@@ -611,6 +638,8 @@ function afficherBadge(actifs) {
         if (mois    && mois !== 'tous')    actifs.push(document.getElementById('filtre-mois').options[document.getElementById('filtre-mois').selectedIndex]?.text ?? mois);
         if (semaine && semaine !== 'tous') actifs.push('Semaine ' + semaine);
         if (jour    && jour !== 'tous')    actifs.push('Jour ' + jour);
+        const sitePdv = appliquerPdv(pdv);
+        if (sitePdv) actifs.push(sitePdv);
         afficherBadge(actifs);
     } catch(e) { localStorage.removeItem(TDB_KEY); updateWeeksSelect(); }
 })();
