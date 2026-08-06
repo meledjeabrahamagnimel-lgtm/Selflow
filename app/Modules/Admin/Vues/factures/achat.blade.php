@@ -151,11 +151,6 @@
         </div>
         
         <div style="display: flex; gap: 8px; align-items: center;">
-            @if($achat->etape === 'Facture' && $achat->type_facture !== 'avoir')
-                <button type="button" class="print-btn" style="border-color:var(--danger); color:var(--danger); font-weight:700;" onclick="ouvrirModalAvoir()">
-                    <i class="fas fa-rotate-left"></i> Générer un avoir
-                </button>
-            @endif
             <button class="print-btn main" onclick="telechargerPdf()"
                     title="Choisissez la destination « Enregistrer au format PDF » pour obtenir le fichier, ou votre imprimante pour une sortie papier.">
                 <i class="fas fa-file-pdf"></i> Imprimer / PDF
@@ -233,6 +228,13 @@ var DATA = {
         type_facture: {!! json_encode($achat->type_facture) !!},
         parent_ref: {!! json_encode($achat->parent ? $achat->parent->numero_facture : null) !!},
         parent_fne: {!! json_encode($achat->parent ? $achat->parent->numero_fne : null) !!},
+        // Signature electronique de la DGI. Elle figurait sur le bordereau
+        // mais sur aucun des quatre modeles de facture d'achat, alors que
+        // c'est la meme piece certifiee.
+        normalise: {{ $achat->normalise ? 'true' : 'false' }},
+        numero_fne: {!! json_encode($achat->numero_fne) !!},
+        qr_code_data: {!! json_encode($achat->qr_code_data) !!},
+        qr_code_image: {!! json_encode(\App\Modules\Admin\Services\QrCodeFneService::imageDeVerification($achat->qr_code_data, 110)) !!},
         raison_avoir: {!! json_encode($achat->raison_avoir) !!},
         mode: {!! json_encode($achat->mode_paiement) !!},
         moyen_bancaire: {!! json_encode($achat->moyen_bancaire) !!},
@@ -334,6 +336,29 @@ function nomFichierPdf() {
 }
 
 @include('admin::factures.partials.script-impression')
+
+/**
+ * Signature electronique exigee par la DGI sur toute piece certifiee :
+ * « le QR Code, le visuel FNE et le format de la numerotation ».
+ *
+ * Le code QR n'est que l'encodage du jeton renvoye par la plateforme, que le
+ * referentiel decrit comme le « code de verification a convertir en QR code ».
+ * Sans jeton, aucun visuel n'est produit.
+ */
+function blocCertificationFneAchat(d) {
+    if (!d.normalise || !d.numero_fne) return '';
+
+    return `
+    <div style="display:flex; align-items:center; gap:14px; border:1px solid var(--border); border-radius:8px; padding:12px 14px; margin-top:16px; background:#fff;">
+        ${d.qr_code_image ? `<img src="${d.qr_code_image}" style="width:110px; height:110px; flex-shrink:0;" alt="Code de vérification FNE">` : ''}
+        <img src="/logo-FNE.png" style="height:52px; object-fit:contain; flex-shrink:0;" alt="Facture normalisée électronique">
+        <div style="font-size:10px; line-height:1.6; color:var(--tx); word-break:break-all;">
+            <div style="font-weight:800; text-transform:uppercase; letter-spacing:.04em;">Facture normalisée électronique</div>
+            <div>N° FNE : <strong style="font-family:monospace;">${d.numero_fne}</strong></div>
+            ${d.qr_code_data ? `<div>Vérification : <span style="font-family:monospace;">${d.qr_code_data}</span></div>` : ''}
+        </div>
+    </div>`;
+}
 
 /**
  * Droit de timbre de quittance sur un bordereau d'achat.
@@ -538,6 +563,7 @@ function model1(d) {
                 ${blocTimbreAchat(d)}
             </div>
         </div>
+        ${blocCertificationFneAchat(d)}
         <div style="border-top:0.5px solid var(--border);padding-top:14px;display:flex;justify-content:space-between;align-items:flex-end">
             <div style="font-size:11px;color:var(--mu);line-height:1.7">Merci pour votre confiance.<br>Document généré par <strong>Selflow</strong></div>
             <div style="text-align:right;font-size:11px;color:var(--mu)">Signature / Cachet<br><div style="width:100px;height:40px;border:0.5px dashed var(--border);border-radius:4px;margin-top:4px"></div></div>
@@ -635,6 +661,7 @@ function model2(d) {
                     ${blocTimbreAchat(d)}
                 </div>
             </div>
+            ${blocCertificationFneAchat(d)}
             <div style="font-size:11px;color:var(--mu)">Généré automatiquement par <strong>Selflow</strong></div>
             `}
         </div>
@@ -748,6 +775,7 @@ function model3(d) {
                 ${blocTimbreAchat(d)}
             </div>
         </div>
+        ${blocCertificationFneAchat(d)}
         <div style="border-top:0.5px solid var(--border);padding-top:12px;display:flex;justify-content:space-between;align-items:center">
             <div style="font-size:11px;color:var(--mu)">Généré par <strong>Selflow</strong> · Document officiel</div>
             <div style="display:flex;gap:16px">
@@ -890,6 +918,7 @@ function modelStandard(d) {
                 <div style="width:140px; height:60px; border:1px dashed #000; border-radius:0; background:#fff; display:inline-block;"></div>
             </div>
         </div>
+        ${blocCertificationFneAchat(d)}
         <div style="border-top:1px solid #000; padding-top:15px; margin-top:20px; font-size:9px; color:#444; line-height:1.6; font-weight:500; text-align:center;">
             Document généré par <strong>Selflow</strong>.
         </div>

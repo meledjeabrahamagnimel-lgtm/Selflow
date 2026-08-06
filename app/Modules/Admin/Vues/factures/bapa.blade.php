@@ -135,7 +135,21 @@
     <div class="invoice" style="padding:40px;">
         
         {{-- En-tête BAPA --}}
+        @php
+            // Logo de l'entreprise : il figure sur les factures de vente et
+            // d'achat mais manquait au bordereau, seule piece a en etre privee.
+            $entrepriseBapa = $achat->pointDeVente->entreprise;
+            $logoBapa = $entrepriseBapa->logo_path;
+            if ($logoBapa && !str_starts_with($logoBapa, 'http://') && !str_starts_with($logoBapa, 'https://')) {
+                $logoBapa = \Illuminate\Support\Facades\Storage::disk('public')->url($logoBapa);
+            }
+        @endphp
         <div style="display:flex; justify-content:space-between; align-items:flex-start; border-bottom:2px solid #000; padding-bottom:20px; margin-bottom:25px;">
+            <div style="display:flex; align-items:flex-start; gap:14px;">
+                @if($logoBapa)
+                    <img src="{{ $logoBapa }}" alt="{{ $entrepriseBapa->nom }}"
+                         style="max-height:56px; max-width:140px; object-fit:contain; flex-shrink:0;">
+                @endif
             <div>
                 <h1 style="font-size:20px; font-weight:800; text-transform:uppercase; margin:0 0 8px 0; color:var(--navy);">
                     {{ $achat->pointDeVente->entreprise->nom }}
@@ -152,6 +166,7 @@
                     <strong>Point de vente :</strong> {{ $achat->pointDeVente->nom }}<br>
                     <strong>Adresse :</strong> {{ $achat->pointDeVente->ville }}, {{ $achat->pointDeVente->commune }}
                 </div>
+            </div>
             </div>
             
             <div style="text-align:right; display:flex; flex-direction:column; align-items:flex-end;">
