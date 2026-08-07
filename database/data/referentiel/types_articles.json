@@ -1,0 +1,92 @@
+[
+ {
+  "code": "MARCHANDISE",
+  "libelle": "Marchandise (achat-revente en l'état)",
+  "compte_vente": "701000",
+  "compte_achat": "601000",
+  "compte_stock": "310000",
+  "compte_variation": "603100",
+  "stockable": true
+ },
+ {
+  "code": "PRODUIT_FINI",
+  "libelle": "Produit fini (fabriqué / récolté)",
+  "compte_vente": "702000",
+  "compte_achat": null,
+  "compte_stock": "360000",
+  "compte_variation": "736000",
+  "stockable": true
+ },
+ {
+  "code": "MATIERE_PREMIERE",
+  "libelle": "Matière première / intrant",
+  "compte_vente": null,
+  "compte_achat": "602000",
+  "compte_stock": "320000",
+  "compte_variation": "603200",
+  "stockable": true
+ },
+ {
+  "code": "CONSOMMABLE",
+  "libelle": "Matière et fourniture consommable",
+  "compte_vente": null,
+  "compte_achat": "604000",
+  "compte_stock": "330000",
+  "compte_variation": "603300",
+  "stockable": true
+ },
+ {
+  "code": "SERVICE",
+  "libelle": "Service / prestation vendue",
+  "compte_vente": "706000",
+  "compte_achat": null,
+  "compte_stock": null,
+  "compte_variation": null,
+  "stockable": false
+ },
+ {
+  "code": "TRAVAUX",
+  "libelle": "Travaux facturés (BTP, par chantier)",
+  "compte_vente": "705000",
+  "compte_achat": null,
+  "compte_stock": "340000",
+  "compte_variation": "734000",
+  "stockable": true
+ },
+ {
+  "code": "ACCESSOIRE",
+  "libelle": "Produit accessoire (livraison, commission)",
+  "compte_vente": "707000",
+  "compte_achat": null,
+  "compte_stock": null,
+  "compte_variation": null,
+  "stockable": false
+ },
+ {
+  "code": "AUTRES_ACHATS",
+  "libelle": "Autres achats non stockés (carburant, énergie)",
+  "compte_vente": null,
+  "compte_achat": "605000",
+  "compte_stock": null,
+  "compte_variation": null,
+  "stockable": false
+ },
+ {
+  "code": "SOUS_TRAITANCE",
+  "libelle": "Sous-traitance / tâcherons",
+  "compte_vente": null,
+  "compte_achat": "621000",
+  "compte_stock": null,
+  "compte_variation": null,
+  "stockable": false
+ },
+ {
+  "code": "FINANCEMENT",
+  "libelle": "Subvention / financement reçu (ONG, associations)",
+  "compte_vente": "710000",
+  "compte_achat": null,
+  "compte_stock": null,
+  "compte_variation": null,
+  "stockable": false
+ }
+]

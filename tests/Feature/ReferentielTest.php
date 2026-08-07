@@ -1,0 +1,156 @@
+<?php
+
+namespace Tests\Feature;
+
+use App\Modules\Admin\Modeles\Referentiel\Article;
+use App\Modules\Admin\Modeles\Referentiel\Categorie;
+use App\Modules\Admin\Modeles\Referentiel\Compte;
+use App\Modules\Admin\Modeles\Referentiel\Famille;
+use App\Modules\Admin\Modeles\Referentiel\Profil;
+use App\Modules\Admin\Modeles\Referentiel\TypeArticle;
+use Database\Seeders\ReferentielSeeder;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+use Tests\TestCase;
+
+/**
+ * Référentiel de préparamétrage.
+ *
+ * Le classeur est la source, le JSON versionné en est la traduction. Ces tests
+ * verrouillent la traduction : les comptes sur six chiffres, l'héritage du type
+ * vers la famille puis vers l'article, et le fait que recharger ne duplique pas.
+ */
+class ReferentielTest extends TestCase
+{
+    use RefreshDatabase;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+        $this->seed(ReferentielSeeder::class);
+    }
+
+    public function test_le_classeur_est_charge_en_entier(): void
+    {
+        $this->assertSame(12,  Categorie::count());
+        $this->assertSame(71,  Profil::count());
+        $this->assertSame(197, Famille::count());
+        $this->assertSame(616, Article::count());
+        $this->assertSame(10,  TypeArticle::count());
+        $this->assertSame(34,  Compte::count());
+    }
+
+    public function test_les_comptes_sont_tous_sur_six_chiffres(): void
+    {
+        // Le classeur donne des racines SYSCOHADA de longueur variable — `701`,
+        // `7011`, `31`, `60311`. L'application les écrit sur six chiffres,
+        // comme le reste de son plan comptable.
+        foreach ([TypeArticle::all(), Famille::all(), Article::all()] as $lot) {
+            foreach ($lot as $ligne) {
+                foreach (['compte_vente', 'compte_achat', 'compte_stock', 'compte_variation'] as $champ) {
+                    $valeur = $ligne->$champ ?? null;
+                    if ($valeur !== null) {
+                        $this->assertMatchesRegularExpression('/^\d{6}$/', $valeur,
+                            "{$champ} de « {$ligne->getTable()} » : {$valeur}");
+                    }
+                }
+            }
+        }
+
+        $this->assertSame(34, Compte::whereRaw('LENGTH(numero) = 6')->count());
+    }
+
+    public function test_la_marchandise_porte_les_comptes_attendus(): void
+    {
+        // Le type d'article est le pivot : c'est lui qui décide des comptes,
+        // et la famille ne fait que subdiviser la racine qu'il impose.
+        $marchandise = TypeArticle::where('code', 'MARCHANDISE')->firstOrFail();
+
+        $this->assertSame('701000', $marchandise->compte_vente);
+        $this->assertSame('601000', $marchandise->compte_achat);
+        $this->assertSame('310000', $marchandise->compte_stock);
+        $this->assertSame('603100', $marchandise->compte_variation);
+        $this->assertTrue($marchandise->estStockable());
+    }
+
+    public function test_un_service_n_est_pas_stockable(): void
+    {
+        // C'est cette propriété qui évitera de créer une fiche de stock pour une
+        // prestation : un cabinet comptable ne doit jamais lire « rupture » sur
+        // une mission d'assistance.
+        $service = TypeArticle::where('code', 'SERVICE')->firstOrFail();
+
+        $this->assertFalse($service->estStockable());
+        $this->assertNull($service->compte_stock);
+        $this->assertSame('706000', $service->compte_vente);
+    }
+
+    public function test_la_famille_subdivise_la_racine_de_son_type(): void
+    {
+        $vivres = Famille::whereHas('profil', fn ($q) => $q->where('code', 'boutique_quartier'))
+            ->where('code', 'VIV')
+            ->firstOrFail();
+
+        $this->assertSame('MARCHANDISE', $vivres->typeArticle->code);
+        // 7011 dans le classeur, donc 701100 ici : la subdivision du 701.
+        $this->assertSame('701100', $vivres->compte_vente);
+        $this->assertSame('601100', $vivres->compte_achat);
+        $this->assertStringStartsWith('701', $vivres->compte_vente);
+    }
+
+    public function test_l_article_herite_des_comptes_de_sa_famille(): void
+    {
+        $riz = Article::where('code', 'BOUQ-VIV-001')->firstOrFail();
+
+        $this->assertSame('Riz sac 25 kg', $riz->designation);
+        $this->assertSame('sac', $riz->unite);
+        $this->assertSame($riz->famille->compte_vente, $riz->compte_vente);
+        $this->assertSame($riz->famille->compte_achat, $riz->compte_achat);
+    }
+
+    public function test_les_profils_ouvrent_les_modules_annonces(): void
+    {
+        $boulangerie = Profil::where('code', 'boulangerie')->firstOrFail();
+        $this->assertSame(['stock', 'production'], $boulangerie->modulesOuverts());
+
+        $maconnerie = Profil::where('code', 'maconnerie')->firstOrFail();
+        $this->assertSame(['stock', 'chantiers'], $maconnerie->modulesOuverts());
+
+        // Dix profils n'ouvrent aucun module : cabinet comptable, taxi, mobile
+        // money. Rien à stocker, rien à produire.
+        $cabinet = Profil::where('code', 'cabinet_comptable')->first();
+        if ($cabinet) {
+            $this->assertSame([], $cabinet->modulesOuverts());
+        }
+    }
+
+    public function test_les_cinq_combinaisons_de_modules_couvrent_les_71_profils(): void
+    {
+        // Cinq combinaisons sur seize possibles : le paramétrage à écrire est
+        // bien plus petit que le nombre de profils ne le laisse craindre.
+        $combinaisons = Profil::all()
+            ->map(fn ($p) => implode('+', $p->modulesOuverts()) ?: 'aucun')
+            ->unique()
+            ->values();
+
+        $this->assertCount(5, $combinaisons);
+    }
+
+    public function test_recharger_le_referentiel_ne_duplique_rien(): void
+    {
+        // Le chargement doit pouvoir tourner à chaque déploiement, et à chaque
+        // nouvelle version du classeur.
+        $this->seed(ReferentielSeeder::class);
+        $this->seed(ReferentielSeeder::class);
+
+        $this->assertSame(71,  Profil::count());
+        $this->assertSame(197, Famille::count());
+        $this->assertSame(616, Article::count());
+    }
+
+    public function test_chaque_famille_et_chaque_article_ont_un_type(): void
+    {
+        $this->assertSame(0, Famille::whereNull('type_article_id')->count());
+        $this->assertSame(0, Article::whereNull('type_article_id')->count());
+        $this->assertSame(0, Article::whereNull('famille_id')->count());
+    }
+}

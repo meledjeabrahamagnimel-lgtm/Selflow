@@ -6,7 +6,7 @@ et ce fichier. Tout ce qui a été décidé, tout ce qui a été écarté et pou
 tout ce qui reste à faire doit donc figurer ici — et y être tenu à jour à chaque
 lot terminé.
 
-Dernière mise à jour : 7 août 2026.
+Dernière mise à jour : 7 août 2026 — lot 1 entamé.
 
 ---
 
@@ -100,10 +100,30 @@ Poussé sur **Selflow**, fusionné dans `main`.
   écrites, la faute que PHP ne révèle qu'au clic de l'utilisateur.
 - `tests/Feature/CloisonnementTest.php` — 7 tests.
 
-### Lot 1 — Le référentiel en base — **À FAIRE**
+### Lot 1 — Le référentiel en base — **PARTIELLEMENT FAIT**
 
-Indépendant du reste. Cinq tables, import du classeur par seeder idempotent,
-conversion vers six chiffres, comptes et journaux par défaut, tout archivable.
+Poussé sur **Selflow**. Ce qui est fait :
+
+- Six tables `referentiel_*` : catégories, profils, types d'article, familles,
+  articles, comptes. Elles portent le catalogue livré avec l'application et ne
+  contiennent aucune donnée client.
+- Le classeur converti en JSON versionné dans `database/data/referentiel/`. Le
+  JSON est au dépôt, pas le tableur : un fichier de tableur ne se relit pas dans
+  une revue de code et ne se compare pas d'une version à l'autre.
+- `ReferentielSeeder`, idempotent — il peut tourner à chaque déploiement et à
+  chaque nouvelle version du classeur sans rien dupliquer.
+- Conversion des racines SYSCOHADA vers six chiffres : `701` → `701000`,
+  `7011` → `701100`, `60311` → `603110`. Elle colle à la convention déjà en
+  place dans `config/selflow.php` (`411000`, `601000`).
+- `tests/Feature/ReferentielTest.php` — 10 tests, dont la vérification que les
+  cinq combinaisons de modules couvrent bien les 71 profils.
+
+Reste à faire dans ce lot :
+
+- Comptes, produits et journaux **par défaut de l'entreprise**, livrés avec
+  l'application indépendamment de Comptaflow, tous archivables. Journaux de
+  trésorerie nommés librement (MTN, Orange, Caisse, nom de banque).
+- Écran superadmin de consultation du référentiel.
 
 ### Lot 2 — Le parcours de souscription — après le lot 1
 
@@ -182,8 +202,17 @@ Elles sont documentées pour ne pas être redécouvertes.
 - L'analytique n'est **jamais** alimentée : zéro occurrence d'`AxeAnalytique` ou
   de `SectionAnalytique` dans le contrôleur de synchronisation, alors que
   Comptaflow possède tout le module.
-- **Selflow n'envoie pas le point de vente** — huit champs transmis, il n'y est
-  pas, alors que la colonne existe en base.
+- **Quatre champs manquent au déversement**, alors que Selflow les possède :
+
+  | Colonne Comptaflow | Reçoit aujourd'hui | Devrait recevoir |
+  |---|---|---|
+  | `n_saisie` | la référence de pièce, sinon `'SELF_' . time()` | `operations.numero_saisie`, unique par entreprise |
+  | `plan_tiers_id` | deviné en cherchant le compte dans le plan tiers | `ecritures_comptables.compte_tiers` |
+  | `plan_analytique` | jamais renseigné (booléen) | le drapeau, avec le point de vente |
+  | *(analytique)* | rien | `ecritures_comptables.point_de_vente_id` |
+
+  Le repli `'SELF_' . time()` est aussi ce qui interdit toute idempotence : deux
+  déversements de la même écriture produisent deux numéros de saisie différents.
 - Un journal inconnu se replie sur le premier de la liste : une vente peut
   atterrir dans le journal des achats, silencieusement.
 - Un compte absent est créé avec `type_de_compte => 'actif'` en dur et le libellé

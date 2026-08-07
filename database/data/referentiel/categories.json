@@ -1,0 +1,50 @@
+[
+ {
+  "nom": "Commerce",
+  "ordre": 1
+ },
+ {
+  "nom": "E-commerce",
+  "ordre": 2
+ },
+ {
+  "nom": "Production",
+  "ordre": 3
+ },
+ {
+  "nom": "Agriculture-Élevage",
+  "ordre": 4
+ },
+ {
+  "nom": "Services",
+  "ordre": 5
+ },
+ {
+  "nom": "Restauration",
+  "ordre": 6
+ },
+ {
+  "nom": "BTP-Travaux",
+  "ordre": 7
+ },
+ {
+  "nom": "Location",
+  "ordre": 8
+ },
+ {
+  "nom": "Éducation",
+  "ordre": 9
+ },
+ {
+  "nom": "Professions libérales",
+  "ordre": 10
+ },
+ {
+  "nom": "Santé",
+  "ordre": 11
+ },
+ {
+  "nom": "ONG-Associations",
+  "ordre": 12
+ }
+]

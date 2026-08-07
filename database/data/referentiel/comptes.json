@@ -1,0 +1,138 @@
+[
+ {
+  "numero": "101000",
+  "intitule": "Capital social"
+ },
+ {
+  "numero": "103000",
+  "intitule": "Capital personnel (entreprise individuelle)"
+ },
+ {
+  "numero": "401000",
+  "intitule": "Fournisseurs"
+ },
+ {
+  "numero": "409100",
+  "intitule": "Fournisseurs, avances et acomptes versés"
+ },
+ {
+  "numero": "411000",
+  "intitule": "Clients"
+ },
+ {
+  "numero": "411100",
+  "intitule": "Clients — ventes à crédit (suivi des créances)"
+ },
+ {
+  "numero": "419100",
+  "intitule": "Clients, avances et acomptes reçus (devis, chantiers, précommandes)"
+ },
+ {
+  "numero": "443100",
+  "intitule": "État, TVA facturée (18 % — régime réel)"
+ },
+ {
+  "numero": "445200",
+  "intitule": "État, TVA récupérable sur achats"
+ },
+ {
+  "numero": "521000",
+  "intitule": "Banque"
+ },
+ {
+  "numero": "571000",
+  "intitule": "Caisse"
+ },
+ {
+  "numero": "601000",
+  "intitule": "Achats de marchandises"
+ },
+ {
+  "numero": "603100",
+  "intitule": "Variations de stocks de marchandises"
+ },
+ {
+  "numero": "602000",
+  "intitule": "Achats de matières premières et fournitures liées"
+ },
+ {
+  "numero": "603200",
+  "intitule": "Variations de stocks de matières premières"
+ },
+ {
+  "numero": "604000",
+  "intitule": "Achats stockés de matières et fournitures consommables"
+ },
+ {
+  "numero": "603300",
+  "intitule": "Variations de stocks d'autres approvisionnements"
+ },
+ {
+  "numero": "605000",
+  "intitule": "Autres achats (carburant, eau, électricité, fournitures non stockées)"
+ },
+ {
+  "numero": "621000",
+  "intitule": "Sous-traitance générale (tâcherons)"
+ },
+ {
+  "numero": "661000",
+  "intitule": "Rémunérations directes versées au personnel"
+ },
+ {
+  "numero": "701000",
+  "intitule": "Ventes de marchandises"
+ },
+ {
+  "numero": "702000",
+  "intitule": "Ventes de produits finis"
+ },
+ {
+  "numero": "705000",
+  "intitule": "Travaux facturés"
+ },
+ {
+  "numero": "706000",
+  "intitule": "Services vendus"
+ },
+ {
+  "numero": "707000",
+  "intitule": "Produits accessoires (livraisons, commissions, locations accessoires)"
+ },
+ {
+  "numero": "310000",
+  "intitule": "Stocks de marchandises"
+ },
+ {
+  "numero": "320000",
+  "intitule": "Stocks de matières premières"
+ },
+ {
+  "numero": "330000",
+  "intitule": "Stocks d'autres approvisionnements (consommables)"
+ },
+ {
+  "numero": "340000",
+  "intitule": "Stocks de produits (travaux) en cours"
+ },
+ {
+  "numero": "360000",
+  "intitule": "Stocks de produits finis"
+ },
+ {
+  "numero": "734000",
+  "intitule": "Variations de stocks de produits en cours"
+ },
+ {
+  "numero": "736000",
+  "intitule": "Variations de stocks de produits finis"
+ },
+ {
+  "numero": "710000",
+  "intitule": "Subventions d'exploitation / financements et dons reçus"
+ },
+ {
+  "numero": "471200",
+  "intitule": "Comptes d'attente — fonds détenus pour le compte de tiers (loyers de bailleurs, séquestres)"
+ }
+]
