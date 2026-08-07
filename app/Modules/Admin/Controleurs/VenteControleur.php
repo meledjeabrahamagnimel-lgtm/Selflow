@@ -1105,6 +1105,16 @@ class VenteControleur
      */
     public function normaliser(Vente $vente): RedirectResponse
     {
+        // Cette piece appartient-elle bien a l'entreprise de l'utilisateur ?
+        // La verification manquait ici alors qu'elle est faite partout ailleurs,
+        // y compris sur son jumeau AchatControleur::normaliser(). Sans elle,
+        // n'importe quel compte pouvait declencher la certification d'une
+        // facture d'une autre entreprise en changeant l'identifiant dans l'URL.
+        abort_unless(
+            $vente->pointDeVente->entreprise_id === Auth::user()->entreprise_id,
+            403
+        );
+
         if ($vente->normalise) {
             return back()->with('info', 'Cette facture est déjà normalisée.');
         }
