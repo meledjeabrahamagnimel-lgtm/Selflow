@@ -118,6 +118,13 @@ Poussé sur **Selflow**. Ce qui est fait :
 - `tests/Feature/ReferentielTest.php` — 10 tests, dont la vérification que les
   cinq combinaisons de modules couvrent bien les 71 profils.
 
+- Le **plan comptable OHADA complet** — 1 256 comptes, 9 classes — chargé comme
+  dictionnaire depuis l'acte uniforme. Il ne remplit pas le plan des
+  entreprises : il sert à nommer. Sans lui, la famille « Vivres » imputait en
+  `701100` sans que rien ne nomme ce compte, et la balance à venir aurait été
+  illisible. `Compte::nommer()` résout un numéro absent par sa racine la plus
+  longue.
+
 Reste à faire dans ce lot :
 
 - Comptes, produits et journaux **par défaut de l'entreprise**, livrés avec
@@ -163,6 +170,40 @@ produits, écran superadmin de gestion de la vitrine.
 
 Identifiants opaques dans les URL, habilitations, limitation de débit, un
 scénario de bout en bout par combinaison de modules.
+
+---
+
+## 5 bis. Une question comptable à trancher
+
+**Le classeur subdivise les comptes sur des positions que SYSCOHADA réserve.**
+
+L'acte uniforme définit `7011` à `7014` comme la ventilation *géographique* des
+ventes de marchandises :
+
+| Compte | Acte uniforme OHADA | Usage dans le classeur |
+|---|---|---|
+| `7011` | Dans la Région | Vivres et alimentation |
+| `7012` | Hors Région | Boissons |
+| `7013` | Aux entreprises du groupe dans la Région | Hygiène et entretien |
+| `7014` | Aux entreprises du groupe hors Région | Divers |
+
+Le classeur le sait — son « Lisez-moi » écrit que « ces subdivisions sont libres
+en SYSCOHADA ». C'est vrai des positions plus profondes, pas de celles-ci.
+
+Deux conséquences. Une entreprise qui ventile ses familles sur `7011`–`7014` ne
+pourra plus produire la ventilation géographique attendue par la liasse fiscale.
+Et Comptaflow, qui produit justement cette liasse, recevra des montants rangés
+sous des intitulés qui ne correspondent pas.
+
+**Contournement en place :** le nom d'un compte de famille ne se lit plus sur son
+numéro mais se construit depuis le compte du *type d'article*. La famille
+« Vivres » affiche donc « Ventes de marchandises — Vivres et alimentation », et
+non « Dans la Région ». L'affichage est juste ; la numérotation reste à arbitrer.
+
+**Option recommandée**, à valider avec votre expert-comptable : déplacer les
+familles sur `7010xx` — `701001`, `701002`… — qui n'est pas défini par l'acte
+uniforme, et laisser `7011`–`7014` à leur usage géographique. Le changement se
+fait dans le JSON du référentiel, avant toute mise en service.
 
 ---
 

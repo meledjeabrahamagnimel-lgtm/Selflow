@@ -1,0 +1,7538 @@
+[
+ {
+  "numero": "100000",
+  "intitule": "Capital",
+  "racine": "10",
+  "classe": "1"
+ },
+ {
+  "numero": "101000",
+  "intitule": "Capital social",
+  "racine": "101",
+  "classe": "1"
+ },
+ {
+  "numero": "101100",
+  "intitule": "Capital souscrit, non appelé",
+  "racine": "1011",
+  "classe": "1"
+ },
+ {
+  "numero": "101200",
+  "intitule": "Capital souscrit, appelé, non versé",
+  "racine": "1012",
+  "classe": "1"
+ },
+ {
+  "numero": "101300",
+  "intitule": "Capital souscrit, appelé, versé, non amorti",
+  "racine": "1013",
+  "classe": "1"
+ },
+ {
+  "numero": "101400",
+  "intitule": "Capital souscrit, appelé, versé, amorti",
+  "racine": "1014",
+  "classe": "1"
+ },
+ {
+  "numero": "101800",
+  "intitule": "Capital souscrit soumis à des conditions particulières",
+  "racine": "1018",
+  "classe": "1"
+ },
+ {
+  "numero": "102000",
+  "intitule": "Capital par dotation",
+  "racine": "102",
+  "classe": "1"
+ },
+ {
+  "numero": "102100",
+  "intitule": "Dotation initiale",
+  "racine": "1021",
+  "classe": "1"
+ },
+ {
+  "numero": "102200",
+  "intitule": "Dotations complémentaires",
+  "racine": "1022",
+  "classe": "1"
+ },
+ {
+  "numero": "102800",
+  "intitule": "Autres dotations",
+  "racine": "1028",
+  "classe": "1"
+ },
+ {
+  "numero": "103000",
+  "intitule": "Capital personnel",
+  "racine": "103",
+  "classe": "1"
+ },
+ {
+  "numero": "104000",
+  "intitule": "Compte de l’exploitant",
+  "racine": "104",
+  "classe": "1"
+ },
+ {
+  "numero": "104100",
+  "intitule": "Apports temporaires",
+  "racine": "1041",
+  "classe": "1"
+ },
+ {
+  "numero": "104200",
+  "intitule": "Opérations courantes",
+  "racine": "1042",
+  "classe": "1"
+ },
+ {
+  "numero": "104300",
+  "intitule": "Rémunérations, impôts et autres charges personnelles",
+  "racine": "1043",
+  "classe": "1"
+ },
+ {
+  "numero": "104700",
+  "intitule": "Prélèvements d’autoconsom-mation",
+  "racine": "1047",
+  "classe": "1"
+ },
+ {
+  "numero": "104800",
+  "intitule": "Autres prélèvements",
+  "racine": "1048",
+  "classe": "1"
+ },
+ {
+  "numero": "105000",
+  "intitule": "Primes liées aux capitaux propres",
+  "racine": "105",
+  "classe": "1"
+ },
+ {
+  "numero": "105100",
+  "intitule": "Primes d’émission",
+  "racine": "1051",
+  "classe": "1"
+ },
+ {
+  "numero": "105200",
+  "intitule": "Primes d’apport",
+  "racine": "1052",
+  "classe": "1"
+ },
+ {
+  "numero": "105300",
+  "intitule": "Primes de fusion",
+  "racine": "1053",
+  "classe": "1"
+ },
+ {
+  "numero": "105400",
+  "intitule": "Primes de conversion",
+  "racine": "1054",
+  "classe": "1"
+ },
+ {
+  "numero": "105800",
+  "intitule": "Autres primes",
+  "racine": "1058",
+  "classe": "1"
+ },
+ {
+  "numero": "106000",
+  "intitule": "Écarts de réévaluation",
+  "racine": "106",
+  "classe": "1"
+ },
+ {
+  "numero": "106100",
+  "intitule": "Écarts de réévaluation légale",
+  "racine": "1061",
+  "classe": "1"
+ },
+ {
+  "numero": "106200",
+  "intitule": "Écarts de réévaluation libre",
+  "racine": "1062",
+  "classe": "1"
+ },
+ {
+  "numero": "109000",
+  "intitule": "Actionnaires, capital souscrit, non appelé",
+  "racine": "109",
+  "classe": "1"
+ },
+ {
+  "numero": "110000",
+  "intitule": "Réserves",
+  "racine": "11",
+  "classe": "1"
+ },
+ {
+  "numero": "111000",
+  "intitule": "Réserve légale",
+  "racine": "111",
+  "classe": "1"
+ },
+ {
+  "numero": "112000",
+  "intitule": "Réserves statutaires ou contractuelles",
+  "racine": "112",
+  "classe": "1"
+ },
+ {
+  "numero": "113000",
+  "intitule": "Réserves réglementées",
+  "racine": "113",
+  "classe": "1"
+ },
+ {
+  "numero": "113100",
+  "intitule": "Réserves de plus-values nettes à long terme",
+  "racine": "1131",
+  "classe": "1"
+ },
+ {
+  "numero": "113300",
+  "intitule": "Réserves consécutives à l’oc-troi de subventions d’investisse-ment",
+  "racine": "1133",
+  "classe": "1"
+ },
+ {
+  "numero": "113800",
+  "intitule": "Autres réserves réglementées",
+  "racine": "1138",
+  "classe": "1"
+ },
+ {
+  "numero": "118000",
+  "intitule": "Autres réserves",
+  "racine": "118",
+  "classe": "1"
+ },
+ {
+  "numero": "118100",
+  "intitule": "Réserves facultatives",
+  "racine": "1181",
+  "classe": "1"
+ },
+ {
+  "numero": "118800",
+  "intitule": "Réserves diverses",
+  "racine": "1188",
+  "classe": "1"
+ },
+ {
+  "numero": "120000",
+  "intitule": "Report à nouveau",
+  "racine": "12",
+  "classe": "1"
+ },
+ {
+  "numero": "121000",
+  "intitule": "Report à nouveau créditeur",
+  "racine": "121",
+  "classe": "1"
+ },
+ {
+  "numero": "129000",
+  "intitule": "Report à nouveau débiteur",
+  "racine": "129",
+  "classe": "1"
+ },
+ {
+  "numero": "129100",
+  "intitule": "Perte nette à reporter",
+  "racine": "1291",
+  "classe": "1"
+ },
+ {
+  "numero": "129200",
+  "intitule": "Perte - Amortissements réputés différés",
+  "racine": "1292",
+  "classe": "1"
+ },
+ {
+  "numero": "130000",
+  "intitule": "Résultat en instance d’affectation",
+  "racine": "130",
+  "classe": "1"
+ },
+ {
+  "numero": "130100",
+  "intitule": "Résultat en instance d’affec-tation : bénéfice",
+  "racine": "1301",
+  "classe": "1"
+ },
+ {
+  "numero": "130900",
+  "intitule": "Résultat en instance d’affec-tation : perte",
+  "racine": "1309",
+  "classe": "1"
+ },
+ {
+  "numero": "131000",
+  "intitule": "Résultat net : bénéfice",
+  "racine": "131",
+  "classe": "1"
+ },
+ {
+  "numero": "132000",
+  "intitule": "Marge brute (MB)",
+  "racine": "132",
+  "classe": "1"
+ },
+ {
+  "numero": "132100",
+  "intitule": "Marge brute sur marchandises",
+  "racine": "1321",
+  "classe": "1"
+ },
+ {
+  "numero": "132200",
+  "intitule": "Marge brute sur matières",
+  "racine": "1322",
+  "classe": "1"
+ },
+ {
+  "numero": "133000",
+  "intitule": "Valeur ajoutée (VA)",
+  "racine": "133",
+  "classe": "1"
+ },
+ {
+  "numero": "134000",
+  "intitule": "Excédent brut d’exploitation (EBE)",
+  "racine": "134",
+  "classe": "1"
+ },
+ {
+  "numero": "135000",
+  "intitule": "Résultat d’exploitation (RE)",
+  "racine": "135",
+  "classe": "1"
+ },
+ {
+  "numero": "136000",
+  "intitule": "Résultat financier (RF)",
+  "racine": "136",
+  "classe": "1"
+ },
+ {
+  "numero": "137000",
+  "intitule": "Résultat des activités ordinaires (RAO)",
+  "racine": "137",
+  "classe": "1"
+ },
+ {
+  "numero": "138000",
+  "intitule": "Résultat hors activités ordinaires (RHAO)",
+  "racine": "138",
+  "classe": "1"
+ },
+ {
+  "numero": "139000",
+  "intitule": "Résultat net : perte",
+  "racine": "139",
+  "classe": "1"
+ },
+ {
+  "numero": "140000",
+  "intitule": "Subventions d’investissement",
+  "racine": "14",
+  "classe": "1"
+ },
+ {
+  "numero": "141000",
+  "intitule": "Subventions d’équipement A",
+  "racine": "141",
+  "classe": "1"
+ },
+ {
+  "numero": "141100",
+  "intitule": "État",
+  "racine": "1411",
+  "classe": "1"
+ },
+ {
+  "numero": "141200",
+  "intitule": "Régions",
+  "racine": "1412",
+  "classe": "1"
+ },
+ {
+  "numero": "141300",
+  "intitule": "Départements",
+  "racine": "1413",
+  "classe": "1"
+ },
+ {
+  "numero": "141400",
+  "intitule": "Communes et collectivités publiques décentralisées",
+  "racine": "1414",
+  "classe": "1"
+ },
+ {
+  "numero": "141500",
+  "intitule": "Entreprises publiques ou mixtes",
+  "racine": "1415",
+  "classe": "1"
+ },
+ {
+  "numero": "141600",
+  "intitule": "Entreprises et organismes privés",
+  "racine": "1416",
+  "classe": "1"
+ },
+ {
+  "numero": "141700",
+  "intitule": "Organismes internationaux",
+  "racine": "1417",
+  "classe": "1"
+ },
+ {
+  "numero": "141800",
+  "intitule": "Autres",
+  "racine": "1418",
+  "classe": "1"
+ },
+ {
+  "numero": "142000",
+  "intitule": "Subventions d’équipement B",
+  "racine": "142",
+  "classe": "1"
+ },
+ {
+  "numero": "148000",
+  "intitule": "Autres subventions d’investisse-ment",
+  "racine": "148",
+  "classe": "1"
+ },
+ {
+  "numero": "150000",
+  "intitule": "Provisions réglementées et fonds assimilés",
+  "racine": "15",
+  "classe": "1"
+ },
+ {
+  "numero": "151000",
+  "intitule": "Amortissements dérogatoires",
+  "racine": "151",
+  "classe": "1"
+ },
+ {
+  "numero": "152000",
+  "intitule": "Plus-values de cession à réinvestir",
+  "racine": "152",
+  "classe": "1"
+ },
+ {
+  "numero": "153000",
+  "intitule": "Fonds réglementés",
+  "racine": "153",
+  "classe": "1"
+ },
+ {
+  "numero": "153100",
+  "intitule": "Fonds National",
+  "racine": "1531",
+  "classe": "1"
+ },
+ {
+  "numero": "153200",
+  "intitule": "Prélèvement pour le Budget",
+  "racine": "1532",
+  "classe": "1"
+ },
+ {
+  "numero": "154000",
+  "intitule": "Provision spéciale de réévaluation",
+  "racine": "154",
+  "classe": "1"
+ },
+ {
+  "numero": "155000",
+  "intitule": "Provisions réglementées relatives aux immobilisations",
+  "racine": "155",
+  "classe": "1"
+ },
+ {
+  "numero": "155100",
+  "intitule": "Reconstitution des gisements miniers et pétroliers",
+  "racine": "1551",
+  "classe": "1"
+ },
+ {
+  "numero": "156000",
+  "intitule": "Provisions réglementées relatives aux stocks",
+  "racine": "156",
+  "classe": "1"
+ },
+ {
+  "numero": "156100",
+  "intitule": "Hausse de prix",
+  "racine": "1561",
+  "classe": "1"
+ },
+ {
+  "numero": "156200",
+  "intitule": "Fluctuation des cours",
+  "racine": "1562",
+  "classe": "1"
+ },
+ {
+  "numero": "157000",
+  "intitule": "Provisions pour investissement",
+  "racine": "157",
+  "classe": "1"
+ },
+ {
+  "numero": "158000",
+  "intitule": "Autres provisions et fonds réglementes",
+  "racine": "158",
+  "classe": "1"
+ },
+ {
+  "numero": "160000",
+  "intitule": "Emprunts et dettes assimilées",
+  "racine": "16",
+  "classe": "1"
+ },
+ {
+  "numero": "161000",
+  "intitule": "Emprunts obligataires",
+  "racine": "161",
+  "classe": "1"
+ },
+ {
+  "numero": "161100",
+  "intitule": "Emprunts obligataires ordinaires",
+  "racine": "1611",
+  "classe": "1"
+ },
+ {
+  "numero": "161200",
+  "intitule": "Emprunts obligataires con-vertibles",
+  "racine": "1612",
+  "classe": "1"
+ },
+ {
+  "numero": "161800",
+  "intitule": "Autres emprunts obligataires",
+  "racine": "1618",
+  "classe": "1"
+ },
+ {
+  "numero": "162000",
+  "intitule": "Emprunts et dettes auprès des établissements de crédit",
+  "racine": "162",
+  "classe": "1"
+ },
+ {
+  "numero": "163000",
+  "intitule": "Avances reçues de l’état",
+  "racine": "163",
+  "classe": "1"
+ },
+ {
+  "numero": "164000",
+  "intitule": "Avances reçues et comptes courants bloqués",
+  "racine": "164",
+  "classe": "1"
+ },
+ {
+  "numero": "165000",
+  "intitule": "Dépôts et cautionnements reçus",
+  "racine": "165",
+  "classe": "1"
+ },
+ {
+  "numero": "165100",
+  "intitule": "Dépôts",
+  "racine": "1651",
+  "classe": "1"
+ },
+ {
+  "numero": "165200",
+  "intitule": "Cautionnements",
+  "racine": "1652",
+  "classe": "1"
+ },
+ {
+  "numero": "166000",
+  "intitule": "Intérêts courus",
+  "racine": "166",
+  "classe": "1"
+ },
+ {
+  "numero": "166100",
+  "intitule": "sur emprunts obligataires",
+  "racine": "1661",
+  "classe": "1"
+ },
+ {
+  "numero": "166200",
+  "intitule": "sur emprunts et dettes auprès des établissements de crédit",
+  "racine": "1662",
+  "classe": "1"
+ },
+ {
+  "numero": "166300",
+  "intitule": "sur avances reçues de l’État",
+  "racine": "1663",
+  "classe": "1"
+ },
+ {
+  "numero": "166400",
+  "intitule": "sur avances reçues et comptes courants bloqués",
+  "racine": "1664",
+  "classe": "1"
+ },
+ {
+  "numero": "166500",
+  "intitule": "sur dépôts et cautionnements reçus",
+  "racine": "1665",
+  "classe": "1"
+ },
+ {
+  "numero": "166700",
+  "intitule": "sur avances assorties de conditions particulières",
+  "racine": "1667",
+  "classe": "1"
+ },
+ {
+  "numero": "166800",
+  "intitule": "sur autres emprunts et dettes",
+  "racine": "1668",
+  "classe": "1"
+ },
+ {
+  "numero": "167000",
+  "intitule": "Avances assorties de conditions particulières",
+  "racine": "167",
+  "classe": "1"
+ },
+ {
+  "numero": "167100",
+  "intitule": "Avances bloquées pour augmentation du capital",
+  "racine": "1671",
+  "classe": "1"
+ },
+ {
+  "numero": "167200",
+  "intitule": "Avances conditionnées par l’État",
+  "racine": "1672",
+  "classe": "1"
+ },
+ {
+  "numero": "167300",
+  "intitule": "Avances conditionnées par les autres organismes africains",
+  "racine": "1673",
+  "classe": "1"
+ },
+ {
+  "numero": "167400",
+  "intitule": "Avances conditionnées par les organismes internationaux",
+  "racine": "1674",
+  "classe": "1"
+ },
+ {
+  "numero": "167600",
+  "intitule": "Droits du concédant exigibles en nature",
+  "racine": "1676",
+  "classe": "1"
+ },
+ {
+  "numero": "168000",
+  "intitule": "Autres emprunts et dettes",
+  "racine": "168",
+  "classe": "1"
+ },
+ {
+  "numero": "168100",
+  "intitule": "Rentes viagères capitalisées",
+  "racine": "1681",
+  "classe": "1"
+ },
+ {
+  "numero": "168200",
+  "intitule": "Billets de fonds",
+  "racine": "1682",
+  "classe": "1"
+ },
+ {
+  "numero": "168300",
+  "intitule": "Dettes consécutives à des titres empruntés",
+  "racine": "1683",
+  "classe": "1"
+ },
+ {
+  "numero": "168400",
+  "intitule": "Dettes du concédant exigibles en nature",
+  "racine": "1684",
+  "classe": "1"
+ },
+ {
+  "numero": "168500",
+  "intitule": "Emprunts participatifs",
+  "racine": "1685",
+  "classe": "1"
+ },
+ {
+  "numero": "168600",
+  "intitule": "Participation des travailleurs aux bénéfices",
+  "racine": "1686",
+  "classe": "1"
+ },
+ {
+  "numero": "170000",
+  "intitule": "Dettes de crédit ‐ bail et contrats assimilés",
+  "racine": "17",
+  "classe": "1"
+ },
+ {
+  "numero": "172000",
+  "intitule": "Emprunts équivalents de crédit - bail immobilier",
+  "racine": "172",
+  "classe": "1"
+ },
+ {
+  "numero": "173000",
+  "intitule": "Emprunts équivalents de crédit - bail mobilier",
+  "racine": "173",
+  "classe": "1"
+ },
+ {
+  "numero": "176000",
+  "intitule": "Intérêts courus",
+  "racine": "176",
+  "classe": "1"
+ },
+ {
+  "numero": "176200",
+  "intitule": "sur emprunts équivalents de crédit - bail immobilier",
+  "racine": "1762",
+  "classe": "1"
+ },
+ {
+  "numero": "176300",
+  "intitule": "sur emprunts équivalents de crédit - bail mobilier",
+  "racine": "1763",
+  "classe": "1"
+ },
+ {
+  "numero": "176800",
+  "intitule": "sur emprunts équivalents d’autres contrats",
+  "racine": "1768",
+  "classe": "1"
+ },
+ {
+  "numero": "178000",
+  "intitule": "Emprunts équivalents d’autres contrats",
+  "racine": "178",
+  "classe": "1"
+ },
+ {
+  "numero": "180000",
+  "intitule": "Dettes  liées  à  des  participations  et  comptes  de  liaison  des  établissements  et sociétés en participation",
+  "racine": "18",
+  "classe": "1"
+ },
+ {
+  "numero": "181000",
+  "intitule": "Dettes liées à des participations",
+  "racine": "181",
+  "classe": "1"
+ },
+ {
+  "numero": "181100",
+  "intitule": "Dettes liées à des participations (groupe)",
+  "racine": "1811",
+  "classe": "1"
+ },
+ {
+  "numero": "181200",
+  "intitule": "Dettes liées à des participations (hors groupe)",
+  "racine": "1812",
+  "classe": "1"
+ },
+ {
+  "numero": "182000",
+  "intitule": "Dettes liées à des sociétés en participation",
+  "racine": "182",
+  "classe": "1"
+ },
+ {
+  "numero": "183000",
+  "intitule": "Intérêts courus sur dettes liées à des participations",
+  "racine": "183",
+  "classe": "1"
+ },
+ {
+  "numero": "184000",
+  "intitule": "Comptes permanents bloqués des établissements et succursales",
+  "racine": "184",
+  "classe": "1"
+ },
+ {
+  "numero": "185000",
+  "intitule": "Comptes permanents non bloqués des établissements et succursales",
+  "racine": "185",
+  "classe": "1"
+ },
+ {
+  "numero": "186000",
+  "intitule": "Comptes de liaison charges",
+  "racine": "186",
+  "classe": "1"
+ },
+ {
+  "numero": "187000",
+  "intitule": "Comptes de liaison produits",
+  "racine": "187",
+  "classe": "1"
+ },
+ {
+  "numero": "188000",
+  "intitule": "Comptes de liaison des sociétés en participation",
+  "racine": "188",
+  "classe": "1"
+ },
+ {
+  "numero": "190000",
+  "intitule": "Provisions financières pour risques et charges",
+  "racine": "19",
+  "classe": "1"
+ },
+ {
+  "numero": "191000",
+  "intitule": "Provisions pour litiges",
+  "racine": "191",
+  "classe": "1"
+ },
+ {
+  "numero": "192000",
+  "intitule": "Provisions pour garanties données aux clients",
+  "racine": "192",
+  "classe": "1"
+ },
+ {
+  "numero": "193000",
+  "intitule": "Provisions pour pertes sur marchés à achèvement futur",
+  "racine": "193",
+  "classe": "1"
+ },
+ {
+  "numero": "194000",
+  "intitule": "Provisions pour pertes de change",
+  "racine": "194",
+  "classe": "1"
+ },
+ {
+  "numero": "195000",
+  "intitule": "Provisions pour impôts",
+  "racine": "195",
+  "classe": "1"
+ },
+ {
+  "numero": "196000",
+  "intitule": "Provisions pour pensions et obligations similaires",
+  "racine": "196",
+  "classe": "1"
+ },
+ {
+  "numero": "197000",
+  "intitule": "Provisions pour charges à repartir sur plusieurs exercices",
+  "racine": "197",
+  "classe": "1"
+ },
+ {
+  "numero": "197100",
+  "intitule": "Provisions pour grosses réparations",
+  "racine": "1971",
+  "classe": "1"
+ },
+ {
+  "numero": "198000",
+  "intitule": "Autres provisions financières pour risques et charges",
+  "racine": "198",
+  "classe": "1"
+ },
+ {
+  "numero": "198100",
+  "intitule": "Provisions pour amendes et pénalités",
+  "racine": "1981",
+  "classe": "1"
+ },
+ {
+  "numero": "198200",
+  "intitule": "Provisions pour renouvellement des immobilisations (entreprises concessionnai- res)",
+  "racine": "1982",
+  "classe": "1"
+ },
+ {
+  "numero": "198300",
+  "intitule": "Provisions de propre assureur",
+  "racine": "1983",
+  "classe": "1"
+ },
+ {
+  "numero": "198800",
+  "intitule": "Autres provisions financières pour risques et charges",
+  "racine": "1988",
+  "classe": "1"
+ },
+ {
+  "numero": "200000",
+  "intitule": "Charges immobilisées",
+  "racine": "20",
+  "classe": "2"
+ },
+ {
+  "numero": "201000",
+  "intitule": "Frais d’établissement",
+  "racine": "201",
+  "classe": "2"
+ },
+ {
+  "numero": "201100",
+  "intitule": "Frais de constitution",
+  "racine": "2011",
+  "classe": "2"
+ },
+ {
+  "numero": "201200",
+  "intitule": "Frais de prospection",
+  "racine": "2012",
+  "classe": "2"
+ },
+ {
+  "numero": "201300",
+  "intitule": "Frais de publicité et de lancement",
+  "racine": "2013",
+  "classe": "2"
+ },
+ {
+  "numero": "201400",
+  "intitule": "Frais de fonctionnement antérieurs au démarrage",
+  "racine": "2014",
+  "classe": "2"
+ },
+ {
+  "numero": "201500",
+  "intitule": "Frais de modification du capital (fusions, scissions, transformations)",
+  "racine": "2015",
+  "classe": "2"
+ },
+ {
+  "numero": "201600",
+  "intitule": "Frais d’entrée à la Bourse",
+  "racine": "2016",
+  "classe": "2"
+ },
+ {
+  "numero": "201700",
+  "intitule": "Frais de restructuration",
+  "racine": "2017",
+  "classe": "2"
+ },
+ {
+  "numero": "201800",
+  "intitule": "Frais divers d’établissement",
+  "racine": "2018",
+  "classe": "2"
+ },
+ {
+  "numero": "202000",
+  "intitule": "Charges à répartir sur plusieurs exercices",
+  "racine": "202",
+  "classe": "2"
+ },
+ {
+  "numero": "202100",
+  "intitule": "Charges différées",
+  "racine": "2021",
+  "classe": "2"
+ },
+ {
+  "numero": "202200",
+  "intitule": "Frais d’acquisition d’immobi-lisations",
+  "racine": "2022",
+  "classe": "2"
+ },
+ {
+  "numero": "202600",
+  "intitule": "Frais d’émission des emprunts",
+  "racine": "2026",
+  "classe": "2"
+ },
+ {
+  "numero": "202800",
+  "intitule": "Charges à étaler",
+  "racine": "2028",
+  "classe": "2"
+ },
+ {
+  "numero": "206000",
+  "intitule": "Primes de remboursement des obligations",
+  "racine": "206",
+  "classe": "2"
+ },
+ {
+  "numero": "206100",
+  "intitule": "Obligations ordinaires",
+  "racine": "2061",
+  "classe": "2"
+ },
+ {
+  "numero": "206200",
+  "intitule": "Obligations convertibles",
+  "racine": "2062",
+  "classe": "2"
+ },
+ {
+  "numero": "206800",
+  "intitule": "Autres emprunts obligataires",
+  "racine": "2068",
+  "classe": "2"
+ },
+ {
+  "numero": "210000",
+  "intitule": "Immobilisations incorporelles",
+  "racine": "21",
+  "classe": "2"
+ },
+ {
+  "numero": "211000",
+  "intitule": "Frais de recherche et de développement",
+  "racine": "211",
+  "classe": "2"
+ },
+ {
+  "numero": "212000",
+  "intitule": "Brevets, licences, concessions et droits similaires",
+  "racine": "212",
+  "classe": "2"
+ },
+ {
+  "numero": "213000",
+  "intitule": "Logiciels",
+  "racine": "213",
+  "classe": "2"
+ },
+ {
+  "numero": "214000",
+  "intitule": "Marques",
+  "racine": "214",
+  "classe": "2"
+ },
+ {
+  "numero": "215000",
+  "intitule": "Fonds commercial",
+  "racine": "215",
+  "classe": "2"
+ },
+ {
+  "numero": "216000",
+  "intitule": "Droit au bail",
+  "racine": "216",
+  "classe": "2"
+ },
+ {
+  "numero": "217000",
+  "intitule": "Investissements de création",
+  "racine": "217",
+  "classe": "2"
+ },
+ {
+  "numero": "218000",
+  "intitule": "Autres droits et valeurs incorporels",
+  "racine": "218",
+  "classe": "2"
+ },
+ {
+  "numero": "219000",
+  "intitule": "Immobilisations incorporelles en cours",
+  "racine": "219",
+  "classe": "2"
+ },
+ {
+  "numero": "219100",
+  "intitule": "Frais de recherche et de développement",
+  "racine": "2191",
+  "classe": "2"
+ },
+ {
+  "numero": "219300",
+  "intitule": "Logiciels",
+  "racine": "2193",
+  "classe": "2"
+ },
+ {
+  "numero": "219800",
+  "intitule": "Autres droits et valeurs incorporels",
+  "racine": "2198",
+  "classe": "2"
+ },
+ {
+  "numero": "220000",
+  "intitule": "Terrains",
+  "racine": "22",
+  "classe": "2"
+ },
+ {
+  "numero": "221000",
+  "intitule": "terrains agricoles et forestiers",
+  "racine": "221",
+  "classe": "2"
+ },
+ {
+  "numero": "221100",
+  "intitule": "Terrains d’exploitation agricole",
+  "racine": "2211",
+  "classe": "2"
+ },
+ {
+  "numero": "221200",
+  "intitule": "Terrains d’exploitation forestière",
+  "racine": "2212",
+  "classe": "2"
+ },
+ {
+  "numero": "221800",
+  "intitule": "Autres terrains",
+  "racine": "2218",
+  "classe": "2"
+ },
+ {
+  "numero": "222000",
+  "intitule": "Terrains nus",
+  "racine": "222",
+  "classe": "2"
+ },
+ {
+  "numero": "222100",
+  "intitule": "Terrains à bâtir",
+  "racine": "2221",
+  "classe": "2"
+ },
+ {
+  "numero": "222800",
+  "intitule": "Autres terrains nus",
+  "racine": "2228",
+  "classe": "2"
+ },
+ {
+  "numero": "223000",
+  "intitule": "Terrains bâtis",
+  "racine": "223",
+  "classe": "2"
+ },
+ {
+  "numero": "223100",
+  "intitule": "pour bâtiments industriels et agricoles",
+  "racine": "2231",
+  "classe": "2"
+ },
+ {
+  "numero": "223200",
+  "intitule": "pour bâtiments administratifs et commerciaux",
+  "racine": "2232",
+  "classe": "2"
+ },
+ {
+  "numero": "223400",
+  "intitule": "pour bâtiments affectés aux autres opérations professionnelles",
+  "racine": "2234",
+  "classe": "2"
+ },
+ {
+  "numero": "223500",
+  "intitule": "pour bâtiments affectés aux autres opérations non professionnelles",
+  "racine": "2235",
+  "classe": "2"
+ },
+ {
+  "numero": "223800",
+  "intitule": "Autres terrains bâtis",
+  "racine": "2238",
+  "classe": "2"
+ },
+ {
+  "numero": "224000",
+  "intitule": "Travaux de mise en valeur des terrains",
+  "racine": "224",
+  "classe": "2"
+ },
+ {
+  "numero": "224100",
+  "intitule": "Plantation d’arbres et d’arbustes",
+  "racine": "2241",
+  "classe": "2"
+ },
+ {
+  "numero": "224800",
+  "intitule": "Autres travaux",
+  "racine": "2248",
+  "classe": "2"
+ },
+ {
+  "numero": "225000",
+  "intitule": "Terrains de gisement",
+  "racine": "225",
+  "classe": "2"
+ },
+ {
+  "numero": "225100",
+  "intitule": "Carrières",
+  "racine": "2251",
+  "classe": "2"
+ },
+ {
+  "numero": "226000",
+  "intitule": "Terrains aménagés",
+  "racine": "226",
+  "classe": "2"
+ },
+ {
+  "numero": "226100",
+  "intitule": "Parkings",
+  "racine": "2261",
+  "classe": "2"
+ },
+ {
+  "numero": "227000",
+  "intitule": "Terrains mis en concession",
+  "racine": "227",
+  "classe": "2"
+ },
+ {
+  "numero": "228000",
+  "intitule": "Autres terrains",
+  "racine": "228",
+  "classe": "2"
+ },
+ {
+  "numero": "228100",
+  "intitule": "Terrains des immeubles de rapport",
+  "racine": "2281",
+  "classe": "2"
+ },
+ {
+  "numero": "228500",
+  "intitule": "Terrains des logements affectés au personnel",
+  "racine": "2285",
+  "classe": "2"
+ },
+ {
+  "numero": "228800",
+  "intitule": "Autres terrains",
+  "racine": "2288",
+  "classe": "2"
+ },
+ {
+  "numero": "229000",
+  "intitule": "Aménagements de terrains en cours",
+  "racine": "229",
+  "classe": "2"
+ },
+ {
+  "numero": "229100",
+  "intitule": "Terrains agricoles et forestiers",
+  "racine": "2291",
+  "classe": "2"
+ },
+ {
+  "numero": "229200",
+  "intitule": "Terrains nus",
+  "racine": "2292",
+  "classe": "2"
+ },
+ {
+  "numero": "229500",
+  "intitule": "Terrains de gisement",
+  "racine": "2295",
+  "classe": "2"
+ },
+ {
+  "numero": "229800",
+  "intitule": "Autres terrains",
+  "racine": "2298",
+  "classe": "2"
+ },
+ {
+  "numero": "230000",
+  "intitule": "Bâtiments, installations techniques et agencements",
+  "racine": "23",
+  "classe": "2"
+ },
+ {
+  "numero": "231000",
+  "intitule": "Bâtiments industriels, agricoles, administratifs et commerciaux sur sol propre",
+  "racine": "231",
+  "classe": "2"
+ },
+ {
+  "numero": "231100",
+  "intitule": "Bâtiments industriels",
+  "racine": "2311",
+  "classe": "2"
+ },
+ {
+  "numero": "231200",
+  "intitule": "Bâtiments agricoles",
+  "racine": "2312",
+  "classe": "2"
+ },
+ {
+  "numero": "231300",
+  "intitule": "Bâtiments administratifs et commerciaux",
+  "racine": "2313",
+  "classe": "2"
+ },
+ {
+  "numero": "231400",
+  "intitule": "Bâtiments affectés au logement du personnel",
+  "racine": "2314",
+  "classe": "2"
+ },
+ {
+  "numero": "231500",
+  "intitule": "Immeubles de rapport",
+  "racine": "2315",
+  "classe": "2"
+ },
+ {
+  "numero": "232000",
+  "intitule": "Bâtiments industriels, agricoles, administratifs et commerciaux sur sol d’autrui",
+  "racine": "232",
+  "classe": "2"
+ },
+ {
+  "numero": "232100",
+  "intitule": "Bâtiments industriels",
+  "racine": "2321",
+  "classe": "2"
+ },
+ {
+  "numero": "232200",
+  "intitule": "Bâtiments agricoles",
+  "racine": "2322",
+  "classe": "2"
+ },
+ {
+  "numero": "232300",
+  "intitule": "Bâtiments administratifs et commerciaux",
+  "racine": "2323",
+  "classe": "2"
+ },
+ {
+  "numero": "232400",
+  "intitule": "Bâtiments affectés au logement du personnel",
+  "racine": "2324",
+  "classe": "2"
+ },
+ {
+  "numero": "232500",
+  "intitule": "Immeubles de rapport",
+  "racine": "2325",
+  "classe": "2"
+ },
+ {
+  "numero": "233000",
+  "intitule": "Ouvrages d’infrastructure",
+  "racine": "233",
+  "classe": "2"
+ },
+ {
+  "numero": "233100",
+  "intitule": "Voies de terre",
+  "racine": "2331",
+  "classe": "2"
+ },
+ {
+  "numero": "233200",
+  "intitule": "Voies de fer",
+  "racine": "2332",
+  "classe": "2"
+ },
+ {
+  "numero": "233300",
+  "intitule": "Voies d’eau",
+  "racine": "2333",
+  "classe": "2"
+ },
+ {
+  "numero": "233400",
+  "intitule": "Barrages, Digues",
+  "racine": "2334",
+  "classe": "2"
+ },
+ {
+  "numero": "233500",
+  "intitule": "Pistes d’aérodrome",
+  "racine": "2335",
+  "classe": "2"
+ },
+ {
+  "numero": "233800",
+  "intitule": "Autres",
+  "racine": "2338",
+  "classe": "2"
+ },
+ {
+  "numero": "234000",
+  "intitule": "Installations techniques",
+  "racine": "234",
+  "classe": "2"
+ },
+ {
+  "numero": "234100",
+  "intitule": "Installations complexes spécialisées sur sol propre",
+  "racine": "2341",
+  "classe": "2"
+ },
+ {
+  "numero": "234200",
+  "intitule": "Installations complexes spécialisées sur sol d’autrui",
+  "racine": "2342",
+  "classe": "2"
+ },
+ {
+  "numero": "234300",
+  "intitule": "Installations à caractère spécifique sur sol propre",
+  "racine": "2343",
+  "classe": "2"
+ },
+ {
+  "numero": "234400",
+  "intitule": "Installations à caractère spécifique sur sol d’autrui",
+  "racine": "2344",
+  "classe": "2"
+ },
+ {
+  "numero": "235000",
+  "intitule": "Aménagements de bureaux",
+  "racine": "235",
+  "classe": "2"
+ },
+ {
+  "numero": "235100",
+  "intitule": "Installations générales",
+  "racine": "2351",
+  "classe": "2"
+ },
+ {
+  "numero": "235800",
+  "intitule": "Autres",
+  "racine": "2358",
+  "classe": "2"
+ },
+ {
+  "numero": "237000",
+  "intitule": "Bâtiments industriels, agricoles et commerciaux mis en concession",
+  "racine": "237",
+  "classe": "2"
+ },
+ {
+  "numero": "238000",
+  "intitule": "Autres installations et agencements",
+  "racine": "238",
+  "classe": "2"
+ },
+ {
+  "numero": "239000",
+  "intitule": "Bâtiments et installations en cours",
+  "racine": "239",
+  "classe": "2"
+ },
+ {
+  "numero": "240000",
+  "intitule": "Matériel",
+  "racine": "24",
+  "classe": "2"
+ },
+ {
+  "numero": "241000",
+  "intitule": "Matériel et outillage industriel et commercial",
+  "racine": "241",
+  "classe": "2"
+ },
+ {
+  "numero": "241100",
+  "intitule": "Matériel industriel",
+  "racine": "2411",
+  "classe": "2"
+ },
+ {
+  "numero": "241200",
+  "intitule": "Outillage industriel",
+  "racine": "2412",
+  "classe": "2"
+ },
+ {
+  "numero": "241300",
+  "intitule": "Matériel commercial",
+  "racine": "2413",
+  "classe": "2"
+ },
+ {
+  "numero": "241400",
+  "intitule": "Outillage commercial",
+  "racine": "2414",
+  "classe": "2"
+ },
+ {
+  "numero": "242000",
+  "intitule": "Matériel et outillage agricole",
+  "racine": "242",
+  "classe": "2"
+ },
+ {
+  "numero": "242100",
+  "intitule": "Matériel agricole",
+  "racine": "2421",
+  "classe": "2"
+ },
+ {
+  "numero": "242200",
+  "intitule": "Outillage agricole",
+  "racine": "2422",
+  "classe": "2"
+ },
+ {
+  "numero": "243000",
+  "intitule": "Matériel d’emballage récupérable et identifiable",
+  "racine": "243",
+  "classe": "2"
+ },
+ {
+  "numero": "244000",
+  "intitule": "Matériel et mobilier",
+  "racine": "244",
+  "classe": "2"
+ },
+ {
+  "numero": "244100",
+  "intitule": "Matériel de bureau",
+  "racine": "2441",
+  "classe": "2"
+ },
+ {
+  "numero": "244200",
+  "intitule": "Matériel informatique",
+  "racine": "2442",
+  "classe": "2"
+ },
+ {
+  "numero": "244300",
+  "intitule": "Matériel bureautique",
+  "racine": "2443",
+  "classe": "2"
+ },
+ {
+  "numero": "244400",
+  "intitule": "Mobilier de bureau",
+  "racine": "2444",
+  "classe": "2"
+ },
+ {
+  "numero": "244600",
+  "intitule": "Matériel et mobilier des immeubles de rapport",
+  "racine": "2446",
+  "classe": "2"
+ },
+ {
+  "numero": "244700",
+  "intitule": "Matériel et mobilier des logements du personnel",
+  "racine": "2447",
+  "classe": "2"
+ },
+ {
+  "numero": "245000",
+  "intitule": "Matériel de transport",
+  "racine": "245",
+  "classe": "2"
+ },
+ {
+  "numero": "245100",
+  "intitule": "Matériel automobile",
+  "racine": "2451",
+  "classe": "2"
+ },
+ {
+  "numero": "245200",
+  "intitule": "Matériel ferroviaire",
+  "racine": "2452",
+  "classe": "2"
+ },
+ {
+  "numero": "245300",
+  "intitule": "Matériel fluvial, lagunaire",
+  "racine": "2453",
+  "classe": "2"
+ },
+ {
+  "numero": "245400",
+  "intitule": "Matériel naval",
+  "racine": "2454",
+  "classe": "2"
+ },
+ {
+  "numero": "245500",
+  "intitule": "Matériel aérien",
+  "racine": "2455",
+  "classe": "2"
+ },
+ {
+  "numero": "245600",
+  "intitule": "Matériel hippomobile",
+  "racine": "2456",
+  "classe": "2"
+ },
+ {
+  "numero": "245800",
+  "intitule": "Autres (vélo, mobylette, moto)",
+  "racine": "2458",
+  "classe": "2"
+ },
+ {
+  "numero": "246000",
+  "intitule": "Immobilisations animales et agricoles",
+  "racine": "246",
+  "classe": "2"
+ },
+ {
+  "numero": "246100",
+  "intitule": "Cheptel, animaux de trait",
+  "racine": "2461",
+  "classe": "2"
+ },
+ {
+  "numero": "246200",
+  "intitule": "Cheptel, animaux reproducteurs",
+  "racine": "2462",
+  "classe": "2"
+ },
+ {
+  "numero": "246300",
+  "intitule": "Animaux de garde",
+  "racine": "2463",
+  "classe": "2"
+ },
+ {
+  "numero": "246500",
+  "intitule": "Plantations agricoles",
+  "racine": "2465",
+  "classe": "2"
+ },
+ {
+  "numero": "246800",
+  "intitule": "Autres",
+  "racine": "2468",
+  "classe": "2"
+ },
+ {
+  "numero": "247000",
+  "intitule": "Agencements et aménagements du matériel",
+  "racine": "247",
+  "classe": "2"
+ },
+ {
+  "numero": "248000",
+  "intitule": "Autres matériels",
+  "racine": "248",
+  "classe": "2"
+ },
+ {
+  "numero": "248100",
+  "intitule": "Collections et œuvres d’art",
+  "racine": "2481",
+  "classe": "2"
+ },
+ {
+  "numero": "249000",
+  "intitule": "Matériel en cours",
+  "racine": "249",
+  "classe": "2"
+ },
+ {
+  "numero": "249100",
+  "intitule": "Matériel et outillage industriel et commercial",
+  "racine": "2491",
+  "classe": "2"
+ },
+ {
+  "numero": "249200",
+  "intitule": "Matériel et outillage agricole",
+  "racine": "2492",
+  "classe": "2"
+ },
+ {
+  "numero": "249300",
+  "intitule": "Matériel d’emballage récupérable et identifiable",
+  "racine": "2493",
+  "classe": "2"
+ },
+ {
+  "numero": "249400",
+  "intitule": "Matériel et mobilier de bureau",
+  "racine": "2494",
+  "classe": "2"
+ },
+ {
+  "numero": "249500",
+  "intitule": "Matériel de transport",
+  "racine": "2495",
+  "classe": "2"
+ },
+ {
+  "numero": "249600",
+  "intitule": "Immobilisations animales et agricoles",
+  "racine": "2496",
+  "classe": "2"
+ },
+ {
+  "numero": "249700",
+  "intitule": "Agencements et aménagements du matériel",
+  "racine": "2497",
+  "classe": "2"
+ },
+ {
+  "numero": "249800",
+  "intitule": "Autres matériels",
+  "racine": "2498",
+  "classe": "2"
+ },
+ {
+  "numero": "250000",
+  "intitule": "Avances et acomptes versés sur immobilisations",
+  "racine": "25",
+  "classe": "2"
+ },
+ {
+  "numero": "251000",
+  "intitule": "Avances et acomptes versés sur immobilisations incorporelles",
+  "racine": "251",
+  "classe": "2"
+ },
+ {
+  "numero": "252000",
+  "intitule": "Avances et acomptes versés sur immobilisations corporelles",
+  "racine": "252",
+  "classe": "2"
+ },
+ {
+  "numero": "260000",
+  "intitule": "Titres de participation",
+  "racine": "26",
+  "classe": "2"
+ },
+ {
+  "numero": "261000",
+  "intitule": "Titres de participation dans des sociétés sous contrôle exclusif",
+  "racine": "261",
+  "classe": "2"
+ },
+ {
+  "numero": "262000",
+  "intitule": "Titres de participation dans des sociétés sous contrôle conjoint",
+  "racine": "262",
+  "classe": "2"
+ },
+ {
+  "numero": "263000",
+  "intitule": "Titres de participation dans des sociétés conférant une influence notable",
+  "racine": "263",
+  "classe": "2"
+ },
+ {
+  "numero": "265000",
+  "intitule": "Participations dans des organismes professionnels",
+  "racine": "265",
+  "classe": "2"
+ },
+ {
+  "numero": "266000",
+  "intitule": "Parts dans des groupements d’intérêt économique (GIE)",
+  "racine": "266",
+  "classe": "2"
+ },
+ {
+  "numero": "268000",
+  "intitule": "Autres titres de participation",
+  "racine": "268",
+  "classe": "2"
+ },
+ {
+  "numero": "270000",
+  "intitule": "Autres immobilisations financières",
+  "racine": "27",
+  "classe": "2"
+ },
+ {
+  "numero": "271000",
+  "intitule": "Prêts et créances non commerciales",
+  "racine": "271",
+  "classe": "2"
+ },
+ {
+  "numero": "271100",
+  "intitule": "Prêts participatifs",
+  "racine": "2711",
+  "classe": "2"
+ },
+ {
+  "numero": "271200",
+  "intitule": "Prêts aux associés",
+  "racine": "2712",
+  "classe": "2"
+ },
+ {
+  "numero": "271300",
+  "intitule": "Billets de fonds",
+  "racine": "2713",
+  "classe": "2"
+ },
+ {
+  "numero": "271400",
+  "intitule": "Titres prêtés",
+  "racine": "2714",
+  "classe": "2"
+ },
+ {
+  "numero": "272000",
+  "intitule": "Prêts au personnel",
+  "racine": "272",
+  "classe": "2"
+ },
+ {
+  "numero": "272100",
+  "intitule": "Prêts immobiliers",
+  "racine": "2721",
+  "classe": "2"
+ },
+ {
+  "numero": "272200",
+  "intitule": "Prêts mobiliers et d’instal-lation",
+  "racine": "2722",
+  "classe": "2"
+ },
+ {
+  "numero": "272800",
+  "intitule": "Autres prêts (frais d’étu-des…)",
+  "racine": "2728",
+  "classe": "2"
+ },
+ {
+  "numero": "273000",
+  "intitule": "Créances sur l’État",
+  "racine": "273",
+  "classe": "2"
+ },
+ {
+  "numero": "273100",
+  "intitule": "Retenues de garantie",
+  "racine": "2731",
+  "classe": "2"
+ },
+ {
+  "numero": "273300",
+  "intitule": "Fonds réglementé",
+  "racine": "2733",
+  "classe": "2"
+ },
+ {
+  "numero": "273800",
+  "intitule": "Autres",
+  "racine": "2738",
+  "classe": "2"
+ },
+ {
+  "numero": "274000",
+  "intitule": "Titres immobilisés",
+  "racine": "274",
+  "classe": "2"
+ },
+ {
+  "numero": "274100",
+  "intitule": "Titres immobilisés de l’acti-vité de portefeuille (TIAP)",
+  "racine": "2741",
+  "classe": "2"
+ },
+ {
+  "numero": "274200",
+  "intitule": "Titres participatifs",
+  "racine": "2742",
+  "classe": "2"
+ },
+ {
+  "numero": "274300",
+  "intitule": "Certificats d’investissement",
+  "racine": "2743",
+  "classe": "2"
+ },
+ {
+  "numero": "274400",
+  "intitule": "Parts de fonds commun de placement (FCP)",
+  "racine": "2744",
+  "classe": "2"
+ },
+ {
+  "numero": "274800",
+  "intitule": "Autres titres immobilisés",
+  "racine": "2748",
+  "classe": "2"
+ },
+ {
+  "numero": "275000",
+  "intitule": "Dépôts et cautionnements versés",
+  "racine": "275",
+  "classe": "2"
+ },
+ {
+  "numero": "275100",
+  "intitule": "Dépôts pour loyers d’avance",
+  "racine": "2751",
+  "classe": "2"
+ },
+ {
+  "numero": "275200",
+  "intitule": "Dépôts pour l’électricité",
+  "racine": "2752",
+  "classe": "2"
+ },
+ {
+  "numero": "275300",
+  "intitule": "Dépôts pour l’eau",
+  "racine": "2753",
+  "classe": "2"
+ },
+ {
+  "numero": "275400",
+  "intitule": "Dépôts pour le gaz",
+  "racine": "2754",
+  "classe": "2"
+ },
+ {
+  "numero": "275500",
+  "intitule": "Dépôts pour le téléphone, le télex, la télécopie",
+  "racine": "2755",
+  "classe": "2"
+ },
+ {
+  "numero": "275600",
+  "intitule": "Cautionnements sur marchés publics",
+  "racine": "2756",
+  "classe": "2"
+ },
+ {
+  "numero": "275700",
+  "intitule": "Cautionnements sur autres opérations",
+  "racine": "2757",
+  "classe": "2"
+ },
+ {
+  "numero": "275800",
+  "intitule": "Autres dépôts et cautionnements",
+  "racine": "2758",
+  "classe": "2"
+ },
+ {
+  "numero": "276000",
+  "intitule": "Intérêts courus",
+  "racine": "276",
+  "classe": "2"
+ },
+ {
+  "numero": "276100",
+  "intitule": "Prêts et créances non commerciales",
+  "racine": "2761",
+  "classe": "2"
+ },
+ {
+  "numero": "276200",
+  "intitule": "Prêts au personnel",
+  "racine": "2762",
+  "classe": "2"
+ },
+ {
+  "numero": "276300",
+  "intitule": "Créances sur l’État",
+  "racine": "2763",
+  "classe": "2"
+ },
+ {
+  "numero": "276400",
+  "intitule": "Titres immobilisés",
+  "racine": "2764",
+  "classe": "2"
+ },
+ {
+  "numero": "276500",
+  "intitule": "Dépôts et cautionnements versés",
+  "racine": "2765",
+  "classe": "2"
+ },
+ {
+  "numero": "276700",
+  "intitule": "Créances rattachées à des participations",
+  "racine": "2767",
+  "classe": "2"
+ },
+ {
+  "numero": "276800",
+  "intitule": "Immobilisations financières diverses",
+  "racine": "2768",
+  "classe": "2"
+ },
+ {
+  "numero": "277000",
+  "intitule": "Créances rattachées à des participations et avances à des GIE",
+  "racine": "277",
+  "classe": "2"
+ },
+ {
+  "numero": "277100",
+  "intitule": "Créances rattachées à des participations (groupe)",
+  "racine": "2771",
+  "classe": "2"
+ },
+ {
+  "numero": "277200",
+  "intitule": "Créances rattachées à des participations (hors groupe)",
+  "racine": "2772",
+  "classe": "2"
+ },
+ {
+  "numero": "277300",
+  "intitule": "Créances rattachées à des sociétés en participation",
+  "racine": "2773",
+  "classe": "2"
+ },
+ {
+  "numero": "277400",
+  "intitule": "Avances à des Groupements d’intérêt économique (GIE)",
+  "racine": "2774",
+  "classe": "2"
+ },
+ {
+  "numero": "278000",
+  "intitule": "Immobilisations financières diverses",
+  "racine": "278",
+  "classe": "2"
+ },
+ {
+  "numero": "278100",
+  "intitule": "Créances diverses groupe",
+  "racine": "2781",
+  "classe": "2"
+ },
+ {
+  "numero": "278200",
+  "intitule": "Créances divers hors groupe",
+  "racine": "2782",
+  "classe": "2"
+ },
+ {
+  "numero": "278500",
+  "intitule": "Or et métaux précieux [1]",
+  "racine": "2785",
+  "classe": "2"
+ },
+ {
+  "numero": "280000",
+  "intitule": "Amortissements",
+  "racine": "28",
+  "classe": "2"
+ },
+ {
+  "numero": "281000",
+  "intitule": "Amortissements des immobilisations incorporelles",
+  "racine": "281",
+  "classe": "2"
+ },
+ {
+  "numero": "281100",
+  "intitule": "Amortissements des frais de recherche et de développement",
+  "racine": "2811",
+  "classe": "2"
+ },
+ {
+  "numero": "281200",
+  "intitule": "Amortissements des brevets, licences, concessions et droits similaires",
+  "racine": "2812",
+  "classe": "2"
+ },
+ {
+  "numero": "281300",
+  "intitule": "Amortissements des logiciels",
+  "racine": "2813",
+  "classe": "2"
+ },
+ {
+  "numero": "281400",
+  "intitule": "Amortissements des marques",
+  "racine": "2814",
+  "classe": "2"
+ },
+ {
+  "numero": "281500",
+  "intitule": "Amortissements du fonds commercial",
+  "racine": "2815",
+  "classe": "2"
+ },
+ {
+  "numero": "281600",
+  "intitule": "Amortissements du droit au bail",
+  "racine": "2816",
+  "classe": "2"
+ },
+ {
+  "numero": "281700",
+  "intitule": "Amortissements des investissements de création",
+  "racine": "2817",
+  "classe": "2"
+ },
+ {
+  "numero": "281800",
+  "intitule": "Amortissements des autres droits et valeurs incorporels",
+  "racine": "2818",
+  "classe": "2"
+ },
+ {
+  "numero": "282000",
+  "intitule": "Amortissements des terrains",
+  "racine": "282",
+  "classe": "2"
+ },
+ {
+  "numero": "282100",
+  "intitule": "Amortissements des terrains agricoles et forestiers",
+  "racine": "2821",
+  "classe": "2"
+ },
+ {
+  "numero": "282400",
+  "intitule": "Amortissements des travaux de mise en valeur des terrains",
+  "racine": "2824",
+  "classe": "2"
+ },
+ {
+  "numero": "282500",
+  "intitule": "Amortissements des terrains de gisement",
+  "racine": "2825",
+  "classe": "2"
+ },
+ {
+  "numero": "283000",
+  "intitule": "Amortissements des bâtiments, installations techniques et agencements",
+  "racine": "283",
+  "classe": "2"
+ },
+ {
+  "numero": "283100",
+  "intitule": "Amortissements des bâtiments industriels, agricoles, administratifs et commer- ciaux sur sol propre",
+  "racine": "2831",
+  "classe": "2"
+ },
+ {
+  "numero": "283200",
+  "intitule": "Amortissements des bâtiments industriels, agricoles, administratifs et commer- ciaux sur sol d’autrui",
+  "racine": "2832",
+  "classe": "2"
+ },
+ {
+  "numero": "283300",
+  "intitule": "Amortissements des ouvrages d’infrastructure",
+  "racine": "2833",
+  "classe": "2"
+ },
+ {
+  "numero": "283400",
+  "intitule": "Amortissements des installations techniques",
+  "racine": "2834",
+  "classe": "2"
+ },
+ {
+  "numero": "283500",
+  "intitule": "Amortissements des aménagements de bureaux",
+  "racine": "2835",
+  "classe": "2"
+ },
+ {
+  "numero": "283700",
+  "intitule": "Amortissements  des  bâtiments  industriels,  agricoles  et  commerciaux  mis  en concession",
+  "racine": "2837",
+  "classe": "2"
+ },
+ {
+  "numero": "283800",
+  "intitule": "Amortissements des autres installations et agencements",
+  "racine": "2838",
+  "classe": "2"
+ },
+ {
+  "numero": "284000",
+  "intitule": "Amortissements du matériel",
+  "racine": "284",
+  "classe": "2"
+ },
+ {
+  "numero": "284100",
+  "intitule": "Amortissements du matériel et outillage industriel et commercial",
+  "racine": "2841",
+  "classe": "2"
+ },
+ {
+  "numero": "284200",
+  "intitule": "Amortissements du matériel et outillage agricole",
+  "racine": "2842",
+  "classe": "2"
+ },
+ {
+  "numero": "284300",
+  "intitule": "Amortissements du matériel d’emballage récupérable et identifiable",
+  "racine": "2843",
+  "classe": "2"
+ },
+ {
+  "numero": "284400",
+  "intitule": "Amortissements du matériel et mobilier",
+  "racine": "2844",
+  "classe": "2"
+ },
+ {
+  "numero": "284500",
+  "intitule": "Amortissements du matériel de transport",
+  "racine": "2845",
+  "classe": "2"
+ },
+ {
+  "numero": "284600",
+  "intitule": "Amortissements des immobilisations animales et agricoles",
+  "racine": "2846",
+  "classe": "2"
+ },
+ {
+  "numero": "284700",
+  "intitule": "Amortissements des agencements et aménagements du matériel",
+  "racine": "2847",
+  "classe": "2"
+ },
+ {
+  "numero": "284800",
+  "intitule": "Amortissements des autres matériels",
+  "racine": "2848",
+  "classe": "2"
+ },
+ {
+  "numero": "290000",
+  "intitule": "Provisions pour dépréciation",
+  "racine": "29",
+  "classe": "2"
+ },
+ {
+  "numero": "291000",
+  "intitule": "Provisions pour dépréciation des immobilisations incorporelles",
+  "racine": "291",
+  "classe": "2"
+ },
+ {
+  "numero": "291200",
+  "intitule": "Provisions pour dépréciation des brevets, licences, concessions et droits similai- res",
+  "racine": "2912",
+  "classe": "2"
+ },
+ {
+  "numero": "291300",
+  "intitule": "Provisions pour dépréciation des logiciels",
+  "racine": "2913",
+  "classe": "2"
+ },
+ {
+  "numero": "291400",
+  "intitule": "Provisions pour dépréciation des marques",
+  "racine": "2914",
+  "classe": "2"
+ },
+ {
+  "numero": "291500",
+  "intitule": "Provisions pour dépréciation du fonds commercial",
+  "racine": "2915",
+  "classe": "2"
+ },
+ {
+  "numero": "291600",
+  "intitule": "Provisions pour dépréciation du droit au bail",
+  "racine": "2916",
+  "classe": "2"
+ },
+ {
+  "numero": "291700",
+  "intitule": "Provisions pour dépréciation des investissements de création",
+  "racine": "2917",
+  "classe": "2"
+ },
+ {
+  "numero": "291800",
+  "intitule": "Provisions pour dépréciation des autres droits et valeurs incorporels",
+  "racine": "2918",
+  "classe": "2"
+ },
+ {
+  "numero": "291900",
+  "intitule": "Provisions pour dépréciation des immobilisations incorporelles en cours",
+  "racine": "2919",
+  "classe": "2"
+ },
+ {
+  "numero": "292000",
+  "intitule": "Provisions pour dépréciation des terrains",
+  "racine": "292",
+  "classe": "2"
+ },
+ {
+  "numero": "292100",
+  "intitule": "Provisions pour dépréciation des terrains agricoles et forestiers",
+  "racine": "2921",
+  "classe": "2"
+ },
+ {
+  "numero": "292200",
+  "intitule": "Provisions pour dépréciation des terrains nus",
+  "racine": "2922",
+  "classe": "2"
+ },
+ {
+  "numero": "292300",
+  "intitule": "Provisions pour dépréciation des terrains bâtis",
+  "racine": "2923",
+  "classe": "2"
+ },
+ {
+  "numero": "292400",
+  "intitule": "Provisions pour dépréciation des travaux de mise en valeur des terrains",
+  "racine": "2924",
+  "classe": "2"
+ },
+ {
+  "numero": "292500",
+  "intitule": "Provisions pour dépréciation des terrains de gisement",
+  "racine": "2925",
+  "classe": "2"
+ },
+ {
+  "numero": "292600",
+  "intitule": "Provisions pour dépréciation des terrains aménagés",
+  "racine": "2926",
+  "classe": "2"
+ },
+ {
+  "numero": "292700",
+  "intitule": "Provisions pour dépréciation des terrains mis en concession",
+  "racine": "2927",
+  "classe": "2"
+ },
+ {
+  "numero": "292800",
+  "intitule": "Provisions pour dépréciation des autres terrains",
+  "racine": "2928",
+  "classe": "2"
+ },
+ {
+  "numero": "292900",
+  "intitule": "Provisions pour dépréciation des aménagements de terrains en cours",
+  "racine": "2929",
+  "classe": "2"
+ },
+ {
+  "numero": "293000",
+  "intitule": "Provisions pour dépréciation des bâtiments, installations techniques et agencements",
+  "racine": "293",
+  "classe": "2"
+ },
+ {
+  "numero": "293100",
+  "intitule": "Provisions pour dépréciation des bâtiments industriels, agricoles, administratifs et commerciaux sur sol propre",
+  "racine": "2931",
+  "classe": "2"
+ },
+ {
+  "numero": "293200",
+  "intitule": "Provisions pour dépréciation des bâtiments industriels, agricoles, administratifs et commerciaux sur sol d’autrui",
+  "racine": "2932",
+  "classe": "2"
+ },
+ {
+  "numero": "293300",
+  "intitule": "Provisions pour dépréciation des ouvrages d’infrastructures",
+  "racine": "2933",
+  "classe": "2"
+ },
+ {
+  "numero": "293400",
+  "intitule": "Provisions pour dépréciation des installations techniques",
+  "racine": "2934",
+  "classe": "2"
+ },
+ {
+  "numero": "293500",
+  "intitule": "Provisions pour dépréciation des aménagements de bureaux",
+  "racine": "2935",
+  "classe": "2"
+ },
+ {
+  "numero": "293700",
+  "intitule": "Provisions  pour  dépréciation  des  bâtiments  industriels,  agricoles  et  commer- ciaux mis en concession",
+  "racine": "2937",
+  "classe": "2"
+ },
+ {
+  "numero": "293800",
+  "intitule": "Provisions pour dépréciation des autres installations et agencements",
+  "racine": "2938",
+  "classe": "2"
+ },
+ {
+  "numero": "293900",
+  "intitule": "Provisions pour dépréciation des bâtiments et installations en cours",
+  "racine": "2939",
+  "classe": "2"
+ },
+ {
+  "numero": "294000",
+  "intitule": "Provisions pour dépréciation de matériel",
+  "racine": "294",
+  "classe": "2"
+ },
+ {
+  "numero": "294100",
+  "intitule": "Provisions pour dépréciation du matériel et outillage industriel et commercial",
+  "racine": "2941",
+  "classe": "2"
+ },
+ {
+  "numero": "294200",
+  "intitule": "Provisions pour dépréciation du matériel et outillage agricole",
+  "racine": "2942",
+  "classe": "2"
+ },
+ {
+  "numero": "294300",
+  "intitule": "Provisions pour dépréciation du matériel d’emballage récupérable et identifiable",
+  "racine": "2943",
+  "classe": "2"
+ },
+ {
+  "numero": "294400",
+  "intitule": "Provisions pour dépréciation du matériel et mobilier",
+  "racine": "2944",
+  "classe": "2"
+ },
+ {
+  "numero": "294500",
+  "intitule": "Provisions pour dépréciation du matériel de transport",
+  "racine": "2945",
+  "classe": "2"
+ },
+ {
+  "numero": "294600",
+  "intitule": "Provisions pour dépréciation des immobilisations animales et agricoles",
+  "racine": "2946",
+  "classe": "2"
+ },
+ {
+  "numero": "294700",
+  "intitule": "Provisions pour dépréciation des agencements et aménagements du matériel",
+  "racine": "2947",
+  "classe": "2"
+ },
+ {
+  "numero": "294800",
+  "intitule": "Provisions pour dépréciation des autres matériels",
+  "racine": "2948",
+  "classe": "2"
+ },
+ {
+  "numero": "294900",
+  "intitule": "Provisions pour dépréciation de matériel en cours",
+  "racine": "2949",
+  "classe": "2"
+ },
+ {
+  "numero": "295000",
+  "intitule": "Provisions pour dépréciation des avances et acomptes versés sur immobilisations",
+  "racine": "295",
+  "classe": "2"
+ },
+ {
+  "numero": "295100",
+  "intitule": "Provisions  pour  dépréciation  des  avances  et  acomptes  versés  sur  immobilisa- tions incorporelles",
+  "racine": "2951",
+  "classe": "2"
+ },
+ {
+  "numero": "295200",
+  "intitule": "Provisions  pour  dépréciation  des  avances  et  acomptes  versés  sur  immobilisa- tions corporelles",
+  "racine": "2952",
+  "classe": "2"
+ },
+ {
+  "numero": "296000",
+  "intitule": "Provisions pour dépréciation des titres de participation",
+  "racine": "296",
+  "classe": "2"
+ },
+ {
+  "numero": "296100",
+  "intitule": "Provisions  pour  dépréciation  des  titres  de  participation  dans  des  sociétés  sous contrôle exclusif",
+  "racine": "2961",
+  "classe": "2"
+ },
+ {
+  "numero": "296200",
+  "intitule": "Provisions  pour  dépréciation  des  titres  de  participation  dans  les  sociétés  sous contrôle conjoint",
+  "racine": "2962",
+  "classe": "2"
+ },
+ {
+  "numero": "296300",
+  "intitule": "Provisions pour dépréciation des titres de participation dans les sociétés confé- rant une influence notable",
+  "racine": "2963",
+  "classe": "2"
+ },
+ {
+  "numero": "296500",
+  "intitule": "Provisions pour dépréciation des participations dans des organismes profession- nels",
+  "racine": "2965",
+  "classe": "2"
+ },
+ {
+  "numero": "296600",
+  "intitule": "Provisions pour dépréciation des parts dans des GIE",
+  "racine": "2966",
+  "classe": "2"
+ },
+ {
+  "numero": "296800",
+  "intitule": "Provisions pour dépréciation des autres titres de participation",
+  "racine": "2968",
+  "classe": "2"
+ },
+ {
+  "numero": "297000",
+  "intitule": "Provisions pour dépréciation des autres immobilisations financières",
+  "racine": "297",
+  "classe": "2"
+ },
+ {
+  "numero": "297100",
+  "intitule": "Provisions pour dépréciation des prêts et créances non commerciales",
+  "racine": "2971",
+  "classe": "2"
+ },
+ {
+  "numero": "297200",
+  "intitule": "Provisions pour dépréciation des prêts au personnel",
+  "racine": "2972",
+  "classe": "2"
+ },
+ {
+  "numero": "297300",
+  "intitule": "Provisions pour dépréciation des créances sur l’État",
+  "racine": "2973",
+  "classe": "2"
+ },
+ {
+  "numero": "297400",
+  "intitule": "Provisions pour dépréciation des titres immobilisés",
+  "racine": "2974",
+  "classe": "2"
+ },
+ {
+  "numero": "297500",
+  "intitule": "Provisions pour dépréciation des dépôts et cautionnements versés",
+  "racine": "2975",
+  "classe": "2"
+ },
+ {
+  "numero": "297700",
+  "intitule": "Provisions  pour  dépréciation  des  créances  rattachées  à  des  participations  et avances à des GIE",
+  "racine": "2977",
+  "classe": "2"
+ },
+ {
+  "numero": "297800",
+  "intitule": "Provisions pour dépréciation des créances financières diverses",
+  "racine": "2978",
+  "classe": "2"
+ },
+ {
+  "numero": "310000",
+  "intitule": "Marchandises",
+  "racine": "31",
+  "classe": "3"
+ },
+ {
+  "numero": "311000",
+  "intitule": "Marchandises A",
+  "racine": "311",
+  "classe": "3"
+ },
+ {
+  "numero": "311100",
+  "intitule": "Marchandises A1",
+  "racine": "3111",
+  "classe": "3"
+ },
+ {
+  "numero": "311200",
+  "intitule": "Marchandises A2",
+  "racine": "3112",
+  "classe": "3"
+ },
+ {
+  "numero": "312000",
+  "intitule": "Marchandises B",
+  "racine": "312",
+  "classe": "3"
+ },
+ {
+  "numero": "312100",
+  "intitule": "Marchandises B1",
+  "racine": "3121",
+  "classe": "3"
+ },
+ {
+  "numero": "312200",
+  "intitule": "Marchandises B2",
+  "racine": "3122",
+  "classe": "3"
+ },
+ {
+  "numero": "318000",
+  "intitule": "Marchandises hors activités ordinaires (HAO)",
+  "racine": "318",
+  "classe": "3"
+ },
+ {
+  "numero": "320000",
+  "intitule": "Matières premières et fournitures liées",
+  "racine": "32",
+  "classe": "3"
+ },
+ {
+  "numero": "321000",
+  "intitule": "Matières A",
+  "racine": "321",
+  "classe": "3"
+ },
+ {
+  "numero": "322000",
+  "intitule": "Matières B",
+  "racine": "322",
+  "classe": "3"
+ },
+ {
+  "numero": "323000",
+  "intitule": "Fournitures (A, B)",
+  "racine": "323",
+  "classe": "3"
+ },
+ {
+  "numero": "330000",
+  "intitule": "Autres approvisionnements",
+  "racine": "33",
+  "classe": "3"
+ },
+ {
+  "numero": "331000",
+  "intitule": "Matières consommables",
+  "racine": "331",
+  "classe": "3"
+ },
+ {
+  "numero": "332000",
+  "intitule": "Fournitures d’atelier et d’usine",
+  "racine": "332",
+  "classe": "3"
+ },
+ {
+  "numero": "333000",
+  "intitule": "Fournitures de magasin",
+  "racine": "333",
+  "classe": "3"
+ },
+ {
+  "numero": "334000",
+  "intitule": "Fournitures de bureau",
+  "racine": "334",
+  "classe": "3"
+ },
+ {
+  "numero": "335000",
+  "intitule": "Emballages",
+  "racine": "335",
+  "classe": "3"
+ },
+ {
+  "numero": "335100",
+  "intitule": "Emballages perdus",
+  "racine": "3351",
+  "classe": "3"
+ },
+ {
+  "numero": "335200",
+  "intitule": "Emballages récupérables non identifiables",
+  "racine": "3352",
+  "classe": "3"
+ },
+ {
+  "numero": "335300",
+  "intitule": "Emballages à usage mixte",
+  "racine": "3353",
+  "classe": "3"
+ },
+ {
+  "numero": "335800",
+  "intitule": "Autres emballages",
+  "racine": "3358",
+  "classe": "3"
+ },
+ {
+  "numero": "338000",
+  "intitule": "Autres matières",
+  "racine": "338",
+  "classe": "3"
+ },
+ {
+  "numero": "340000",
+  "intitule": "Produits en cours",
+  "racine": "34",
+  "classe": "3"
+ },
+ {
+  "numero": "341000",
+  "intitule": "Produits en cours",
+  "racine": "341",
+  "classe": "3"
+ },
+ {
+  "numero": "341100",
+  "intitule": "Produits en cours P1",
+  "racine": "3411",
+  "classe": "3"
+ },
+ {
+  "numero": "341200",
+  "intitule": "Produits en cours P2",
+  "racine": "3412",
+  "classe": "3"
+ },
+ {
+  "numero": "342000",
+  "intitule": "Travaux en cours",
+  "racine": "342",
+  "classe": "3"
+ },
+ {
+  "numero": "342100",
+  "intitule": "Travaux en cours T1",
+  "racine": "3421",
+  "classe": "3"
+ },
+ {
+  "numero": "342200",
+  "intitule": "Travaux en cours T2",
+  "racine": "3422",
+  "classe": "3"
+ },
+ {
+  "numero": "343000",
+  "intitule": "Produits intermédiaires en cours",
+  "racine": "343",
+  "classe": "3"
+ },
+ {
+  "numero": "343100",
+  "intitule": "Produits intermédiaires A",
+  "racine": "3431",
+  "classe": "3"
+ },
+ {
+  "numero": "343200",
+  "intitule": "Produits intermédiaires B",
+  "racine": "3432",
+  "classe": "3"
+ },
+ {
+  "numero": "344000",
+  "intitule": "Produits résiduels en cours",
+  "racine": "344",
+  "classe": "3"
+ },
+ {
+  "numero": "344100",
+  "intitule": "Produits résiduels A",
+  "racine": "3441",
+  "classe": "3"
+ },
+ {
+  "numero": "344200",
+  "intitule": "Produits résiduels B",
+  "racine": "3442",
+  "classe": "3"
+ },
+ {
+  "numero": "350000",
+  "intitule": "Services en cours",
+  "racine": "35",
+  "classe": "3"
+ },
+ {
+  "numero": "351000",
+  "intitule": "Études en cours",
+  "racine": "351",
+  "classe": "3"
+ },
+ {
+  "numero": "351100",
+  "intitule": "Études en cours E1",
+  "racine": "3511",
+  "classe": "3"
+ },
+ {
+  "numero": "351200",
+  "intitule": "Études en cours E2",
+  "racine": "3512",
+  "classe": "3"
+ },
+ {
+  "numero": "352000",
+  "intitule": "Prestations de services en cours",
+  "racine": "352",
+  "classe": "3"
+ },
+ {
+  "numero": "352100",
+  "intitule": "Prestations de services S1",
+  "racine": "3521",
+  "classe": "3"
+ },
+ {
+  "numero": "352200",
+  "intitule": "Prestations de services S2",
+  "racine": "3522",
+  "classe": "3"
+ },
+ {
+  "numero": "360000",
+  "intitule": "Produits finis",
+  "racine": "36",
+  "classe": "3"
+ },
+ {
+  "numero": "361000",
+  "intitule": "Produits finis A",
+  "racine": "361",
+  "classe": "3"
+ },
+ {
+  "numero": "362000",
+  "intitule": "Produits finis B",
+  "racine": "362",
+  "classe": "3"
+ },
+ {
+  "numero": "370000",
+  "intitule": "Produits intermédiaires et résiduels",
+  "racine": "37",
+  "classe": "3"
+ },
+ {
+  "numero": "371000",
+  "intitule": "Produits intermédiaires",
+  "racine": "371",
+  "classe": "3"
+ },
+ {
+  "numero": "371100",
+  "intitule": "Produits intermédiaires A",
+  "racine": "3711",
+  "classe": "3"
+ },
+ {
+  "numero": "371200",
+  "intitule": "Produits intermédiaires B",
+  "racine": "3712",
+  "classe": "3"
+ },
+ {
+  "numero": "372000",
+  "intitule": "Produits résiduels",
+  "racine": "372",
+  "classe": "3"
+ },
+ {
+  "numero": "372100",
+  "intitule": "Déchets",
+  "racine": "3721",
+  "classe": "3"
+ },
+ {
+  "numero": "372200",
+  "intitule": "Rebuts",
+  "racine": "3722",
+  "classe": "3"
+ },
+ {
+  "numero": "372300",
+  "intitule": "Matières de Récupération",
+  "racine": "3723",
+  "classe": "3"
+ },
+ {
+  "numero": "380000",
+  "intitule": "Stocks en cours de route, en consignation ou en dépôt",
+  "racine": "38",
+  "classe": "3"
+ },
+ {
+  "numero": "381000",
+  "intitule": "Marchandises en cours de route",
+  "racine": "381",
+  "classe": "3"
+ },
+ {
+  "numero": "382000",
+  "intitule": "Matières premières et fournitures liées en cours de route",
+  "racine": "382",
+  "classe": "3"
+ },
+ {
+  "numero": "383000",
+  "intitule": "Autres approvisionnements en cours de route",
+  "racine": "383",
+  "classe": "3"
+ },
+ {
+  "numero": "386000",
+  "intitule": "Produits finis en cours de route",
+  "racine": "386",
+  "classe": "3"
+ },
+ {
+  "numero": "387000",
+  "intitule": "Stock en consignation ou en dépôt",
+  "racine": "387",
+  "classe": "3"
+ },
+ {
+  "numero": "387100",
+  "intitule": "Stock en consignation",
+  "racine": "3871",
+  "classe": "3"
+ },
+ {
+  "numero": "387200",
+  "intitule": "Stock en dépôt",
+  "racine": "3872",
+  "classe": "3"
+ },
+ {
+  "numero": "388000",
+  "intitule": "Stock provenant d’immobilisa-tions mises hors service ou au rebut",
+  "racine": "388",
+  "classe": "3"
+ },
+ {
+  "numero": "390000",
+  "intitule": "Dépréciations des stocks",
+  "racine": "39",
+  "classe": "3"
+ },
+ {
+  "numero": "391000",
+  "intitule": "Dépréciations des stocks de marchandises",
+  "racine": "391",
+  "classe": "3"
+ },
+ {
+  "numero": "392000",
+  "intitule": "Dépréciations des stocks de matières premières et fournitures liées",
+  "racine": "392",
+  "classe": "3"
+ },
+ {
+  "numero": "393000",
+  "intitule": "Dépréciations des stocks d’au-tres approvisionnements",
+  "racine": "393",
+  "classe": "3"
+ },
+ {
+  "numero": "394000",
+  "intitule": "Dépréciations des productions en cours",
+  "racine": "394",
+  "classe": "3"
+ },
+ {
+  "numero": "395000",
+  "intitule": "Dépréciations des services en cours",
+  "racine": "395",
+  "classe": "3"
+ },
+ {
+  "numero": "396000",
+  "intitule": "Dépréciations des stocks de produits finis",
+  "racine": "396",
+  "classe": "3"
+ },
+ {
+  "numero": "397000",
+  "intitule": "Dépréciations des stocks de produits intermédiaires et résiduels",
+  "racine": "397",
+  "classe": "3"
+ },
+ {
+  "numero": "398000",
+  "intitule": "Dépréciations des stocks en cours de route, en consignation ou en dépôt",
+  "racine": "398",
+  "classe": "3"
+ },
+ {
+  "numero": "400000",
+  "intitule": "Fournisseurs et comptes rattachés",
+  "racine": "40",
+  "classe": "4"
+ },
+ {
+  "numero": "401000",
+  "intitule": "Fournisseurs, dettes en compte",
+  "racine": "401",
+  "classe": "4"
+ },
+ {
+  "numero": "401100",
+  "intitule": "Fournisseurs",
+  "racine": "4011",
+  "classe": "4"
+ },
+ {
+  "numero": "401200",
+  "intitule": "Fournisseurs Groupe",
+  "racine": "4012",
+  "classe": "4"
+ },
+ {
+  "numero": "401300",
+  "intitule": "Fournisseurs sous-traitants",
+  "racine": "4013",
+  "classe": "4"
+ },
+ {
+  "numero": "401700",
+  "intitule": "Fournisseur, retenues de garantie",
+  "racine": "4017",
+  "classe": "4"
+ },
+ {
+  "numero": "402000",
+  "intitule": "Fournisseurs, effets à payer",
+  "racine": "402",
+  "classe": "4"
+ },
+ {
+  "numero": "402100",
+  "intitule": "Fournisseurs, Effets à payer",
+  "racine": "4021",
+  "classe": "4"
+ },
+ {
+  "numero": "402200",
+  "intitule": "Fournisseurs - Groupe, Effets à payer",
+  "racine": "4022",
+  "classe": "4"
+ },
+ {
+  "numero": "402300",
+  "intitule": "Fournisseurs sous-traitants, Effets à payer",
+  "racine": "4023",
+  "classe": "4"
+ },
+ {
+  "numero": "408000",
+  "intitule": "Fournisseurs, factures non parvenues",
+  "racine": "408",
+  "classe": "4"
+ },
+ {
+  "numero": "408100",
+  "intitule": "Fournisseurs",
+  "racine": "4081",
+  "classe": "4"
+ },
+ {
+  "numero": "408200",
+  "intitule": "Fournisseurs - Groupe",
+  "racine": "4082",
+  "classe": "4"
+ },
+ {
+  "numero": "408300",
+  "intitule": "Fournisseurs sous-traitants",
+  "racine": "4083",
+  "classe": "4"
+ },
+ {
+  "numero": "408600",
+  "intitule": "Fournisseurs, intérêts courus",
+  "racine": "4086",
+  "classe": "4"
+ },
+ {
+  "numero": "409000",
+  "intitule": "Fournisseurs débiteurs",
+  "racine": "409",
+  "classe": "4"
+ },
+ {
+  "numero": "409100",
+  "intitule": "Fournisseurs avances et acomptes versés",
+  "racine": "4091",
+  "classe": "4"
+ },
+ {
+  "numero": "409200",
+  "intitule": "Fournisseurs - Groupe avances et acomptes versés",
+  "racine": "4092",
+  "classe": "4"
+ },
+ {
+  "numero": "409300",
+  "intitule": "Fournisseurs sous-traitants avances et acomptes versés",
+  "racine": "4093",
+  "classe": "4"
+ },
+ {
+  "numero": "409400",
+  "intitule": "Fournisseurs créances pour emballages et matériels à rendre",
+  "racine": "4094",
+  "classe": "4"
+ },
+ {
+  "numero": "409800",
+  "intitule": "Rabais, Remises, Ristournes et autres avoirs à obtenir",
+  "racine": "4098",
+  "classe": "4"
+ },
+ {
+  "numero": "410000",
+  "intitule": "Clients et comptes rattachés",
+  "racine": "41",
+  "classe": "4"
+ },
+ {
+  "numero": "411000",
+  "intitule": "Clients",
+  "racine": "411",
+  "classe": "4"
+ },
+ {
+  "numero": "411100",
+  "intitule": "Clients",
+  "racine": "4111",
+  "classe": "4"
+ },
+ {
+  "numero": "411200",
+  "intitule": "Clients - Groupe",
+  "racine": "4112",
+  "classe": "4"
+ },
+ {
+  "numero": "411400",
+  "intitule": "Clients, État et Collectivités publiques",
+  "racine": "4114",
+  "classe": "4"
+ },
+ {
+  "numero": "411500",
+  "intitule": "Clients, organismes internationaux",
+  "racine": "4115",
+  "classe": "4"
+ },
+ {
+  "numero": "411700",
+  "intitule": "Client, retenues de garantie",
+  "racine": "4117",
+  "classe": "4"
+ },
+ {
+  "numero": "411800",
+  "intitule": "Clients, dégrèvement de taxes sur la valeur ajoutée (TVA)",
+  "racine": "4118",
+  "classe": "4"
+ },
+ {
+  "numero": "412000",
+  "intitule": "Clients, effets à recevoir en portefeuille",
+  "racine": "412",
+  "classe": "4"
+ },
+ {
+  "numero": "412100",
+  "intitule": "Clients, Effets à recevoir",
+  "racine": "4121",
+  "classe": "4"
+ },
+ {
+  "numero": "412200",
+  "intitule": "Clients - Groupe, Effets à recevoir",
+  "racine": "4122",
+  "classe": "4"
+ },
+ {
+  "numero": "412400",
+  "intitule": "État et Collectivités publiques, Effets à recevoir",
+  "racine": "4124",
+  "classe": "4"
+ },
+ {
+  "numero": "412500",
+  "intitule": "Organismes Internationaux, Effets à recevoir",
+  "racine": "4125",
+  "classe": "4"
+ },
+ {
+  "numero": "414000",
+  "intitule": "Créances sur cessions d’immobi-lisations",
+  "racine": "414",
+  "classe": "4"
+ },
+ {
+  "numero": "414100",
+  "intitule": "Créances en compte",
+  "racine": "4141",
+  "classe": "4"
+ },
+ {
+  "numero": "414200",
+  "intitule": "Effets à recevoir",
+  "racine": "4142",
+  "classe": "4"
+ },
+ {
+  "numero": "415000",
+  "intitule": "Clients, effets escomptés non échus",
+  "racine": "415",
+  "classe": "4"
+ },
+ {
+  "numero": "416000",
+  "intitule": "Créances clients litigieuses ou douteuses",
+  "racine": "416",
+  "classe": "4"
+ },
+ {
+  "numero": "416100",
+  "intitule": "Créances litigieuses",
+  "racine": "4161",
+  "classe": "4"
+ },
+ {
+  "numero": "416200",
+  "intitule": "Créances douteuses",
+  "racine": "4162",
+  "classe": "4"
+ },
+ {
+  "numero": "418000",
+  "intitule": "Clients, produits à recevoir",
+  "racine": "418",
+  "classe": "4"
+ },
+ {
+  "numero": "418100",
+  "intitule": "Clients, factures à établir",
+  "racine": "4181",
+  "classe": "4"
+ },
+ {
+  "numero": "418600",
+  "intitule": "Clients, intérêts courus",
+  "racine": "4186",
+  "classe": "4"
+ },
+ {
+  "numero": "419000",
+  "intitule": "Clients créditeurs",
+  "racine": "419",
+  "classe": "4"
+ },
+ {
+  "numero": "419100",
+  "intitule": "Clients, avances et acomptes reçus",
+  "racine": "4191",
+  "classe": "4"
+ },
+ {
+  "numero": "419200",
+  "intitule": "Clients - Groupe, avances et acomptes reçus",
+  "racine": "4192",
+  "classe": "4"
+ },
+ {
+  "numero": "419400",
+  "intitule": "Clients, dettes pour emballages et matériels consignés",
+  "racine": "4194",
+  "classe": "4"
+ },
+ {
+  "numero": "419800",
+  "intitule": "Rabais, Remises, Ristournes et autres avoirs à accorder",
+  "racine": "4198",
+  "classe": "4"
+ },
+ {
+  "numero": "420000",
+  "intitule": "Personnel",
+  "racine": "42",
+  "classe": "4"
+ },
+ {
+  "numero": "421000",
+  "intitule": "Personnel, avances et acomptes",
+  "racine": "421",
+  "classe": "4"
+ },
+ {
+  "numero": "421100",
+  "intitule": "Personnel, avances",
+  "racine": "4211",
+  "classe": "4"
+ },
+ {
+  "numero": "421200",
+  "intitule": "Personnel, acomptes",
+  "racine": "4212",
+  "classe": "4"
+ },
+ {
+  "numero": "421300",
+  "intitule": "Frais avancés et fournitures au personnel",
+  "racine": "4213",
+  "classe": "4"
+ },
+ {
+  "numero": "422000",
+  "intitule": "Personnel, rémunérations dues",
+  "racine": "422",
+  "classe": "4"
+ },
+ {
+  "numero": "423000",
+  "intitule": "Personnel, oppositions, saisies-arrêts",
+  "racine": "423",
+  "classe": "4"
+ },
+ {
+  "numero": "423100",
+  "intitule": "Personnel, oppositions",
+  "racine": "4231",
+  "classe": "4"
+ },
+ {
+  "numero": "423200",
+  "intitule": "Personnel, saisies-arrêts",
+  "racine": "4232",
+  "classe": "4"
+ },
+ {
+  "numero": "423300",
+  "intitule": "Personnel, avis à tiers détenteur",
+  "racine": "4233",
+  "classe": "4"
+ },
+ {
+  "numero": "424000",
+  "intitule": "Personnel, œuvres sociales internes",
+  "racine": "424",
+  "classe": "4"
+ },
+ {
+  "numero": "424100",
+  "intitule": "Assistance médicale",
+  "racine": "4241",
+  "classe": "4"
+ },
+ {
+  "numero": "424200",
+  "intitule": "Allocations familiales",
+  "racine": "4242",
+  "classe": "4"
+ },
+ {
+  "numero": "424500",
+  "intitule": "Organismes sociaux rattachés à l’entreprise",
+  "racine": "4245",
+  "classe": "4"
+ },
+ {
+  "numero": "424800",
+  "intitule": "Autres œuvres sociales internes",
+  "racine": "4248",
+  "classe": "4"
+ },
+ {
+  "numero": "425000",
+  "intitule": "Représentants du personnel",
+  "racine": "425",
+  "classe": "4"
+ },
+ {
+  "numero": "425100",
+  "intitule": "Délégués du personnel",
+  "racine": "4251",
+  "classe": "4"
+ },
+ {
+  "numero": "425200",
+  "intitule": "Syndicats et Comités d’entre-prises, d’Établissement",
+  "racine": "4252",
+  "classe": "4"
+ },
+ {
+  "numero": "425800",
+  "intitule": "Autres représentants du personnel",
+  "racine": "4258",
+  "classe": "4"
+ },
+ {
+  "numero": "426000",
+  "intitule": "Personnel, participation aux bénéfices",
+  "racine": "426",
+  "classe": "4"
+ },
+ {
+  "numero": "427000",
+  "intitule": "Personnel - dépôts",
+  "racine": "427",
+  "classe": "4"
+ },
+ {
+  "numero": "428000",
+  "intitule": "Personnel, charges à payer et produits à recevoir",
+  "racine": "428",
+  "classe": "4"
+ },
+ {
+  "numero": "428100",
+  "intitule": "Dettes provisionnées pour congés à payer",
+  "racine": "4281",
+  "classe": "4"
+ },
+ {
+  "numero": "428600",
+  "intitule": "Autres charges à payer",
+  "racine": "4286",
+  "classe": "4"
+ },
+ {
+  "numero": "428700",
+  "intitule": "Produits à recevoir",
+  "racine": "4287",
+  "classe": "4"
+ },
+ {
+  "numero": "430000",
+  "intitule": "Organismes sociaux",
+  "racine": "43",
+  "classe": "4"
+ },
+ {
+  "numero": "431000",
+  "intitule": "Sécurité sociale",
+  "racine": "431",
+  "classe": "4"
+ },
+ {
+  "numero": "431100",
+  "intitule": "Prestations familiales",
+  "racine": "4311",
+  "classe": "4"
+ },
+ {
+  "numero": "431200",
+  "intitule": "Accidents de travail",
+  "racine": "4312",
+  "classe": "4"
+ },
+ {
+  "numero": "431300",
+  "intitule": "Caisse de retraite obligatoire",
+  "racine": "4313",
+  "classe": "4"
+ },
+ {
+  "numero": "431400",
+  "intitule": "Caisse de retraite facultative",
+  "racine": "4314",
+  "classe": "4"
+ },
+ {
+  "numero": "431800",
+  "intitule": "Autres cotisations sociales",
+  "racine": "4318",
+  "classe": "4"
+ },
+ {
+  "numero": "432000",
+  "intitule": "Caisses de retraite complémentaire",
+  "racine": "432",
+  "classe": "4"
+ },
+ {
+  "numero": "433000",
+  "intitule": "Autres organismes sociaux",
+  "racine": "433",
+  "classe": "4"
+ },
+ {
+  "numero": "433100",
+  "intitule": "Mutuelle",
+  "racine": "4331",
+  "classe": "4"
+ },
+ {
+  "numero": "433400",
+  "intitule": "TVA facturée sur production livrée à soi-même",
+  "racine": "4334",
+  "classe": "4"
+ },
+ {
+  "numero": "433500",
+  "intitule": "TVA sur factures à établir",
+  "racine": "4335",
+  "classe": "4"
+ },
+ {
+  "numero": "438000",
+  "intitule": "Organismes sociaux, charges à payer et produits à recevoir",
+  "racine": "438",
+  "classe": "4"
+ },
+ {
+  "numero": "438100",
+  "intitule": "Charges sociales sur gratifications à payer",
+  "racine": "4381",
+  "classe": "4"
+ },
+ {
+  "numero": "438200",
+  "intitule": "Charges sociales sur congés à payer",
+  "racine": "4382",
+  "classe": "4"
+ },
+ {
+  "numero": "438600",
+  "intitule": "Autres charges à payer",
+  "racine": "4386",
+  "classe": "4"
+ },
+ {
+  "numero": "438700",
+  "intitule": "Produits à recevoir",
+  "racine": "4387",
+  "classe": "4"
+ },
+ {
+  "numero": "440000",
+  "intitule": "État et collectivités publiques",
+  "racine": "44",
+  "classe": "4"
+ },
+ {
+  "numero": "441000",
+  "intitule": "État, impôt sur les bénéfices",
+  "racine": "441",
+  "classe": "4"
+ },
+ {
+  "numero": "442000",
+  "intitule": "État, autres impôts et taxes",
+  "racine": "442",
+  "classe": "4"
+ },
+ {
+  "numero": "442100",
+  "intitule": "Impôts et taxes d’État",
+  "racine": "4421",
+  "classe": "4"
+ },
+ {
+  "numero": "442200",
+  "intitule": "Impôts et taxes pour les collectivités publiques",
+  "racine": "4422",
+  "classe": "4"
+ },
+ {
+  "numero": "442300",
+  "intitule": "Impôts et taxes recouvrables sur des obligataires",
+  "racine": "4423",
+  "classe": "4"
+ },
+ {
+  "numero": "442400",
+  "intitule": "Impôts et taxes recouvrables sur des associés",
+  "racine": "4424",
+  "classe": "4"
+ },
+ {
+  "numero": "442600",
+  "intitule": "Droits de douane",
+  "racine": "4426",
+  "classe": "4"
+ },
+ {
+  "numero": "442800",
+  "intitule": "Autres impôts et taxes",
+  "racine": "4428",
+  "classe": "4"
+ },
+ {
+  "numero": "443000",
+  "intitule": "État, TVA facturée",
+  "racine": "443",
+  "classe": "4"
+ },
+ {
+  "numero": "443100",
+  "intitule": "TVA facturée sur ventes",
+  "racine": "4431",
+  "classe": "4"
+ },
+ {
+  "numero": "443200",
+  "intitule": "TVA facturée sur prestations de services",
+  "racine": "4432",
+  "classe": "4"
+ },
+ {
+  "numero": "443300",
+  "intitule": "TVA facturée sur travaux",
+  "racine": "4433",
+  "classe": "4"
+ },
+ {
+  "numero": "444000",
+  "intitule": "État, TVA due ou crédit de TVA",
+  "racine": "444",
+  "classe": "4"
+ },
+ {
+  "numero": "444100",
+  "intitule": "État, TVA due",
+  "racine": "4441",
+  "classe": "4"
+ },
+ {
+  "numero": "444900",
+  "intitule": "État, crédit de TVA à reporter",
+  "racine": "4449",
+  "classe": "4"
+ },
+ {
+  "numero": "445000",
+  "intitule": "État, TVA récupérable",
+  "racine": "445",
+  "classe": "4"
+ },
+ {
+  "numero": "445100",
+  "intitule": "TVA récupérable sur immobilisations",
+  "racine": "4451",
+  "classe": "4"
+ },
+ {
+  "numero": "445200",
+  "intitule": "TVA récupérable sur achats",
+  "racine": "4452",
+  "classe": "4"
+ },
+ {
+  "numero": "445300",
+  "intitule": "TVA récupérable sur transport",
+  "racine": "4453",
+  "classe": "4"
+ },
+ {
+  "numero": "445400",
+  "intitule": "TVA récupérable sur services extérieurs et autres charges",
+  "racine": "4454",
+  "classe": "4"
+ },
+ {
+  "numero": "445500",
+  "intitule": "TVA récupérable sur factures non parvenues",
+  "racine": "4455",
+  "classe": "4"
+ },
+ {
+  "numero": "445600",
+  "intitule": "TVA transférée par d’autres entreprises",
+  "racine": "4456",
+  "classe": "4"
+ },
+ {
+  "numero": "446000",
+  "intitule": "État, autres taxes sur le chiffre d’affaires",
+  "racine": "446",
+  "classe": "4"
+ },
+ {
+  "numero": "447000",
+  "intitule": "État, impôts retenus à la source",
+  "racine": "447",
+  "classe": "4"
+ },
+ {
+  "numero": "447100",
+  "intitule": "Impôt Général sur le revenu",
+  "racine": "4471",
+  "classe": "4"
+ },
+ {
+  "numero": "447200",
+  "intitule": "Impôts sur salaires",
+  "racine": "4472",
+  "classe": "4"
+ },
+ {
+  "numero": "447300",
+  "intitule": "Contribution nationale",
+  "racine": "4473",
+  "classe": "4"
+ },
+ {
+  "numero": "447400",
+  "intitule": "Contribution nationale de solidarité",
+  "racine": "4474",
+  "classe": "4"
+ },
+ {
+  "numero": "447800",
+  "intitule": "Autres impôts et contributions",
+  "racine": "4478",
+  "classe": "4"
+ },
+ {
+  "numero": "448000",
+  "intitule": "État, charges à payer et produits à recevoir",
+  "racine": "448",
+  "classe": "4"
+ },
+ {
+  "numero": "448600",
+  "intitule": "Charges à payer",
+  "racine": "4486",
+  "classe": "4"
+ },
+ {
+  "numero": "448700",
+  "intitule": "Produits à recevoir",
+  "racine": "4487",
+  "classe": "4"
+ },
+ {
+  "numero": "449000",
+  "intitule": "État, créances et dettes diverses",
+  "racine": "449",
+  "classe": "4"
+ },
+ {
+  "numero": "449100",
+  "intitule": "État, obligations cautionnées",
+  "racine": "4491",
+  "classe": "4"
+ },
+ {
+  "numero": "449200",
+  "intitule": "État, avances et acomptes versés sur impôts",
+  "racine": "4492",
+  "classe": "4"
+ },
+ {
+  "numero": "449300",
+  "intitule": "État, fonds de dotation à recevoir",
+  "racine": "4493",
+  "classe": "4"
+ },
+ {
+  "numero": "449400",
+  "intitule": "État, subventions d’équipe-ment à recevoir",
+  "racine": "4494",
+  "classe": "4"
+ },
+ {
+  "numero": "449500",
+  "intitule": "État, subventions d’exploita-tion à recevoir",
+  "racine": "4495",
+  "classe": "4"
+ },
+ {
+  "numero": "449600",
+  "intitule": "État, subventions d’équilibre à recevoir",
+  "racine": "4496",
+  "classe": "4"
+ },
+ {
+  "numero": "449900",
+  "intitule": "État, fonds réglementé provisionné",
+  "racine": "4499",
+  "classe": "4"
+ },
+ {
+  "numero": "450000",
+  "intitule": "Organismes internationaux",
+  "racine": "45",
+  "classe": "4"
+ },
+ {
+  "numero": "451000",
+  "intitule": "Opérations avec les organismes africains",
+  "racine": "451",
+  "classe": "4"
+ },
+ {
+  "numero": "452000",
+  "intitule": "Opérations avec les autres organismes internationaux",
+  "racine": "452",
+  "classe": "4"
+ },
+ {
+  "numero": "458000",
+  "intitule": "Organismes internationaux, fonds de dotation et subventions à recevoir",
+  "racine": "458",
+  "classe": "4"
+ },
+ {
+  "numero": "458100",
+  "intitule": "Organismes internationaux, fonds de dotation à recevoir",
+  "racine": "4581",
+  "classe": "4"
+ },
+ {
+  "numero": "458200",
+  "intitule": "Organismes internationaux, subventions à recevoir",
+  "racine": "4582",
+  "classe": "4"
+ },
+ {
+  "numero": "460000",
+  "intitule": "Associés et groupe",
+  "racine": "46",
+  "classe": "4"
+ },
+ {
+  "numero": "461000",
+  "intitule": "Associés, opérations sur le capital",
+  "racine": "461",
+  "classe": "4"
+ },
+ {
+  "numero": "461100",
+  "intitule": "Associés apports en nature",
+  "racine": "4611",
+  "classe": "4"
+ },
+ {
+  "numero": "461200",
+  "intitule": "Associés apports en numéraire",
+  "racine": "4612",
+  "classe": "4"
+ },
+ {
+  "numero": "461300",
+  "intitule": "Actionnaires, capital souscrit appelé non versé",
+  "racine": "4613",
+  "classe": "4"
+ },
+ {
+  "numero": "461400",
+  "intitule": "Associés, capital appelé non versé",
+  "racine": "4614",
+  "classe": "4"
+ },
+ {
+  "numero": "461500",
+  "intitule": "Associés, versements reçus sur augmentation de capital",
+  "racine": "4615",
+  "classe": "4"
+ },
+ {
+  "numero": "461600",
+  "intitule": "Associés, versements anticipés",
+  "racine": "4616",
+  "classe": "4"
+ },
+ {
+  "numero": "461700",
+  "intitule": "Actionnaires défaillants",
+  "racine": "4617",
+  "classe": "4"
+ },
+ {
+  "numero": "461800",
+  "intitule": "Associés, autres apports",
+  "racine": "4618",
+  "classe": "4"
+ },
+ {
+  "numero": "461900",
+  "intitule": "Associés, capital à rembourser",
+  "racine": "4619",
+  "classe": "4"
+ },
+ {
+  "numero": "462000",
+  "intitule": "Associés, comptes courants",
+  "racine": "462",
+  "classe": "4"
+ },
+ {
+  "numero": "462100",
+  "intitule": "Principal",
+  "racine": "4621",
+  "classe": "4"
+ },
+ {
+  "numero": "462600",
+  "intitule": "Intérêts courus",
+  "racine": "4626",
+  "classe": "4"
+ },
+ {
+  "numero": "463000",
+  "intitule": "Associés, opérations faites en commun",
+  "racine": "463",
+  "classe": "4"
+ },
+ {
+  "numero": "465000",
+  "intitule": "Associés, dividendes à payer",
+  "racine": "465",
+  "classe": "4"
+ },
+ {
+  "numero": "466000",
+  "intitule": "Groupe, comptes courants",
+  "racine": "466",
+  "classe": "4"
+ },
+ {
+  "numero": "467000",
+  "intitule": "Actionnaires, restant dû sur capital appelé",
+  "racine": "467",
+  "classe": "4"
+ },
+ {
+  "numero": "470000",
+  "intitule": "Débiteurs et créditeurs divers",
+  "racine": "47",
+  "classe": "4"
+ },
+ {
+  "numero": "471000",
+  "intitule": "Comptes d’attente",
+  "racine": "471",
+  "classe": "4"
+ },
+ {
+  "numero": "471100",
+  "intitule": "Débiteurs divers",
+  "racine": "4711",
+  "classe": "4"
+ },
+ {
+  "numero": "471200",
+  "intitule": "Créditeurs divers",
+  "racine": "4712",
+  "classe": "4"
+ },
+ {
+  "numero": "472000",
+  "intitule": "Versements restant à effectuer sur titres non libérés",
+  "racine": "472",
+  "classe": "4"
+ },
+ {
+  "numero": "472600",
+  "intitule": "Titres de participation",
+  "racine": "4726",
+  "classe": "4"
+ },
+ {
+  "numero": "472700",
+  "intitule": "Titres immobilisés",
+  "racine": "4727",
+  "classe": "4"
+ },
+ {
+  "numero": "472800",
+  "intitule": "Titres de placement",
+  "racine": "4728",
+  "classe": "4"
+ },
+ {
+  "numero": "474000",
+  "intitule": "Répartition périodique des charges et des produits",
+  "racine": "474",
+  "classe": "4"
+ },
+ {
+  "numero": "474600",
+  "intitule": "Charges",
+  "racine": "4746",
+  "classe": "4"
+ },
+ {
+  "numero": "474700",
+  "intitule": "Produits",
+  "racine": "4747",
+  "classe": "4"
+ },
+ {
+  "numero": "475000",
+  "intitule": "Créances sur travaux non encore facturables",
+  "racine": "475",
+  "classe": "4"
+ },
+ {
+  "numero": "476000",
+  "intitule": "Charges constatées d’avance",
+  "racine": "476",
+  "classe": "4"
+ },
+ {
+  "numero": "477000",
+  "intitule": "Produits constatés d’avance",
+  "racine": "477",
+  "classe": "4"
+ },
+ {
+  "numero": "478000",
+  "intitule": "Écarts de conversion - actif",
+  "racine": "478",
+  "classe": "4"
+ },
+ {
+  "numero": "478100",
+  "intitule": "Diminution des créances",
+  "racine": "4781",
+  "classe": "4"
+ },
+ {
+  "numero": "478200",
+  "intitule": "Augmentation des dettes",
+  "racine": "4782",
+  "classe": "4"
+ },
+ {
+  "numero": "478800",
+  "intitule": "Différences compensées par couverture de change",
+  "racine": "4788",
+  "classe": "4"
+ },
+ {
+  "numero": "479000",
+  "intitule": "Écarts de conversion - passif",
+  "racine": "479",
+  "classe": "4"
+ },
+ {
+  "numero": "479100",
+  "intitule": "Augmentation des créances",
+  "racine": "4791",
+  "classe": "4"
+ },
+ {
+  "numero": "479200",
+  "intitule": "Diminution des dettes",
+  "racine": "4792",
+  "classe": "4"
+ },
+ {
+  "numero": "479800",
+  "intitule": "Différences compensées par couverture de change",
+  "racine": "4798",
+  "classe": "4"
+ },
+ {
+  "numero": "480000",
+  "intitule": "Créances et dettes hors activités ordinaires (HAO)",
+  "racine": "48",
+  "classe": "4"
+ },
+ {
+  "numero": "481000",
+  "intitule": "Fournisseurs d’investissements",
+  "racine": "481",
+  "classe": "4"
+ },
+ {
+  "numero": "481100",
+  "intitule": "Immobilisations incorporelles",
+  "racine": "4811",
+  "classe": "4"
+ },
+ {
+  "numero": "481200",
+  "intitule": "Immobilisations corporelles",
+  "racine": "4812",
+  "classe": "4"
+ },
+ {
+  "numero": "481700",
+  "intitule": "Retenues de garantie",
+  "racine": "4817",
+  "classe": "4"
+ },
+ {
+  "numero": "481800",
+  "intitule": "Factures non parvenues",
+  "racine": "4818",
+  "classe": "4"
+ },
+ {
+  "numero": "482000",
+  "intitule": "Fournisseurs d’investissements, effets à payer",
+  "racine": "482",
+  "classe": "4"
+ },
+ {
+  "numero": "483000",
+  "intitule": "Dettes sur acquisition de titres de placement",
+  "racine": "483",
+  "classe": "4"
+ },
+ {
+  "numero": "484000",
+  "intitule": "Autres dettes hors activités ordinaires (HAO)",
+  "racine": "484",
+  "classe": "4"
+ },
+ {
+  "numero": "485000",
+  "intitule": "Créances sur cessions d’immobi-lisations",
+  "racine": "485",
+  "classe": "4"
+ },
+ {
+  "numero": "485100",
+  "intitule": "En compte",
+  "racine": "4851",
+  "classe": "4"
+ },
+ {
+  "numero": "485200",
+  "intitule": "Effets à recevoir",
+  "racine": "4852",
+  "classe": "4"
+ },
+ {
+  "numero": "485700",
+  "intitule": "Retenues de garantie",
+  "racine": "4857",
+  "classe": "4"
+ },
+ {
+  "numero": "485800",
+  "intitule": "Factures à établir",
+  "racine": "4858",
+  "classe": "4"
+ },
+ {
+  "numero": "486000",
+  "intitule": "Créances sur cessions de titres de placement",
+  "racine": "486",
+  "classe": "4"
+ },
+ {
+  "numero": "488000",
+  "intitule": "Autres créances hors activités ordinaires (HAO)",
+  "racine": "488",
+  "classe": "4"
+ },
+ {
+  "numero": "490000",
+  "intitule": "Dépréciations des comptes fournisseurs",
+  "racine": "490",
+  "classe": "4"
+ },
+ {
+  "numero": "491000",
+  "intitule": "Dépréciations des comptes clients",
+  "racine": "491",
+  "classe": "4"
+ },
+ {
+  "numero": "491100",
+  "intitule": "Créances litigieuses",
+  "racine": "4911",
+  "classe": "4"
+ },
+ {
+  "numero": "491200",
+  "intitule": "Créances douteuses",
+  "racine": "4912",
+  "classe": "4"
+ },
+ {
+  "numero": "492000",
+  "intitule": "Dépréciations des comptes personnel",
+  "racine": "492",
+  "classe": "4"
+ },
+ {
+  "numero": "493000",
+  "intitule": "Dépréciations des comptes organismes sociaux",
+  "racine": "493",
+  "classe": "4"
+ },
+ {
+  "numero": "494000",
+  "intitule": "Dépréciations des comptes état et collectivités publiques",
+  "racine": "494",
+  "classe": "4"
+ },
+ {
+  "numero": "495000",
+  "intitule": "Dépréciations des comptes organismes internationaux",
+  "racine": "495",
+  "classe": "4"
+ },
+ {
+  "numero": "496000",
+  "intitule": "Dépréciations des comptes associés et groupe",
+  "racine": "496",
+  "classe": "4"
+ },
+ {
+  "numero": "496200",
+  "intitule": "Associés, comptes courants",
+  "racine": "4962",
+  "classe": "4"
+ },
+ {
+  "numero": "496300",
+  "intitule": "Associés, opérations faites en commun",
+  "racine": "4963",
+  "classe": "4"
+ },
+ {
+  "numero": "496600",
+  "intitule": "Groupe, comptes courants",
+  "racine": "4966",
+  "classe": "4"
+ },
+ {
+  "numero": "497000",
+  "intitule": "Dépréciations des comptes débiteurs divers",
+  "racine": "497",
+  "classe": "4"
+ },
+ {
+  "numero": "498000",
+  "intitule": "Dépréciations des comptes de créances HAO",
+  "racine": "498",
+  "classe": "4"
+ },
+ {
+  "numero": "498100",
+  "intitule": "Créances sur cessions d’im-mobilisations",
+  "racine": "4981",
+  "classe": "4"
+ },
+ {
+  "numero": "498200",
+  "intitule": "Créances sur cessions de titres de placement",
+  "racine": "4982",
+  "classe": "4"
+ },
+ {
+  "numero": "498300",
+  "intitule": "Autres créances HAO",
+  "racine": "4983",
+  "classe": "4"
+ },
+ {
+  "numero": "499000",
+  "intitule": "Risques provisionnés",
+  "racine": "499",
+  "classe": "4"
+ },
+ {
+  "numero": "499100",
+  "intitule": "Sur opérations d’exploitation",
+  "racine": "4991",
+  "classe": "4"
+ },
+ {
+  "numero": "499800",
+  "intitule": "Sur opérations HAO",
+  "racine": "4998",
+  "classe": "4"
+ },
+ {
+  "numero": "500000",
+  "intitule": "Titres de placement",
+  "racine": "50",
+  "classe": "5"
+ },
+ {
+  "numero": "501000",
+  "intitule": "Titres du trésor et bons de caisse à court terme",
+  "racine": "501",
+  "classe": "5"
+ },
+ {
+  "numero": "501100",
+  "intitule": "Titres du Trésor à court terme",
+  "racine": "5011",
+  "classe": "5"
+ },
+ {
+  "numero": "501200",
+  "intitule": "Titres d’organismes financiers",
+  "racine": "5012",
+  "classe": "5"
+ },
+ {
+  "numero": "501300",
+  "intitule": "Bons de caisse à court terme",
+  "racine": "5013",
+  "classe": "5"
+ },
+ {
+  "numero": "502000",
+  "intitule": "Actions",
+  "racine": "502",
+  "classe": "5"
+ },
+ {
+  "numero": "502100",
+  "intitule": "Actions propres",
+  "racine": "5021",
+  "classe": "5"
+ },
+ {
+  "numero": "502200",
+  "intitule": "Actions cotées",
+  "racine": "5022",
+  "classe": "5"
+ },
+ {
+  "numero": "502300",
+  "intitule": "Actions non cotées",
+  "racine": "5023",
+  "classe": "5"
+ },
+ {
+  "numero": "502400",
+  "intitule": "Actions démembrées (certificats d’investissement, droits de vote)",
+  "racine": "5024",
+  "classe": "5"
+ },
+ {
+  "numero": "502500",
+  "intitule": "Autres titres conférant un droit de propriété",
+  "racine": "5025",
+  "classe": "5"
+ },
+ {
+  "numero": "503000",
+  "intitule": "Obligations",
+  "racine": "503",
+  "classe": "5"
+ },
+ {
+  "numero": "503100",
+  "intitule": "Obligations émises par la société et rachetées par elle",
+  "racine": "5031",
+  "classe": "5"
+ },
+ {
+  "numero": "503200",
+  "intitule": "Obligations cotées",
+  "racine": "5032",
+  "classe": "5"
+ },
+ {
+  "numero": "503300",
+  "intitule": "Obligations non cotées",
+  "racine": "5033",
+  "classe": "5"
+ },
+ {
+  "numero": "503500",
+  "intitule": "Autres titres conférant un droit de créance",
+  "racine": "5035",
+  "classe": "5"
+ },
+ {
+  "numero": "504000",
+  "intitule": "Bons de souscription",
+  "racine": "504",
+  "classe": "5"
+ },
+ {
+  "numero": "504200",
+  "intitule": "Bons de souscription d’ac-tions",
+  "racine": "5042",
+  "classe": "5"
+ },
+ {
+  "numero": "504300",
+  "intitule": "Bons de souscription d’obli-gations",
+  "racine": "5043",
+  "classe": "5"
+ },
+ {
+  "numero": "505000",
+  "intitule": "Titres négociables hors région",
+  "racine": "505",
+  "classe": "5"
+ },
+ {
+  "numero": "506000",
+  "intitule": "Intérêts courus",
+  "racine": "506",
+  "classe": "5"
+ },
+ {
+  "numero": "506100",
+  "intitule": "Titres du Trésor et bons de caisse à court terme",
+  "racine": "5061",
+  "classe": "5"
+ },
+ {
+  "numero": "506200",
+  "intitule": "Actions",
+  "racine": "5062",
+  "classe": "5"
+ },
+ {
+  "numero": "506300",
+  "intitule": "Obligations",
+  "racine": "5063",
+  "classe": "5"
+ },
+ {
+  "numero": "508000",
+  "intitule": "Autres valeurs assimilées",
+  "racine": "508",
+  "classe": "5"
+ },
+ {
+  "numero": "510000",
+  "intitule": "Valeurs à encaisser",
+  "racine": "51",
+  "classe": "5"
+ },
+ {
+  "numero": "511000",
+  "intitule": "Effets à encaisser",
+  "racine": "511",
+  "classe": "5"
+ },
+ {
+  "numero": "512000",
+  "intitule": "Effets à l’encaissement",
+  "racine": "512",
+  "classe": "5"
+ },
+ {
+  "numero": "513000",
+  "intitule": "Chèques à encaisser",
+  "racine": "513",
+  "classe": "5"
+ },
+ {
+  "numero": "514000",
+  "intitule": "Chèques à l’encaissement",
+  "racine": "514",
+  "classe": "5"
+ },
+ {
+  "numero": "515000",
+  "intitule": "Cartes de crédit à encaisser",
+  "racine": "515",
+  "classe": "5"
+ },
+ {
+  "numero": "518000",
+  "intitule": "Autres valeurs à l’encaissement",
+  "racine": "518",
+  "classe": "5"
+ },
+ {
+  "numero": "518100",
+  "intitule": "Warrants",
+  "racine": "5181",
+  "classe": "5"
+ },
+ {
+  "numero": "518200",
+  "intitule": "Billets de fonds",
+  "racine": "5182",
+  "classe": "5"
+ },
+ {
+  "numero": "518500",
+  "intitule": "Chèques de voyage",
+  "racine": "5185",
+  "classe": "5"
+ },
+ {
+  "numero": "518600",
+  "intitule": "Coupons échus",
+  "racine": "5186",
+  "classe": "5"
+ },
+ {
+  "numero": "518700",
+  "intitule": "Intérêts échus des obligations",
+  "racine": "5187",
+  "classe": "5"
+ },
+ {
+  "numero": "520000",
+  "intitule": "Banques",
+  "racine": "52",
+  "classe": "5"
+ },
+ {
+  "numero": "521000",
+  "intitule": "Banques locales",
+  "racine": "521",
+  "classe": "5"
+ },
+ {
+  "numero": "521100",
+  "intitule": "Banque X",
+  "racine": "5211",
+  "classe": "5"
+ },
+ {
+  "numero": "521200",
+  "intitule": "Banque Y",
+  "racine": "5212",
+  "classe": "5"
+ },
+ {
+  "numero": "522000",
+  "intitule": "Banques autres États région",
+  "racine": "522",
+  "classe": "5"
+ },
+ {
+  "numero": "523000",
+  "intitule": "Banques autres États zone monétaire",
+  "racine": "523",
+  "classe": "5"
+ },
+ {
+  "numero": "524000",
+  "intitule": "Banques hors zone monétaire",
+  "racine": "524",
+  "classe": "5"
+ },
+ {
+  "numero": "526000",
+  "intitule": "Banques, intérêts courus",
+  "racine": "526",
+  "classe": "5"
+ },
+ {
+  "numero": "530000",
+  "intitule": "Établissements financiers et assimilés",
+  "racine": "53",
+  "classe": "5"
+ },
+ {
+  "numero": "531000",
+  "intitule": "Chèques postaux",
+  "racine": "531",
+  "classe": "5"
+ },
+ {
+  "numero": "532000",
+  "intitule": "Trésor",
+  "racine": "532",
+  "classe": "5"
+ },
+ {
+  "numero": "533000",
+  "intitule": "Sociétés de gestion et d’inter-médiation (SGI)",
+  "racine": "533",
+  "classe": "5"
+ },
+ {
+  "numero": "536000",
+  "intitule": "Établissements financiers, intérêts courus",
+  "racine": "536",
+  "classe": "5"
+ },
+ {
+  "numero": "538000",
+  "intitule": "autres organismes financiers",
+  "racine": "538",
+  "classe": "5"
+ },
+ {
+  "numero": "540000",
+  "intitule": "Instruments de trésorerie",
+  "racine": "54",
+  "classe": "5"
+ },
+ {
+  "numero": "541000",
+  "intitule": "Options de taux d’intérêt",
+  "racine": "541",
+  "classe": "5"
+ },
+ {
+  "numero": "542000",
+  "intitule": "Options de taux de change",
+  "racine": "542",
+  "classe": "5"
+ },
+ {
+  "numero": "543000",
+  "intitule": "Options de taux boursiers",
+  "racine": "543",
+  "classe": "5"
+ },
+ {
+  "numero": "544000",
+  "intitule": "Instruments de marchés à terme",
+  "racine": "544",
+  "classe": "5"
+ },
+ {
+  "numero": "545000",
+  "intitule": "Avoirs d’or et autres métaux précieux [2]",
+  "racine": "545",
+  "classe": "5"
+ },
+ {
+  "numero": "560000",
+  "intitule": "Banques, crédits de trésorerie et d’escompte",
+  "racine": "56",
+  "classe": "5"
+ },
+ {
+  "numero": "561000",
+  "intitule": "Crédits de trésorerie",
+  "racine": "561",
+  "classe": "5"
+ },
+ {
+  "numero": "564000",
+  "intitule": "Escompte de crédits de campagne",
+  "racine": "564",
+  "classe": "5"
+ },
+ {
+  "numero": "565000",
+  "intitule": "Escompte de crédits ordinaires",
+  "racine": "565",
+  "classe": "5"
+ },
+ {
+  "numero": "566000",
+  "intitule": "Banques, crédits de trésorerie, intérêts courus",
+  "racine": "566",
+  "classe": "5"
+ },
+ {
+  "numero": "570000",
+  "intitule": "Caisse",
+  "racine": "57",
+  "classe": "5"
+ },
+ {
+  "numero": "571000",
+  "intitule": "Caisse siège social",
+  "racine": "571",
+  "classe": "5"
+ },
+ {
+  "numero": "571100",
+  "intitule": "en unités monétaires légales",
+  "racine": "5711",
+  "classe": "5"
+ },
+ {
+  "numero": "571200",
+  "intitule": "en devises",
+  "racine": "5712",
+  "classe": "5"
+ },
+ {
+  "numero": "572000",
+  "intitule": "Caisse succursale A",
+  "racine": "572",
+  "classe": "5"
+ },
+ {
+  "numero": "572100",
+  "intitule": "en unités monétaires légales",
+  "racine": "5721",
+  "classe": "5"
+ },
+ {
+  "numero": "572200",
+  "intitule": "en devises",
+  "racine": "5722",
+  "classe": "5"
+ },
+ {
+  "numero": "573000",
+  "intitule": "Caisse succursale B",
+  "racine": "573",
+  "classe": "5"
+ },
+ {
+  "numero": "573100",
+  "intitule": "en unités monétaires légales",
+  "racine": "5731",
+  "classe": "5"
+ },
+ {
+  "numero": "573200",
+  "intitule": "en devises",
+  "racine": "5732",
+  "classe": "5"
+ },
+ {
+  "numero": "580000",
+  "intitule": "Régies d’avances, accréditifs et virements internes",
+  "racine": "58",
+  "classe": "5"
+ },
+ {
+  "numero": "581000",
+  "intitule": "Régies d’avance",
+  "racine": "581",
+  "classe": "5"
+ },
+ {
+  "numero": "582000",
+  "intitule": "Accréditifs",
+  "racine": "582",
+  "classe": "5"
+ },
+ {
+  "numero": "585000",
+  "intitule": "Virements de fonds",
+  "racine": "585",
+  "classe": "5"
+ },
+ {
+  "numero": "588000",
+  "intitule": "Autres virements internes",
+  "racine": "588",
+  "classe": "5"
+ },
+ {
+  "numero": "590000",
+  "intitule": "Dépréciations des titres de placement",
+  "racine": "590",
+  "classe": "5"
+ },
+ {
+  "numero": "591000",
+  "intitule": "Dépréciations des titres et valeurs à encaisser",
+  "racine": "591",
+  "classe": "5"
+ },
+ {
+  "numero": "592000",
+  "intitule": "Dépréciations des comptes banques",
+  "racine": "592",
+  "classe": "5"
+ },
+ {
+  "numero": "593000",
+  "intitule": "Dépréciations des comptes établissements financiers et assimilés",
+  "racine": "593",
+  "classe": "5"
+ },
+ {
+  "numero": "594000",
+  "intitule": "Dépréciations des comptes d’instruments de trésorerie",
+  "racine": "594",
+  "classe": "5"
+ },
+ {
+  "numero": "599000",
+  "intitule": "Risques provisionnés à caractère financier",
+  "racine": "599",
+  "classe": "5"
+ },
+ {
+  "numero": "600000",
+  "intitule": "Achats et variations de stocks",
+  "racine": "60",
+  "classe": "6"
+ },
+ {
+  "numero": "601000",
+  "intitule": "Achats de marchandises",
+  "racine": "601",
+  "classe": "6"
+ },
+ {
+  "numero": "601100",
+  "intitule": "dans la Région [3]",
+  "racine": "6011",
+  "classe": "6"
+ },
+ {
+  "numero": "601200",
+  "intitule": "hors Région (1)",
+  "racine": "6012",
+  "classe": "6"
+ },
+ {
+  "numero": "601300",
+  "intitule": "aux entreprises du groupe dans la Région",
+  "racine": "6013",
+  "classe": "6"
+ },
+ {
+  "numero": "601400",
+  "intitule": "aux entreprises du groupe hors Région",
+  "racine": "6014",
+  "classe": "6"
+ },
+ {
+  "numero": "601900",
+  "intitule": "Rabais, Remises et Ristournes obtenus (non ventilés)",
+  "racine": "6019",
+  "classe": "6"
+ },
+ {
+  "numero": "602000",
+  "intitule": "Achats de matières premières et fournitures liées",
+  "racine": "602",
+  "classe": "6"
+ },
+ {
+  "numero": "602100",
+  "intitule": "dans la Région (1)",
+  "racine": "6021",
+  "classe": "6"
+ },
+ {
+  "numero": "602200",
+  "intitule": "hors Région (1)",
+  "racine": "6022",
+  "classe": "6"
+ },
+ {
+  "numero": "602300",
+  "intitule": "aux entreprises du groupe dans la Région",
+  "racine": "6023",
+  "classe": "6"
+ },
+ {
+  "numero": "602400",
+  "intitule": "aux entreprises du groupe hors Région",
+  "racine": "6024",
+  "classe": "6"
+ },
+ {
+  "numero": "602900",
+  "intitule": "Rabais, Remises et Ristournes obtenus (non ventilés)",
+  "racine": "6029",
+  "classe": "6"
+ },
+ {
+  "numero": "603000",
+  "intitule": "Variations des stocks de biens achetés",
+  "racine": "603",
+  "classe": "6"
+ },
+ {
+  "numero": "603100",
+  "intitule": "Variations des stocks de marchandises",
+  "racine": "6031",
+  "classe": "6"
+ },
+ {
+  "numero": "603200",
+  "intitule": "Variations des stocks de matières premières et fournitures liées",
+  "racine": "6032",
+  "classe": "6"
+ },
+ {
+  "numero": "603300",
+  "intitule": "Variations des stocks d’au-tres approvisionnements",
+  "racine": "6033",
+  "classe": "6"
+ },
+ {
+  "numero": "604000",
+  "intitule": "Achats stockés de matières et fournitures consommables",
+  "racine": "604",
+  "classe": "6"
+ },
+ {
+  "numero": "604100",
+  "intitule": "Matières consommables",
+  "racine": "6041",
+  "classe": "6"
+ },
+ {
+  "numero": "604200",
+  "intitule": "Matières combustibles",
+  "racine": "6042",
+  "classe": "6"
+ },
+ {
+  "numero": "604300",
+  "intitule": "Produits d’entretien",
+  "racine": "6043",
+  "classe": "6"
+ },
+ {
+  "numero": "604400",
+  "intitule": "Fournitures d’atelier et d’usine",
+  "racine": "6044",
+  "classe": "6"
+ },
+ {
+  "numero": "604600",
+  "intitule": "Fournitures de magasin",
+  "racine": "6046",
+  "classe": "6"
+ },
+ {
+  "numero": "604700",
+  "intitule": "Fournitures de bureau",
+  "racine": "6047",
+  "classe": "6"
+ },
+ {
+  "numero": "604900",
+  "intitule": "Rabais, Remises et Ristournes obtenus (non ventilés)",
+  "racine": "6049",
+  "classe": "6"
+ },
+ {
+  "numero": "605000",
+  "intitule": "Autres achats",
+  "racine": "605",
+  "classe": "6"
+ },
+ {
+  "numero": "605100",
+  "intitule": "Fournitures non stockables -Eau",
+  "racine": "6051",
+  "classe": "6"
+ },
+ {
+  "numero": "605200",
+  "intitule": "Fournitures non stockables - Électricité",
+  "racine": "6052",
+  "classe": "6"
+ },
+ {
+  "numero": "605300",
+  "intitule": "Fournitures non stockables - Autres énergies",
+  "racine": "6053",
+  "classe": "6"
+ },
+ {
+  "numero": "605400",
+  "intitule": "Fournitures d’entretien non stockables",
+  "racine": "6054",
+  "classe": "6"
+ },
+ {
+  "numero": "605500",
+  "intitule": "Fournitures de bureau non stockables",
+  "racine": "6055",
+  "classe": "6"
+ },
+ {
+  "numero": "605600",
+  "intitule": "Achats de petit matériel et outillage",
+  "racine": "6056",
+  "classe": "6"
+ },
+ {
+  "numero": "605700",
+  "intitule": "Achats d’études et prestations de services",
+  "racine": "6057",
+  "classe": "6"
+ },
+ {
+  "numero": "605800",
+  "intitule": "Achats de travaux, matériels et équipements",
+  "racine": "6058",
+  "classe": "6"
+ },
+ {
+  "numero": "605900",
+  "intitule": "Rabais, Remises et Ristournes obtenus (non ventilés)",
+  "racine": "6059",
+  "classe": "6"
+ },
+ {
+  "numero": "608000",
+  "intitule": "Achats d’emballages",
+  "racine": "608",
+  "classe": "6"
+ },
+ {
+  "numero": "608100",
+  "intitule": "Emballages perdus",
+  "racine": "6081",
+  "classe": "6"
+ },
+ {
+  "numero": "608200",
+  "intitule": "Emballages récupérables non identifiables",
+  "racine": "6082",
+  "classe": "6"
+ },
+ {
+  "numero": "608300",
+  "intitule": "Emballages à usage mixte",
+  "racine": "6083",
+  "classe": "6"
+ },
+ {
+  "numero": "608900",
+  "intitule": "Rabais, Remises et Ristournes obtenus (non ventilés)",
+  "racine": "6089",
+  "classe": "6"
+ },
+ {
+  "numero": "610000",
+  "intitule": "Transports",
+  "racine": "61",
+  "classe": "6"
+ },
+ {
+  "numero": "611000",
+  "intitule": "Transports sur achats [4]",
+  "racine": "611",
+  "classe": "6"
+ },
+ {
+  "numero": "612000",
+  "intitule": "Transports sur ventes",
+  "racine": "612",
+  "classe": "6"
+ },
+ {
+  "numero": "613000",
+  "intitule": "Transports pour le compte de tiers",
+  "racine": "613",
+  "classe": "6"
+ },
+ {
+  "numero": "614000",
+  "intitule": "Transports du personnel",
+  "racine": "614",
+  "classe": "6"
+ },
+ {
+  "numero": "616000",
+  "intitule": "Transports de plis",
+  "racine": "616",
+  "classe": "6"
+ },
+ {
+  "numero": "618000",
+  "intitule": "Autres frais de transport",
+  "racine": "618",
+  "classe": "6"
+ },
+ {
+  "numero": "618100",
+  "intitule": "Voyages et déplacements",
+  "racine": "6181",
+  "classe": "6"
+ },
+ {
+  "numero": "618200",
+  "intitule": "Transports entre établissements ou chantiers",
+  "racine": "6182",
+  "classe": "6"
+ },
+ {
+  "numero": "618300",
+  "intitule": "Transports administratifs",
+  "racine": "6183",
+  "classe": "6"
+ },
+ {
+  "numero": "620000",
+  "intitule": "Services extérieurs A",
+  "racine": "62",
+  "classe": "6"
+ },
+ {
+  "numero": "621000",
+  "intitule": "Sous-traitance générale",
+  "racine": "621",
+  "classe": "6"
+ },
+ {
+  "numero": "622000",
+  "intitule": "Locations et charges locatives",
+  "racine": "622",
+  "classe": "6"
+ },
+ {
+  "numero": "622100",
+  "intitule": "Locations de terrains",
+  "racine": "6221",
+  "classe": "6"
+ },
+ {
+  "numero": "622200",
+  "intitule": "Locations de bâtiments",
+  "racine": "6222",
+  "classe": "6"
+ },
+ {
+  "numero": "622300",
+  "intitule": "Locations de matériels et outillages",
+  "racine": "6223",
+  "classe": "6"
+ },
+ {
+  "numero": "622400",
+  "intitule": "Malis sur emballages",
+  "racine": "6224",
+  "classe": "6"
+ },
+ {
+  "numero": "622500",
+  "intitule": "Locations d’emballages",
+  "racine": "6225",
+  "classe": "6"
+ },
+ {
+  "numero": "622800",
+  "intitule": "Locations et charges locatives diverses",
+  "racine": "6228",
+  "classe": "6"
+ },
+ {
+  "numero": "623000",
+  "intitule": "Redevances de crédit-bail et contrats assimilés",
+  "racine": "623",
+  "classe": "6"
+ },
+ {
+  "numero": "623200",
+  "intitule": "Crédit-bail immobilier",
+  "racine": "6232",
+  "classe": "6"
+ },
+ {
+  "numero": "623300",
+  "intitule": "Crédit-bail mobilier",
+  "racine": "6233",
+  "classe": "6"
+ },
+ {
+  "numero": "623500",
+  "intitule": "Contrats assimilés",
+  "racine": "6235",
+  "classe": "6"
+ },
+ {
+  "numero": "624000",
+  "intitule": "Entretien, réparations et maintenance",
+  "racine": "624",
+  "classe": "6"
+ },
+ {
+  "numero": "624100",
+  "intitule": "Entretien et réparations des biens immobiliers",
+  "racine": "6241",
+  "classe": "6"
+ },
+ {
+  "numero": "624200",
+  "intitule": "Entretien et réparations des biens mobiliers",
+  "racine": "6242",
+  "classe": "6"
+ },
+ {
+  "numero": "624300",
+  "intitule": "Maintenance",
+  "racine": "6243",
+  "classe": "6"
+ },
+ {
+  "numero": "624800",
+  "intitule": "Autres entretiens et réparations",
+  "racine": "6248",
+  "classe": "6"
+ },
+ {
+  "numero": "625000",
+  "intitule": "Primes d’assurance",
+  "racine": "625",
+  "classe": "6"
+ },
+ {
+  "numero": "625100",
+  "intitule": "Assurances multirisques",
+  "racine": "6251",
+  "classe": "6"
+ },
+ {
+  "numero": "625200",
+  "intitule": "Assurances matériel de transport",
+  "racine": "6252",
+  "classe": "6"
+ },
+ {
+  "numero": "625300",
+  "intitule": "Assurances risques d’exploi-tation",
+  "racine": "6253",
+  "classe": "6"
+ },
+ {
+  "numero": "625400",
+  "intitule": "Assurances responsabilité du producteur",
+  "racine": "6254",
+  "classe": "6"
+ },
+ {
+  "numero": "625500",
+  "intitule": "Assurances insolvabilité clients",
+  "racine": "6255",
+  "classe": "6"
+ },
+ {
+  "numero": "625600",
+  "intitule": "Assurances transport sur achats",
+  "racine": "6256",
+  "classe": "6"
+ },
+ {
+  "numero": "625700",
+  "intitule": "Assurances transport sur ventes",
+  "racine": "6257",
+  "classe": "6"
+ },
+ {
+  "numero": "625800",
+  "intitule": "Autres primes d’assurances",
+  "racine": "6258",
+  "classe": "6"
+ },
+ {
+  "numero": "626000",
+  "intitule": "Études, recherches et documentation",
+  "racine": "626",
+  "classe": "6"
+ },
+ {
+  "numero": "626100",
+  "intitule": "Études et recherches",
+  "racine": "6261",
+  "classe": "6"
+ },
+ {
+  "numero": "626500",
+  "intitule": "Documentation générale",
+  "racine": "6265",
+  "classe": "6"
+ },
+ {
+  "numero": "626600",
+  "intitule": "Documentation technique",
+  "racine": "6266",
+  "classe": "6"
+ },
+ {
+  "numero": "627000",
+  "intitule": "Publicité, publications, relations publiques",
+  "racine": "627",
+  "classe": "6"
+ },
+ {
+  "numero": "627100",
+  "intitule": "Annonces, insertions",
+  "racine": "6271",
+  "classe": "6"
+ },
+ {
+  "numero": "627200",
+  "intitule": "Catalogues, imprimés publicitaires",
+  "racine": "6272",
+  "classe": "6"
+ },
+ {
+  "numero": "627300",
+  "intitule": "Échantillons",
+  "racine": "6273",
+  "classe": "6"
+ },
+ {
+  "numero": "627400",
+  "intitule": "Foires et expositions",
+  "racine": "6274",
+  "classe": "6"
+ },
+ {
+  "numero": "627500",
+  "intitule": "Publications",
+  "racine": "6275",
+  "classe": "6"
+ },
+ {
+  "numero": "627600",
+  "intitule": "Cadeaux à la clientèle",
+  "racine": "6276",
+  "classe": "6"
+ },
+ {
+  "numero": "627700",
+  "intitule": "Frais de colloques, séminaires, conférences",
+  "racine": "6277",
+  "classe": "6"
+ },
+ {
+  "numero": "627800",
+  "intitule": "Autres charges de publicité et relations publiques",
+  "racine": "6278",
+  "classe": "6"
+ },
+ {
+  "numero": "628000",
+  "intitule": "Frais de télécommunications",
+  "racine": "628",
+  "classe": "6"
+ },
+ {
+  "numero": "628100",
+  "intitule": "Frais de téléphone",
+  "racine": "6281",
+  "classe": "6"
+ },
+ {
+  "numero": "628200",
+  "intitule": "Frais de télex",
+  "racine": "6282",
+  "classe": "6"
+ },
+ {
+  "numero": "628300",
+  "intitule": "Frais de télécopie",
+  "racine": "6283",
+  "classe": "6"
+ },
+ {
+  "numero": "628800",
+  "intitule": "Autres frais de télécommunications",
+  "racine": "6288",
+  "classe": "6"
+ },
+ {
+  "numero": "630000",
+  "intitule": "Services extérieurs B",
+  "racine": "63",
+  "classe": "6"
+ },
+ {
+  "numero": "631000",
+  "intitule": "Frais bancaires",
+  "racine": "631",
+  "classe": "6"
+ },
+ {
+  "numero": "631100",
+  "intitule": "Frais sur titres (achat, vente, garde)",
+  "racine": "6311",
+  "classe": "6"
+ },
+ {
+  "numero": "631200",
+  "intitule": "Frais sur effets",
+  "racine": "6312",
+  "classe": "6"
+ },
+ {
+  "numero": "631300",
+  "intitule": "Location de coffres",
+  "racine": "6313",
+  "classe": "6"
+ },
+ {
+  "numero": "631500",
+  "intitule": "Commissions sur cartes de crédit",
+  "racine": "6315",
+  "classe": "6"
+ },
+ {
+  "numero": "631600",
+  "intitule": "Frais d’émission d’emprunts",
+  "racine": "6316",
+  "classe": "6"
+ },
+ {
+  "numero": "631800",
+  "intitule": "Autres frais bancaires",
+  "racine": "6318",
+  "classe": "6"
+ },
+ {
+  "numero": "632000",
+  "intitule": "Rémunérations d’intermédiaires et de conseils",
+  "racine": "632",
+  "classe": "6"
+ },
+ {
+  "numero": "632100",
+  "intitule": "Commissions et courtages sur achats",
+  "racine": "6321",
+  "classe": "6"
+ },
+ {
+  "numero": "632200",
+  "intitule": "Commissions et courtages sur ventes",
+  "racine": "6322",
+  "classe": "6"
+ },
+ {
+  "numero": "632300",
+  "intitule": "Rémunérations des transitaires",
+  "racine": "6323",
+  "classe": "6"
+ },
+ {
+  "numero": "632400",
+  "intitule": "Honoraires",
+  "racine": "6324",
+  "classe": "6"
+ },
+ {
+  "numero": "632500",
+  "intitule": "Frais d’actes et de contentieux",
+  "racine": "6325",
+  "classe": "6"
+ },
+ {
+  "numero": "632800",
+  "intitule": "Divers frais",
+  "racine": "6328",
+  "classe": "6"
+ },
+ {
+  "numero": "633000",
+  "intitule": "Frais de formation du personnel",
+  "racine": "633",
+  "classe": "6"
+ },
+ {
+  "numero": "634000",
+  "intitule": "Redevances pour brevets, licences, logiciels et droits similaires",
+  "racine": "634",
+  "classe": "6"
+ },
+ {
+  "numero": "634200",
+  "intitule": "Redevances pour brevets, licences, concessions et droits similaires",
+  "racine": "6342",
+  "classe": "6"
+ },
+ {
+  "numero": "634300",
+  "intitule": "Redevances pour logiciels",
+  "racine": "6343",
+  "classe": "6"
+ },
+ {
+  "numero": "634400",
+  "intitule": "Redevances pour marques",
+  "racine": "6344",
+  "classe": "6"
+ },
+ {
+  "numero": "635000",
+  "intitule": "Cotisations",
+  "racine": "635",
+  "classe": "6"
+ },
+ {
+  "numero": "635100",
+  "intitule": "Cotisations",
+  "racine": "6351",
+  "classe": "6"
+ },
+ {
+  "numero": "635800",
+  "intitule": "Concours divers",
+  "racine": "6358",
+  "classe": "6"
+ },
+ {
+  "numero": "637000",
+  "intitule": "Rémunérations de personnel extérieur à l’entreprise",
+  "racine": "637",
+  "classe": "6"
+ },
+ {
+  "numero": "637100",
+  "intitule": "Personnel intérimaire",
+  "racine": "6371",
+  "classe": "6"
+ },
+ {
+  "numero": "637200",
+  "intitule": "Personnel détaché ou prêté à l’entreprise",
+  "racine": "6372",
+  "classe": "6"
+ },
+ {
+  "numero": "638000",
+  "intitule": "Autres charges externes",
+  "racine": "638",
+  "classe": "6"
+ },
+ {
+  "numero": "638100",
+  "intitule": "Frais de recrutement du personnel",
+  "racine": "6381",
+  "classe": "6"
+ },
+ {
+  "numero": "638200",
+  "intitule": "Frais de déménagement",
+  "racine": "6382",
+  "classe": "6"
+ },
+ {
+  "numero": "638300",
+  "intitule": "Réceptions",
+  "racine": "6383",
+  "classe": "6"
+ },
+ {
+  "numero": "638400",
+  "intitule": "Missions",
+  "racine": "6384",
+  "classe": "6"
+ },
+ {
+  "numero": "640000",
+  "intitule": "Impôts et taxes",
+  "racine": "64",
+  "classe": "6"
+ },
+ {
+  "numero": "641000",
+  "intitule": "Impôts et taxes directs",
+  "racine": "641",
+  "classe": "6"
+ },
+ {
+  "numero": "641100",
+  "intitule": "Impôts fonciers et taxes annexes",
+  "racine": "6411",
+  "classe": "6"
+ },
+ {
+  "numero": "641200",
+  "intitule": "Patentes, licences et taxes annexes",
+  "racine": "6412",
+  "classe": "6"
+ },
+ {
+  "numero": "641300",
+  "intitule": "Taxes sur appointements et salaires",
+  "racine": "6413",
+  "classe": "6"
+ },
+ {
+  "numero": "641400",
+  "intitule": "Taxes d’apprentissage",
+  "racine": "6414",
+  "classe": "6"
+ },
+ {
+  "numero": "641500",
+  "intitule": "Formation professionnelle continue",
+  "racine": "6415",
+  "classe": "6"
+ },
+ {
+  "numero": "641800",
+  "intitule": "Autres impôts et taxes directs",
+  "racine": "6418",
+  "classe": "6"
+ },
+ {
+  "numero": "645000",
+  "intitule": "Impôts et taxes indirects",
+  "racine": "645",
+  "classe": "6"
+ },
+ {
+  "numero": "646000",
+  "intitule": "Droits d’enregistrement",
+  "racine": "646",
+  "classe": "6"
+ },
+ {
+  "numero": "646100",
+  "intitule": "Droits de mutation",
+  "racine": "6461",
+  "classe": "6"
+ },
+ {
+  "numero": "646200",
+  "intitule": "Droits de timbre",
+  "racine": "6462",
+  "classe": "6"
+ },
+ {
+  "numero": "646300",
+  "intitule": "Taxes sur les véhicules de société",
+  "racine": "6463",
+  "classe": "6"
+ },
+ {
+  "numero": "646400",
+  "intitule": "Vignettes",
+  "racine": "6464",
+  "classe": "6"
+ },
+ {
+  "numero": "646800",
+  "intitule": "Autres droits",
+  "racine": "6468",
+  "classe": "6"
+ },
+ {
+  "numero": "647000",
+  "intitule": "Pénalités et amendes fiscales",
+  "racine": "647",
+  "classe": "6"
+ },
+ {
+  "numero": "647100",
+  "intitule": "Pénalités d’assiette, impôts directs",
+  "racine": "6471",
+  "classe": "6"
+ },
+ {
+  "numero": "647200",
+  "intitule": "Pénalités d’assiette, impôts indirects",
+  "racine": "6472",
+  "classe": "6"
+ },
+ {
+  "numero": "647300",
+  "intitule": "Pénalités de recouvrement, impôts directs",
+  "racine": "6473",
+  "classe": "6"
+ },
+ {
+  "numero": "647400",
+  "intitule": "Pénalités de recouvrement, impôts indirects",
+  "racine": "6474",
+  "classe": "6"
+ },
+ {
+  "numero": "647800",
+  "intitule": "Autres amendes pénales et fiscales",
+  "racine": "6478",
+  "classe": "6"
+ },
+ {
+  "numero": "648000",
+  "intitule": "Autres impôts et taxes",
+  "racine": "648",
+  "classe": "6"
+ },
+ {
+  "numero": "650000",
+  "intitule": "Autres charges",
+  "racine": "65",
+  "classe": "6"
+ },
+ {
+  "numero": "651000",
+  "intitule": "Pertes sur créances clients et autres débiteurs",
+  "racine": "651",
+  "classe": "6"
+ },
+ {
+  "numero": "651100",
+  "intitule": "Clients",
+  "racine": "6511",
+  "classe": "6"
+ },
+ {
+  "numero": "651500",
+  "intitule": "Autres débiteurs",
+  "racine": "6515",
+  "classe": "6"
+ },
+ {
+  "numero": "652000",
+  "intitule": "Quote-part de résultat sur opérations faites en commun",
+  "racine": "652",
+  "classe": "6"
+ },
+ {
+  "numero": "652100",
+  "intitule": "Quote-part transférée de bénéfices (comptabilité du gérant)",
+  "racine": "6521",
+  "classe": "6"
+ },
+ {
+  "numero": "652500",
+  "intitule": "Pertes imputées par transfert (comptabilité des associés non gérants)",
+  "racine": "6525",
+  "classe": "6"
+ },
+ {
+  "numero": "653000",
+  "intitule": "Quote-part de résultat annulée sur exécution partielle de contrats pluri-exercices",
+  "racine": "653",
+  "classe": "6"
+ },
+ {
+  "numero": "654000",
+  "intitule": "Valeur comptable des cessions courantes d’immobilisations",
+  "racine": "654",
+  "classe": "6"
+ },
+ {
+  "numero": "658000",
+  "intitule": "Charges diverses",
+  "racine": "658",
+  "classe": "6"
+ },
+ {
+  "numero": "658100",
+  "intitule": "Jetons de présence et autres rémunérations d’administrateurs",
+  "racine": "6581",
+  "classe": "6"
+ },
+ {
+  "numero": "658200",
+  "intitule": "Dons",
+  "racine": "6582",
+  "classe": "6"
+ },
+ {
+  "numero": "658300",
+  "intitule": "Mécénat",
+  "racine": "6583",
+  "classe": "6"
+ },
+ {
+  "numero": "659000",
+  "intitule": "Charges provisionnées d’exploi-tation",
+  "racine": "659",
+  "classe": "6"
+ },
+ {
+  "numero": "659100",
+  "intitule": "sur risques à court terme",
+  "racine": "6591",
+  "classe": "6"
+ },
+ {
+  "numero": "659300",
+  "intitule": "sur stocks",
+  "racine": "6593",
+  "classe": "6"
+ },
+ {
+  "numero": "659400",
+  "intitule": "sur créances",
+  "racine": "6594",
+  "classe": "6"
+ },
+ {
+  "numero": "659800",
+  "intitule": "Autres charges provisionnées",
+  "racine": "6598",
+  "classe": "6"
+ },
+ {
+  "numero": "660000",
+  "intitule": "Charges de personnel",
+  "racine": "66",
+  "classe": "6"
+ },
+ {
+  "numero": "661000",
+  "intitule": "Rémunérations directes versées au personnel national",
+  "racine": "661",
+  "classe": "6"
+ },
+ {
+  "numero": "661100",
+  "intitule": "Appointements salaires et commissions",
+  "racine": "6611",
+  "classe": "6"
+ },
+ {
+  "numero": "661200",
+  "intitule": "Primes et gratifications",
+  "racine": "6612",
+  "classe": "6"
+ },
+ {
+  "numero": "661300",
+  "intitule": "Congés payés",
+  "racine": "6613",
+  "classe": "6"
+ },
+ {
+  "numero": "661400",
+  "intitule": "Indemnités de préavis, de licenciement et de recherche d’em-bauche",
+  "racine": "6614",
+  "classe": "6"
+ },
+ {
+  "numero": "661500",
+  "intitule": "Indemnités de maladie versées aux travailleurs",
+  "racine": "6615",
+  "classe": "6"
+ },
+ {
+  "numero": "661600",
+  "intitule": "Supplément familial",
+  "racine": "6616",
+  "classe": "6"
+ },
+ {
+  "numero": "661700",
+  "intitule": "Avantages en nature",
+  "racine": "6617",
+  "classe": "6"
+ },
+ {
+  "numero": "661800",
+  "intitule": "Autres rémunérations directes",
+  "racine": "6618",
+  "classe": "6"
+ },
+ {
+  "numero": "662000",
+  "intitule": "Rémunérations directes versées au personnel non national",
+  "racine": "662",
+  "classe": "6"
+ },
+ {
+  "numero": "662100",
+  "intitule": "Appointements salaires et commissions",
+  "racine": "6621",
+  "classe": "6"
+ },
+ {
+  "numero": "662200",
+  "intitule": "Primes et gratifications",
+  "racine": "6622",
+  "classe": "6"
+ },
+ {
+  "numero": "662300",
+  "intitule": "Congés payés",
+  "racine": "6623",
+  "classe": "6"
+ },
+ {
+  "numero": "662400",
+  "intitule": "Indemnités de préavis, de licenciement et de recherche d’em-bauche",
+  "racine": "6624",
+  "classe": "6"
+ },
+ {
+  "numero": "662500",
+  "intitule": "Indemnités de maladie versées aux travailleurs",
+  "racine": "6625",
+  "classe": "6"
+ },
+ {
+  "numero": "662600",
+  "intitule": "Supplément familial",
+  "racine": "6626",
+  "classe": "6"
+ },
+ {
+  "numero": "662700",
+  "intitule": "Avantages en nature",
+  "racine": "6627",
+  "classe": "6"
+ },
+ {
+  "numero": "662800",
+  "intitule": "Autres rémunérations directes",
+  "racine": "6628",
+  "classe": "6"
+ },
+ {
+  "numero": "663000",
+  "intitule": "Indemnités forfaitaires versées au personnel",
+  "racine": "663",
+  "classe": "6"
+ },
+ {
+  "numero": "663100",
+  "intitule": "Indemnités de logement",
+  "racine": "6631",
+  "classe": "6"
+ },
+ {
+  "numero": "663200",
+  "intitule": "Indemnités de représentation",
+  "racine": "6632",
+  "classe": "6"
+ },
+ {
+  "numero": "663300",
+  "intitule": "Indemnités d’expatriation",
+  "racine": "6633",
+  "classe": "6"
+ },
+ {
+  "numero": "663800",
+  "intitule": "Autres indemnités et avantages divers",
+  "racine": "6638",
+  "classe": "6"
+ },
+ {
+  "numero": "664000",
+  "intitule": "Charges sociales",
+  "racine": "664",
+  "classe": "6"
+ },
+ {
+  "numero": "664100",
+  "intitule": "Charges sociales sur rémunération du personnel national",
+  "racine": "6641",
+  "classe": "6"
+ },
+ {
+  "numero": "664200",
+  "intitule": "Charges sociales sur rémunération du personnel non national",
+  "racine": "6642",
+  "classe": "6"
+ },
+ {
+  "numero": "666000",
+  "intitule": "Rémunérations et charges sociales de l’exploitant individuel",
+  "racine": "666",
+  "classe": "6"
+ },
+ {
+  "numero": "666100",
+  "intitule": "Rémunération du travail de l’exploitant",
+  "racine": "6661",
+  "classe": "6"
+ },
+ {
+  "numero": "666200",
+  "intitule": "Charges sociales",
+  "racine": "6662",
+  "classe": "6"
+ },
+ {
+  "numero": "667000",
+  "intitule": "Rémunération transférée de personnel extérieur",
+  "racine": "667",
+  "classe": "6"
+ },
+ {
+  "numero": "667100",
+  "intitule": "Personnel intérimaire",
+  "racine": "6671",
+  "classe": "6"
+ },
+ {
+  "numero": "667200",
+  "intitule": "Personnel détaché ou prêté à l’entreprise",
+  "racine": "6672",
+  "classe": "6"
+ },
+ {
+  "numero": "668000",
+  "intitule": "Autres charges sociales",
+  "racine": "668",
+  "classe": "6"
+ },
+ {
+  "numero": "668100",
+  "intitule": "Versements aux syndicats et comités d’entreprise, d’établisse-ment",
+  "racine": "6681",
+  "classe": "6"
+ },
+ {
+  "numero": "668200",
+  "intitule": "Versements aux comités d’hygiène et de sécurité",
+  "racine": "6682",
+  "classe": "6"
+ },
+ {
+  "numero": "668300",
+  "intitule": "Versements aux autres œuvres sociales",
+  "racine": "6683",
+  "classe": "6"
+ },
+ {
+  "numero": "668400",
+  "intitule": "Médecine du travail et pharmacie",
+  "racine": "6684",
+  "classe": "6"
+ },
+ {
+  "numero": "670000",
+  "intitule": "Frais financiers et charges assimilées",
+  "racine": "67",
+  "classe": "6"
+ },
+ {
+  "numero": "671000",
+  "intitule": "Intérêts des emprunts",
+  "racine": "671",
+  "classe": "6"
+ },
+ {
+  "numero": "671100",
+  "intitule": "Emprunts obligataires",
+  "racine": "6711",
+  "classe": "6"
+ },
+ {
+  "numero": "671200",
+  "intitule": "Emprunts auprès des établissements de crédit",
+  "racine": "6712",
+  "classe": "6"
+ },
+ {
+  "numero": "671300",
+  "intitule": "Dettes liées à des participations",
+  "racine": "6713",
+  "classe": "6"
+ },
+ {
+  "numero": "672000",
+  "intitule": "Intérêts dans loyers de crédit-bail et contrats assimilés",
+  "racine": "672",
+  "classe": "6"
+ },
+ {
+  "numero": "672100",
+  "intitule": "Intérêts dans loyers de crédit-bail immobilier",
+  "racine": "6721",
+  "classe": "6"
+ },
+ {
+  "numero": "672200",
+  "intitule": "Intérêts dans loyers de crédit-bail mobilier",
+  "racine": "6722",
+  "classe": "6"
+ },
+ {
+  "numero": "672300",
+  "intitule": "Intérêts dans loyers des autres contrats",
+  "racine": "6723",
+  "classe": "6"
+ },
+ {
+  "numero": "673000",
+  "intitule": "Escomptes accordés",
+  "racine": "673",
+  "classe": "6"
+ },
+ {
+  "numero": "674000",
+  "intitule": "Autres intérêts",
+  "racine": "674",
+  "classe": "6"
+ },
+ {
+  "numero": "674100",
+  "intitule": "Avances reçues et dépôts créditeurs",
+  "racine": "6741",
+  "classe": "6"
+ },
+ {
+  "numero": "674200",
+  "intitule": "Comptes courants bloqués",
+  "racine": "6742",
+  "classe": "6"
+ },
+ {
+  "numero": "674300",
+  "intitule": "Intérêts sur obligations cautionnées",
+  "racine": "6743",
+  "classe": "6"
+ },
+ {
+  "numero": "674400",
+  "intitule": "Intérêts sur dettes commerciales",
+  "racine": "6744",
+  "classe": "6"
+ },
+ {
+  "numero": "674500",
+  "intitule": "Intérêts bancaires et sur opérations de trésorerie et d’es-compte",
+  "racine": "6745",
+  "classe": "6"
+ },
+ {
+  "numero": "674800",
+  "intitule": "Intérêts sur dettes diverses",
+  "racine": "6748",
+  "classe": "6"
+ },
+ {
+  "numero": "675000",
+  "intitule": "Escomptes des effets de commerce",
+  "racine": "675",
+  "classe": "6"
+ },
+ {
+  "numero": "676000",
+  "intitule": "Pertes de change",
+  "racine": "676",
+  "classe": "6"
+ },
+ {
+  "numero": "677000",
+  "intitule": "Pertes sur cessions de titres de placement",
+  "racine": "677",
+  "classe": "6"
+ },
+ {
+  "numero": "678000",
+  "intitule": "Pertes sur risques financiers",
+  "racine": "678",
+  "classe": "6"
+ },
+ {
+  "numero": "678100",
+  "intitule": "Sur rentes viagères",
+  "racine": "6781",
+  "classe": "6"
+ },
+ {
+  "numero": "678200",
+  "intitule": "Sur opérations financières",
+  "racine": "6782",
+  "classe": "6"
+ },
+ {
+  "numero": "678400",
+  "intitule": "Sur instruments de trésorerie",
+  "racine": "6784",
+  "classe": "6"
+ },
+ {
+  "numero": "679000",
+  "intitule": "Charges provisionnées financières",
+  "racine": "679",
+  "classe": "6"
+ },
+ {
+  "numero": "679100",
+  "intitule": "Sur risques financiers",
+  "racine": "6791",
+  "classe": "6"
+ },
+ {
+  "numero": "679500",
+  "intitule": "Sur titres de placement",
+  "racine": "6795",
+  "classe": "6"
+ },
+ {
+  "numero": "679800",
+  "intitule": "Autres charges provisionnées financières",
+  "racine": "6798",
+  "classe": "6"
+ },
+ {
+  "numero": "680000",
+  "intitule": "Dotations aux amortissements",
+  "racine": "68",
+  "classe": "6"
+ },
+ {
+  "numero": "681000",
+  "intitule": "Dotations aux amortissements d’exploitation",
+  "racine": "681",
+  "classe": "6"
+ },
+ {
+  "numero": "681100",
+  "intitule": "Dotations aux amortissements des charges immobilisées",
+  "racine": "6811",
+  "classe": "6"
+ },
+ {
+  "numero": "681200",
+  "intitule": "Dotations aux amortissements des immobilisations incorporelles",
+  "racine": "6812",
+  "classe": "6"
+ },
+ {
+  "numero": "681300",
+  "intitule": "Dotations aux amortissements des immobilisations corporelles",
+  "racine": "6813",
+  "classe": "6"
+ },
+ {
+  "numero": "687000",
+  "intitule": "Dotations aux amortissements à caractère financier",
+  "racine": "687",
+  "classe": "6"
+ },
+ {
+  "numero": "687200",
+  "intitule": "Dotations aux amortissements des primes de remboursement des obligations",
+  "racine": "6872",
+  "classe": "6"
+ },
+ {
+  "numero": "687800",
+  "intitule": "Autres dotations aux amortissements à caractère financier",
+  "racine": "6878",
+  "classe": "6"
+ },
+ {
+  "numero": "690000",
+  "intitule": "Dotations aux provisions",
+  "racine": "69",
+  "classe": "6"
+ },
+ {
+  "numero": "691000",
+  "intitule": "Dotations aux provisions d’ex-ploitation",
+  "racine": "691",
+  "classe": "6"
+ },
+ {
+  "numero": "691100",
+  "intitule": "Pour risques et charges",
+  "racine": "6911",
+  "classe": "6"
+ },
+ {
+  "numero": "691200",
+  "intitule": "Pour grosses réparations",
+  "racine": "6912",
+  "classe": "6"
+ },
+ {
+  "numero": "691300",
+  "intitule": "Pour dépréciation des immobilisations incorporelles",
+  "racine": "6913",
+  "classe": "6"
+ },
+ {
+  "numero": "691400",
+  "intitule": "Pour dépréciation des immobilisations corporelles",
+  "racine": "6914",
+  "classe": "6"
+ },
+ {
+  "numero": "697000",
+  "intitule": "Dotations aux provisions financières",
+  "racine": "697",
+  "classe": "6"
+ },
+ {
+  "numero": "697100",
+  "intitule": "Pour risques et charges",
+  "racine": "6971",
+  "classe": "6"
+ },
+ {
+  "numero": "697200",
+  "intitule": "Pour dépréciation des immobilisations financières",
+  "racine": "6972",
+  "classe": "6"
+ },
+ {
+  "numero": "700000",
+  "intitule": "Ventes",
+  "racine": "70",
+  "classe": "7"
+ },
+ {
+  "numero": "701000",
+  "intitule": "Ventes de marchandises",
+  "racine": "701",
+  "classe": "7"
+ },
+ {
+  "numero": "701100",
+  "intitule": "Dans la Région [5]",
+  "racine": "7011",
+  "classe": "7"
+ },
+ {
+  "numero": "701200",
+  "intitule": "Hors Région (1)",
+  "racine": "7012",
+  "classe": "7"
+ },
+ {
+  "numero": "701300",
+  "intitule": "Aux entreprises du groupe dans la Région",
+  "racine": "7013",
+  "classe": "7"
+ },
+ {
+  "numero": "701400",
+  "intitule": "Aux entreprises du groupe hors Région",
+  "racine": "7014",
+  "classe": "7"
+ },
+ {
+  "numero": "702000",
+  "intitule": "Ventes de produits finis",
+  "racine": "702",
+  "classe": "7"
+ },
+ {
+  "numero": "702100",
+  "intitule": "Dans la Région (1)",
+  "racine": "7021",
+  "classe": "7"
+ },
+ {
+  "numero": "702200",
+  "intitule": "Hors Région (1)",
+  "racine": "7022",
+  "classe": "7"
+ },
+ {
+  "numero": "702300",
+  "intitule": "Aux entreprises du groupe dans la Région",
+  "racine": "7023",
+  "classe": "7"
+ },
+ {
+  "numero": "702400",
+  "intitule": "Aux entreprises du groupe hors Région",
+  "racine": "7024",
+  "classe": "7"
+ },
+ {
+  "numero": "703000",
+  "intitule": "Ventes de produits intermédiaires",
+  "racine": "703",
+  "classe": "7"
+ },
+ {
+  "numero": "703100",
+  "intitule": "Dans la Région (1)",
+  "racine": "7031",
+  "classe": "7"
+ },
+ {
+  "numero": "703200",
+  "intitule": "Hors Région (1)",
+  "racine": "7032",
+  "classe": "7"
+ },
+ {
+  "numero": "703300",
+  "intitule": "Aux entreprises du groupe dans la Région",
+  "racine": "7033",
+  "classe": "7"
+ },
+ {
+  "numero": "703400",
+  "intitule": "Aux entreprises du groupe hors Région",
+  "racine": "7034",
+  "classe": "7"
+ },
+ {
+  "numero": "704000",
+  "intitule": "Ventes de produits résiduels",
+  "racine": "704",
+  "classe": "7"
+ },
+ {
+  "numero": "704100",
+  "intitule": "Dans la Région (1)",
+  "racine": "7041",
+  "classe": "7"
+ },
+ {
+  "numero": "704200",
+  "intitule": "Hors Région (1)",
+  "racine": "7042",
+  "classe": "7"
+ },
+ {
+  "numero": "704300",
+  "intitule": "Aux entreprises du groupe dans la Région",
+  "racine": "7043",
+  "classe": "7"
+ },
+ {
+  "numero": "704400",
+  "intitule": "Aux entreprises du groupe hors Région",
+  "racine": "7044",
+  "classe": "7"
+ },
+ {
+  "numero": "705000",
+  "intitule": "Travaux facturés",
+  "racine": "705",
+  "classe": "7"
+ },
+ {
+  "numero": "705100",
+  "intitule": "Dans la Région (1)",
+  "racine": "7051",
+  "classe": "7"
+ },
+ {
+  "numero": "705200",
+  "intitule": "Hors Région (1)",
+  "racine": "7052",
+  "classe": "7"
+ },
+ {
+  "numero": "705300",
+  "intitule": "Aux entreprises du groupe dans la Région",
+  "racine": "7053",
+  "classe": "7"
+ },
+ {
+  "numero": "705400",
+  "intitule": "Aux entreprises du groupe hors Région",
+  "racine": "7054",
+  "classe": "7"
+ },
+ {
+  "numero": "706000",
+  "intitule": "Services vendus",
+  "racine": "706",
+  "classe": "7"
+ },
+ {
+  "numero": "706100",
+  "intitule": "Dans la Région (1)",
+  "racine": "7061",
+  "classe": "7"
+ },
+ {
+  "numero": "706200",
+  "intitule": "Hors Région (1)",
+  "racine": "7062",
+  "classe": "7"
+ },
+ {
+  "numero": "706300",
+  "intitule": "Aux entreprises du groupe dans la Région",
+  "racine": "7063",
+  "classe": "7"
+ },
+ {
+  "numero": "706400",
+  "intitule": "Aux entreprises du groupe hors Région",
+  "racine": "7064",
+  "classe": "7"
+ },
+ {
+  "numero": "707000",
+  "intitule": "Produits accessoires",
+  "racine": "707",
+  "classe": "7"
+ },
+ {
+  "numero": "707100",
+  "intitule": "Ports, emballages perdus et autres frais facturés",
+  "racine": "7071",
+  "classe": "7"
+ },
+ {
+  "numero": "707200",
+  "intitule": "Commissions et courtages [6]",
+  "racine": "7072",
+  "classe": "7"
+ },
+ {
+  "numero": "707300",
+  "intitule": "Locations (2)",
+  "racine": "7073",
+  "classe": "7"
+ },
+ {
+  "numero": "707400",
+  "intitule": "Bonis sur reprises et cessions d’emballages",
+  "racine": "7074",
+  "classe": "7"
+ },
+ {
+  "numero": "707500",
+  "intitule": "Mise à disposition de personnel (2)",
+  "racine": "7075",
+  "classe": "7"
+ },
+ {
+  "numero": "707600",
+  "intitule": "Redevances pour brevets, logiciels, marques et droits similaires (2)",
+  "racine": "7076",
+  "classe": "7"
+ },
+ {
+  "numero": "707700",
+  "intitule": "Services exploités dans l’intérêt du personnel",
+  "racine": "7077",
+  "classe": "7"
+ },
+ {
+  "numero": "707800",
+  "intitule": "Autres produits accessoires",
+  "racine": "7078",
+  "classe": "7"
+ },
+ {
+  "numero": "710000",
+  "intitule": "Subventions d’exploitation",
+  "racine": "71",
+  "classe": "7"
+ },
+ {
+  "numero": "711000",
+  "intitule": "Sur produits à l’exportation",
+  "racine": "711",
+  "classe": "7"
+ },
+ {
+  "numero": "712000",
+  "intitule": "Sur produits à l’importation",
+  "racine": "712",
+  "classe": "7"
+ },
+ {
+  "numero": "713000",
+  "intitule": "Sur produits de péréquation",
+  "racine": "713",
+  "classe": "7"
+ },
+ {
+  "numero": "718000",
+  "intitule": "Autres subventions d’exploita-tion",
+  "racine": "718",
+  "classe": "7"
+ },
+ {
+  "numero": "718100",
+  "intitule": "Versées par l’État et les collectivités publiques",
+  "racine": "7181",
+  "classe": "7"
+ },
+ {
+  "numero": "718200",
+  "intitule": "Versées par les organismes internationaux",
+  "racine": "7182",
+  "classe": "7"
+ },
+ {
+  "numero": "718300",
+  "intitule": "Versées par des tiers",
+  "racine": "7183",
+  "classe": "7"
+ },
+ {
+  "numero": "720000",
+  "intitule": "Production immobilisée",
+  "racine": "72",
+  "classe": "7"
+ },
+ {
+  "numero": "721000",
+  "intitule": "Immobilisations incorporelles",
+  "racine": "721",
+  "classe": "7"
+ },
+ {
+  "numero": "722000",
+  "intitule": "Immobilisations corporelles",
+  "racine": "722",
+  "classe": "7"
+ },
+ {
+  "numero": "726000",
+  "intitule": "Immobilisations financières [7]",
+  "racine": "726",
+  "classe": "7"
+ },
+ {
+  "numero": "730000",
+  "intitule": "Variations des stocks de biens et de services produits",
+  "racine": "73",
+  "classe": "7"
+ },
+ {
+  "numero": "734000",
+  "intitule": "Variations des stocks de produits en cours",
+  "racine": "734",
+  "classe": "7"
+ },
+ {
+  "numero": "734100",
+  "intitule": "Produits en cours",
+  "racine": "7341",
+  "classe": "7"
+ },
+ {
+  "numero": "734200",
+  "intitule": "Travaux en cours",
+  "racine": "7342",
+  "classe": "7"
+ },
+ {
+  "numero": "735000",
+  "intitule": "Variations des en-cours de services",
+  "racine": "735",
+  "classe": "7"
+ },
+ {
+  "numero": "735100",
+  "intitule": "Études en cours",
+  "racine": "7351",
+  "classe": "7"
+ },
+ {
+  "numero": "735200",
+  "intitule": "Prestations de services en cours",
+  "racine": "7352",
+  "classe": "7"
+ },
+ {
+  "numero": "736000",
+  "intitule": "Variations des stocks de produits finis",
+  "racine": "736",
+  "classe": "7"
+ },
+ {
+  "numero": "737000",
+  "intitule": "Variations des stocks de produits intermédiaires et résiduels",
+  "racine": "737",
+  "classe": "7"
+ },
+ {
+  "numero": "737100",
+  "intitule": "Produits intermédiaires",
+  "racine": "7371",
+  "classe": "7"
+ },
+ {
+  "numero": "737200",
+  "intitule": "Produits résiduels",
+  "racine": "7372",
+  "classe": "7"
+ },
+ {
+  "numero": "750000",
+  "intitule": "Autres produits",
+  "racine": "75",
+  "classe": "7"
+ },
+ {
+  "numero": "752000",
+  "intitule": "Quote-part de résultat sur opérations faites en commun",
+  "racine": "752",
+  "classe": "7"
+ },
+ {
+  "numero": "752100",
+  "intitule": "Quote-part transférée de pertes (comptabilité du gérant)",
+  "racine": "7521",
+  "classe": "7"
+ },
+ {
+  "numero": "752500",
+  "intitule": "Bénéfices attribués par transfert (comptabilité des associés non gérants)",
+  "racine": "7525",
+  "classe": "7"
+ },
+ {
+  "numero": "753000",
+  "intitule": "Quote-part de résultat sur exécution partielle de contrats pluri-exercices",
+  "racine": "753",
+  "classe": "7"
+ },
+ {
+  "numero": "754000",
+  "intitule": "Produits des cessions courantes d’immobilisations",
+  "racine": "754",
+  "classe": "7"
+ },
+ {
+  "numero": "758000",
+  "intitule": "Produits divers",
+  "racine": "758",
+  "classe": "7"
+ },
+ {
+  "numero": "758100",
+  "intitule": "Jetons de présence et autres rémunérations d’administrateurs",
+  "racine": "7581",
+  "classe": "7"
+ },
+ {
+  "numero": "758200",
+  "intitule": "Indemnités d’assurances reçues",
+  "racine": "7582",
+  "classe": "7"
+ },
+ {
+  "numero": "759000",
+  "intitule": "Reprises de charges provisionnées d’exploitation",
+  "racine": "759",
+  "classe": "7"
+ },
+ {
+  "numero": "759100",
+  "intitule": "Sur risques à court terme",
+  "racine": "7591",
+  "classe": "7"
+ },
+ {
+  "numero": "759300",
+  "intitule": "Sur stocks",
+  "racine": "7593",
+  "classe": "7"
+ },
+ {
+  "numero": "759400",
+  "intitule": "Sur créances",
+  "racine": "7594",
+  "classe": "7"
+ },
+ {
+  "numero": "759800",
+  "intitule": "Sur autres charges provisionnées",
+  "racine": "7598",
+  "classe": "7"
+ },
+ {
+  "numero": "770000",
+  "intitule": "Revenus financiers et produits assimilés",
+  "racine": "77",
+  "classe": "7"
+ },
+ {
+  "numero": "771000",
+  "intitule": "Intérêts de prêts",
+  "racine": "771",
+  "classe": "7"
+ },
+ {
+  "numero": "772000",
+  "intitule": "Revenus de participations",
+  "racine": "772",
+  "classe": "7"
+ },
+ {
+  "numero": "773000",
+  "intitule": "Escomptes obtenus",
+  "racine": "773",
+  "classe": "7"
+ },
+ {
+  "numero": "774000",
+  "intitule": "Revenus de titres de placement",
+  "racine": "774",
+  "classe": "7"
+ },
+ {
+  "numero": "776000",
+  "intitule": "Gains de change",
+  "racine": "776",
+  "classe": "7"
+ },
+ {
+  "numero": "777000",
+  "intitule": "Gains sur cessions de titres de placement",
+  "racine": "777",
+  "classe": "7"
+ },
+ {
+  "numero": "778000",
+  "intitule": "Gains sur risques financiers",
+  "racine": "778",
+  "classe": "7"
+ },
+ {
+  "numero": "778100",
+  "intitule": "Sur rentes viagères",
+  "racine": "7781",
+  "classe": "7"
+ },
+ {
+  "numero": "778200",
+  "intitule": "Sur opérations financières",
+  "racine": "7782",
+  "classe": "7"
+ },
+ {
+  "numero": "778400",
+  "intitule": "Sur instruments de trésorerie",
+  "racine": "7784",
+  "classe": "7"
+ },
+ {
+  "numero": "779000",
+  "intitule": "Reprises de charges provisionnées financières",
+  "racine": "779",
+  "classe": "7"
+ },
+ {
+  "numero": "779100",
+  "intitule": "Sur risques financiers",
+  "racine": "7791",
+  "classe": "7"
+ },
+ {
+  "numero": "779500",
+  "intitule": "Sur titres de placement",
+  "racine": "7795",
+  "classe": "7"
+ },
+ {
+  "numero": "779800",
+  "intitule": "Autres charges provisionnées financières",
+  "racine": "7798",
+  "classe": "7"
+ },
+ {
+  "numero": "780000",
+  "intitule": "Transferts de charges",
+  "racine": "78",
+  "classe": "7"
+ },
+ {
+  "numero": "781000",
+  "intitule": "Transferts de charges d’exploita-tion",
+  "racine": "781",
+  "classe": "7"
+ },
+ {
+  "numero": "787000",
+  "intitule": "Transferts de charges financieres",
+  "racine": "787",
+  "classe": "7"
+ },
+ {
+  "numero": "790000",
+  "intitule": "Reprises de provisions",
+  "racine": "79",
+  "classe": "7"
+ },
+ {
+  "numero": "791000",
+  "intitule": "Reprises de provisions d’exploi-tation",
+  "racine": "791",
+  "classe": "7"
+ },
+ {
+  "numero": "791100",
+  "intitule": "Pour risques et charges",
+  "racine": "7911",
+  "classe": "7"
+ },
+ {
+  "numero": "791200",
+  "intitule": "Pour grosses réparations",
+  "racine": "7912",
+  "classe": "7"
+ },
+ {
+  "numero": "791300",
+  "intitule": "Pour dépréciation des immobilisations incorporelles",
+  "racine": "7913",
+  "classe": "7"
+ },
+ {
+  "numero": "791400",
+  "intitule": "Pour dépréciation des immobilisations corporelles",
+  "racine": "7914",
+  "classe": "7"
+ },
+ {
+  "numero": "797000",
+  "intitule": "Reprises de provisions financières",
+  "racine": "797",
+  "classe": "7"
+ },
+ {
+  "numero": "797100",
+  "intitule": "Pour risques et charges",
+  "racine": "7971",
+  "classe": "7"
+ },
+ {
+  "numero": "797200",
+  "intitule": "Pour dépréciation des immobilisations financières",
+  "racine": "7972",
+  "classe": "7"
+ },
+ {
+  "numero": "798000",
+  "intitule": "Reprises d’amortissements [8]",
+  "racine": "798",
+  "classe": "7"
+ },
+ {
+  "numero": "810000",
+  "intitule": "Valeurs comptables des cessions d’immobilisations",
+  "racine": "81",
+  "classe": "8"
+ },
+ {
+  "numero": "811000",
+  "intitule": "Immobilisations incorporelles",
+  "racine": "811",
+  "classe": "8"
+ },
+ {
+  "numero": "812000",
+  "intitule": "Immobilisations corporelles",
+  "racine": "812",
+  "classe": "8"
+ },
+ {
+  "numero": "816000",
+  "intitule": "Immobilisations financières",
+  "racine": "816",
+  "classe": "8"
+ },
+ {
+  "numero": "820000",
+  "intitule": "Produits des cessions d’immobilisa-tions",
+  "racine": "82",
+  "classe": "8"
+ },
+ {
+  "numero": "821000",
+  "intitule": "Immobilisations incorporelles",
+  "racine": "821",
+  "classe": "8"
+ },
+ {
+  "numero": "822000",
+  "intitule": "Immobilisations corporelles",
+  "racine": "822",
+  "classe": "8"
+ },
+ {
+  "numero": "826000",
+  "intitule": "Immobilisations financières",
+  "racine": "826",
+  "classe": "8"
+ },
+ {
+  "numero": "830000",
+  "intitule": "Charges hors activités ordinaires",
+  "racine": "83",
+  "classe": "8"
+ },
+ {
+  "numero": "831000",
+  "intitule": "Charges HAO constatées",
+  "racine": "831",
+  "classe": "8"
+ },
+ {
+  "numero": "834000",
+  "intitule": "Pertes sur créances HAO",
+  "racine": "834",
+  "classe": "8"
+ },
+ {
+  "numero": "835000",
+  "intitule": "Dons et libéralités accordés",
+  "racine": "835",
+  "classe": "8"
+ },
+ {
+  "numero": "836000",
+  "intitule": "Abandons de créances consentis",
+  "racine": "836",
+  "classe": "8"
+ },
+ {
+  "numero": "839000",
+  "intitule": "Charges provisionnées HAO",
+  "racine": "839",
+  "classe": "8"
+ },
+ {
+  "numero": "840000",
+  "intitule": "Produits hors activités ordinaires",
+  "racine": "84",
+  "classe": "8"
+ },
+ {
+  "numero": "841000",
+  "intitule": "Produits HAO constatés",
+  "racine": "841",
+  "classe": "8"
+ },
+ {
+  "numero": "845000",
+  "intitule": "Dons et libéralités obtenus",
+  "racine": "845",
+  "classe": "8"
+ },
+ {
+  "numero": "846000",
+  "intitule": "Abandons de créances obtenus",
+  "racine": "846",
+  "classe": "8"
+ },
+ {
+  "numero": "848000",
+  "intitule": "Transferts de charges HAO",
+  "racine": "848",
+  "classe": "8"
+ },
+ {
+  "numero": "849000",
+  "intitule": "Reprises des charges provisionnées HAO",
+  "racine": "849",
+  "classe": "8"
+ },
+ {
+  "numero": "850000",
+  "intitule": "Dotations hors activités ordinaires",
+  "racine": "85",
+  "classe": "8"
+ },
+ {
+  "numero": "851000",
+  "intitule": "Dotations aux provisions réglementées",
+  "racine": "851",
+  "classe": "8"
+ },
+ {
+  "numero": "852000",
+  "intitule": "Dotations aux amortissements HAO",
+  "racine": "852",
+  "classe": "8"
+ },
+ {
+  "numero": "853000",
+  "intitule": "Dotations aux provisions pour dépréciation HAO",
+  "racine": "853",
+  "classe": "8"
+ },
+ {
+  "numero": "854000",
+  "intitule": "Dotations aux provisions pour risques et charges HAO",
+  "racine": "854",
+  "classe": "8"
+ },
+ {
+  "numero": "858000",
+  "intitule": "Autres dotations HAO",
+  "racine": "858",
+  "classe": "8"
+ },
+ {
+  "numero": "860000",
+  "intitule": "Reprises hors activités ordinaires",
+  "racine": "86",
+  "classe": "8"
+ },
+ {
+  "numero": "861000",
+  "intitule": "Reprises de provisions réglementées",
+  "racine": "861",
+  "classe": "8"
+ },
+ {
+  "numero": "862000",
+  "intitule": "Reprises d’amortissements",
+  "racine": "862",
+  "classe": "8"
+ },
+ {
+  "numero": "863000",
+  "intitule": "Reprises de provisions pour dépréciation HAO",
+  "racine": "863",
+  "classe": "8"
+ },
+ {
+  "numero": "864000",
+  "intitule": "Reprises de provisions pour risques et charges HAO",
+  "racine": "864",
+  "classe": "8"
+ },
+ {
+  "numero": "865000",
+  "intitule": "Reprises de subventions d’inves-tissement",
+  "racine": "865",
+  "classe": "8"
+ },
+ {
+  "numero": "868000",
+  "intitule": "Autres reprises HAO",
+  "racine": "868",
+  "classe": "8"
+ },
+ {
+  "numero": "870000",
+  "intitule": "participation des travailleurs",
+  "racine": "87",
+  "classe": "8"
+ },
+ {
+  "numero": "871000",
+  "intitule": "Participation légale aux bénéfices",
+  "racine": "871",
+  "classe": "8"
+ },
+ {
+  "numero": "874000",
+  "intitule": "Participation contractuelle aux bénéfices",
+  "racine": "874",
+  "classe": "8"
+ },
+ {
+  "numero": "878000",
+  "intitule": "Autres participations",
+  "racine": "878",
+  "classe": "8"
+ },
+ {
+  "numero": "880000",
+  "intitule": "Subventions d’équilibre",
+  "racine": "88",
+  "classe": "8"
+ },
+ {
+  "numero": "881000",
+  "intitule": "État",
+  "racine": "881",
+  "classe": "8"
+ },
+ {
+  "numero": "884000",
+  "intitule": "Collectivités publiques",
+  "racine": "884",
+  "classe": "8"
+ },
+ {
+  "numero": "886000",
+  "intitule": "Groupe",
+  "racine": "886",
+  "classe": "8"
+ },
+ {
+  "numero": "888000",
+  "intitule": "Autres",
+  "racine": "888",
+  "classe": "8"
+ },
+ {
+  "numero": "890000",
+  "intitule": "Impôts sur le résultat",
+  "racine": "89",
+  "classe": "8"
+ },
+ {
+  "numero": "891000",
+  "intitule": "Impôts sur les bénéfices de l’exercice",
+  "racine": "891",
+  "classe": "8"
+ },
+ {
+  "numero": "891100",
+  "intitule": "Activités exercées dans l’État",
+  "racine": "8911",
+  "classe": "8"
+ },
+ {
+  "numero": "891200",
+  "intitule": "Activités exercées dans les autres États de la Région",
+  "racine": "8912",
+  "classe": "8"
+ },
+ {
+  "numero": "891300",
+  "intitule": "Activités exercées hors Région",
+  "racine": "8913",
+  "classe": "8"
+ },
+ {
+  "numero": "892000",
+  "intitule": "Rappel d’impôts sur résultats antérieurs",
+  "racine": "892",
+  "classe": "8"
+ },
+ {
+  "numero": "895000",
+  "intitule": "Impôt minimum forfaitaire IMF",
+  "racine": "895",
+  "classe": "8"
+ },
+ {
+  "numero": "899000",
+  "intitule": "Dégrèvements et annulations d’impôts sur résultats antérieurs",
+  "racine": "899",
+  "classe": "8"
+ },
+ {
+  "numero": "899100",
+  "intitule": "Dégrèvements",
+  "racine": "8991",
+  "classe": "8"
+ },
+ {
+  "numero": "899400",
+  "intitule": "Annulations pour pertes rétroactives",
+  "racine": "8994",
+  "classe": "8"
+ },
+ {
+  "numero": "900000",
+  "intitule": "Engagements obtenus et engagements accordés",
+  "racine": "90",
+  "classe": "9"
+ },
+ {
+  "numero": "901000",
+  "intitule": "à 904 ‐ Engagements obtenus",
+  "racine": "901",
+  "classe": "9"
+ },
+ {
+  "numero": "901100",
+  "intitule": "Crédits confirmés obtenus",
+  "racine": "9011",
+  "classe": "9"
+ },
+ {
+  "numero": "901200",
+  "intitule": "Emprunts restant à encaisser",
+  "racine": "9012",
+  "classe": "9"
+ },
+ {
+  "numero": "901300",
+  "intitule": "Facilités de financement renouvelables",
+  "racine": "9013",
+  "classe": "9"
+ },
+ {
+  "numero": "901400",
+  "intitule": "Facilités d’émission",
+  "racine": "9014",
+  "classe": "9"
+ },
+ {
+  "numero": "901800",
+  "intitule": "Autres engagements de financement obtenus",
+  "racine": "9018",
+  "classe": "9"
+ },
+ {
+  "numero": "902000",
+  "intitule": "Engagements de garantie obtenus",
+  "racine": "902",
+  "classe": "9"
+ },
+ {
+  "numero": "902100",
+  "intitule": "Avals obtenus",
+  "racine": "9021",
+  "classe": "9"
+ },
+ {
+  "numero": "902200",
+  "intitule": "Cautions, garanties obtenues",
+  "racine": "9022",
+  "classe": "9"
+ },
+ {
+  "numero": "902300",
+  "intitule": "Hypothèques obtenues",
+  "racine": "9023",
+  "classe": "9"
+ },
+ {
+  "numero": "902400",
+  "intitule": "Effets endossés par des tiers",
+  "racine": "9024",
+  "classe": "9"
+ },
+ {
+  "numero": "902800",
+  "intitule": "Autres garanties obtenues",
+  "racine": "9028",
+  "classe": "9"
+ },
+ {
+  "numero": "903000",
+  "intitule": "Engagements réciproques",
+  "racine": "903",
+  "classe": "9"
+ },
+ {
+  "numero": "903100",
+  "intitule": "Achats de marchandises à terme",
+  "racine": "9031",
+  "classe": "9"
+ },
+ {
+  "numero": "903200",
+  "intitule": "Achats à terme de devises",
+  "racine": "9032",
+  "classe": "9"
+ },
+ {
+  "numero": "903300",
+  "intitule": "Commandes fermes des clients",
+  "racine": "9033",
+  "classe": "9"
+ },
+ {
+  "numero": "903800",
+  "intitule": "Autres engagements réciproques",
+  "racine": "9038",
+  "classe": "9"
+ },
+ {
+  "numero": "904000",
+  "intitule": "Autres engagements obtenus",
+  "racine": "904",
+  "classe": "9"
+ },
+ {
+  "numero": "904100",
+  "intitule": "Abandons de créances conditionnels",
+  "racine": "9041",
+  "classe": "9"
+ },
+ {
+  "numero": "904300",
+  "intitule": "Ventes avec clause de réserve de propriété",
+  "racine": "9043",
+  "classe": "9"
+ },
+ {
+  "numero": "904800",
+  "intitule": "Divers engagements obtenus",
+  "racine": "9048",
+  "classe": "9"
+ },
+ {
+  "numero": "905000",
+  "intitule": "à 908 ‐ Engagements accordés",
+  "racine": "905",
+  "classe": "9"
+ },
+ {
+  "numero": "905100",
+  "intitule": "Crédits accordés non décaissés",
+  "racine": "9051",
+  "classe": "9"
+ },
+ {
+  "numero": "905800",
+  "intitule": "Autres engagements de financement accordés",
+  "racine": "9058",
+  "classe": "9"
+ },
+ {
+  "numero": "906000",
+  "intitule": "Engagements de garantie accordés",
+  "racine": "906",
+  "classe": "9"
+ },
+ {
+  "numero": "906100",
+  "intitule": "Avals accordés",
+  "racine": "9061",
+  "classe": "9"
+ },
+ {
+  "numero": "906200",
+  "intitule": "Cautions, garanties accordées",
+  "racine": "9062",
+  "classe": "9"
+ },
+ {
+  "numero": "906300",
+  "intitule": "Hypothèques accordées",
+  "racine": "9063",
+  "classe": "9"
+ },
+ {
+  "numero": "906400",
+  "intitule": "Effets endossés par l’entre-prise",
+  "racine": "9064",
+  "classe": "9"
+ },
+ {
+  "numero": "906800",
+  "intitule": "Autres garanties accordées",
+  "racine": "9068",
+  "classe": "9"
+ },
+ {
+  "numero": "907000",
+  "intitule": "Engagements réciproques",
+  "racine": "907",
+  "classe": "9"
+ },
+ {
+  "numero": "907100",
+  "intitule": "Ventes de marchandises à terme",
+  "racine": "9071",
+  "classe": "9"
+ },
+ {
+  "numero": "907200",
+  "intitule": "Ventes à terme de devises",
+  "racine": "9072",
+  "classe": "9"
+ },
+ {
+  "numero": "907300",
+  "intitule": "Commandes fermes aux fournisseurs",
+  "racine": "9073",
+  "classe": "9"
+ },
+ {
+  "numero": "907800",
+  "intitule": "Autres engagements réciproques",
+  "racine": "9078",
+  "classe": "9"
+ },
+ {
+  "numero": "908000",
+  "intitule": "Autres engagements accordés",
+  "racine": "908",
+  "classe": "9"
+ },
+ {
+  "numero": "908100",
+  "intitule": "Annulations conditionnelles de dettes",
+  "racine": "9081",
+  "classe": "9"
+ },
+ {
+  "numero": "908200",
+  "intitule": "Engagements de retraite",
+  "racine": "9082",
+  "classe": "9"
+ },
+ {
+  "numero": "908300",
+  "intitule": "Achats avec clause de réserve de propriété",
+  "racine": "9083",
+  "classe": "9"
+ },
+ {
+  "numero": "908800",
+  "intitule": "Divers engagements accordés",
+  "racine": "9088",
+  "classe": "9"
+ },
+ {
+  "numero": "910000",
+  "intitule": "Contreparties des engagements",
+  "racine": "91",
+  "classe": "9"
+ },
+ {
+  "numero": "911000",
+  "intitule": "à 914 Contrepartie des engagements obtenus, 901 à 904",
+  "racine": "911",
+  "classe": "9"
+ },
+ {
+  "numero": "915000",
+  "intitule": "à 918 Contrepartie des engagements accordés, 905 à 908",
+  "racine": "915",
+  "classe": "9"
+ },
+ {
+  "numero": "920000",
+  "intitule": "Comptes réfléchis",
+  "racine": "92",
+  "classe": "9"
+ },
+ {
+  "numero": "930000",
+  "intitule": "Comptes de reclassements",
+  "racine": "93",
+  "classe": "9"
+ },
+ {
+  "numero": "940000",
+  "intitule": "Comptes de coûts",
+  "racine": "94",
+  "classe": "9"
+ },
+ {
+  "numero": "950000",
+  "intitule": "Comptes de stocks",
+  "racine": "95",
+  "classe": "9"
+ },
+ {
+  "numero": "960000",
+  "intitule": "Comptes d’écarts sur coûts préétablis",
+  "racine": "96",
+  "classe": "9"
+ },
+ {
+  "numero": "970000",
+  "intitule": "Comptes de différences de traitement comptable",
+  "racine": "97",
+  "classe": "9"
+ },
+ {
+  "numero": "980000",
+  "intitule": "Comptes de résultats",
+  "racine": "98",
+  "classe": "9"
+ },
+ {
+  "numero": "990000",
+  "intitule": "Comptes de liaisons internes",
+  "racine": "99",
+  "classe": "9"
+ }
+]

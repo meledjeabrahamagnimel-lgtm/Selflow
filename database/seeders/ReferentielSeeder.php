@@ -32,6 +32,7 @@ class ReferentielSeeder extends Seeder
         DB::transaction(function () {
             $categories = $this->chargerCategories();
             $types      = $this->chargerTypesArticles();
+            $this->chargerPlanOhada();
             $this->chargerComptes();
             $profils    = $this->chargerProfils($categories);
             $familles   = $this->chargerFamilles($profils, $types);
@@ -96,12 +97,46 @@ class ReferentielSeeder extends Seeder
         return $ids;
     }
 
+    /**
+     * Les 1 256 comptes de l'acte uniforme OHADA, comme dictionnaire.
+     *
+     * Ils ne sont pas donnés aux entreprises : ils servent à nommer. Le
+     * référentiel impute sur des subdivisions — `701100`, `603110` — dont
+     * l'intitulé se déduit de leur racine.
+     */
+    private function chargerPlanOhada(): void
+    {
+        $lignes = array_map(fn ($l) => [
+            'numero'     => $l['numero'],
+            'racine'     => $l['racine'],
+            'intitule'   => $l['intitule'],
+            'classe'     => (int) $l['classe'],
+            'commun'     => false,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ], $this->lire('plan_ohada'));
+
+        // 1 256 lignes une par une feraient 1 256 requêtes : on insère par lots,
+        // en écrasant ce qui existe déjà pour rester rejouable.
+        foreach (array_chunk($lignes, 200) as $lot) {
+            Compte::upsert($lot, ['numero'], ['racine', 'intitule', 'classe']);
+        }
+    }
+
+    /**
+     * Les comptes que toute entreprise reçoit, quel que soit son profil.
+     *
+     * Leur intitulé prime sur celui de l'acte uniforme : le classeur les nomme
+     * en tenant compte du contexte ivoirien — « État, TVA facturée (18 % —
+     * régime réel) » dit plus que « État, TVA facturée ».
+     */
     private function chargerComptes(): void
     {
         foreach ($this->lire('comptes') as $ligne) {
             Compte::updateOrCreate(
                 ['numero' => $ligne['numero']],
-                ['intitule' => $ligne['intitule']]
+                ['intitule' => $ligne['intitule'], 'commun' => true,
+                 'classe' => (int) substr($ligne['numero'], 0, 1)]
             );
         }
     }

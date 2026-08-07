@@ -36,7 +36,9 @@ class ReferentielTest extends TestCase
         $this->assertSame(197, Famille::count());
         $this->assertSame(616, Article::count());
         $this->assertSame(10,  TypeArticle::count());
-        $this->assertSame(34,  Compte::count());
+        // 1 256 comptes OHADA, dont les 34 communs qui les recouvrent.
+        $this->assertSame(1256, Compte::count());
+        $this->assertSame(34,   Compte::where('commun', true)->count());
     }
 
     public function test_les_comptes_sont_tous_sur_six_chiffres(): void
@@ -56,7 +58,7 @@ class ReferentielTest extends TestCase
             }
         }
 
-        $this->assertSame(34, Compte::whereRaw('LENGTH(numero) = 6')->count());
+        $this->assertSame(0, Compte::whereRaw('LENGTH(numero) <> 6')->count());
     }
 
     public function test_la_marchandise_porte_les_comptes_attendus(): void
@@ -145,6 +147,78 @@ class ReferentielTest extends TestCase
         $this->assertSame(71,  Profil::count());
         $this->assertSame(197, Famille::count());
         $this->assertSame(616, Article::count());
+    }
+
+    public function test_tout_compte_du_referentiel_recoit_un_intitule(): void
+    {
+        // Le vrai risque : imputer sur un numero que rien ne nomme. Le plan
+        // comptable de l'entreprise afficherait des numeros nus, et la balance
+        // a venir serait illisible.
+        $utilises = collect();
+        foreach ([Famille::all(), Article::all(), TypeArticle::all()] as $lot) {
+            foreach ($lot as $ligne) {
+                foreach (['compte_vente', 'compte_achat', 'compte_stock', 'compte_variation'] as $champ) {
+                    if (!empty($ligne->$champ)) {
+                        $utilises->push($ligne->$champ);
+                    }
+                }
+            }
+        }
+
+        $utilises = $utilises->unique();
+        $this->assertGreaterThan(35, $utilises->count());
+
+        foreach ($utilises as $numero) {
+            $this->assertNotNull(
+                Compte::nommer($numero),
+                "Le compte {$numero} est impute par le referentiel sans avoir d'intitule."
+            );
+        }
+    }
+
+    public function test_une_subdivision_absente_du_plan_herite_de_sa_racine(): void
+    {
+        // `603110` n'est pas a l'acte uniforme : le classeur le cree en
+        // subdivisant `6031`. Il doit malgre tout porter un nom lisible.
+        $this->assertNull(Compte::where('numero', '603110')->value('intitule'));
+
+        $this->assertSame(
+            'Variations de stocks de marchandises',
+            Compte::nommer('603110')
+        );
+    }
+
+    public function test_une_famille_ne_prend_pas_l_intitule_geographique_du_plan(): void
+    {
+        // Piege : le classeur subdivise `701` en `7011`, `7012`… pour ses
+        // familles, alors que l'acte uniforme reserve ces positions a la
+        // ventilation geographique des ventes. Lire l'intitule du numero de la
+        // famille donnerait « Dans la Region » sur les vivres d'une boutique.
+        $this->assertSame('Dans la Région [5]', Compte::nommer('701100'));
+
+        $vivres = Famille::whereHas('profil', fn ($q) => $q->where('code', 'boutique_quartier'))
+            ->where('code', 'VIV')
+            ->firstOrFail();
+
+        $this->assertSame('701100', $vivres->compte_vente);
+        $this->assertSame(
+            'Ventes de marchandises — Vivres et alimentation',
+            $vivres->intituleCompte('compte_vente')
+        );
+        $this->assertSame(
+            'Achats de marchandises — Vivres et alimentation',
+            $vivres->intituleCompte('compte_achat')
+        );
+    }
+
+    public function test_les_comptes_communs_gardent_leur_intitule_ivoirien(): void
+    {
+        // Le classeur nomme en tenant compte du contexte local ; son intitule
+        // prime sur celui de l'acte uniforme.
+        $tva = Compte::where('numero', '443100')->firstOrFail();
+
+        $this->assertTrue($tva->commun);
+        $this->assertStringContainsString('18 %', $tva->intitule);
     }
 
     public function test_chaque_famille_et_chaque_article_ont_un_type(): void

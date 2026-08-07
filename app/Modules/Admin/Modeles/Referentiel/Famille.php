@@ -34,4 +34,32 @@ class Famille extends Model
     {
         return $this->hasMany(Article::class, 'famille_id');
     }
+
+    /**
+     * Intitulé du compte de cette famille, tel qu'il figurera au plan comptable
+     * de l'entreprise.
+     *
+     * Il se construit depuis le compte du TYPE d'article, pas depuis le numéro
+     * de la famille — et c'est volontaire. Le classeur subdivise `701` en
+     * `7011`, `7012`… pour ses familles, alors que l'acte uniforme réserve ces
+     * quatre positions à la ventilation géographique des ventes (« Dans la
+     * Région », « Hors Région »…). Lire l'intitulé du numéro de la famille
+     * donnerait donc « Dans la Région » sur les vivres d'une boutique.
+     *
+     *     Vivres, compte de vente 701100
+     *     → « Ventes de marchandises — Vivres et alimentation »
+     *
+     * @param  string  $champ  compte_vente, compte_achat, compte_stock ou compte_variation
+     */
+    public function intituleCompte(string $champ): ?string
+    {
+        if (empty($this->$champ)) {
+            return null;
+        }
+
+        $racine = $this->typeArticle?->$champ;
+        $base   = $racine ? Compte::nommer($racine) : Compte::nommer($this->$champ);
+
+        return $base ? "{$base} — {$this->nom}" : $this->nom;
+    }
 }
