@@ -13,6 +13,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\View\View;
+use App\Modules\Admin\Regles\Appartenance;
 
 class TransfertStockControleur
 {
@@ -47,9 +48,9 @@ class TransfertStockControleur
     public function creer(Request $request): RedirectResponse
     {
         $request->validate([
-            'produit_id'                   => ['required', 'integer', 'exists:produits,id'],
-            'point_de_vente_source_id'      => ['required', 'integer', 'exists:points_de_vente,id'],
-            'point_de_vente_destination_id'=> ['required', 'integer', 'exists:points_de_vente,id', 'different:point_de_vente_source_id'],
+            'produit_id'                   => ['required', 'integer', Appartenance::a('produits', 'id')],
+            'point_de_vente_source_id'      => ['required', 'integer', Appartenance::a('points_de_vente', 'id')],
+            'point_de_vente_destination_id'=> ['required', 'integer', Appartenance::a('points_de_vente', 'id'), 'different:point_de_vente_source_id'],
             'quantite'                     => ['required', 'numeric', 'min:1'],
             'note'                         => ['nullable', 'string', 'max:500'],
         ], [

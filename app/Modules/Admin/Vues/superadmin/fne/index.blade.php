@@ -128,7 +128,7 @@
                 </td>
                 <td style="text-align:right;">
                     <button class="btn btn-outline" style="font-size:12px; padding:6px 10px;"
-                            onclick="ouvrirModalGestion({{ $row['entreprise']->id }}, '{{ addslashes($row['entreprise']->nom) }}')">
+                            onclick="ouvrirModalGestion({{ $row['entreprise']->id }}, @js($row['entreprise']->nom))">
                         <i class="fas fa-gear"></i> Gérer
                     </button>
                 </td>

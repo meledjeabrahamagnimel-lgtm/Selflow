@@ -12,6 +12,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use App\Modules\Admin\Regles\Appartenance;
 
 class AchatApiControleur
 {
@@ -52,11 +53,11 @@ class AchatApiControleur
         $pointDeVenteId = $this->obtenirPointDeVenteId($request);
 
         $request->validate([
-            'fournisseur_id' => ['required', 'integer', 'exists:fournisseurs,id'],
+            'fournisseur_id' => ['required', 'integer', Appartenance::a('fournisseurs', 'id')],
             'date_achat'     => ['required', 'date'],
             'mode_paiement'  => ['required', 'string'],
             'articles'       => ['required', 'array', 'min:1'],
-            'articles.*.produit_id'    => ['nullable', 'integer', 'exists:produits,id'],
+            'articles.*.produit_id'    => ['nullable', 'integer', Appartenance::a('produits', 'id')],
             'articles.*.libelle_virtuel' => ['nullable', 'string', 'max:255'],
             'articles.*.quantite'      => ['required', 'integer', 'min:1'],
             'articles.*.prix_unitaire' => ['required', 'numeric', 'min:0'],

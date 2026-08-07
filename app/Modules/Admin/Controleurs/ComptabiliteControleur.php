@@ -18,6 +18,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\View\View;
+use App\Modules\Admin\Regles\Appartenance;
 
 class ComptabiliteControleur
 {
@@ -413,7 +414,7 @@ class ComptabiliteControleur
 
         if ($request->mode_paiement === 'Banque') {
             $request->validate([
-                'banque_id'          => ['required', 'integer', 'exists:codes_journaux,id'],
+                'banque_id'          => ['required', 'integer', Appartenance::a('codes_journaux', 'id')],
                 'moyen_bancaire'     => ['required', 'string', 'in:carte,virement,cheque'],
                 'reference_paiement' => ['required', 'string', 'max:255'],
             ], [
@@ -657,7 +658,7 @@ class ComptabiliteControleur
             'libelle'                => ['required', 'string', 'max:255'],
             'description'            => ['nullable', 'string', 'max:2000'],
             'code_journal'           => ['required', 'string', 'max:10'],
-            'point_de_vente_id'      => ['nullable', 'integer', 'exists:points_de_vente,id'],
+            'point_de_vente_id'      => ['nullable', 'integer', Appartenance::a('points_de_vente', 'id')],
             'lignes'                 => ['required', 'array', 'min:2'],
             'lignes.*.compte'        => ['required', 'string', 'max:50'],
             'lignes.*.compte_tiers'  => ['nullable', 'string', 'max:50'],

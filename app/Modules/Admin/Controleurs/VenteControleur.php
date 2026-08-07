@@ -22,6 +22,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\View\View;
+use App\Modules\Admin\Regles\Appartenance;
 
 class VenteControleur
 {
@@ -74,10 +75,10 @@ class VenteControleur
                 ]))->id);
 
         $request->validate(array_merge([
-            'client_id'      => ['nullable', 'integer', 'exists:clients,id'],
+            'client_id'      => ['nullable', 'integer', Appartenance::a('clients', 'id')],
             'mode_paiement'  => ['required', 'string'],
             'articles'       => ['required', 'array', 'min:1'],
-            'articles.*.produit_id'      => ['nullable', 'integer', 'exists:produits,id'],
+            'articles.*.produit_id'      => ['nullable', 'integer', Appartenance::a('produits', 'id')],
             'articles.*.libelle_virtuel' => ['nullable', 'string', 'max:255'],
             'articles.*.quantite'        => ['required', 'integer', 'min:1'],
             'articles.*.unite'           => ['nullable', 'string', 'max:50'],
@@ -94,7 +95,7 @@ class VenteControleur
 
         if ($request->mode_paiement === 'Banque') {
             $request->validate([
-                'banque_id'          => ['required', 'integer', 'exists:codes_journaux,id'],
+                'banque_id'          => ['required', 'integer', Appartenance::a('codes_journaux', 'id')],
                 'moyen_bancaire'     => ['required', 'string', 'in:carte,virement,cheque'],
                 'reference_paiement' => ['required', 'string', 'max:255'],
             ], [
@@ -646,10 +647,10 @@ class VenteControleur
         }
 
         $request->validate(array_merge([
-            'client_id'      => ['nullable', 'integer', 'exists:clients,id'],
+            'client_id'      => ['nullable', 'integer', Appartenance::a('clients', 'id')],
             'mode_paiement'  => ['required', 'string'],
             'articles'       => ['required', 'array', 'min:1'],
-            'articles.*.produit_id'      => ['nullable', 'integer', 'exists:produits,id'],
+            'articles.*.produit_id'      => ['nullable', 'integer', Appartenance::a('produits', 'id')],
             'articles.*.libelle_virtuel' => ['nullable', 'string', 'max:255'],
             'articles.*.quantite'        => ['required', 'integer', 'min:1'],
             'articles.*.unite'           => ['nullable', 'string', 'max:50'],
@@ -666,7 +667,7 @@ class VenteControleur
 
         if ($request->mode_paiement === 'Banque') {
             $request->validate([
-                'banque_id'          => ['required', 'integer', 'exists:codes_journaux,id'],
+                'banque_id'          => ['required', 'integer', Appartenance::a('codes_journaux', 'id')],
                 'moyen_bancaire'     => ['required', 'string', 'in:carte,virement,cheque'],
                 'reference_paiement' => ['required', 'string', 'max:255'],
             ], [
@@ -1497,7 +1498,7 @@ class VenteControleur
     public function creerAvoirNouveau(Request $request): RedirectResponse
     {
         $request->validate([
-            'parent_id' => ['required', 'exists:ventes,id'],
+            'parent_id' => ['required', Appartenance::a('ventes', 'id')],
             'raison'    => ['required', 'string', 'max:255'],
             'items'     => ['required', 'array'],
             // Mentions du document d'avoir (impression locale uniquement)

@@ -24,6 +24,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\View\View;
+use App\Modules\Admin\Regles\Appartenance;
 
 class B2bControleur extends Controller
 {
@@ -82,9 +83,9 @@ class B2bControleur extends Controller
         $entreprise = Auth::user()->entreprise;
 
         $request->validate([
-            'fournisseur_id' => ['required', 'integer', 'exists:fournisseurs,id'],
+            'fournisseur_id' => ['required', 'integer', Appartenance::a('fournisseurs', 'id')],
             'articles'       => ['required', 'array', 'min:1'],
-            'articles.*.produit_id' => ['required', 'integer', 'exists:produits,id'],
+            'articles.*.produit_id' => ['required', 'integer', Appartenance::a('produits', 'id')],
             'articles.*.quantite'   => ['required', 'numeric', 'min:0.0001'],
             'articles.*.prix'       => ['nullable', 'numeric', 'min:0'],
             'articles.*.prix_unitaire' => ['nullable', 'numeric', 'min:0'],
@@ -234,7 +235,7 @@ class B2bControleur extends Controller
 
         $request->validate([
             'type_facturation'   => ['required', 'string', 'in:disponible,commande'],
-            'point_de_vente_id'  => ['required', 'integer', 'exists:points_de_vente,id'],
+            'point_de_vente_id'  => ['required', 'integer', Appartenance::a('points_de_vente', 'id')],
             'mode_paiement'      => ['required', 'string'],
         ]);
 

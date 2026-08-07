@@ -10,6 +10,7 @@ use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use App\Modules\Admin\Traits\JournaliseActions;
 use Illuminate\View\View;
+use App\Modules\Admin\Regles\Appartenance;
 
 class EntrepriseControleur
 {
@@ -170,7 +171,7 @@ class EntrepriseControleur
     public function switchPeriode(Request $request): RedirectResponse
     {
         $request->validate([
-            'periode_id' => ['required', 'integer', 'exists:periodes,id'],
+            'periode_id' => ['required', 'integer', Appartenance::a('periodes', 'id')],
         ]);
 
         $entreprise = Auth::user()->entreprise;

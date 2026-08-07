@@ -72,7 +72,7 @@
                                 @if($pointDeVenteId !== 'tout')
                                     <td>
                                         @if($p->stock_actuel > 0)
-                                            <button class="btn btn-primary btn-sm" onclick="ouvrirModalRetrait({{ $p->id }}, '{{ addslashes($p->nom) }}', {{ $p->stock_actuel }})" style="background:var(--danger); border-color:var(--danger);">
+                                            <button class="btn btn-primary btn-sm" onclick="ouvrirModalRetrait({{ $p->id }}, @js($p->nom), {{ $p->stock_actuel }})" style="background:var(--danger); border-color:var(--danger);">
                                                 <i class="fas fa-trash"></i> Retirer
                                             </button>
                                         @else
@@ -130,7 +130,7 @@
                                 @if($pointDeVenteId !== 'tout')
                                     <td>
                                         @if($p->stock_actuel > 0)
-                                            <button class="btn btn-primary btn-sm" onclick="ouvrirModalRetrait({{ $p->id }}, '{{ addslashes($p->nom) }}', {{ $p->stock_actuel }})" style="background:var(--warning); border-color:var(--warning); color:#333;">
+                                            <button class="btn btn-primary btn-sm" onclick="ouvrirModalRetrait({{ $p->id }}, @js($p->nom), {{ $p->stock_actuel }})" style="background:var(--warning); border-color:var(--warning); color:#333;">
                                                 <i class="fas fa-trash"></i> Retirer
                                             </button>
                                         @else

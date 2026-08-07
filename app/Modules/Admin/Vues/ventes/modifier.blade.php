@@ -447,24 +447,24 @@ const panier = {
     @foreach($vente->details as $detail)
         @if($detail->produit_id)
             "{{ $detail->produit_id }}": {
-                nom: "{!! addslashes($detail->produit->nom) !!}",
+                nom: @js($detail->produit->nom),
                 prix: {{ $detail->prix_unitaire }},
                 qte: {{ $detail->quantite }},
                 stock: {{ $detail->produit->stock_actuel + $detail->quantite }},
                 stock_minimum: {{ $detail->produit->stock_minimum }},
-                unite: "{!! addslashes($detail->unite ?? 'Unité') !!}",
+                unite: @js($detail->unite ?? 'Unité'),
                 tva: {{ $detail->produit ? $detail->produit->taux_tva : 18 }},
                 remise_taux: {{ (float) ($detail->remise_taux ?? 0) }},
                 isVirtual: false
             },
         @else
             "v_{{ $detail->id }}": {
-                nom: "{!! addslashes($detail->libelle_virtuel) !!}",
+                nom: @js($detail->libelle_virtuel),
                 prix: {{ $detail->prix_unitaire }},
                 qte: {{ $detail->quantite }},
                 stock: 99999,
                 stock_minimum: 0,
-                unite: "{!! addslashes($detail->unite ?? 'Unité') !!}",
+                unite: @js($detail->unite ?? 'Unité'),
                 tva: {{ $detail->montant_tva > 0 ? 18 : 0 }},
                 remise_taux: {{ (float) ($detail->remise_taux ?? 0) }},
                 isVirtual: true

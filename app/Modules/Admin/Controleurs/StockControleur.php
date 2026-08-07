@@ -10,6 +10,7 @@ use App\Modules\Admin\Modeles\Produit;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\View\View;
+use App\Modules\Admin\Regles\Appartenance;
 
 class StockControleur
 {
@@ -175,7 +176,7 @@ class StockControleur
     public function retirerRebut(Request $request): \Illuminate\Http\RedirectResponse
     {
         $request->validate([
-            'produit_id' => ['required', 'integer', 'exists:produits,id'],
+            'produit_id' => ['required', 'integer', Appartenance::a('produits', 'id')],
             'quantite'   => ['required', 'integer', 'min:1'],
         ]);
 

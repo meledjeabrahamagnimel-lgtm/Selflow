@@ -23,7 +23,11 @@ return [
     | Clé secrète partagée entre Selflow et COMPTAFLOW pour authentifier
     | les appels API locaux. Doit être identique dans les deux .env.
     */
-    'comptaflow_api_secret' => env('EXTERNAL_SYNC_SECRET', 'selflow-comptaflow-secret-2026'),
+    // Secret partage avec Comptaflow. Aucune valeur de repli : un secret ecrit
+    // dans le code est un secret public des que le depot l'est, et ces routes
+    // creent des entreprises. Sans EXTERNAL_SYNC_SECRET, la synchronisation
+    // refuse tout appel plutot que d'en accepter avec un secret connu de tous.
+    'comptaflow_api_secret' => env('EXTERNAL_SYNC_SECRET'),
 
     /*
     |--------------------------------------------------------------------------

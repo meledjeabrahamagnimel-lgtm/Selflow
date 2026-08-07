@@ -208,12 +208,12 @@
                                 </form>
                             @else
                                 <button type="button" class="btn btn-primary btn-sm"
-                                    onclick="ouvrirLierPour({{ $ent->id }}, '{{ addslashes($ent->nom) }}')"
+                                    onclick="ouvrirLierPour({{ $ent->id }}, @js($ent->nom))"
                                     style="padding:5px 10px; font-size:11px;">
                                     <i class="fas fa-plug"></i> Lier
                                 </button>
                                 <button type="button" class="btn btn-outline btn-sm"
-                                    onclick="ouvrirCreerPour({{ $ent->id }}, '{{ addslashes($ent->nom) }}')"
+                                    onclick="ouvrirCreerPour({{ $ent->id }}, @js($ent->nom))"
                                     style="padding:5px 10px; font-size:11px;">
                                     <i class="fas fa-plus"></i> Créer CPTF
                                 </button>

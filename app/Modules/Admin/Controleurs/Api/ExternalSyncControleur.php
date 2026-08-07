@@ -26,10 +26,9 @@ class ExternalSyncControleur
     public function enregistrerEntreprise(Request $request): JsonResponse
     {
         // ── Vérification du secret partagé ──
-        $expectedSecret = config('selflow.comptaflow_api_secret', 'selflow-comptaflow-secret-2026');
         $providedSecret = $request->input('secret') ?? $request->header('X-Sync-Secret');
 
-        if ($providedSecret !== $expectedSecret) {
+        if (!self::secretValide($providedSecret)) {
             Log::warning('ExternalSync Selflow: secret invalide', ['ip' => $request->ip()]);
             return response()->json(['success' => false, 'message' => 'Accès non autorisé.'], 401);
         }
@@ -144,10 +143,9 @@ class ExternalSyncControleur
      */
     public function companyInfo(Request $request): JsonResponse
     {
-        $expectedSecret = config('selflow.comptaflow_api_secret', 'selflow-comptaflow-secret-2026');
         $providedSecret = $request->input('secret') ?? $request->header('X-Sync-Secret');
 
-        if ($providedSecret !== $expectedSecret) {
+        if (!self::secretValide($providedSecret)) {
             return response()->json(['success' => false, 'message' => 'Accès non autorisé.'], 401);
         }
 
@@ -195,10 +193,9 @@ class ExternalSyncControleur
      */
     public function listCompanies(Request $request): JsonResponse
     {
-        $expectedSecret = config('selflow.comptaflow_api_secret', 'selflow-comptaflow-secret-2026');
         $providedSecret = $request->input('secret') ?? $request->header('X-Sync-Secret');
 
-        if ($providedSecret !== $expectedSecret) {
+        if (!self::secretValide($providedSecret)) {
             return response()->json(['success' => false, 'message' => 'Accès non autorisé.'], 401);
         }
 
@@ -237,10 +234,9 @@ class ExternalSyncControleur
      */
     public function tierInfo(Request $request): JsonResponse
     {
-        $expectedSecret = config('selflow.comptaflow_api_secret', 'selflow-comptaflow-secret-2026');
         $providedSecret = $request->input('secret') ?? $request->header('X-Sync-Secret');
 
-        if ($providedSecret !== $expectedSecret) {
+        if (!self::secretValide($providedSecret)) {
             return response()->json(['success' => false, 'message' => 'Accès non autorisé.'], 401);
         }
 
@@ -340,5 +336,28 @@ class ExternalSyncControleur
             'success' => !empty($tierData),
             'tier'    => $tierData,
         ]);
+    }
+
+    /**
+     * Le secret partage est-il celui attendu ?
+     *
+     * Deux points fermes ici. La valeur de repli inscrite dans le code
+     * — `selflow-comptaflow-secret-2026` — faisait que, si la variable
+     * d'environnement n'etait pas renseignee, le secret de production etait
+     * celui du depot, public. Un secret absent refuse desormais tout appel.
+     *
+     * Et la comparaison se faisait avec `!==`, qui s'arrete au premier
+     * caractere different : le temps de reponse laissait deviner le secret
+     * caractere par caractere. `hash_equals` compare en temps constant.
+     */
+    private static function secretValide(?string $fourni): bool
+    {
+        $attendu = config('selflow.comptaflow_api_secret');
+
+        if (empty($attendu) || empty($fourni)) {
+            return false;
+        }
+
+        return hash_equals((string) $attendu, (string) $fourni);
     }
 }

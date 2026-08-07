@@ -12,6 +12,7 @@ use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\Rule;
 use App\Modules\Admin\Traits\JournaliseActions;
 use Illuminate\View\View;
+use App\Modules\Admin\Regles\Appartenance;
 
 class PersonnelControleur
 {
@@ -40,7 +41,7 @@ class PersonnelControleur
             'email'              => ['required', 'email', 'max:150', Rule::unique('utilisateurs', 'email')],
             'password'           => ['required', 'string', 'min:6'],
             'role'               => ['required', 'string', Rule::in(['admin', 'admin_secondaire', 'responsable_pdv', 'caissier'])],
-            'point_de_vente_id'  => ['nullable', 'exists:points_de_vente,id'],
+            'point_de_vente_id'  => ['nullable', Appartenance::a('points_de_vente', 'id')],
             'fonction'           => ['nullable', 'string', 'max:150'],
             'date_debut_contrat' => ['nullable', 'date'],
             'date_fin_contrat'   => ['nullable', 'date', 'after_or_equal:date_debut_contrat'],
@@ -93,7 +94,7 @@ class PersonnelControleur
             'email'              => ['required', 'email', 'max:150', Rule::unique('utilisateurs', 'email')->ignore($personnel->id)],
             'password'           => ['nullable', 'string', 'min:6'],
             'role'               => ['required', 'string', Rule::in(['admin', 'admin_secondaire', 'responsable_pdv', 'caissier'])],
-            'point_de_vente_id'  => ['nullable', 'exists:points_de_vente,id'],
+            'point_de_vente_id'  => ['nullable', Appartenance::a('points_de_vente', 'id')],
             'fonction'           => ['nullable', 'string', 'max:150'],
             'date_debut_contrat' => ['nullable', 'date'],
             'date_fin_contrat'   => ['nullable', 'date', 'after_or_equal:date_debut_contrat'],

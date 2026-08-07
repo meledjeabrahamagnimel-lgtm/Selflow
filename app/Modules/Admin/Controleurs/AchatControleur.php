@@ -19,6 +19,7 @@ use Illuminate\View\View;
 use App\Jobs\NormaliserAchatBapaJob;
 use App\Modules\Admin\Modeles\B2bNegotiation;
 use App\Modules\Admin\Modeles\Entreprise;
+use App\Modules\Admin\Regles\Appartenance;
 
 class AchatControleur
 {
@@ -76,14 +77,14 @@ class AchatControleur
         $isBapa = $request->input('type_facture') === 'bapa';
 
         $request->validate([
-            'fournisseur_id'             => $isBapa ? ['nullable'] : ['required', 'integer', 'exists:fournisseurs,id'],
+            'fournisseur_id'             => $isBapa ? ['nullable'] : ['required', 'integer', Appartenance::a('fournisseurs', 'id')],
             'fournisseur_nom_bapa'        => $isBapa ? ['required', 'string', 'max:255'] : ['nullable'],
             'date_achat'                 => ['required', 'date'],
             'mode_paiement'              => ['nullable', 'string'], // optionnel hors bloc Facture physique/BAPA
             'numero_facture_fournisseur' => ['nullable', 'string', 'max:100'],
             'type_facture'               => ['nullable', 'string', 'in:normale,bapa'],
             'articles'                   => ['required', 'array', 'min:1'],
-            'articles.*.produit_id'      => ['nullable', 'integer', 'exists:produits,id'],
+            'articles.*.produit_id'      => ['nullable', 'integer', Appartenance::a('produits', 'id')],
             'articles.*.libelle_virtuel' => ['nullable', 'string', 'max:255'],
             'articles.*.quantite'        => ['required', 'integer', 'min:1'],
             'articles.*.prix_unitaire'   => ['required', 'numeric', 'min:0'],
@@ -112,7 +113,7 @@ class AchatControleur
 
         if ($request->mode_paiement === 'Banque') {
             $request->validate([
-                'banque_id'          => ['required', 'integer', 'exists:codes_journaux,id'],
+                'banque_id'          => ['required', 'integer', Appartenance::a('codes_journaux', 'id')],
                 'moyen_bancaire'     => ['required', 'string', 'in:carte,virement,cheque'],
                 'reference_paiement' => ['required', 'string', 'max:255'],
             ], [
@@ -753,7 +754,7 @@ class AchatControleur
     public function creerAvoirNouveau(Request $request): RedirectResponse
     {
         $request->validate([
-            'parent_id' => ['required', 'exists:achats,id'],
+            'parent_id' => ['required', Appartenance::a('achats', 'id')],
             'raison'    => ['required', 'string', 'max:255'],
             'items'     => ['required', 'array'],
         ]);

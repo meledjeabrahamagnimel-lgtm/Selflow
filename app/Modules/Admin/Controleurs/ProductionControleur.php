@@ -16,6 +16,7 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\View\View;
 use App\Modules\Admin\Services\ComptabiliteService;
+use App\Modules\Admin\Regles\Appartenance;
 
 class ProductionControleur extends Controller
 {
@@ -78,11 +79,11 @@ class ProductionControleur extends Controller
         $entrepriseId = Auth::user()->entreprise_id;
 
         $request->validate([
-            'produit_fini_id' => [$request->filled('nouveau_produit_fini_nom') ? 'nullable' : 'required', 'integer', 'exists:produits,id'],
+            'produit_fini_id' => [$request->filled('nouveau_produit_fini_nom') ? 'nullable' : 'required', 'integer', Appartenance::a('produits', 'id')],
             'nouveau_produit_fini_nom' => ['nullable', 'string', 'max:255'],
             'description'     => ['nullable', 'string'],
             'ingredients'     => ['required', 'array', 'min:1'],
-            'ingredients.*.ingredient_id' => ['required', 'integer', 'exists:produits,id'],
+            'ingredients.*.ingredient_id' => ['required', 'integer', Appartenance::a('produits', 'id')],
             'ingredients.*.quantite'      => ['required', 'numeric', 'min:0.0001'],
             'ingredients.*.unite'         => ['required', 'string', 'max:50'],
         ]);
@@ -195,7 +196,7 @@ class ProductionControleur extends Controller
         $request->validate([
             'description' => ['nullable', 'string'],
             'ingredients' => ['required', 'array', 'min:1'],
-            'ingredients.*.ingredient_id' => ['required', 'integer', 'exists:produits,id'],
+            'ingredients.*.ingredient_id' => ['required', 'integer', Appartenance::a('produits', 'id')],
             'ingredients.*.quantite'      => ['required', 'numeric', 'min:0.0001'],
             'ingredients.*.unite'         => ['required', 'string', 'max:50'],
         ]);
@@ -287,8 +288,8 @@ class ProductionControleur extends Controller
         $entrepriseId = Auth::user()->entreprise_id;
 
         $request->validate([
-            'produit_fini_id'   => ['required', 'integer', 'exists:produits,id'],
-            'point_de_vente_id' => ['required', 'integer', 'exists:points_de_vente,id'],
+            'produit_fini_id'   => ['required', 'integer', Appartenance::a('produits', 'id')],
+            'point_de_vente_id' => ['required', 'integer', Appartenance::a('points_de_vente', 'id')],
             'quantite_cible'    => ['required', 'numeric', 'min:0.0001'],
             'date_production'   => ['required', 'date'],
         ]);
