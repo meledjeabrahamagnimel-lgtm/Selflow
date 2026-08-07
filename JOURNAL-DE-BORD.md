@@ -1,0 +1,236 @@
+# Selflow — journal de bord
+
+**Ce fichier est la mémoire du projet.** Une session d'assistant qui démarre à
+froid n'a pas l'historique de nos conversations : elle a ce dépôt, `CLAUDE.md`,
+et ce fichier. Tout ce qui a été décidé, tout ce qui a été écarté et pourquoi,
+tout ce qui reste à faire doit donc figurer ici — et y être tenu à jour à chaque
+lot terminé.
+
+Dernière mise à jour : 7 août 2026.
+
+---
+
+## 1. Les deux applications
+
+| | Rôle | Dépôt |
+|---|---|---|
+| **Selflow** | Gestion commerciale : ventes, achats, stocks, points de vente, certification FNE auprès de la DGI. Produit les écritures comptables. | `meledjeabrahamagnimel-lgtm/Selflow` |
+| **Comptaflow** | Application comptable complète : balance, grand livre, états SYSCOHADA, analytique. Reçoit les écritures de Selflow. | `guysergekouassi/COMPTAFLOW` |
+
+Selflow écrit, Comptaflow exploite. Un client sans abonnement Comptaflow doit
+malgré tout disposer d'une balance de contrôle dans Selflow — décidé, à faire.
+
+---
+
+## 2. La règle d'or : la conformité FNE est gelée
+
+Voir `CLAUDE.md`, qui fait foi. En résumé : ne plus toucher aux payloads, aux
+champs `fne_*`, au barème du timbre, au code QR, aux blocs de certification des
+documents imprimés ni à `FnePayloadTest`. Trois exceptions seulement — nouvelle
+version du référentiel DGI, rejet prouvé par le journal, demande explicite du
+propriétaire.
+
+Seul point de contact autorisé : l'écriture comptable du BAPA, en lecture seule
+de ce que la plateforme a déjà retourné.
+
+---
+
+## 3. Décisions arrêtées
+
+Elles ne se rediscutent pas sans raison neuve.
+
+| Sujet | Décision |
+|---|---|
+| Inventaire | **Permanent**, valorisé au coût moyen pondéré (CUMP) |
+| Sortie de stock | **À la livraison**. La vente au comptant émet une livraison implicite immédiate |
+| Données existantes | **Supprimées** — le développement repart de zéro, aucune donnée réelle |
+| Numérotation des comptes | **Six chiffres** pour toute la partie locale (`7011` → `701100`) |
+| Rôle du superadmin | **Active tout par défaut**, quel que soit l'abonnement. L'utilisateur choisit ensuite ce qu'il veut voir |
+| Comptes, produits, journaux | **Livrés par défaut** avec l'application, indépendamment de Comptaflow, tous archivables |
+| Journaux de trésorerie | Nommés librement : MTN, Orange, Caisse, ou le nom de la banque |
+| Identifiants dans l'URL | **Masqués** par un identifiant public opaque — après les contrôles d'appartenance, jamais avant |
+| États comptables | Comptaflow. Selflow garde une balance de contrôle |
+| Souscription | Parcours qui se déplie étape par étape, **sans intervention du superadmin** |
+| Choix hors référentiel | Un champ **« Autre »** à saisie libre partout où l'utilisateur choisit dans une liste fermée |
+
+---
+
+## 4. Le référentiel de préparamétrage
+
+Source : `sellflow_parametrage_activites_1.xlsx` (version 1.2, 31/07/2026).
+
+Cinq niveaux, du plus large au plus fin :
+
+| Niveau | Nombre | Rôle |
+|---|---|---|
+| **Catégorie** | 12 | Regroupement d'affichage. C'est l'équivalent de l'ancien « secteur d'activité ». Ne décide de rien |
+| **Profil** | 71 | Le métier réel. Ce que l'utilisateur choisit ; décide des modules à ouvrir. **Niveau neuf** |
+| **Famille** | 197 | Le rayon. **Porte les quatre comptes** : vente, achat, stock, variation |
+| **Article** | 616 | Le produit. Hérite des comptes de sa famille |
+| **Type d'article** | 10 | Transversal. **Détermine les comptes** ; la famille subdivise la racine qu'il impose |
+
+Les 71 profils ne produisent que **cinq combinaisons de modules** :
+
+| Combinaison | Profils |
+|---|---|
+| Stock seul | 31 |
+| Stock + Production | 15 |
+| Aucun module | 10 |
+| Stock + Cycles agricoles | 8 |
+| Stock + Chantiers | 7 |
+
+---
+
+## 5. État des lots
+
+### Lot 0 — Fermer les portes ouvertes — **TERMINÉ**
+
+Poussé sur **Selflow**, fusionné dans `main`.
+
+- Contrôle du propriétaire sur `VenteControleur::normaliser()` — c'était la seule
+  action du projet qui chargeait une pièce sans vérifier à qui elle appartient.
+- **34 règles `exists:` cloisonnées** par `App\Modules\Admin\Regles\Appartenance`,
+  dans 12 contrôleurs. Une table dont le rattachement n'est pas déclaré lève une
+  exception plutôt que de laisser passer.
+- Secret de synchronisation : plus de valeur de repli dans le code,
+  comparaison par `hash_equals`. **`EXTERNAL_SYNC_SECRET` doit être posé dans
+  `.env`**, sinon la synchronisation refuse tout appel.
+- Neuf `addslashes` remplacés par `@js()`.
+- `php artisan verifier:variables` — détecte les variables lues sans avoir été
+  écrites, la faute que PHP ne révèle qu'au clic de l'utilisateur.
+- `tests/Feature/CloisonnementTest.php` — 7 tests.
+
+### Lot 1 — Le référentiel en base — **À FAIRE**
+
+Indépendant du reste. Cinq tables, import du classeur par seeder idempotent,
+conversion vers six chiffres, comptes et journaux par défaut, tout archivable.
+
+### Lot 2 — Le parcours de souscription — après le lot 1
+
+Sept étapes qui se déplient. Activité mixte. Droits et préférences séparés en
+deux colonnes, les droits ouverts en grand. Champ « Autre » partout.
+
+### Lot 3 — Le stock suit l'événement — le plus lourd
+
+Quantités décimales, `StockService` unique, journal en écriture seule, relation
+polymorphe vers la pièce, quatre portes (réception, livraison, production,
+inventaire), cycle d'achat complet, engagements pour devis et commandes, aucune
+fiche de stock pour les articles non stockables, sort de la marchandise choisi
+ligne par ligne sur les avoirs.
+
+### Lot 4 — Les imputations — après 1 et 3
+
+Chaîne article → famille → type → défaut. Inventaire permanent au CUMP. Codes
+journaux imposés. Règlements et lettrage. BAPA sans TVA déductible.
+
+### Lot 5 — La passerelle Comptaflow — les deux dépôts
+
+Concordance des exercices, déversement dans l'exercice qui contient la date,
+axe « Points de vente » et sections automatiques, rejeu idempotent, balance de
+contrôle dans Selflow.
+
+### Lot 6 — Les manques métier
+
+Devis B2B opposable, nomenclature de production, lots et péremption,
+immobilisations, emballages consignés, modèles d'importation complets.
+
+### Lot 7 — La vitrine
+
+Landing page, documentation, politique, présentation de DC-Knowing et de ses
+produits, écran superadmin de gestion de la vitrine.
+
+### Lot 8 — Stabilisation
+
+Identifiants opaques dans les URL, habilitations, limitation de débit, un
+scénario de bout en bout par combinaison de modules.
+
+---
+
+## 6. Anomalies constatées et non encore corrigées
+
+Elles sont documentées pour ne pas être redécouvertes.
+
+### Stock
+
+- `quantite_disponible` est un `integer` — le référentiel livre des kg, litres,
+  sacs. 12,5 kg de cacao deviennent 12.
+- Deux portes pour la même entrée : `AchatControleur:242` incrémente à
+  l'enregistrement de la facture, `StockControleur:301` incrémente à la
+  réception. Rien n'interdit les deux.
+- `VenteControleur:698` **supprime** les mouvements de stock à la modification
+  d'une vente. Un journal se contre-passe, il ne s'efface pas.
+- Le couple « décrémenter puis écrire le mouvement » est recopié dans plus de
+  douze endroits, sur sept contrôleurs et deux contrôleurs d'API.
+- `reference_document` est une chaîne libre, pas une relation.
+- Une **fiche de stock est créée pour tous les types de produits**, y compris les
+  services, avec un minimum de 5 : un service apparaît en permanence dans les
+  alertes de rupture. `ProduitControleur:171`, `PointDeVenteControleur:56`.
+- Les avoirs réinjectent le stock automatiquement, sans jamais demander si la
+  marchandise revient vendable, en rebut, ou pas du tout.
+
+### Comptabilité
+
+- Aucun compte de stock (31, 32, 33, 36) ni de variation (6031, 6032, 6033, 736)
+  n'est mouvementé.
+- Pas de coût de revient : `produits.prix_achat` est un prix catalogue figé.
+
+### Passerelle Comptaflow
+
+- `deverserEcritures` prend l'exercice **actif** de Comptaflow sans jamais le
+  comparer à la date de l'écriture.
+- `linkCompany` ne vérifie aucune concordance d'exercice à la liaison.
+- L'analytique n'est **jamais** alimentée : zéro occurrence d'`AxeAnalytique` ou
+  de `SectionAnalytique` dans le contrôleur de synchronisation, alors que
+  Comptaflow possède tout le module.
+- **Selflow n'envoie pas le point de vente** — huit champs transmis, il n'y est
+  pas, alors que la colonne existe en base.
+- Un journal inconnu se replie sur le premier de la liste : une vente peut
+  atterrir dans le journal des achats, silencieusement.
+- Un compte absent est créé avec `type_de_compte => 'actif'` en dur et le libellé
+  de l'écriture pour intitulé — cela pollue le plan comptable de Comptaflow.
+- Aucune idempotence : rejouer une synchronisation redéverse les mêmes écritures.
+
+### Importations
+
+Les modèles d'importation CSV ne couvrent que cinq types — points de vente,
+clients, fournisseurs, utilisateurs, produits — et leurs colonnes sont
+incomplètes au regard des champs réellement gérés. Manquent notamment les
+articles avec leur famille et leurs comptes, les stocks initiaux, le plan
+comptable, les codes journaux, et les soldes d'ouverture.
+
+### B2B
+
+Le flux va de la demande de prix à la proposition, puis crée directement une
+vente et un achat. **L'étape du devis n'existe pas** : ni pièce opposable, ni
+validité, ni acceptation, ni renégociation.
+
+---
+
+## 7. Ce qui est sain, vérifié
+
+Pour ne pas re-auditer inutilement :
+
+- Aucune interpolation de variable dans du SQL brut.
+- Aucun modèle avec `$guarded = []`.
+- `$request->all()` n'apparaît qu'à l'intérieur d'un validateur.
+- Les routes superadmin sont derrière `role:superadmin`.
+- Le B2B vérifie systématiquement que la négociation concerne l'entreprise.
+- La connexion est limitée en tentatives, sur le web comme sur l'API.
+- La normalisation n'apparaît que sur les écrans de factures ; devis, commandes
+  et bons de livraison n'en portent pas, et le serveur refuse toute pièce dont
+  l'étape n'est pas « Facture ».
+- La double normalisation est bloquée des deux côtés.
+- L'état `normalise` est porté par la pièce : l'admin voit partout ce qu'un
+  responsable a certifié dans son point de vente.
+
+---
+
+## 8. Conventions de travail
+
+- Développement sur `claude/selflow-remises-taxes-dgi-a5je2b`, puis fusion dans
+  `main` à chaque lot.
+- Toujours préciser **sur quel dépôt** un envoi a été fait — Selflow ou
+  Comptaflow.
+- `php artisan test` et `php artisan verifier:variables` avant chaque envoi.
+- Les commentaires de code expliquent **pourquoi**, en rapportant ce qui avait
+  échoué — pas ce que le code fait, qui se lit.

@@ -37,6 +37,12 @@ image1.png
 image2.png
 *xlsx
 
+# La memoire du projet doit voyager avec le depot : ignoree par la regle
+# `*.md` ci-dessus, elle n'existait que sur le poste de celui qui l'avait
+# ecrite. Un clone frais n'avait ni la regle d'or FNE, ni l'etat des lots.
+!CLAUDE.md
+!JOURNAL-DE-BORD.md
+
 # Exception pour ce fichier spécifique
 !nv-MODULE.md
 !CONFIGURATION FNE
