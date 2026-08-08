@@ -138,7 +138,7 @@ class SuperadminFneControleur extends Controller
                 // 5. Supprimer les mouvements de stock, ordres de production, transferts, fiches techniques, stocks et produits
                 \Illuminate\Support\Facades\DB::table('mouvements_stock')->whereIn('point_de_vente_id', $pdvIds)->delete();
                 \Illuminate\Support\Facades\DB::table('transferts_stock')
-                    ->whereIn('point_de_vente_contrepartie_id', $pdvIds)
+                    ->whereIn('point_de_vente_source_id', $pdvIds)
                     ->orWhereIn('point_de_vente_destination_id', $pdvIds)
                     ->delete();
                 \Illuminate\Support\Facades\DB::table('ordres_production')->whereIn('point_de_vente_id', $pdvIds)->delete();

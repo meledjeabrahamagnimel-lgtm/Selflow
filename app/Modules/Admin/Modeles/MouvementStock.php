@@ -37,6 +37,8 @@ class MouvementStock extends Model
      * `StockControleur` écrivait `Reception`. Une seule forme, décidée ici.
      */
     public const RECEPTION              = 'reception';
+    public const RETOUR_CLIENT          = 'retour_client';
+    public const RETOUR_FOURNISSEUR     = 'retour_fournisseur';
     public const LIVRAISON              = 'livraison';
     public const TRANSFERT              = 'transfert';
     public const REBUT                  = 'rebut';
@@ -47,7 +49,8 @@ class MouvementStock extends Model
 
     /** @var array<int, string> */
     public const MOTIFS = [
-        self::RECEPTION, self::LIVRAISON, self::TRANSFERT, self::REBUT,
+        self::RECEPTION, self::RETOUR_CLIENT, self::RETOUR_FOURNISSEUR,
+        self::LIVRAISON, self::TRANSFERT, self::REBUT,
         self::INVENTAIRE, self::PRODUCTION_ENTREE, self::PRODUCTION_CONSOMMATION,
         self::CONTREPASSATION,
     ];

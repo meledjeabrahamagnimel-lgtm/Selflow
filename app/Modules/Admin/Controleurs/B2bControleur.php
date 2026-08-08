@@ -26,6 +26,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\View\View;
 use App\Modules\Admin\Regles\Appartenance;
 use App\Modules\Admin\Regles\Quantite;
+use App\Modules\Admin\Services\StockService;
 
 class B2bControleur extends Controller
 {
@@ -342,22 +343,15 @@ class B2bControleur extends Controller
                     'quantite_receptionnee'=> 0,
                 ]);
 
-                // Sortie de stock fournisseur
+                // Sortie de stock chez le vendeur.
+                //
+                // Le sous-type etait « vente », valeur que l'ecran des
+                // mouvements ne connait pas : la ligne existait, mais aucune
+                // section ne l'affichait. C'est une livraison, comme une autre.
                 if ($det['produit']->estStockable()) {
-                    $stockAvant = $det['produit']->stockActuel($pdvId);
-                    $det['produit']->decrementStock($pdvId, $det['quantite']);
-
-                    MouvementStock::create([
-                        'produit_id'         => $det['produit']->id,
-                        'point_de_vente_id'  => $pdvId,
-                        'type_mouvement'     => 'Sortie',
-                        'sous_type'          => 'vente',
-                        'quantite'           => $det['quantite'],
-                        'stock_avant'        => $stockAvant,
-                        'stock_apres'        => $stockAvant - $det['quantite'],
-                        'reference_document' => $numero,
-                        'utilisateur_id'     => Auth::id(),
-                    ]);
+                    StockService::sortie($det['produit'], (int) $pdvId, (float) $det['quantite'],
+                        MouvementStock::LIVRAISON,
+                        ['piece' => $vente, 'reference' => $numero, 'client_id' => $vente->client_id]);
                 }
             }
 
@@ -499,21 +493,16 @@ class B2bControleur extends Controller
 
             // Incrémenter le stock de chaque produit chez l'acheteur
             foreach ($achat->details as $det) {
+                // Entree chez l'acheteur. Meme remarque : « Entree » sans
+                // accent et un sous-type « achat » inconnu de l'ecran. C'est
+                // une reception.
                 if ($det->produit && $det->produit->estStockable()) {
-                    $stockAvant = $det->produit->stockActuel($achat->point_de_vente_id);
-                    $det->produit->incrementStock($achat->point_de_vente_id, $det->quantite);
+                    $det->update(['quantite_receptionnee' => $det->quantite]);
 
-                    MouvementStock::create([
-                        'produit_id'         => $det->produit->id,
-                        'point_de_vente_id'  => $achat->point_de_vente_id,
-                        'type_mouvement'     => 'Entree',
-                        'sous_type'          => 'achat',
-                        'quantite'           => $det->quantite,
-                        'stock_avant'        => $stockAvant,
-                        'stock_apres'        => $stockAvant + $det->quantite,
-                        'reference_document' => $achat->numero_facture,
-                        'utilisateur_id'     => Auth::id(),
-                    ]);
+                    StockService::entree($det->produit, (int) $achat->point_de_vente_id,
+                        (float) $det->quantite, MouvementStock::RECEPTION,
+                        ['piece' => $achat, 'reference' => $achat->numero_facture,
+                         'fournisseur_id' => $achat->fournisseur_id]);
                 }
             }
 

@@ -16,6 +16,7 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use App\Modules\Admin\Regles\Appartenance;
 use App\Modules\Admin\Regles\Quantite;
+use App\Modules\Admin\Services\StockService;
 
 class VenteApiControleur
 {
@@ -236,30 +237,21 @@ class VenteApiControleur
                 ]);
 
                 if ($etape === 'Facture' && $produit && $produit->estStockable()) {
-                    $stockAvant = $produit->stockActuel($pointDeVenteId);
+                    // La disponibilite se lit sous le verrou qui servira a la
+                    // sortie : c'est ce que l'API n'avait pas non plus.
+                    $disponible = StockService::disponible($produit, (int) $pointDeVenteId);
 
-                    if ($stockAvant < $article['quantite']) {
+                    if ($disponible < $article['quantite']) {
                         throw new \InvalidArgumentException(
-                            "Stock insuffisant pour « {$produit->nom} » (Disponible: {$stockAvant}, Demandé: {$article['quantite']})."
+                            "Stock insuffisant pour « {$produit->nom} » (Disponible: {$disponible}, Demandé: {$article['quantite']})."
                         );
                     }
 
-                    // Table Stock (par point de vente), comme sur le web —
-                    // remplace l'ancien decrement('stock_actuel', ...) qui
-                    // touchait une colonne directement sur Produit, invisible
-                    // du reste de l'application (StockControleur, etc.).
-                    $produit->decrementStock($pointDeVenteId, $article['quantite']);
                     $detail->update(['quantite_livree' => $article['quantite']]);
 
-                    MouvementStock::create([
-                        'produit_id'         => $produit->id,
-                        'point_de_vente_id'  => $pointDeVenteId,
-                        'type_mouvement'     => 'Sortie',
-                        'quantite'           => $article['quantite'],
-                        'stock_avant'        => $stockAvant,
-                        'stock_apres'        => $stockAvant - $article['quantite'],
-                        'reference_document' => $numero,
-                    ]);
+                    StockService::sortie($produit, (int) $pointDeVenteId, (float) $article['quantite'],
+                        MouvementStock::LIVRAISON,
+                        ['piece' => $vente, 'reference' => $numero, 'client_id' => $vente->client_id]);
                 }
             }
 

@@ -15,6 +15,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\View\View;
 use App\Modules\Admin\Regles\Appartenance;
 use App\Modules\Admin\Regles\Quantite;
+use App\Modules\Admin\Services\StockService;
 
 class TransfertStockControleur
 {
@@ -79,7 +80,7 @@ class TransfertStockControleur
         $user = Auth::user();
         $isAdmin = $user->role === 'admin';
 
-        DB::transaction(function () use ($produit, $sourceId, $destId, $qty, $request, $user, $isAdmin, $dispo) {
+        DB::transaction(function () use ($produit, $sourceId, $destId, $qty, $request, $user, $isAdmin) {
             $statut = $isAdmin ? 'approuve' : 'en_attente';
 
             $transfert = TransfertStock::create([
@@ -96,43 +97,9 @@ class TransfertStockControleur
 
             // Si admin, on applique directement le mouvement de stock
             if ($isAdmin) {
-                // Décrémenter source
-                $produit->decrementStock($sourceId, $qty);
-
-                // Incrémenter destination
-                $produit->incrementStock($destId, $qty);
-
-                // Mouvement Sortie Source
-                MouvementStock::create([
-                    'produit_id'               => $produit->id,
-                    'point_de_vente_id'        => $sourceId,
-                    'type_mouvement'           => 'Sortie',
-                    'sous_type'                => 'Transfert',
-                    'point_de_vente_source_id' => $destId, // Destination du transfert
-                    'utilisateur_id'           => $user->id,
-                    'quantite'                 => $qty,
-                    'stock_avant'              => $dispo,
-                    'stock_apres'              => $dispo - $qty,
-                    'reference_document'       => 'TRANSFERT-DIR-' . $transfert->id,
-                ]);
-
-                // Mouvement Entrée Destination
-                $stockDest = Stock::where('produit_id', $produit->id)
-                    ->where('point_de_vente_id', $destId)
-                    ->first();
-                $dispoDest = $stockDest ? $stockDest->quantite_disponible : 0;
-
-                MouvementStock::create([
-                    'produit_id'               => $produit->id,
-                    'point_de_vente_id'        => $destId,
-                    'type_mouvement'           => 'Entrée',
-                    'sous_type'                => 'Transfert',
-                    'point_de_vente_source_id' => $sourceId, // Source du transfert
-                    'utilisateur_id'           => $user->id,
-                    'quantite'                 => $qty,
-                    'stock_avant'              => $dispoDest - $qty, // car déjà incrémenté ci-dessus
-                    'stock_apres'              => $dispoDest,
-                    'reference_document'       => 'TRANSFERT-DIR-' . $transfert->id,
+                StockService::transferer($produit, (int) $sourceId, (int) $destId, $qty, [
+                    'piece'     => $transfert,
+                    'reference' => 'TRANSFERT-DIR-' . $transfert->id,
                 ]);
 
                 // Journaliser
@@ -183,7 +150,7 @@ class TransfertStockControleur
             return back()->with('erreur', "Impossible d'approuver : stock insuffisant à la source (Disponible: $dispo).");
         }
 
-        DB::transaction(function () use ($transfert, $dispo) {
+        DB::transaction(function () use ($transfert) {
             $produit = $transfert->produit;
 
             $transfert->update([
@@ -192,44 +159,13 @@ class TransfertStockControleur
                 'approuve_le'    => now(),
             ]);
 
-            // Décrémenter source
-            $produit->decrementStock($transfert->point_de_vente_source_id, $transfert->quantite);
-
-            // Incrémenter destination
-            $produit->incrementStock($transfert->point_de_vente_destination_id, $transfert->quantite);
-
-            // Mouvement Sortie Source
-            MouvementStock::create([
-                'produit_id'               => $produit->id,
-                'point_de_vente_id'        => $transfert->point_de_vente_source_id,
-                'type_mouvement'           => 'Sortie',
-                'sous_type'                => 'Transfert',
-                'point_de_vente_source_id' => $transfert->point_de_vente_destination_id,
-                'utilisateur_id'           => Auth::id(),
-                'quantite'                 => $transfert->quantite,
-                'stock_avant'              => $dispo,
-                'stock_apres'              => $dispo - $transfert->quantite,
-                'reference_document'       => 'TRANSFERT-APP-' . $transfert->id,
-            ]);
-
-            // Mouvement Entrée Destination
-            $stockDest = Stock::where('produit_id', $produit->id)
-                ->where('point_de_vente_id', $transfert->point_de_vente_destination_id)
-                ->first();
-            $dispoDest = $stockDest ? $stockDest->quantite_disponible : 0;
-
-            MouvementStock::create([
-                'produit_id'               => $produit->id,
-                'point_de_vente_id'        => $transfert->point_de_vente_destination_id,
-                'type_mouvement'           => 'Entrée',
-                'sous_type'                => 'Transfert',
-                'point_de_vente_source_id' => $transfert->point_de_vente_source_id,
-                'utilisateur_id'           => Auth::id(),
-                'quantite'                 => $transfert->quantite,
-                'stock_avant'              => $dispoDest - $transfert->quantite,
-                'stock_apres'              => $dispoDest,
-                'reference_document'       => 'TRANSFERT-APP-' . $transfert->id,
-            ]);
+            StockService::transferer(
+                $produit,
+                (int) $transfert->point_de_vente_source_id,
+                (int) $transfert->point_de_vente_destination_id,
+                (float) $transfert->quantite,
+                ['piece' => $transfert, 'reference' => 'TRANSFERT-APP-' . $transfert->id]
+            );
 
             // Journaliser
             JournalAudit::create([

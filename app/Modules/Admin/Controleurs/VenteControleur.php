@@ -24,6 +24,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\View\View;
 use App\Modules\Admin\Regles\Appartenance;
 use App\Modules\Admin\Regles\Quantite;
+use App\Modules\Admin\Services\StockService;
 
 class VenteControleur
 {
@@ -294,18 +295,18 @@ class VenteControleur
                 }
 
                 if ($produit && $etape === 'Facture' && $produit->estStockable()) {
-                    $stockAvant = $produit->stockActuel($pointDeVenteId);
+                    // Controle final sous le verrou de la fiche de stock —
+                    // celui-la meme qui servira a la sortie. C'est la seconde
+                    // verification, autoritaire cette fois : elle protege des
+                    // ventes concurrentes passees entre la pre-verification et
+                    // ici.
+                    $disponible = StockService::disponible($produit, (int) $pointDeVenteId);
 
-                    // Contrôle final sous verrou (Produit::lockForUpdate() ci-dessus) :
-                    // seconde vérification, autoritaire cette fois, qui protège contre
-                    // les ventes concurrentes passées entre la pré-vérification et ici.
-                    if ($stockAvant < $article['quantite']) {
+                    if ($disponible < $article['quantite']) {
                         throw new \InvalidArgumentException(
-                            "Stock insuffisant pour « {$produit->nom} » (Disponible: {$stockAvant}, Demandé: {$article['quantite']})."
+                            "Stock insuffisant pour « {$produit->nom} » (Disponible: {$disponible}, Demandé: {$article['quantite']})."
                         );
                     }
-
-                    $produit->decrementStock($pointDeVenteId, $article['quantite']);
 
                     // Marquer la ligne comme totalement livrée : la facturation directe
                     // implique une sortie de stock immédiate. Sans cela, cette même
@@ -314,15 +315,9 @@ class VenteControleur
                     // UNE SECONDE FOIS si un utilisateur validait une "livraison" dessus.
                     $detail->update(['quantite_livree' => $article['quantite']]);
 
-                    MouvementStock::create([
-                        'produit_id'         => $produit->id,
-                        'point_de_vente_id'  => $pointDeVenteId,
-                        'type_mouvement'     => 'Sortie',
-                        'quantite'           => $article['quantite'],
-                        'stock_avant'        => $stockAvant,
-                        'stock_apres'        => $stockAvant - $article['quantite'],
-                        'reference_document' => $numero,
-                    ]);
+                    StockService::sortie($produit, (int) $pointDeVenteId, (float) $article['quantite'],
+                        MouvementStock::LIVRAISON,
+                        ['piece' => $vente, 'reference' => $numero, 'client_id' => $vente->client_id]);
                 }
             }
 
@@ -686,18 +681,22 @@ class VenteControleur
             // 1. Restituer les stocks anciens — UNIQUEMENT si la vente était déjà
             //    facturée (le stock n'a jamais été décrémenté pour un Devis ou un
             //    Bon de commande ; l'incrémenter ici serait une fuite de stock fictive).
+            //
+            // La contre-passation restitue le stock ET garde l'histoire. Le code
+            // faisait deux choses distinctes : il ré-incrémentait à la main, puis
+            // effaçait les mouvements par
+            //     MouvementStock::where('reference_document', ...)->delete()
+            // Le stock revenait juste, mais la sortie de dix sacs disparaissait
+            // du journal — et avec elle toute chance d'expliquer un écart
+            // d'inventaire six mois plus tard. Le modèle refuse désormais cette
+            // suppression ; c'est une écriture de sens inverse qui corrige.
             $oldDetails = VenteDetail::where('vente_id', $vente->id)->with('produit')->get();
             if ($etaitFacturee) {
-                foreach ($oldDetails as $oldDetail) {
-                    if ($oldDetail->produit && $oldDetail->produit->estStockable()) {
-                        $oldDetail->produit->incrementStock($pointDeVenteId, $oldDetail->quantite);
-                    }
-                }
+                StockService::contrePasserLaPiece($vente, ['reference' => $vente->numero_facture]);
             }
 
-            // 2. Supprimer les anciens détails, mouvements de stock et écritures de trésorerie
+            // 2. Supprimer les anciens détails et écritures de trésorerie
             VenteDetail::where('vente_id', $vente->id)->delete();
-            MouvementStock::where('reference_document', $vente->numero_facture)->delete();
             TresorerieJournal::where('reference_document', $vente->numero_facture)->delete();
 
             // 3. Recalculer avec les nouveaux articles
@@ -828,15 +827,14 @@ class VenteControleur
                 }
 
                 if ($produit && $etaitFacturee && $produit->estStockable()) {
-                    $stockAvant = $produit->stockActuel($pointDeVenteId);
+                    $disponible = StockService::disponible($produit, (int) $pointDeVenteId);
 
-                    if ($stockAvant < $article['quantite']) {
+                    if ($disponible < $article['quantite']) {
                         throw new \InvalidArgumentException(
-                            "Stock insuffisant pour « {$produit->nom} » (Disponible: {$stockAvant}, Demandé: {$article['quantite']})."
+                            "Stock insuffisant pour « {$produit->nom} » (Disponible: {$disponible}, Demandé: {$article['quantite']})."
                         );
                     }
 
-                    $produit->decrementStock($pointDeVenteId, $article['quantite']);
                     // Voir explication dans store() : évite le double décrément via la
                     // file "Livraisons à valider" (StockControleur::livraisons()).
                     VenteDetail::where('vente_id', $vente->id)
@@ -845,15 +843,10 @@ class VenteControleur
                         ->limit(1)
                         ->update(['quantite_livree' => $article['quantite']]);
 
-                    MouvementStock::create([
-                        'produit_id'         => $produit->id,
-                        'point_de_vente_id'  => $pointDeVenteId,
-                        'type_mouvement'     => 'Sortie',
-                        'quantite'           => $article['quantite'],
-                        'stock_avant'        => $stockAvant,
-                        'stock_apres'        => $stockAvant - $article['quantite'],
-                        'reference_document' => $vente->numero_facture,
-                    ]);
+                    StockService::sortie($produit, (int) $pointDeVenteId, (float) $article['quantite'],
+                        MouvementStock::LIVRAISON,
+                        ['piece' => $vente, 'reference' => $vente->numero_facture,
+                         'client_id' => $vente->client_id]);
                 }
             }
 
@@ -923,22 +916,14 @@ class VenteControleur
                 // Verrou de ligne pour éviter toute décrémentation concurrente incohérente
                 $produit = $detail->produit ? \App\Modules\Admin\Modeles\Produit::lockForUpdate()->find($detail->produit->id) : null;
                 if ($produit && $produit->estStockable()) {
-                    $stockAvant = $produit->stockActuel($vente->point_de_vente_id);
-                    $produit->decrementStock($vente->point_de_vente_id, $detail->quantite);
-
                     // Évite le double décrément via la file "Livraisons à valider"
                     // (StockControleur::livraisons()) — voir explication dans store().
                     $detail->update(['quantite_livree' => $detail->quantite]);
 
-                    MouvementStock::create([
-                        'produit_id'         => $produit->id,
-                        'point_de_vente_id'  => $vente->point_de_vente_id,
-                        'type_mouvement'     => 'Sortie',
-                        'quantite'           => $detail->quantite,
-                        'stock_avant'        => $stockAvant,
-                        'stock_apres'        => $stockAvant - $detail->quantite,
-                        'reference_document' => $vente->numero_facture,
-                    ]);
+                    StockService::sortie($produit, (int) $vente->point_de_vente_id, (float) $detail->quantite,
+                        MouvementStock::LIVRAISON,
+                        ['piece' => $vente, 'reference' => $vente->numero_facture,
+                         'client_id' => $vente->client_id]);
                 }
             }
 
@@ -1054,20 +1039,15 @@ class VenteControleur
                     'fne_invoice_item_id'=> $detail->fne_invoice_item_id,
                 ]);
 
-                // Ré-incrémenter le stock si le produit est stockable
+                // Retour de la marchandise en stock vendable.
+                //
+                // Un avoir total annule la vente entiere : la marchandise
+                // revient telle quelle. L'avoir partiel, lui, laisse le choix
+                // ligne par ligne — voir `retournerLaMarchandise()`.
                 if ($detail->produit && $detail->produit->estStockable()) {
-                    $stockAvant = $detail->produit->stockActuel($vente->point_de_vente_id);
-                    $detail->produit->incrementStock($vente->point_de_vente_id, $detail->quantite);
-
-                    MouvementStock::create([
-                        'produit_id'         => $detail->produit_id,
-                        'point_de_vente_id'  => $vente->point_de_vente_id,
-                        'type_mouvement'     => 'Entrée', // Retour client
-                        'quantite'           => $detail->quantite,
-                        'stock_avant'        => $stockAvant,
-                        'stock_apres'        => $stockAvant + $detail->quantite,
-                        'reference_document' => $numAvoir,
-                    ]);
+                    StockService::entree($detail->produit, (int) $vente->point_de_vente_id,
+                        (float) $detail->quantite, MouvementStock::RETOUR_CLIENT,
+                        ['piece' => $avoir, 'reference' => $numAvoir, 'client_id' => $vente->client_id]);
                 }
             }
 
@@ -1432,6 +1412,54 @@ class VenteControleur
     }
 
     /**
+     * Le sort de la marchandise rendue, choisi ligne par ligne sur l'avoir.
+     *
+     * Trois cas, et trois seulement :
+     *
+     * - **`reinject`** — elle revient vendable. Une entrée, motif « retour
+     *   client ».
+     * - **`scrap`** — elle revient inutilisable. Deux écritures : elle est
+     *   bien rentrée, puis elle est sortie au rebut. Le stock ne bouge pas au
+     *   total, mais l'histoire est vraie, et le rebut apparaît là où on le
+     *   cherche — c'est aussi ce qui permettra de l'imputer en perte.
+     * - **`none`** — elle n'est pas revenue. Geste commercial, marchandise
+     *   restée chez le client : rien à écrire.
+     *
+     * Le choix était auparavant consigné dans une clé `notes` que
+     * `mouvements_stock` n'a pas : Eloquent la laissait tomber sans rien dire.
+     * Et le rebut écrivait une entrée fantôme — quantité N, `stock_avant` 0,
+     * `stock_apres` 0 — qui ne changeait rien mais se lisait comme une entrée.
+     * Un retour défectueux et un retour vendable étaient donc indiscernables à
+     * l'écran, et le rebut invisible.
+     */
+    private static function retournerLaMarchandise(
+        ?Produit $produit,
+        Vente $venteOrigine,
+        Vente $avoir,
+        string $numAvoir,
+        float $quantite,
+        string $sort
+    ): void {
+        if (!$produit || !$produit->estStockable() || $quantite <= 0 || $sort === 'none') {
+            return;
+        }
+
+        $contexte = [
+            'piece'     => $avoir,
+            'reference' => $numAvoir,
+            'client_id' => $venteOrigine->client_id,
+        ];
+
+        $pointDeVenteId = (int) $venteOrigine->point_de_vente_id;
+
+        StockService::entree($produit, $pointDeVenteId, $quantite, MouvementStock::RETOUR_CLIENT, $contexte);
+
+        if ($sort === 'scrap') {
+            StockService::sortie($produit, $pointDeVenteId, $quantite, MouvementStock::REBUT, $contexte);
+        }
+    }
+
+    /**
      * Taux de TVA réellement appliqué à une ligne, reconstitué depuis les
      * montants enregistrés.
      *
@@ -1629,36 +1657,8 @@ class VenteControleur
                     $totalTva += $itemTva;
                     $totalTtc += $itemTtc;
 
-                    // Action sur stock pour produit catalogue stockable
-                    if ($produit && $produit->estStockable()) {
-                        $stockAction = $itemData['stock_action'] ?? 'none';
-                        if ($stockAction === 'reinject') {
-                            $stockAvant = $produit->stockActuel($parent->point_de_vente_id);
-                            $produit->incrementStock($parent->point_de_vente_id, $qteAvoir);
-
-                            MouvementStock::create([
-                                'produit_id'         => $produitId,
-                                'point_de_vente_id'  => $parent->point_de_vente_id,
-                                'type_mouvement'     => 'Entrée',
-                                'quantite'           => $qteAvoir,
-                                'stock_avant'        => $stockAvant,
-                                'stock_apres'        => $stockAvant + $qteAvoir,
-                                'reference_document' => $numAvoir,
-                                'notes'              => 'Retour client - Réinjecté en stock vendable (Ajouté)',
-                            ]);
-                        } elseif ($stockAction === 'scrap') {
-                            MouvementStock::create([
-                                'produit_id'         => $produitId,
-                                'point_de_vente_id'  => $parent->point_de_vente_id,
-                                'type_mouvement'     => 'Entrée',
-                                'quantite'           => $qteAvoir,
-                                'stock_avant'        => 0,
-                                'stock_apres'        => 0,
-                                'reference_document' => $numAvoir,
-                                'notes'              => 'Retour client défectueux - Mis au rebut (Ajouté)',
-                            ]);
-                        }
-                    }
+                    self::retournerLaMarchandise($produit, $parent, $avoir, $numAvoir,
+                        (float) $qteAvoir, $itemData['stock_action'] ?? 'none');
                 } else {
                     $detail = VenteDetail::where('vente_id', $parent->id)->where('id', $itemId)->first();
                     if (!$detail) continue;
@@ -1708,36 +1708,8 @@ class VenteControleur
                     $totalTva += $itemTva;
                     $totalTtc += $itemTtc;
 
-                    // Action sur stock
-                    if ($detail->produit && $detail->produit->estStockable()) {
-                        $stockAction = $itemData['stock_action'] ?? 'none';
-                        if ($stockAction === 'reinject') {
-                            $stockAvant = $detail->produit->stockActuel($parent->point_de_vente_id);
-                            $detail->produit->incrementStock($parent->point_de_vente_id, $qteAvoir);
-
-                            MouvementStock::create([
-                                'produit_id'         => $detail->produit_id,
-                                'point_de_vente_id'  => $parent->point_de_vente_id,
-                                'type_mouvement'     => 'Entrée',
-                                'quantite'           => $qteAvoir,
-                                'stock_avant'        => $stockAvant,
-                                'stock_apres'        => $stockAvant + $qteAvoir,
-                                'reference_document' => $numAvoir,
-                                'notes'              => 'Retour client - Réinjecté en stock vendable',
-                            ]);
-                        } elseif ($stockAction === 'scrap') {
-                            MouvementStock::create([
-                                'produit_id'         => $detail->produit_id,
-                                'point_de_vente_id'  => $parent->point_de_vente_id,
-                                'type_mouvement'     => 'Entrée',
-                                'quantite'           => $qteAvoir,
-                                'stock_avant'        => 0,
-                                'stock_apres'        => 0,
-                                'reference_document' => $numAvoir,
-                                'notes'              => 'Retour client défectueux - Mis au rebut',
-                            ]);
-                        }
-                    }
+                    self::retournerLaMarchandise($detail->produit, $parent, $avoir, $numAvoir,
+                        (float) $qteAvoir, $itemData['stock_action'] ?? 'none');
                 }
             }
 

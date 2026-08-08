@@ -20,6 +20,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\View\View;
+use App\Modules\Admin\Services\StockService;
 
 class BonLivraisonControleur extends Controller
 {
@@ -199,27 +200,25 @@ class BonLivraisonControleur extends Controller
                     $produit = Produit::lockForUpdate()->find($ligne['produit_id']);
 
                     if ($produit && $produit->estStockable()) {
-                        $stockAvant = $produit->stockActuel($vente->point_de_vente_id);
+                        // La disponibilite se lit sous le verrou de la fiche,
+                        // celui-la meme qui servira a la sortie.
+                        $disponible = StockService::disponible($produit, (int) $vente->point_de_vente_id);
 
-                        if ($stockAvant < $qteL) {
+                        if ($disponible < $qteL) {
                             throw new \InvalidArgumentException(
-                                "Stock insuffisant pour livrer « {$produit->nom} » (Disponible: {$stockAvant}, Demandé: {$qteL})."
+                                "Stock insuffisant pour livrer « {$produit->nom} » (Disponible: {$disponible}, Demandé: {$qteL})."
                             );
                         }
 
-                        $produit->decrementStock($vente->point_de_vente_id, $qteL);
-
-                        // Traçabilité : auparavant ce mouvement n'était enregistré nulle
-                        // part (Stock::decrement brut, sans ligne MouvementStock).
-                        MouvementStock::create([
-                            'produit_id'         => $produit->id,
-                            'point_de_vente_id'  => $vente->point_de_vente_id,
-                            'type_mouvement'     => 'Sortie',
-                            'quantite'           => $qteL,
-                            'stock_avant'        => $stockAvant,
-                            'stock_apres'        => $stockAvant - $qteL,
-                            'reference_document' => $numeroBL,
-                        ]);
+                        // Ce mouvement partait sans sous-type : l'ecran des
+                        // mouvements le rangeait dans le defaut, en gris, et la
+                        // section « Ventes » ne le montrait pas.
+                        StockService::sortie($produit, (int) $vente->point_de_vente_id, (float) $qteL,
+                            MouvementStock::LIVRAISON, [
+                                'piece'     => $bl,
+                                'reference' => $numeroBL,
+                                'client_id' => $vente->client_id,
+                            ]);
 
                         // Synchroniser avec le détail de vente d'origine : évite le
                         // double décrément si l'utilisateur passe aussi par la file

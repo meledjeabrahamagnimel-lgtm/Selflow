@@ -13,6 +13,8 @@ use Illuminate\View\View;
 use App\Modules\Admin\Regles\Appartenance;
 use App\Modules\Admin\Regles\Quantite;
 use App\Modules\Admin\Modeles\Stock;
+use App\Modules\Admin\Services\StockService;
+use Illuminate\Support\Facades\DB;
 
 class StockControleur
 {
@@ -77,7 +79,7 @@ class StockControleur
             $qReceptions->where('point_de_vente_id', $pointDeVenteId);
             $qLivraisons->where('point_de_vente_id', $pointDeVenteId);
             $qTransferts->where(function($q) use ($pointDeVenteId) {
-                $q->where('point_de_vente_contrepartie_id', $pointDeVenteId)
+                $q->where('point_de_vente_source_id', $pointDeVenteId)
                   ->orWhere('point_de_vente_destination_id', $pointDeVenteId);
             });
         }
@@ -197,34 +199,27 @@ class StockControleur
             return back()->with('erreur', 'Veuillez sélectionner un point de vente spécifique pour effectuer un retrait.');
         }
 
-        $stockObj = \App\Modules\Admin\Modeles\Stock::where('produit_id', $produit->id)
-            ->where('point_de_vente_id', $pointDeVenteId)
-            ->first();
-
-        $stockDisponible = $stockObj ? $stockObj->quantite_disponible : 0;
         $quantiteRetrait = round((float) $request->quantite, Stock::DECIMALES);
 
-        if ($quantiteRetrait > $stockDisponible) {
-            return back()->with('erreur', "Quantité insuffisante en stock (Disponible: $stockDisponible).");
-        }
+        // La disponibilité se lit sous le verrou qui servira au retrait : lue
+        // hors transaction, elle est déjà périmée au moment où l'on s'en sert.
+        $insuffisant = DB::transaction(function () use ($produit, $pointDeVenteId, $quantiteRetrait) {
+            $disponible = StockService::disponible($produit, (int) $pointDeVenteId);
 
-        \Illuminate\Support\Facades\DB::transaction(function () use ($produit, $pointDeVenteId, $stockDisponible, $quantiteRetrait) {
-            // Décrémenter le stock
-            $produit->decrementStock($pointDeVenteId, $quantiteRetrait);
+            if ($quantiteRetrait > $disponible) {
+                return $disponible;
+            }
 
-            // Mouvement de type Rebut
-            MouvementStock::create([
-                'produit_id'         => $produit->id,
-                'point_de_vente_id'  => $pointDeVenteId,
-                'type_mouvement'     => 'Sortie',
-                'sous_type'          => 'Rebut',
-                'quantite'           => $quantiteRetrait,
-                'stock_avant'        => $stockDisponible,
-                'stock_apres'        => $stockDisponible - $quantiteRetrait,
-                'utilisateur_id'     => Auth::id(),
-                'reference_document' => 'REBUT-' . now()->format('YmdHis'),
+            StockService::sortie($produit, (int) $pointDeVenteId, $quantiteRetrait, MouvementStock::REBUT, [
+                'reference' => 'REBUT-' . now()->format('YmdHis'),
             ]);
+
+            return null;
         });
+
+        if ($insuffisant !== null) {
+            return back()->with('erreur', "Quantité insuffisante en stock (Disponible: {$insuffisant}).");
+        }
 
         // Journaliser
         \App\Modules\Admin\Modeles\JournalAudit::create([
@@ -276,14 +271,14 @@ class StockControleur
         
         $request->validate([
             'reception'   => ['required', 'array', 'min:1'],
-            'reception.*' => ['required', 'integer', 'min:0'],
+            'reception.*' => Quantite::facultative(),
         ]);
 
         $pointDeVenteId = $achat->point_de_vente_id;
 
         DB::transaction(function () use ($request, $achat, $pointDeVenteId) {
             foreach ($request->reception as $detailId => $qtyAReceptionner) {
-                $qtyAReceptionner = intval($qtyAReceptionner);
+                $qtyAReceptionner = round((float) $qtyAReceptionner, Stock::DECIMALES);
                 if ($qtyAReceptionner <= 0) continue;
 
                 $detail = AchatDetail::findOrFail($detailId);
@@ -299,28 +294,14 @@ class StockControleur
 
                 $produit = $detail->produit;
                 if ($produit && $produit->estStockable()) {
-                    $stockObj = Stock::where('produit_id', $produit->id)
-                        ->where('point_de_vente_id', $pointDeVenteId)
-                        ->first();
-                    $stockAvant = $stockObj ? $stockObj->quantite_disponible : 0;
-
-                    // Ajuster les quantités de réception et de stock
                     $detail->increment('quantite_receptionnee', $qtyAReceptionner);
-                    $produit->incrementStock($pointDeVenteId, $qtyAReceptionner);
 
-                    // Mouvement de stock Entrée sous-type Réception
-                    MouvementStock::create([
-                        'produit_id'         => $produit->id,
-                        'point_de_vente_id'  => $pointDeVenteId,
-                        'type_mouvement'     => 'Entrée',
-                        'sous_type'          => 'Reception',
-                        'fournisseur_id'     => $achat->fournisseur_id,
-                        'utilisateur_id'     => Auth::id(),
-                        'quantite'           => $qtyAReceptionner,
-                        'stock_avant'        => $stockAvant,
-                        'stock_apres'        => $stockAvant + $qtyAReceptionner,
-                        'reference_document' => $achat->numero_facture,
-                    ]);
+                    StockService::entree($produit, (int) $pointDeVenteId, (float) $qtyAReceptionner,
+                        MouvementStock::RECEPTION, [
+                            'piece'          => $achat,
+                            'reference'      => $achat->numero_facture,
+                            'fournisseur_id' => $achat->fournisseur_id,
+                        ]);
                 }
             }
 
@@ -388,14 +369,14 @@ class StockControleur
 
         $request->validate([
             'livraison'   => ['required', 'array', 'min:1'],
-            'livraison.*' => ['required', 'integer', 'min:0'],
+            'livraison.*' => Quantite::facultative(),
         ]);
 
         $pointDeVenteId = $vente->point_de_vente_id;
 
         DB::transaction(function () use ($request, $vente, $pointDeVenteId) {
             foreach ($request->livraison as $detailId => $qtyALivrer) {
-                $qtyALivrer = intval($qtyALivrer);
+                $qtyALivrer = round((float) $qtyALivrer, Stock::DECIMALES);
                 if ($qtyALivrer <= 0) continue;
 
                 $detail = VenteDetail::findOrFail($detailId);
@@ -411,32 +392,24 @@ class StockControleur
 
                 $produit = $detail->produit;
                 if ($produit && $produit->estStockable()) {
-                    $stockObj = Stock::where('produit_id', $produit->id)
-                        ->where('point_de_vente_id', $pointDeVenteId)
-                        ->first();
-                    $stockDisponible = $stockObj ? $stockObj->quantite_disponible : 0;
+                    // La disponibilite se lit sous le verrou qui servira a la
+                    // sortie : lue avant, elle est deja perimee au moment ou
+                    // l'on s'en sert, et deux livraisons simultanees la
+                    // trouveraient toutes deux suffisante.
+                    $disponible = StockService::disponible($produit, (int) $pointDeVenteId);
 
-                    if ($qtyALivrer > $stockDisponible) {
-                        throw new \InvalidArgumentException("Stock insuffisant pour livrer {$produit->nom} (Disponible: {$stockDisponible}, Demandé: {$qtyALivrer}).");
+                    if ($qtyALivrer > $disponible) {
+                        throw new \InvalidArgumentException("Stock insuffisant pour livrer {$produit->nom} (Disponible: {$disponible}, Demandé: {$qtyALivrer}).");
                     }
 
-                    // Ajuster les quantités de livraison et de stock
                     $detail->increment('quantite_livree', $qtyALivrer);
-                    $produit->decrementStock($pointDeVenteId, $qtyALivrer);
 
-                    // Mouvement de stock Sortie sous-type Livraison
-                    MouvementStock::create([
-                        'produit_id'         => $produit->id,
-                        'point_de_vente_id'  => $pointDeVenteId,
-                        'type_mouvement'     => 'Sortie',
-                        'sous_type'          => 'Livraison',
-                        'client_id'          => $vente->client_id,
-                        'utilisateur_id'     => Auth::id(),
-                        'quantite'           => $qtyALivrer,
-                        'stock_avant'        => $stockDisponible,
-                        'stock_apres'        => $stockDisponible - $qtyALivrer,
-                        'reference_document' => $vente->numero_facture,
-                    ]);
+                    StockService::sortie($produit, (int) $pointDeVenteId, (float) $qtyALivrer,
+                        MouvementStock::LIVRAISON, [
+                            'piece'     => $vente,
+                            'reference' => $vente->numero_facture,
+                            'client_id' => $vente->client_id,
+                        ]);
                 }
             }
 

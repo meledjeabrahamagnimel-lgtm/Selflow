@@ -21,6 +21,7 @@ use App\Modules\Admin\Modeles\B2bNegotiation;
 use App\Modules\Admin\Modeles\Entreprise;
 use App\Modules\Admin\Regles\Appartenance;
 use App\Modules\Admin\Regles\Quantite;
+use App\Modules\Admin\Services\StockService;
 
 class AchatControleur
 {
@@ -240,18 +241,21 @@ class AchatControleur
 
                 // Augmenter le stock + mouvement uniquement si Facture et stockable
                 if ($produit && $etape === 'Facture' && $produit->estStockable()) {
-                    $stockAvant = $produit->stockActuel($pointDeVenteId);
-                    $produit->incrementStock($pointDeVenteId, $article['quantite']);
+                    // Marquer la ligne comme entierement receptionnee : facturer
+                    // directement vaut reception immediate, symetrique de ce que
+                    // la vente au comptant fait pour la livraison.
+                    //
+                    // C'etait la seconde porte du meme stock : sans cette ligne,
+                    // la commande restait dans la file « Receptions a traiter »
+                    // (StockControleur::receptions()), qui se fonde sur
+                    // quantite_receptionnee, et valider la reception incrementait
+                    // le stock UNE SECONDE FOIS. Rien ne l'interdisait.
+                    $detail->update(['quantite_receptionnee' => $article['quantite']]);
 
-                    MouvementStock::create([
-                        'produit_id'         => $produit->id,
-                        'point_de_vente_id'  => $pointDeVenteId,
-                        'type_mouvement'     => 'Entrée',
-                        'quantite'           => $article['quantite'],
-                        'stock_avant'        => $stockAvant,
-                        'stock_apres'        => $stockAvant + $article['quantite'],
-                        'reference_document' => $numero,
-                    ]);
+                    StockService::entree($produit, (int) $pointDeVenteId, (float) $article['quantite'],
+                        MouvementStock::RECEPTION,
+                        ['piece' => $achat, 'reference' => $numero,
+                         'fournisseur_id' => $achat->fournisseur_id]);
                 }
             }
 
@@ -464,6 +468,51 @@ class AchatControleur
         return view('admin::factures.bapa', compact('achat', 'dejaPaye'));
     }
 
+    /**
+     * Le sort de la marchandise rendue au fournisseur, ligne par ligne.
+     *
+     * Deux cas seulement, malgré le nom du code d'origine :
+     *
+     * - **`reinject`** — la marchandise repart physiquement. C'est une sortie
+     *   de stock. Le mot vient de l'écran des avoirs de vente, où il désigne
+     *   une entrée ; sur un achat il désigne l'inverse, et c'est trompeur.
+     * - **tout le reste** — avoir purement financier : remise obtenue après
+     *   coup, erreur de facturation. La marchandise reste, le stock ne bouge
+     *   pas.
+     *
+     * Le choix était consigné dans une clé `notes` que `mouvements_stock` n'a
+     * pas : Eloquent la laissait tomber sans rien dire.
+     */
+    private static function rendreAuFournisseur(
+        ?Produit $produit,
+        Achat $achatOrigine,
+        Achat $avoir,
+        string $numAvoir,
+        float $quantite,
+        string $sort
+    ): void {
+        if (!$produit || !$produit->estStockable() || $quantite <= 0 || $sort !== 'reinject') {
+            return;
+        }
+
+        $pointDeVenteId = (int) $achatOrigine->point_de_vente_id;
+        $disponible = StockService::disponible($produit, $pointDeVenteId);
+
+        if ($disponible < $quantite) {
+            throw new \InvalidArgumentException(
+                "Retour fournisseur impossible pour « {$produit->nom} » : stock actuel "
+                . "({$disponible}) inférieur à la quantité à retourner ({$quantite}). "
+                . 'Une partie a probablement déjà été revendue.'
+            );
+        }
+
+        StockService::sortie($produit, $pointDeVenteId, $quantite, MouvementStock::RETOUR_FOURNISSEUR, [
+            'piece'          => $avoir,
+            'reference'      => $numAvoir,
+            'fournisseur_id' => $achatOrigine->fournisseur_id,
+        ]);
+    }
+
     private function autoriserAcces(Achat $achat): void
     {
         $entrepriseId = Auth::user()->entreprise_id;
@@ -501,18 +550,15 @@ class AchatControleur
             foreach ($achat->details as $detail) {
                 $produit = $detail->produit;
                 if ($produit && $produit->estStockable()) {
-                    $stockAvant = $produit->stockActuel($achat->point_de_vente_id);
-                    $produit->incrementStock($achat->point_de_vente_id, $detail->quantite);
+                    // Meme raison qu'a la facturation directe : sans cela, la
+                    // file des receptions proposerait de receptionner une
+                    // seconde fois ce qui vient d'entrer.
+                    $detail->update(['quantite_receptionnee' => $detail->quantite]);
 
-                    MouvementStock::create([
-                        'produit_id'         => $produit->id,
-                        'point_de_vente_id'  => $achat->point_de_vente_id,
-                        'type_mouvement'     => 'Entrée',
-                        'quantite'           => $detail->quantite,
-                        'stock_avant'        => $stockAvant,
-                        'stock_apres'        => $stockAvant + $detail->quantite,
-                        'reference_document' => $achat->numero_facture,
-                    ]);
+                    StockService::entree($produit, (int) $achat->point_de_vente_id, (float) $detail->quantite,
+                        MouvementStock::RECEPTION,
+                        ['piece' => $achat, 'reference' => $achat->numero_facture,
+                         'fournisseur_id' => $achat->fournisseur_id]);
                 }
             }
 
@@ -613,25 +659,18 @@ class AchatControleur
 
                 // Décrémenter le stock si le produit est stockable
                 if ($detail->produit && $detail->produit->estStockable()) {
-                    $stockAvant = $detail->produit->stockActuel($achat->point_de_vente_id);
+                    $disponible = StockService::disponible($detail->produit, (int) $achat->point_de_vente_id);
 
-                    if ($stockAvant < $detail->quantite) {
+                    if ($disponible < $detail->quantite) {
                         throw new \InvalidArgumentException(
-                            "Retour fournisseur impossible pour « {$detail->produit->nom} » : stock actuel ({$stockAvant}) inférieur à la quantité à retourner ({$detail->quantite}). Une partie a probablement déjà été revendue."
+                            "Retour fournisseur impossible pour « {$detail->produit->nom} » : stock actuel ({$disponible}) inférieur à la quantité à retourner ({$detail->quantite}). Une partie a probablement déjà été revendue."
                         );
                     }
 
-                    $detail->produit->decrementStock($achat->point_de_vente_id, $detail->quantite);
-
-                    MouvementStock::create([
-                        'produit_id'         => $detail->produit_id,
-                        'point_de_vente_id'  => $achat->point_de_vente_id,
-                        'type_mouvement'     => 'Sortie', // Retour fournisseur
-                        'quantite'           => $detail->quantite,
-                        'stock_avant'        => $stockAvant,
-                        'stock_apres'        => $stockAvant - $detail->quantite,
-                        'reference_document' => $numAvoir,
-                    ]);
+                    StockService::sortie($detail->produit, (int) $achat->point_de_vente_id,
+                        (float) $detail->quantite, MouvementStock::RETOUR_FOURNISSEUR,
+                        ['piece' => $avoir, 'reference' => $numAvoir,
+                         'fournisseur_id' => $achat->fournisseur_id]);
                 }
             }
 
@@ -837,29 +876,8 @@ class AchatControleur
 
                     // Action sur stock (décrémentation stock si retour physique marchandise)
                     if ($produit && $produit->estStockable()) {
-                        $stockAction = $itemData['stock_action'] ?? 'none';
-                        if ($stockAction === 'reinject') {
-                            $stockAvant = $produit->stockActuel($parent->point_de_vente_id);
-
-                            if ($stockAvant < $qteAvoir) {
-                                throw new \InvalidArgumentException(
-                                    "Retour fournisseur impossible pour « {$produit->nom} » : stock actuel ({$stockAvant}) inférieur à la quantité à retourner ({$qteAvoir})."
-                                );
-                            }
-
-                            $produit->decrementStock($parent->point_de_vente_id, $qteAvoir);
-
-                            MouvementStock::create([
-                                'produit_id'         => $produitId,
-                                'point_de_vente_id'  => $parent->point_de_vente_id,
-                                'type_mouvement'     => 'Sortie',
-                                'quantite'           => $qteAvoir,
-                                'stock_avant'        => $stockAvant,
-                                'stock_apres'        => $stockAvant - $qteAvoir,
-                                'reference_document' => $numAvoir,
-                                'notes'              => 'Retour fournisseur - Sortie physique de stock (Ajouté)',
-                            ]);
-                        }
+                        self::rendreAuFournisseur($produit, $parent, $avoir, $numAvoir,
+                            (float) $qteAvoir, $itemData['stock_action'] ?? 'none');
                     }
                 } else {
                     $detail = \App\Modules\Admin\Modeles\AchatDetail::where('achat_id', $parent->id)->where('id', $itemId)->first();
@@ -886,22 +904,8 @@ class AchatControleur
 
                     // Action sur stock (décrémentation stock si retour physique marchandise)
                     if ($detail->produit && $detail->produit->estStockable()) {
-                        $stockAction = $itemData['stock_action'] ?? 'none';
-                        if ($stockAction === 'reinject') {
-                            $stockAvant = $detail->produit->stockActuel($parent->point_de_vente_id);
-                            $detail->produit->decrementStock($parent->point_de_vente_id, $qteAvoir);
-
-                            MouvementStock::create([
-                                'produit_id'         => $detail->produit_id,
-                                'point_de_vente_id'  => $parent->point_de_vente_id,
-                                'type_mouvement'     => 'Sortie',
-                                'quantite'           => $qteAvoir,
-                                'stock_avant'        => $stockAvant,
-                                'stock_apres'        => $stockAvant - $qteAvoir,
-                                'reference_document' => $numAvoir,
-                                'notes'              => 'Retour fournisseur - Sortie physique de stock',
-                            ]);
-                        }
+                        self::rendreAuFournisseur($detail->produit, $parent, $avoir, $numAvoir,
+                            (float) $qteAvoir, $itemData['stock_action'] ?? 'none');
                     }
                 }
             }

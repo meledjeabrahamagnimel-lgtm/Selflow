@@ -17,6 +17,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\View\View;
 use App\Modules\Admin\Services\ComptabiliteService;
 use App\Modules\Admin\Regles\Appartenance;
+use App\Modules\Admin\Services\StockService;
 
 class ProductionControleur extends Controller
 {
@@ -361,22 +362,10 @@ class ProductionControleur extends Controller
             foreach ($besoins as $b) {
                 $produit = $b['ingredient'];
                 $qty = $b['quantite'];
-                $stockAvant = $produit->stockActuel($ordre->point_de_vente_id);
 
-                $produit->decrementStock($ordre->point_de_vente_id, $qty);
-
-                // Mouvement de stock de type Sortie
-                MouvementStock::create([
-                    'produit_id'         => $produit->id,
-                    'point_de_vente_id'  => $ordre->point_de_vente_id,
-                    'type_mouvement'     => 'Sortie',
-                    'sous_type'          => 'production_consommation',
-                    'quantite'           => $qty,
-                    'stock_avant'        => $stockAvant,
-                    'stock_apres'        => $stockAvant - $qty,
-                    'reference_document' => $ordre->code_ordre,
-                    'utilisateur_id'     => Auth::id(),
-                ]);
+                StockService::sortie($produit, (int) $ordre->point_de_vente_id, (float) $qty,
+                    MouvementStock::PRODUCTION_CONSOMMATION,
+                    ['piece' => $ordre, 'reference' => $ordre->code_ordre]);
 
                 // Préparer pour l'écriture comptable
                 $consommationsCompta[] = [
@@ -389,22 +378,13 @@ class ProductionControleur extends Controller
             // Incrémenter le produit fini
             $produitFini = $ordre->produitFini;
             $qtyFini = $ordre->quantite_cible;
-            $stockAvantFini = $produitFini->stockActuel($ordre->point_de_vente_id);
 
-            $produitFini->incrementStock($ordre->point_de_vente_id, $qtyFini);
-
-            // Mouvement de stock de type Entrée
-            MouvementStock::create([
-                'produit_id'         => $produitFini->id,
-                'point_de_vente_id'  => $ordre->point_de_vente_id,
-                'type_mouvement'     => 'Entree',
-                'sous_type'          => 'production_entree',
-                'quantite'           => $qtyFini,
-                'stock_avant'        => $stockAvantFini,
-                'stock_apres'        => $stockAvantFini + $qtyFini,
-                'reference_document' => $ordre->code_ordre,
-                'utilisateur_id'     => Auth::id(),
-            ]);
+            // « Entree » sans accent partait ici : l'ecran des mouvements
+            // compare la chaine exacte, et une entree de production s'affichait
+            // en rouge, precedee d'un signe moins. Le service pose la constante.
+            StockService::entree($produitFini, (int) $ordre->point_de_vente_id, (float) $qtyFini,
+                MouvementStock::PRODUCTION_ENTREE,
+                ['piece' => $ordre, 'reference' => $ordre->code_ordre]);
 
             // Mettre à jour le statut de l'ordre
             $ordre->update([

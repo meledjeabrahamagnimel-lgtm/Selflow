@@ -6,8 +6,8 @@ et ce fichier. Tout ce qui a été décidé, tout ce qui a été écarté et pou
 tout ce qui reste à faire doit donc figurer ici — et y être tenu à jour à chaque
 lot terminé.
 
-Dernière mise à jour : 8 août 2026 — lot 3.1 : les quantités passent en décimal
-sur toute la chaîne.
+Dernière mise à jour : 8 août 2026 — lots 3.1 à 3.4 : le stock passe par une
+seule porte, et son journal ne s’efface plus.
 
 ---
 
@@ -320,9 +320,11 @@ créer — les codes viennent d'un formulaire.
 | Étape | État |
 |---|---|
 | 3.1 · Quantités décimales de bout en bout | **TERMINÉ** |
-| 3.2 · `StockService` unique, journal en écriture seule | à faire |
-| 3.3 · Rebrancher les appelants, fermer la double porte d'achat | à faire |
-| 3.4 · Sort de la marchandise sur les avoirs | à faire |
+| 3.2 · `StockService` unique, journal en écriture seule | **TERMINÉ** |
+| 3.3 · Rebrancher les appelants, fermer la double porte d'achat | **TERMINÉ** |
+| 3.4 · Sort de la marchandise sur les avoirs | **TERMINÉ** |
+| 3.5 · Module d'inventaire physique | à faire |
+| 3.6 · Engagements sur devis et bons de commande | à faire |
 
 #### 3.1 — Les quantités cessent d'être entières
 
@@ -365,12 +367,105 @@ le navigateur, sans message compréhensible.
 
 - `tests/Feature/QuantitesDecimalesTest.php` — 15 tests.
 
-#### 3.2 à 3.4 — reste à faire
+#### 3.2 — Une seule porte, un journal qui ne s'efface pas
 
-`StockService` unique et journal en écriture seule, relation polymorphe vers la
-pièce, quatre portes (réception, livraison, production, inventaire), cycle
-d'achat complet, engagements pour devis et commandes, sort de la marchandise
-choisi ligne par ligne sur les avoirs.
+Le couple « modifier la fiche, puis écrire le mouvement » était recopié dans
+plus de douze endroits, sur sept contrôleurs et deux contrôleurs d'API. Trois
+conséquences, toutes constatées dans le dépôt :
+
+- **rien ne garantissait la paire.** Une exception entre les deux gestes
+  laissait un stock modifié sans trace, ou une trace sans stock ; plusieurs de
+  ces blocs n'étaient même pas dans une transaction ;
+- **`stock_avant` était lu sans verrou.** Deux ventes simultanées sur le même
+  article lisaient la même valeur, écrivaient chacune leur `stock_apres`, et le
+  journal annonçait un stock que la fiche démentait ;
+- **les libellés divergeaient.** Six formes différentes pour quatre notions.
+
+`App\Modules\Admin\Services\StockService` rend les trois gestes indissociables —
+verrouiller sous `lockForUpdate`, modifier la fiche, journaliser — et les motifs
+deviennent des constantes de `MouvementStock`.
+
+| Méthode | Ce qu'elle fait |
+|---|---|
+| `entree` / `sortie` | Le geste unique, avec son motif |
+| `transferer` | Les deux jambes, verrous pris dans un ordre stable pour éviter l'interblocage |
+| `inventorier` | L'écart d'un comptage physique, dans le sens qu'il faut ; rien si le comptage est conforme |
+| `contrePasser` | L'écriture de sens inverse, qui désigne celle qu'elle annule |
+| `contrePasserLaPiece` | Toutes celles d'une vente ou d'un achat |
+| `disponible` | La quantité lue **sous le verrou** qui servira à l'écriture |
+
+**Le journal ne s'efface pas.** `MouvementStock` refuse la suppression et la
+modification des colonnes qui font foi ; `reference_document` reste modifiable,
+c'est un libellé d'affichage. Contre-passer deux fois le même mouvement est
+refusé : cela fabriquerait de la marchandise qui n'a jamais existé.
+
+Une pièce se rattache désormais vraiment à ses mouvements
+(`piece_type` / `piece_id`). `reference_document` est une chaîne libre :
+renuméroter une facture rompait le lien sans que rien ne le signale.
+
+- `tests/Feature/StockServiceTest.php` — 20 tests.
+
+#### 3.3 — Les douze copies disparaissent
+
+Sept contrôleurs et deux contrôleurs d'API passent par le service. Il ne reste
+aucun `MouvementStock::create` hors du service, et `Produit::incrementStock()` /
+`decrementStock()` sont marquées `@deprecated` — elles ne subsistent que pour le
+jeu de données de démonstration.
+
+**La double porte de l'achat est fermée.** `AchatControleur` incrémentait le
+stock à la facture mais ne marquait pas la ligne reçue : la commande restait
+dans la file « Réceptions à traiter », et valider la réception incrémentait
+**une seconde fois**. Rien ne l'interdisait. La facture vaut désormais réception
+immédiate — `quantite_receptionnee` est posée — exactement comme la vente au
+comptant vaut livraison immédiate.
+
+**La modification d'une vente contre-passe au lieu d'effacer.**
+`VenteControleur` faisait
+`MouvementStock::where('reference_document', ...)->delete()` : le stock revenait
+juste, mais la sortie de dix sacs disparaissait du journal, et avec elle toute
+chance d'expliquer un écart d'inventaire six mois plus tard.
+
+**Quatre motifs inventés ne s'affichaient nulle part.** `B2bControleur`
+écrivait `vente` et `achat`, `BonLivraisonControleur` n'écrivait aucun
+sous-type, `ProductionControleur` écrivait `Entree` sans accent. L'écran des
+mouvements compare la chaîne exacte : ces lignes existaient, tombaient dans le
+défaut, s'affichaient en gris — et une entrée de production apparaissait en
+rouge, précédée d'un signe moins.
+
+#### 3.4 — Le sort de la marchandise rendue
+
+Le choix existait déjà à l'écran (`reinject` / `scrap` / `none`), mais il était
+consigné dans une clé **`notes` que `mouvements_stock` n'a pas** : Eloquent la
+laissait tomber sans rien dire. Et le rebut écrivait une entrée fantôme —
+quantité N, `stock_avant` 0, `stock_apres` 0 — qui ne changeait rien mais se
+lisait comme une entrée. Un retour vendable et un retour défectueux étaient donc
+**indiscernables**, et le rebut invisible.
+
+| Choix | Ce qui s'écrit |
+|---|---|
+| Revient vendable | Une entrée, motif `retour_client` |
+| Revient inutilisable | Une entrée `retour_client`, **puis** une sortie `rebut` |
+| N'est pas revenue | Rien : geste commercial, la marchandise est restée chez le client |
+
+Deux écritures pour le rebut plutôt qu'une seule : le stock ne bouge pas au
+total, mais les deux faits sont vrais, et le rebut apparaît là où on le cherche.
+C'est aussi ce qui permettra de l'imputer en perte au lot 4.
+
+Côté achat, `rendreAuFournisseur()` fait le symétrique. Le mot `reinject` y
+désigne l'inverse de ce qu'il désigne côté vente — une **sortie** de stock ; le
+nom vient de l'écran des avoirs de vente et prête à confusion, il est documenté
+là où il est lu.
+
+- `tests/Feature/CycleStockTest.php` — 9 tests, qui passent par les routes et
+  non par le service : les défauts corrigés ici n'étaient pas dans le service,
+  ils étaient dans la façon dont douze endroits l'imitaient chacun à sa manière.
+
+#### 3.5 et 3.6 — reste à faire
+
+Module d'inventaire physique — `StockService::inventorier()` existe, l'écran de
+saisie de comptage non — et engagements de stock sur les devis et bons de
+commande, pour que le prévisionnel cesse d'être une soustraction faite à
+l'affichage.
 
 ### Lot 4 — Les imputations — après 1 et 3
 
@@ -452,14 +547,20 @@ Elles sont documentées pour ne pas être redécouvertes.
 - ~~`quantite_disponible` est un `integer` — le référentiel livre des kg,
   litres, sacs. 12,5 kg de cacao deviennent 12.~~ **CORRIGÉ au lot 3.1** — voir
   le lot 3 pour le détail de la chaîne.
-- Deux portes pour la même entrée : `AchatControleur:242` incrémente à
-  l'enregistrement de la facture, `StockControleur:301` incrémente à la
-  réception. Rien n'interdit les deux.
-- `VenteControleur:698` **supprime** les mouvements de stock à la modification
-  d'une vente. Un journal se contre-passe, il ne s'efface pas.
-- Le couple « décrémenter puis écrire le mouvement » est recopié dans plus de
-  douze endroits, sur sept contrôleurs et deux contrôleurs d'API.
-- `reference_document` est une chaîne libre, pas une relation.
+- ~~Deux portes pour la même entrée : `AchatControleur` incrémente à
+  l'enregistrement de la facture, `StockControleur` incrémente à la réception.
+  Rien n'interdit les deux.~~ **CORRIGÉ au lot 3.3** : la facture pose
+  `quantite_receptionnee`, la ligne quitte la file des réceptions.
+- ~~`VenteControleur:698` **supprime** les mouvements de stock à la
+  modification d'une vente. Un journal se contre-passe, il ne s'efface pas.~~
+  **CORRIGÉ au lot 3.3** : `StockService::contrePasserLaPiece()`, et le modèle
+  refuse désormais toute suppression.
+- ~~Le couple « décrémenter puis écrire le mouvement » est recopié dans plus
+  de douze endroits, sur sept contrôleurs et deux contrôleurs d'API.~~
+  **CORRIGÉ au lot 3.2/3.3** : `StockService` est la seule porte.
+- ~~`reference_document` est une chaîne libre, pas une relation.~~
+  **CORRIGÉ au lot 3.2** : couple `piece_type` / `piece_id`, la chaîne restant
+  pour l'affichage.
 - ~~Une **fiche de stock est créée pour tous les types de produits**, y compris
   les services, avec un minimum de 5 : un service apparaît en permanence dans
   les alertes de rupture.~~ **CORRIGÉ au lot 2** : `ProduitControleur` sort
@@ -468,8 +569,10 @@ Elles sont documentées pour ne pas être redécouvertes.
   cabinet comptable, dont tous les articles sont des missions, le tableau de
   bord n'annonçait jusqu'ici que des ruptures sur des choses qui ne s'épuisent
   pas.
-- Les avoirs réinjectent le stock automatiquement, sans jamais demander si la
-  marchandise revient vendable, en rebut, ou pas du tout.
+- ~~Les avoirs réinjectent le stock automatiquement, sans jamais demander si
+  la marchandise revient vendable, en rebut, ou pas du tout.~~ **CORRIGÉ au
+  lot 3.4** — le choix existait à l'écran mais s'écrivait dans une colonne
+  inexistante ; voir le lot 3.4.
 
 ### Comptabilité
 

@@ -1359,7 +1359,7 @@ class SeedMassiveCommand extends Command
 
             TransfertStock::create([
                 'produit_id' => $produit['id'],
-                'point_de_vente_contrepartie_id' => $source,
+                'point_de_vente_source_id' => $source,
                 'point_de_vente_destination_id' => $destination,
                 'quantite' => $qte,
                 'statut' => 'Validé',

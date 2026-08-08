@@ -497,6 +497,14 @@ class Produit extends Model
 
     /**
      * Incrémenter le stock pour un point de vente donné.
+     *
+     * @deprecated Passez par `StockService::entree()`.
+     *
+     * Cette méthode touche la fiche sans écrire au journal et sans verrou :
+     * c'est la moitié d'un geste qui doit en compter trois. Les douze copies
+     * du couple « décrémenter puis journaliser » qui parsemaient les
+     * contrôleurs partaient d'ici. Elle ne subsiste que pour le jeu de données
+     * de démonstration, qui pose des stocks de départ sans histoire à raconter.
      */
     public function incrementStock($pointDeVenteId, $quantite): void
     {
@@ -514,6 +522,8 @@ class Produit extends Model
 
     /**
      * Décrémenter le stock pour un point de vente donné.
+     *
+     * @deprecated Passez par `StockService::sortie()`. Voir `incrementStock()`.
      */
     public function decrementStock($pointDeVenteId, $quantite): void
     {

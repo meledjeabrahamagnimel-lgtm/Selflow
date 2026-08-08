@@ -14,6 +14,7 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use App\Modules\Admin\Regles\Appartenance;
 use App\Modules\Admin\Regles\Quantite;
+use App\Modules\Admin\Services\StockService;
 
 class AchatApiControleur
 {
@@ -136,7 +137,7 @@ class AchatApiControleur
                 $ht      = $article['quantite'] * $article['prix_unitaire'];
                 $tva     = $ht * 0.18;
 
-                AchatDetail::create([
+                $detail = AchatDetail::create([
                     'achat_id'       => $achat->id,
                     'produit_id'     => $produit ? $produit->id : null,
                     'libelle_virtuel'=> $produit ? null : ($article['libelle_virtuel'] ?? 'Saisie libre'),
@@ -151,18 +152,15 @@ class AchatApiControleur
                 // (pas de contrôle de disponibilité nécessaire ici : un achat
                 // AUGMENTE le stock, aucun risque de valeur négative).
                 if ($produit && $produit->estStockable()) {
-                    $stockAvant = $produit->stockActuel($pointDeVenteId);
-                    $produit->incrementStock($pointDeVenteId, $article['quantite']);
+                    // Reception implicite, comme sur le web : sans cela la file
+                    // des receptions proposerait d'entrer une seconde fois ce
+                    // qui vient d'entrer.
+                    $detail->update(['quantite_receptionnee' => $article['quantite']]);
 
-                    MouvementStock::create([
-                        'produit_id'         => $produit->id,
-                        'point_de_vente_id'  => $pointDeVenteId,
-                        'type_mouvement'     => 'Entrée',
-                        'quantite'           => $article['quantite'],
-                        'stock_avant'        => $stockAvant,
-                        'stock_apres'        => $stockAvant + $article['quantite'],
-                        'reference_document' => $numero,
-                    ]);
+                    StockService::entree($produit, (int) $pointDeVenteId, (float) $article['quantite'],
+                        MouvementStock::RECEPTION,
+                        ['piece' => $achat, 'reference' => $numero,
+                         'fournisseur_id' => $achat->fournisseur_id]);
                 }
             }
 
