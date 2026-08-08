@@ -295,6 +295,12 @@ Route::prefix('superadmin')
             Route::delete('/{utilisateur}',       [\App\Modules\Admin\Controleurs\SuperadminControleur::class, 'supprimerAdmin'])->name('supprimer');
         });
 
+        // ── Referentiel de preparametrage (consultation seule) ──
+        Route::prefix('referentiel')->name('referentiel.')->group(function () {
+            Route::get('/',        [\App\Modules\Admin\Controleurs\SuperadminReferentielControleur::class, 'index'])->name('index');
+            Route::get('/{code}',  [\App\Modules\Admin\Controleurs\SuperadminReferentielControleur::class, 'profil'])->name('profil');
+        });
+
         // ── Liaisons SELFLOW ↔ COMPTAFLOW ──
         Route::prefix('liaisons')->name('liaisons.')->group(function () {
             Route::get('/',                                    [SuperadminLiaisonControleur::class, 'index'])->name('index');

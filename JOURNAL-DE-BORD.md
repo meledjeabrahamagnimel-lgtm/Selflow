@@ -6,7 +6,7 @@ et ce fichier. Tout ce qui a été décidé, tout ce qui a été écarté et pou
 tout ce qui reste à faire doit donc figurer ici — et y être tenu à jour à chaque
 lot terminé.
 
-Dernière mise à jour : 7 août 2026 — lot 1 quasi terminé.
+Dernière mise à jour : 7 août 2026 — lot 1 terminé.
 
 ---
 
@@ -100,7 +100,7 @@ Poussé sur **Selflow**, fusionné dans `main`.
   écrites, la faute que PHP ne révèle qu'au clic de l'utilisateur.
 - `tests/Feature/CloisonnementTest.php` — 7 tests.
 
-### Lot 1 — Le référentiel en base — **PARTIELLEMENT FAIT**
+### Lot 1 — Le référentiel en base — **TERMINÉ**
 
 Poussé sur **Selflow**. Ce qui est fait :
 
@@ -173,11 +173,14 @@ Poussé sur **Selflow**. Ce qui est fait :
 
 - `tests/Feature/TrousseauEntrepriseTest.php` — 10 tests.
 
-Reste à faire dans ce lot :
+- L'**écran superadmin de consultation** : `/superadmin/referentiel`. Il montre
+  les types d'article et leurs comptes, les dix journaux livrés, et les profils
+  filtrables par catégorie ; le détail d'un profil liste ses familles avec leurs
+  quatre comptes et ses articles types. Consultation seule — le référentiel se
+  modifie dans le classeur puis se recharge par le seeder.
 
-- Écran superadmin de consultation du référentiel.
-- Produits par défaut : ils viendront avec la souscription d'un profil (lot 2),
-  puisqu'ils dépendent du profil choisi.
+**Lot 1 terminé.** Les produits par défaut viendront avec la souscription d'un
+profil (lot 2), puisqu'ils en dépendent.
 
 ### Lot 2 — Le parcours de souscription — après le lot 1
 
@@ -315,6 +318,19 @@ Elles sont documentées pour ne pas être redécouvertes.
 - Un compte absent est créé avec `type_de_compte => 'actif'` en dur et le libellé
   de l'écriture pour intitulé — cela pollue le plan comptable de Comptaflow.
 - Aucune idempotence : rejouer une synchronisation redéverse les mêmes écritures.
+
+### Gestionnaire d'exceptions — **CORRIGÉ**
+
+Le gestionnaire interceptait **toutes** les exceptions et renvoyait la page
+« 500 — panne détectée » pour chacune. En production, cela voulait dire qu'une
+adresse mal tapée, un accès refusé, une session expirée — et surtout **un
+formulaire mal rempli, dont la saisie était perdue** — affichaient une panne.
+Chacune déclenchait en prime un courriel d'alerte à deux adresses : un robot
+cherchant `/wp-admin` inondait la boîte aux lettres.
+
+`App\Exceptions\Panne::estUne()` fait le tri : seules les erreurs serveur
+méritent la page de panne. Découvert en écrivant les tests de l'écran
+superadmin, qui recevaient 500 là où ils attendaient 403 et 404.
 
 ### Importations
 

@@ -53,7 +53,7 @@ return Application::configure(basePath: dirname(__DIR__))
 
         $exceptions->render(function (\Throwable $e, Request $request) {
             // Uniquement pour les requêtes web non-API en production
-            if (!config('app.debug') && !$request->is('api/*')) {
+            if (!config('app.debug') && !$request->is('api/*') && \App\Exceptions\Panne::estUne($e)) {
                 // Tenter d'envoyer l'alerte email aux super-admins
                 try {
                     $url = $request->fullUrl();

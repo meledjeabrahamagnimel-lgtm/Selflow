@@ -570,6 +570,9 @@
             <a href="{{ route('superadmin.secteurs_modules.index') }}" class="nav-item {{ request()->routeIs('superadmin.secteurs_modules*') ? 'active' : '' }}">
                 <i class="fas fa-cubes"></i> Secteurs &amp; Modules
             </a>
+            <a href="{{ route('superadmin.referentiel.index') }}" class="nav-item {{ request()->routeIs('superadmin.referentiel*') ? 'active' : '' }}">
+                <i class="fas fa-book-open"></i> Référentiel d'activités
+            </a>
             @endif
         @elseif(request()->routeIs('caissier.*'))
             <!-- ── CAISSIER SIDEBAR ── -->
