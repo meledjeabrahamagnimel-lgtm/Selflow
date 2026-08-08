@@ -19,6 +19,8 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\View\View;
 use App\Modules\Admin\Regles\Appartenance;
+use App\Modules\Admin\Services\BalanceService;
+use App\Modules\Admin\Services\FiltrePeriodeService;
 
 class ComptabiliteControleur
 {
@@ -557,6 +559,44 @@ class ComptabiliteControleur
         });
 
         return back()->with('succes', 'Règlement enregistré avec succès.');
+    }
+
+    /**
+     * La balance de contrôle.
+     *
+     * Selflow écrit les écritures, Comptaflow les exploite. Mais un client sans
+     * abonnement Comptaflow n'avait **aucun moyen de vérifier ce que Selflow
+     * avait écrit** : les écritures existaient en base, et nulle part un écran
+     * ne les totalisait. Une erreur d'imputation ne se voyait donc jamais.
+     *
+     * La période reprend le filtre commun de l'application ; le site aussi,
+     * pour qu'un gérant puisse contrôler un magasin sans les autres.
+     */
+    public function balance(Request $request): View
+    {
+        $entreprise = Auth::user()->entreprise;
+
+        [$debut, $fin] = FiltrePeriodeService::intervalle($request);
+
+        // Un identifiant de site venu de l'URL est confronté à l'entreprise
+        // avant d'être retenu : sans cela, `?pdv_id=` afficherait la balance
+        // du voisin.
+        $pointDeVenteId = $request->query('pdv_id');
+        $pointDeVenteId = ($pointDeVenteId && $pointDeVenteId !== 'tous')
+            ? \App\Modules\Admin\Modeles\PointDeVente::where('id', $pointDeVenteId)
+                ->where('entreprise_id', $entreprise->id)
+                ->value('id')
+            : null;
+
+        $balance = BalanceService::etablir($entreprise->id, $debut, $fin, $pointDeVenteId);
+
+        return view('admin::comptabilite.balance', [
+            'balance'        => $balance,
+            'generiques'     => BalanceService::comptesGeneriquesUtilises($balance['lignes']),
+            'libellePeriode' => FiltrePeriodeService::libelle($request),
+            'pointsDeVente'  => $entreprise->pointsDeVente()->orderBy('nom')->get(),
+            'pointDeVenteId' => $pointDeVenteId,
+        ]);
     }
 
     /**

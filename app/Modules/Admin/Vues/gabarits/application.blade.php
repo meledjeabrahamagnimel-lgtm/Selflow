@@ -729,6 +729,11 @@
                 <i class="fas fa-book-open"></i> Plan Comptable
             </a>
             @endif
+            @if(auth()->user()->aHabilitation('comptabilite_globale'))
+            <a href="{{ route('admin.comptabilite.balance') }}" class="nav-item {{ request()->routeIs('admin.comptabilite.balance') ? 'active' : '' }}">
+                <i class="fas fa-scale-balanced"></i> Balance de contrôle
+            </a>
+            @endif
             @endif
 
             <!-- Fiscalité & DGI (Module FNE) -->

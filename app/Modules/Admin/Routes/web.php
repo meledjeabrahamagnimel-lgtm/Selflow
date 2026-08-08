@@ -135,6 +135,10 @@ Route::prefix('admin')
             Route::get('/plan-comptable', [\App\Modules\Admin\Controleurs\ComptabiliteControleur::class, 'planComptable'])->name('plan_comptable');
             Route::post('/plan-comptable', [\App\Modules\Admin\Controleurs\ComptabiliteControleur::class, 'creerCompteComptable'])->name('creer_compte_comptable');
             Route::post('/ecritures/manuelle', [\App\Modules\Admin\Controleurs\ComptabiliteControleur::class, 'creerEcritureManuelle'])->name('ecriture_manuelle');
+
+            // Balance de controle : ce qui permet a un client sans abonnement
+            // Comptaflow de verifier ce que Selflow a ecrit.
+            Route::get('/balance', [\App\Modules\Admin\Controleurs\ComptabiliteControleur::class, 'balance'])->name('balance');
         });
 
         // ── Module Fiscalité & DGI (Gestion FNE) ──

@@ -697,6 +697,15 @@ class ComptabiliteService
     {
         $achat->loadMissing('details.produit.categorieRelation');
 
+        // Un bordereau d'achat constate un achat aupres d'un tiers **non
+        // immatricule** : il ne facture aucune TVA, et il n'y a donc rien a
+        // deduire. Le taux du catalogue s'appliquait pourtant ici, comme il
+        // s'appliquait autrefois au document imprime — corrige au lot 1 — et au
+        // payload FNE. L'ecriture creditait donc un compte 445 de TVA
+        // deductible sur une taxe que personne n'avait payee : ce n'est pas une
+        // imprecision comptable, c'est une deduction indue.
+        $sansTva = $achat->type_facture === 'bapa';
+
         $comptes = [];
         $totalTva = 0;
         foreach ($achat->details as $detail) {
@@ -711,14 +720,18 @@ class ComptabiliteService
                 $nom = $detail->libelle_virtuel ?? $detail->produit?->nom;
                 if ($nom) $comptes[$compte]['produits'][] = $nom;
 
-                $tauxTva = $detail->produit?->taux_tva ?? 0;
+                $tauxTva = $sansTva ? 0 : ($detail->produit?->taux_tva ?? 0);
                 if ($tauxTva > 0) {
                     $totalTva += round($ht * ($tauxTva / 100), 2);
                 }
             }
         }
 
-        $tva = $totalTva > 0 ? $totalTva : (float) ($achat->montant_tva ?? 0);
+        // Le repli sur `montant_tva` ne doit pas rattraper ce que l'on vient
+        // d'ecarter : un bordereau dont la piece porterait une TVA — saisie a
+        // tort, ou heritee d'une conversion — la verrait revenir ici.
+        $tva = $sansTva ? 0.0 : ($totalTva > 0 ? $totalTva : (float) ($achat->montant_tva ?? 0));
+
         return ['comptes' => $comptes, 'tva' => $tva];
     }
 

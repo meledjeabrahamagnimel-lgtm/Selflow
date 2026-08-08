@@ -6,8 +6,8 @@ et ce fichier. Tout ce qui a été décidé, tout ce qui a été écarté et pou
 tout ce qui reste à faire doit donc figurer ici — et y être tenu à jour à chaque
 lot terminé.
 
-Dernière mise à jour : 8 août 2026 — lots 4.1 et 4.2 : l’imputation se lit sur
-le rayon, et le stock prend enfin une valeur.
+Dernière mise à jour : 8 août 2026 — lot 4 : imputation, CUMP (Coût Unitaire
+Moyen Pondéré), BAPA sans TVA indue, et une balance de contrôle.
 
 ---
 
@@ -18,8 +18,8 @@ le rayon, et le stock prend enfin une valeur.
 | **Selflow** | Gestion commerciale : ventes, achats, stocks, points de vente, certification FNE auprès de la DGI. Produit les écritures comptables. | `meledjeabrahamagnimel-lgtm/Selflow` |
 | **Comptaflow** | Application comptable complète : balance, grand livre, états SYSCOHADA, analytique. Reçoit les écritures de Selflow. | `guysergekouassi/COMPTAFLOW` |
 
-Selflow écrit, Comptaflow exploite. Un client sans abonnement Comptaflow doit
-malgré tout disposer d'une balance de contrôle dans Selflow — décidé, à faire.
+Selflow écrit, Comptaflow exploite. Un client sans abonnement Comptaflow dispose
+malgré tout d’une balance de contrôle dans Selflow — faite au lot 4.5.
 
 ---
 
@@ -614,8 +614,8 @@ besoin s'en fait sentir. Le test le constate au lieu de le passer sous silence.
 | 4.1 · Chaîne d'imputation article → rayon → défaut | **TERMINÉ** |
 | 4.2 · CUMP (Coût Unitaire Moyen Pondéré) et inventaire permanent | **TERMINÉ** |
 | 4.3 · Règlements et lettrage | à faire |
-| 4.4 · BAPA sans TVA déductible | à faire |
-| 4.5 · Balance de contrôle dans Selflow | à faire |
+| 4.4 · BAPA sans TVA déductible | **TERMINÉ** |
+| 4.5 · Balance de contrôle dans Selflow | **TERMINÉ** |
 
 #### 4.1 — L'imputation se lit sur le rayon
 
@@ -708,6 +708,59 @@ sa propre référence, `MVT-{id}`. La colonne n'accepte pas le vide, et une
 écriture sans référence serait introuvable au grand livre.
 
 - `tests/Feature/InventairePermanentTest.php` — 16 tests.
+
+#### 4.4 — Le bordereau d'achat ne déduit plus de TVA
+
+Un **BAPA** constate un achat auprès d'un tiers **non immatriculé** : il ne
+facture aucune TVA, et il n'y a donc rien à déduire. `ventilationAchat`
+recalculait pourtant la TVA depuis `produits.taux_tva`, le taux du catalogue.
+
+L'écriture débitait donc un compte `445` de TVA déductible **sur une taxe que
+personne n'avait payée**. Ce n'est pas une imprécision comptable : c'est une
+déduction indue, et c'est l'entreprise qui en répond devant l'administration.
+
+C'est le même défaut que celui corrigé au lot 1 sur le document imprimé et sur
+le payload FNE — il subsistait dans la troisième sortie, l'écriture comptable.
+Le repli sur `achats.montant_tva` est écarté lui aussi : un bordereau dont la
+pièce porterait une TVA, saisie à tort ou héritée d'une conversion, la verrait
+sinon revenir par la fenêtre.
+
+Deux tests, et le second compte autant que le premier : écarter la TVA partout
+serait aussi faux que la déduire partout, donc un achat ordinaire doit continuer
+de déduire la sienne.
+
+#### 4.5 — La balance de contrôle
+
+Selflow écrit les écritures, Comptaflow les exploite. Mais **un client sans
+abonnement Comptaflow n'avait aucun moyen de vérifier ce que Selflow avait
+écrit** : les écritures existaient en base, et nulle part un écran ne les
+totalisait. Une erreur d'imputation ne se voyait donc jamais.
+
+`/admin/comptabilite/balance` répond à trois questions, et à trois seulement :
+
+1. **Les débits égalent-ils les crédits ?** Si non, une écriture est incomplète,
+   et tout ce qui en découle — résultat, bilan — est faux. C'est le contrôle qui
+   prime sur les autres, et il s'affiche en tête.
+2. **Quels comptes ont bougé, et de combien ?**
+3. **Quelque chose est-il tombé sur un compte générique ?** Une ligne en
+   `701000` alors que les rayons portent leurs comptes signale un article créé à
+   la main, sans rayon — exactement ce que le lot 4.1 corrige, et ce contrôle
+   dit s'il en reste.
+
+Chaque écriture porte **un compte au débit et un compte au crédit**, sur la même
+ligne : ce n'est pas une ligne par compte. La balance agrège donc les deux
+colonnes séparément avant de les réunir par numéro.
+
+Le solde est **une seule colonne signée** — positif débiteur, négatif créditeur.
+L'écran présente ce qu'il veut ; le calcul n'a pas à choisir pour lui.
+
+Ce n'est **pas un état comptable au sens légal**, et l'écran le dit : les états
+SYSCOHADA — grand livre, bilan, compte de résultat — restent produits par
+Comptaflow.
+
+- `tests/Feature/BalanceTest.php` — 15 tests, dont le filtre de site confronté à
+  l'identifiant d'une autre entreprise : sans ce contrôle, `?pdv_id=`
+  afficherait le chiffre d'affaires du concurrent.
 
 ### Lot 5 — La passerelle Comptaflow — les deux dépôts
 
