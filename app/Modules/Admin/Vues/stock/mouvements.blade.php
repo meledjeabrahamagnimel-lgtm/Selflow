@@ -1,4 +1,5 @@
 @extends('admin::gabarits.application')
+@use('App\Modules\Admin\Modeles\MouvementStock', 'Mvt')
 @section('titre', 'Mouvements de stock')
 @section('topbar_titre', 'Stock — Mouvements')
 
@@ -65,27 +66,30 @@
                     <td>
                         @php
                             $subColors = [
-                                'reception'  => ['bg' => '#ecfdf5', 'color' => '#047857', 'label' => 'Réception'],
-                                'livraison'  => ['bg' => '#eff6ff', 'color' => '#1d4ed8', 'label' => 'Livraison'],
-                                'transfert'  => ['bg' => '#fff7ed', 'color' => '#b45309', 'label' => 'Transfert'],
-                                'rebut'      => ['bg' => '#fef2f2', 'color' => '#b91c1c', 'label' => 'Rebut'],
-                                'ajustement' => ['bg' => '#f3f4f6', 'color' => '#374151', 'label' => 'Ajustement'],
-                                'production' => ['bg' => '#f5f3ff', 'color' => '#6d28d9', 'label' => 'Production'],
+                                Mvt::RECEPTION               => ['bg' => '#ecfdf5', 'color' => '#047857', 'label' => 'Réception'],
+                                Mvt::LIVRAISON               => ['bg' => '#eff6ff', 'color' => '#1d4ed8', 'label' => 'Livraison'],
+                                Mvt::TRANSFERT               => ['bg' => '#fff7ed', 'color' => '#b45309', 'label' => 'Transfert'],
+                                Mvt::REBUT                   => ['bg' => '#fef2f2', 'color' => '#b91c1c', 'label' => 'Rebut'],
+                                Mvt::INVENTAIRE              => ['bg' => '#f3f4f6', 'color' => '#374151', 'label' => 'Inventaire'],
+                                Mvt::PRODUCTION_ENTREE       => ['bg' => '#f5f3ff', 'color' => '#6d28d9', 'label' => 'Production'],
+                                Mvt::PRODUCTION_CONSOMMATION => ['bg' => '#f5f3ff', 'color' => '#6d28d9', 'label' => 'Consommation'],
+                                Mvt::CONTREPASSATION         => ['bg' => '#fffbeb', 'color' => '#92400e', 'label' => 'Contre-passation'],
                             ];
-                            $sc = $subColors[strtolower($m->sous_type)] ?? ['bg' => '#f3f4f6', 'color' => '#374151', 'label' => $m->type_mouvement];
+                            $sc = $subColors[$m->sous_type] ?? ['bg' => '#f3f4f6', 'color' => '#374151', 'label' => $m->type_mouvement];
                         @endphp
                         <span class="badge" style="background:{{ $sc['bg'] }}; color:{{ $sc['color'] }}; padding:4px 10px; border-radius:20px; font-weight:700; font-size:11px;">
                             {{ $sc['label'] }}
                         </span>
                     </td>
-                    <td style="font-weight:700; {{ $m->type_mouvement === 'Entrée' ? 'color:var(--success)' : 'color:var(--danger)' }}">
-                        {{ $m->type_mouvement === 'Entrée' ? '+' : '-' }}{{ $m->quantite }}
+                    @php $estEntree = $m->type_mouvement === Mvt::ENTREE; @endphp
+                    <td style="font-weight:700; {{ $estEntree ? 'color:var(--success)' : 'color:var(--danger)' }}">
+                        {{ $estEntree ? '+' : '-' }}@qte($m->quantite)
                         <span style="font-size:11px; font-weight:400; color:var(--text-3);">{{ $m->produit->unite }}</span>
                     </td>
                     <td>
                         <div style="font-size:13px; font-weight:600; color:var(--text-1);">
-                            {{ $m->stock_apres }}
-                            <span style="font-weight:400; font-size:11px; color:var(--text-3);"> (avant: {{ $m->stock_avant }})</span>
+                            @qte($m->stock_apres)
+                            <span style="font-weight:400; font-size:11px; color:var(--text-3);"> (avant: @qte($m->stock_avant))</span>
                         </div>
                     </td>
                     <td>
@@ -97,17 +101,17 @@
                         @endif
                     </td>
                     <td style="font-size:13px; color:var(--text-2);">
-                        @if(strtolower($m->sous_type) === 'reception' && $m->fournisseur)
+                        @if($m->sous_type === Mvt::RECEPTION && $m->fournisseur)
                             <i class="fas fa-building" style="font-size:11px; color:var(--text-3);"></i> {{ $m->fournisseur->nom }}
-                        @elseif(strtolower($m->sous_type) === 'livraison' && $m->client)
+                        @elseif($m->sous_type === Mvt::LIVRAISON && $m->client)
                             <i class="fas fa-user" style="font-size:11px; color:var(--text-3);"></i> {{ $m->client->nom }}
-                        @elseif(strtolower($m->sous_type) === 'transfert')
-                            @if($m->type_mouvement === 'Sortie')
-                                <i class="fas fa-arrow-right-from-bracket" style="color:var(--danger); font-size:11px;"></i> Vers: <strong>{{ $m->pointDeVente->nom }}</strong>
+                        @elseif($m->sous_type === Mvt::TRANSFERT)
+                            @if($estEntree)
+                                <i class="fas fa-arrow-left-to-bracket" style="color:var(--success); font-size:11px;"></i> Depuis: <strong>{{ $m->pointDeVenteContrepartie->nom ?? 'Autre site' }}</strong>
                             @else
-                                <i class="fas fa-arrow-left-to-bracket" style="color:var(--success); font-size:11px;"></i> Depuis: <strong>{{ $m->pointDeVenteSource->nom ?? 'Autre site' }}</strong>
+                                <i class="fas fa-arrow-right-from-bracket" style="color:var(--danger); font-size:11px;"></i> Vers: <strong>{{ $m->pointDeVenteContrepartie->nom ?? 'Autre site' }}</strong>
                             @endif
-                        @elseif(strtolower($m->sous_type) === 'rebut')
+                        @elseif($m->sous_type === Mvt::REBUT)
                             <span style="color:var(--danger); font-style:italic;"><i class="fas fa-trash-can"></i> Mis au rebut</span>
                         @else
                             —

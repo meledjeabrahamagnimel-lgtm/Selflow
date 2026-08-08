@@ -77,7 +77,7 @@ class StockControleur
             $qReceptions->where('point_de_vente_id', $pointDeVenteId);
             $qLivraisons->where('point_de_vente_id', $pointDeVenteId);
             $qTransferts->where(function($q) use ($pointDeVenteId) {
-                $q->where('point_de_vente_source_id', $pointDeVenteId)
+                $q->where('point_de_vente_contrepartie_id', $pointDeVenteId)
                   ->orWhere('point_de_vente_destination_id', $pointDeVenteId);
             });
         }
@@ -107,7 +107,7 @@ class StockControleur
         $section = $request->input('section', 'tous');
 
         $query = MouvementStock::with([
-            'produit', 'pointDeVente', 'pointDeVenteSource', 'utilisateur', 'fournisseur', 'client'
+            'produit', 'pointDeVente', 'pointDeVenteContrepartie', 'utilisateur', 'fournisseur', 'client'
         ]);
 
         if ($pointDeVenteId) {
@@ -116,15 +116,20 @@ class StockControleur
             $query->whereHas('pointDeVente', fn($q) => $q->where('entreprise_id', $entreprise->id));
         }
 
-        // Filtrer selon la section/sous-type
-        if ($section === 'achats') {
-            $query->where('sous_type', 'Reception');
-        } elseif ($section === 'ventes') {
-            $query->where('sous_type', 'Livraison');
-        } elseif ($section === 'transferts') {
-            $query->where('sous_type', 'Transfert');
-        } elseif ($section === 'rebuts') {
-            $query->where('sous_type', 'Rebut');
+        // Filtrer selon la section. Les motifs sont des constantes de
+        // MouvementStock : ces comparaisons portaient la casse d'origine
+        // (« Reception ») quand l'écran comparait en minuscules, et rien ne
+        // signalait qu'un contrôleur écrivant une autre forme rendait la
+        // section vide.
+        $motifs = [
+            'achats'      => MouvementStock::RECEPTION,
+            'ventes'      => MouvementStock::LIVRAISON,
+            'transferts'  => MouvementStock::TRANSFERT,
+            'rebuts'      => MouvementStock::REBUT,
+        ];
+
+        if (isset($motifs[$section])) {
+            $query->where('sous_type', $motifs[$section]);
         }
 
         $mouvements = $query->latest()->paginate(30);
