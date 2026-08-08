@@ -25,6 +25,7 @@ class Utilisateur extends Authenticatable
         'date_debut_contrat',
         'date_fin_contrat',
         'statut',
+        'visite_guidee_terminee_le',
         'notes',
         'habilitations',
         'jeton_api',
@@ -43,6 +44,7 @@ class Utilisateur extends Authenticatable
             'password'              => 'hashed',
             'habilitations'         => 'array',
             'doit_changer_password' => 'boolean',
+            'visite_guidee_terminee_le' => 'datetime',
         ];
     }
 
@@ -110,5 +112,16 @@ class Utilisateur extends Authenticatable
             $initials = 'U';
         }
         return '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" width="128" height="128"><rect width="128" height="128" fill="#002B5C"/><text x="50%" y="54%" dominant-baseline="middle" text-anchor="middle" font-family="system-ui, -apple-system, BlinkMacSystemFont, \'Segoe UI\', Roboto, Helvetica, Arial, sans-serif" font-size="48" font-weight="800" fill="#FFFFFF">' . $initials . '</text></svg>';
+    }
+
+    /**
+     * A-t-il déjà fait la visite guidée ?
+     *
+     * Elle se retient par utilisateur : un vendeur qui rejoint une entreprise
+     * déjà configurée découvre l'application pour la première fois, lui aussi.
+     */
+    public function aFaitLaVisite(): bool
+    {
+        return $this->visite_guidee_terminee_le !== null;
     }
 }

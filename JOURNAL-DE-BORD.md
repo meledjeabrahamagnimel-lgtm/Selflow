@@ -6,7 +6,7 @@ et ce fichier. Tout ce qui a été décidé, tout ce qui a été écarté et pou
 tout ce qui reste à faire doit donc figurer ici — et y être tenu à jour à chaque
 lot terminé.
 
-Dernière mise à jour : 8 août 2026 — parcours de souscription en place.
+Dernière mise à jour : 8 août 2026 — visite guidée et bannière de configuration.
 
 ---
 
@@ -242,8 +242,28 @@ créer — les codes viennent d'un formulaire.
 - fixer le prix d'un produit d'une autre entreprise est refusé par
   `Appartenance`, avec la vérification de propriétaire en second rideau.
 
-Reste à faire : le stock initial à l'étape 5, et le champ « Autre » sur les
-listes d'unités et de types.
+- **La bannière de configuration** : une entreprise qui n'a pas fait son
+  parcours part d'une page blanche. Le tableau de bord le dit, et annonce le
+  point que l'utilisateur doit connaître avant sa première facture — le
+  catalogue arrive rempli, mais **sans prix**, eux seuls variant selon la zone
+  et la période. Elle disparaît une fois la configuration faite, et ne
+  s'affiche pas pendant le parcours lui-même.
+
+- **La visite guidée de première utilisation** : une main désigne l'élément,
+  une bulle explique à quoi il sert. Six étapes — configuration, catalogue,
+  vente, clients, FNE, paramètres. Elle se retient **par utilisateur et en
+  base** : un vendeur qui rejoint une entreprise déjà configurée la voit à son
+  tour, et changer de poste ne la fait pas recommencer.
+
+  Les cibles sont des attributs `data-visite` posés exprès dans le gabarit :
+  une classe CSS change au gré des retouches, un repère posé pour cela ne bouge
+  pas. Une étape dont la cible est absente — un module fermé — est sautée.
+  `Échap` ferme, et `prefers-reduced-motion` coupe les animations.
+
+- `tests/Feature/VisiteGuideeTest.php` — 9 tests.
+
+Reste à faire : le stock initial à l'étape 5, le champ « Autre » sur les listes
+d'unités et de types, et l'entrée de menu pour revoir la visite.
 
 ### Lot 3 — Le stock suit l'événement — le plus lourd
 

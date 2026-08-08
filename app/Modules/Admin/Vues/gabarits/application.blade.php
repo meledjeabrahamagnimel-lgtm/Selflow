@@ -615,7 +615,7 @@
             @if(in_array('ventes', $modulesActifs) && (auth()->user()->aHabilitation('nouvelle_vente') || auth()->user()->aHabilitation('factures_vente') || auth()->user()->aHabilitation('historique_ventes')))
             <div class="nav-section"><span>Ventes</span></div>
             @if(auth()->user()->aHabilitation('nouvelle_vente'))
-            <a href="{{ route('admin.ventes.nouvelle') }}" class="nav-item {{ request()->routeIs('admin.ventes.nouvelle') ? 'active' : '' }}">
+            <a href="{{ route('admin.ventes.nouvelle') }}" data-visite="nouvelle-vente" class="nav-item {{ request()->routeIs('admin.ventes.nouvelle') ? 'active' : '' }}">
                 <i class="fas fa-cash-register"></i> Nouvelle vente
             </a>
             @endif
@@ -731,7 +731,7 @@
             <!-- Fiscalité & DGI (Module FNE) -->
             @if(in_array('comptabilite', $modulesActifs))
             <div class="nav-section"><span>Fiscalité &amp; DGI</span></div>
-            <a href="{{ route('admin.fne.gestion') }}" class="nav-item {{ request()->routeIs('admin.fne.gestion') ? 'active' : '' }}">
+            <a href="{{ route('admin.fne.gestion') }}" data-visite="fne" class="nav-item {{ request()->routeIs('admin.fne.gestion') ? 'active' : '' }}">
                 <i class="fas fa-calculator"></i> Gestion FNE
             </a>
             <a href="{{ route('admin.fne.situation') }}" class="nav-item {{ request()->routeIs('admin.fne.situation') ? 'active' : '' }}">
@@ -768,7 +768,7 @@
             <!-- 7. Produits (catalogue) -->
             @if((in_array('ventes', $modulesActifs) || in_array('achats', $modulesActifs) || in_array('stock', $modulesActifs)) && auth()->user()->aHabilitation('catalogue_produits'))
             <div class="nav-section"><span>Produits</span></div>
-            <a href="{{ route('admin.produits.index') }}" class="nav-item {{ request()->routeIs('admin.produits.index') ? 'active' : '' }}">
+            <a href="{{ route('admin.produits.index') }}" data-visite="catalogue" class="nav-item {{ request()->routeIs('admin.produits.index') ? 'active' : '' }}">
                 <i class="fas fa-barcode"></i> Catalogue produits
             </a>
             @endif
@@ -777,7 +777,7 @@
             @if((in_array('ventes', $modulesActifs) || in_array('achats', $modulesActifs)) && (auth()->user()->aHabilitation('tiers_clients') || auth()->user()->aHabilitation('tiers_fournisseurs')))
             <div class="nav-section"><span>Tiers</span></div>
             @if(auth()->user()->aHabilitation('tiers_clients'))
-            <a href="{{ route('admin.clients.index') }}" class="nav-item {{ request()->routeIs('admin.clients.index') ? 'active' : '' }}">
+            <a href="{{ route('admin.clients.index') }}" data-visite="clients" class="nav-item {{ request()->routeIs('admin.clients.index') ? 'active' : '' }}">
                 <i class="fas fa-users"></i> Clients
             </a>
             @endif
@@ -799,7 +799,7 @@
             <!-- 10. Paramètres entreprise (admin uniquement) -->
             @if(auth()->user()->role === 'admin')
             <div class="nav-section"><span>Entreprise</span></div>
-            <a href="{{ route('admin.entreprise.parametres') }}" class="nav-item {{ request()->routeIs('admin.entreprise.parametres') ? 'active' : '' }}">
+            <a href="{{ route('admin.entreprise.parametres') }}" data-visite="parametres" class="nav-item {{ request()->routeIs('admin.entreprise.parametres') ? 'active' : '' }}">
                 <i class="fas fa-gear"></i> Paramètres &amp; logos
             </a>
             @endif
@@ -944,6 +944,37 @@
                     suivante.
                 </div>
             </details>
+        @endif
+
+        {{-- Une entreprise qui n'a pas fait sa configuration part d'une page
+             blanche : ni catalogue, ni comptes de metier. Le dire ici, une
+             fois pour toutes, evite qu'elle s'en apercoive a sa premiere
+             facture. --}}
+        @if(auth()->check() && auth()->user()->entreprise
+            && !auth()->user()->entreprise->souscription_terminee_le
+            && auth()->user()->role === 'admin'
+            && !request()->routeIs('admin.souscription.*'))
+            <div data-visite-banniere
+                 style="display:flex; align-items:center; gap:16px; flex-wrap:wrap;
+                        background:#EFF6FF; border:1px solid #BFDBFE; border-radius:12px;
+                        padding:16px 20px; margin-bottom:20px;">
+                <span style="font-size:22px; line-height:1;">&#128640;</span>
+                <div style="flex:1; min-width:260px;">
+                    <div style="font-weight:700; font-size:14px; color:#1E3A8A; margin-bottom:3px;">
+                        Configurez votre metier en cinq minutes
+                    </div>
+                    <div style="font-size:13px; color:#1D4ED8; line-height:1.55;">
+                        Selflow remplira votre catalogue, votre plan comptable et vos journaux
+                        a partir de votre activite. Il vous restera a saisir vos prix &mdash;
+                        eux seuls varient selon la zone et la periode, nous ne pouvons pas les deviner.
+                    </div>
+                </div>
+                <a href="{{ route('admin.souscription.index') }}"
+                   style="white-space:nowrap; background:#1D4ED8; color:#fff; padding:9px 16px;
+                          border-radius:8px; font-weight:600; font-size:13px; text-decoration:none;">
+                    Commencer
+                </a>
+            </div>
         @endif
 
         @yield('contenu')
@@ -1159,6 +1190,8 @@ document.addEventListener('DOMContentLoaded', () => {
 </script>
 
 @yield('scripts')
+
+@include('admin::partials.visite-guidee')
 </body>
 </html>
 

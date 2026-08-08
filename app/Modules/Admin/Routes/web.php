@@ -267,6 +267,15 @@ Route::prefix('admin')
         });
     });
 
+// ── Visite guidee de premiere utilisation ──
+Route::prefix('admin/visite')
+    ->middleware(['auth'])
+    ->name('admin.visite.')
+    ->group(function () {
+        Route::post('/terminer', [\App\Modules\Admin\Controleurs\VisiteGuideeControleur::class, 'terminer'])->name('terminer');
+        Route::post('/rejouer',  [\App\Modules\Admin\Controleurs\VisiteGuideeControleur::class, 'rejouer'])->name('rejouer');
+    });
+
 // ───────────────────────────────────────────────────────────────────────
 // Parcours de configuration de l'entreprise
 //
