@@ -21,6 +21,13 @@
   "renommable": false
  },
  {
+  "code": "RAN",
+  "type": "RAN",
+  "intitule": "Report à nouveau",
+  "compte": null,
+  "renommable": false
+ },
+ {
   "code": "CAI",
   "type": "Caisse",
   "intitule": "Caisse",
@@ -28,7 +35,7 @@
   "renommable": true
  },
  {
-  "code": "BQE",
+  "code": "BQ",
   "type": "Banque",
   "intitule": "Banque",
   "compte": "521100",

@@ -134,9 +134,28 @@ Poussé sur **Selflow**. Ce qui est fait :
   synchronisation Comptaflow. Sans lui, la première vente s'imputait sur des
   comptes inventés à la volée.
 
-  Les journaux couvrent les quatre types que `ComptabiliteService` interroge
-  (Vente, Achat, OD, Banque) plus la caisse, et le mobile money ivoirien —
-  MTN, Orange, Moov, Wave. Chaque journal de trésorerie a son compte au plan.
+  **Les dix journaux livrés :**
+
+  | Code | Type | Compte | Intitulé |
+  |---|---|---|---|
+  | `VTE` | Vente | — | Journal des ventes |
+  | `ACH` | Achat | — | Journal des achats |
+  | `OD` | OD | — | Opérations diverses |
+  | `RAN` | RAN | — | Report à nouveau |
+  | `CAI` | Caisse | `571000` | Caisse |
+  | `BQ` | Banque | `521100` | Banque |
+  | `MTN` | Banque | `521500` | MTN Mobile Money |
+  | `OMY` | Banque | `521600` | Orange Money |
+  | `MOOV` | Banque | `521700` | Moov Money |
+  | `WAVE` | Banque | `521800` | Wave |
+
+  Seuls les journaux de trésorerie portent un compte général : `VTE`, `ACH`,
+  `OD` et `RAN` n'en ont aucun, et la colonne est devenue facultative pour
+  cela. Chaque journal de trésorerie a en revanche son compte au plan, sans
+  quoi l'écriture de règlement s'imputerait nulle part.
+
+  Le repli codé en dur dans `ComptabiliteService` est aligné sur ces codes —
+  il annonçait `BQE`, qui n'existait dans aucun plan.
 
   Le mobile money est rangé en subdivision de `521` « Banques locales », à
   partir de `521500` : c'est un avoir détenu chez un établissement agréé, pas
@@ -149,7 +168,7 @@ Poussé sur **Selflow**. Ce qui est fait :
   portées `actifs()` et `archives()`. Un compte supprimé après avoir servi
   laisserait des écritures orphelines.
 
-- `tests/Feature/TrousseauEntrepriseTest.php` — 9 tests.
+- `tests/Feature/TrousseauEntrepriseTest.php` — 10 tests.
 
 Reste à faire dans ce lot :
 

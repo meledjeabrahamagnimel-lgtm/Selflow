@@ -35,7 +35,7 @@ class TrousseauEntrepriseTest extends TestCase
         $bilan = TrousseauEntrepriseService::doter($this->entreprise);
 
         $this->assertSame(34, $bilan['comptes']);
-        $this->assertSame(9,  $bilan['journaux']);
+        $this->assertSame(10, $bilan['journaux']);
 
         // Les comptes que toute écriture de vente au comptant touche.
         foreach (['411000', '401000', '443100', '445200', '571000', '521000', '701000', '601000'] as $numero) {
@@ -53,7 +53,7 @@ class TrousseauEntrepriseTest extends TestCase
         // `ComptabiliteService` cherche ses journaux par type et retombe sur un
         // code en dur s'il n'en trouve pas. Le trousseau doit couvrir les
         // quatre types qu'il interroge, sinon le repli sert toujours.
-        foreach (['Vente' => 'VTE', 'Achat' => 'ACH', 'OD' => 'OD', 'Banque' => 'BQE'] as $type => $code) {
+        foreach (['Vente' => 'VTE', 'Achat' => 'ACH', 'OD' => 'OD', 'RAN' => 'RAN', 'Banque' => 'BQ'] as $type => $code) {
             $journal = CodeJournal::where('entreprise_id', $this->entreprise->id)
                 ->where('type', $type)
                 ->first();
@@ -101,12 +101,27 @@ class TrousseauEntrepriseTest extends TestCase
     {
         TrousseauEntrepriseService::doter($this->entreprise);
 
-        foreach (['VTE', 'ACH', 'OD'] as $code) {
+        foreach (['VTE', 'ACH', 'OD', 'RAN'] as $code) {
             $this->assertNull(
                 CodeJournal::where('entreprise_id', $this->entreprise->id)->where('code', $code)->value('compte'),
                 "Le journal {$code} ne devrait porter aucun compte."
             );
         }
+    }
+
+    public function test_le_report_a_nouveau_est_livre_sans_compte(): void
+    {
+        // C'est le journal qui reprend les soldes d'un exercice sur le suivant.
+        // Il ne servira qu'a la cloture, mais il doit exister des le depart :
+        // le creer au moment ou l'on en a besoin, c'est le creer dans l'urgence.
+        TrousseauEntrepriseService::doter($this->entreprise);
+
+        $ran = CodeJournal::where('entreprise_id', $this->entreprise->id)
+            ->where('code', 'RAN')->firstOrFail();
+
+        $this->assertSame('RAN', $ran->type);
+        $this->assertSame('Report à nouveau', $ran->intitule);
+        $this->assertNull($ran->compte);
     }
 
     public function test_doter_deux_fois_ne_duplique_rien(): void
@@ -123,13 +138,13 @@ class TrousseauEntrepriseTest extends TestCase
         TrousseauEntrepriseService::doter($this->entreprise);
 
         CodeJournal::where('entreprise_id', $this->entreprise->id)
-            ->where('code', 'BQE')
+            ->where('code', 'BQ')
             ->update(['intitule' => 'Ecobank Cocody']);
 
         TrousseauEntrepriseService::doter($this->entreprise);
 
         $this->assertSame('Ecobank Cocody', CodeJournal::where('entreprise_id', $this->entreprise->id)
-            ->where('code', 'BQE')->value('intitule'));
+            ->where('code', 'BQ')->value('intitule'));
     }
 
     public function test_ce_qui_ne_sert_pas_s_archive_et_disparait_des_listes(): void
@@ -166,6 +181,6 @@ class TrousseauEntrepriseTest extends TestCase
             PlanComptable::where('entreprise_id', $this->entreprise->id)->count(),
             PlanComptable::where('entreprise_id', $voisine->id)->count()
         );
-        $this->assertSame(9, CodeJournal::where('entreprise_id', $voisine->id)->count());
+        $this->assertSame(10, CodeJournal::where('entreprise_id', $voisine->id)->count());
     }
 }
