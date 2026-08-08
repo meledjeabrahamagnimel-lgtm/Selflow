@@ -6,8 +6,8 @@ et ce fichier. Tout ce qui a été décidé, tout ce qui a été écarté et pou
 tout ce qui reste à faire doit donc figurer ici — et y être tenu à jour à chaque
 lot terminé.
 
-Dernière mise à jour : 8 août 2026 — lot 3 terminé : le stock passe par une seule
-porte, son journal ne s’efface plus, et 16 attaques simulées le vérifient.
+Dernière mise à jour : 8 août 2026 — lot 3 terminé ; quantités décimales admises
+par la DGI ; 41 attaques simulées, dont un mot de passe superadmin publié.
 
 ---
 
@@ -34,24 +34,37 @@ propriétaire.
 Seul point de contact autorisé : l'écriture comptable du BAPA, en lecture seule
 de ce que la plateforme a déjà retourné.
 
-### Un point signalé, non corrigé — décision du propriétaire
+### La seule modification autorisée à ce jour — quantités décimales
 
-`FneService` transmet les quantités par `intval($detail->quantite)`, à six
-endroits (lignes 101, 133, 324, 746, 796 et 806). Depuis le lot 3.1, la ligne de
-vente porte des décimales : **une vente de 12,5 kg de cacao part à la DGI pour
-12 kg**, et la pièce certifiée diffère de la pièce établie dans Selflow — le
-genre d'écart silencieux que la règle d'or existe pour éviter.
+**Exception 3 : demande explicite du propriétaire, le 8 août 2026**, après
+vérification du référentiel technique.
 
-Je n'y touche pas : aucune des trois exceptions ne s'applique. Le champ
-`quantity` de l'API attend peut-être un entier, auquel cas la correction n'est
-pas dans `FneService` mais dans la façon dont on facture une quantité fractionnée
-— facturer en grammes plutôt qu'en kilos, par exemple.
+`FneService` transmettait les quantités par `intval($detail->quantite)`, à six
+endroits. Depuis le lot 3.1 les lignes portent des décimales : une vente de
+12,5 kg de cacao partait certifiée pour **12 kg**, et la pièce certifiée
+divergeait de la pièce établie dans Selflow, sans que rien ne le signale.
 
-**Ce qu'il faut vérifier avant de décider** : le type du champ `quantity` dans le
-référentiel technique de la DGI. S'il accepte un décimal, c'est le cas 1 ou 3
-des exceptions et la correction tient en six `intval` → `floatval`. S'il n'en
-accepte pas, il faut interdire les quantités fractionnées sur les pièces
-normalisées, et le dire à la saisie.
+`CONFIGURATION FNE/Procedure_technique_integration_API.txt` est formel — le
+champ est un **`number`**, dans les trois tableaux de champs :
+
+| Endpoint | Ligne | Déclaration |
+|---|---|---|
+| Certification de facture | 272 | `quantity \| number \| Quantité \| O` |
+| Reçu normalisé | 508 | `quantity \| number \| Quantité \| O` |
+| Avoir / remboursement | 684 | `quantity \| number \| La quantité de l'article à retourner \| Y` |
+
+Un `number` JSON n'est pas un entier. `FneService::quantiteFne()` arrondit
+désormais au millième — la précision de la colonne `decimal(15,3)`, car
+transmettre plus de décimales que la base n'en garde rendrait la pièce certifiée
+irreproductible depuis nos données.
+
+**La forme sur le fil ne change pas pour ce qui passait déjà** : `json_encode`
+écrit `30` et non `30.0` pour un flottant sans partie décimale. Les pièces déjà
+certifiées partent à l'identique ; seul ce qui était tronqué change.
+
+Trois tests le verrouillent dans `FnePayloadTest` — une quantité fractionnée,
+une quantité entière (dont la forme ne doit pas bouger), et l'alignement sur les
+trois décimales.
 
 ---
 
@@ -61,7 +74,7 @@ Elles ne se rediscutent pas sans raison neuve.
 
 | Sujet | Décision |
 |---|---|
-| Inventaire | **Permanent**, valorisé au coût moyen pondéré (CUMP) |
+| Inventaire | **Permanent**, valorisé au **CUMP** (Coût Unitaire Moyen Pondéré) |
 | Sortie de stock | **À la livraison**. La vente au comptant émet une livraison implicite immédiate |
 | Données existantes | **Supprimées** — le développement repart de zéro, aucune donnée réelle |
 | Numérotation des comptes | **Six chiffres** pour toute la partie locale (`7011` → `701100`) |
@@ -72,6 +85,8 @@ Elles ne se rediscutent pas sans raison neuve.
 | États comptables | Comptaflow. Selflow garde une balance de contrôle |
 | Souscription | Parcours qui se déplie étape par étape, **sans intervention du superadmin** |
 | Choix hors référentiel | Un champ **« Autre »** à saisie libre partout où l'utilisateur choisit dans une liste fermée |
+| Sigle CUMP | Toujours écrit **CUMP (Coût Unitaire Moyen Pondéré)**, définition entre parenthèses, à chaque occurrence — code, commentaires, journal, échanges |
+| Secrets | Aucun mot de passe ni clé dans le code versionné. Ils viennent de l'environnement, ou sont tirés au hasard et affichés une seule fois |
 
 ---
 
@@ -528,6 +543,64 @@ ressortait ensuite dans ses propres écrans. `Appartenance` reçoit un troisièm
 mode, `RATTACHEMENT_PAR_CATEGORIE` : `sous_categories` ne porte pas
 `entreprise_id`, elle pend à une catégorie qui en porte un.
 
+#### Simulation d'attaques — élévation de privilèges et vol d'accès
+
+`tests/Feature/AttaquesElevationTest.php` — 25 tentatives. C'est l'attaque qui
+compte le plus : les autres sont bornées, elles atteignent une donnée. Un compte
+`superadmin` volé atteint **toutes les entreprises de la plateforme** — leurs
+chiffres d'affaires, leurs clients, leurs clés FNE.
+
+Le principe éprouvé : **rien de ce qui décide des droits ne vient de la
+requête.** Le rôle, l'entreprise d'appartenance, les habilitations et le jeton
+d'API sont décidés par le serveur.
+
+| Tentative | Résultat |
+|---|---|
+| Poster `role: superadmin` sur « Mon profil » | ignoré — le contrôleur construit un tableau explicite |
+| Poster `entreprise_id` sur « Mon profil » | ignoré |
+| Se poser un `jeton_api` choisi | ignoré |
+| Créer un compte `superadmin` depuis la gestion du personnel | refusé par `Rule::in` |
+| Promouvoir un employé en `superadmin` | refusé |
+| Créer un employé chez le voisin (`entreprise_id` forgé) | le serveur impose l'entreprise |
+| Modifier l'employé d'une autre entreprise | 403 |
+| Atteindre les 4 écrans de la plateforme en tant qu'admin | 302 / 403 |
+| Idem sans être connecté | redirection |
+| Gestion du personnel en tant que caissier | 302 / 403 |
+| Jeton d'API affiché dans une liste | absent |
+| Mot de passe haché affiché | absent |
+| Jeton inventé sur l'API | 401 |
+| Jeton d'autrui : voir au-delà de son entreprise | cloisonné |
+| `' OR '1'='1`, `admin@…' --`, `' OR 1=1 #` à la connexion | aucune session |
+| Poser `role` en session | sans effet — le rôle se lit en base |
+| L'adresse en dur `superadmin@gmail.com` avec un rôle d'admin | refusée |
+
+**La faille la plus grave du dépôt, trouvée et corrigée.** Trois seeders
+créaient le compte de la plateforme avec un **mot de passe en clair dans le code
+versionné** — `12345678SUPER@` — et `doit_changer_password => false` : rien
+n'obligeait jamais à le changer. `SeedMassiveCommand` allait jusqu'à afficher un
+avertissement disant que le mot de passe était public, sans rien y changer.
+
+Quiconque avait lu le dépôt disposait d'un accès superadmin sur tout
+déploiement ayant exécuté un seeder. Les comptes de démonstration
+(`ADMIN@@@###123`, `Caissier@2025`) avaient le même défaut.
+
+Désormais : les mots de passe viennent de l'environnement, ou sont **tirés au
+hasard et affichés une seule fois**, à l'exécution. Tous partent avec
+`doit_changer_password => true`.
+
+| Variable | Rôle | Défaut si absente |
+|---|---|---|
+| `SUPERADMIN_EMAIL` | Adresse du compte de la plateforme | `superadmin@gmail.com` |
+| `SUPERADMIN_PASSWORD` | Son mot de passe | tiré au hasard, affiché une fois |
+| `DEMO_PASSWORD` | Comptes de démonstration | tiré au hasard, affiché une fois |
+| `EXTERNAL_SYNC_SECRET` | Passerelle Comptaflow | **aucun** — la synchronisation refuse tout |
+
+**Un point noté, non corrigé** : `VerifierHabilitationRoute` court-circuite tout
+contrôle d'habilitation pour l'adresse `superadmin@gmail.com`, écrite en dur.
+Ce n'est pas exploitable — le middleware `role:superadmin` passe avant, et un
+test le vérifie — mais une identité en dur reste une clé publiée. À remplacer
+par un drapeau sur le compte quand l'occasion se présentera.
+
 **Une limite documentée plutôt que tue** : `MouvementStock::where(...)->delete()`
 court-circuite les événements Eloquent — le garde-fou du modèle ne s'y applique
 pas. Aucun code du dépôt ne le fait plus, et le seul appelant qui le faisait a
@@ -536,7 +609,8 @@ besoin s'en fait sentir. Le test le constate au lieu de le passer sous silence.
 
 ### Lot 4 — Les imputations — après 1 et 3
 
-Chaîne article → famille → type → défaut. Inventaire permanent au CUMP. Codes
+Chaîne article → famille → type → défaut. Inventaire permanent au **CUMP**
+(Coût Unitaire Moyen Pondéré). Codes
 journaux imposés. Règlements et lettrage. BAPA sans TVA déductible.
 
 ### Lot 5 — La passerelle Comptaflow — les deux dépôts

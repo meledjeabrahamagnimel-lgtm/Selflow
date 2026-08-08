@@ -12,6 +12,7 @@ use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 
 class DonneesInitialesSeeder extends Seeder
 {
@@ -107,13 +108,20 @@ class DonneesInitialesSeeder extends Seeder
         );
 
         // Utilisateurs
+        // Voir SelflowCompleteSeeder::creerSuperAdmin() : le mot de passe ne
+        // figure plus dans le code. Il valait « 12345678SUPER », en clair,
+        // versionne — soit un acces a toutes les entreprises de la plateforme
+        // pour quiconque a lu ce depot.
+        $motDePasseSuper = env('SUPERADMIN_PASSWORD') ?: Str::password(20);
+
         Utilisateur::firstOrCreate(
-            ['email' => 'superadmin@gmail.com'],
+            ['email' => env('SUPERADMIN_EMAIL', 'superadmin@gmail.com')],
             [
-                'nom'                => 'Super Administrateur',
-                'password'           => Hash::make('12345678SUPER'),
-                'role'               => 'superadmin',
-                'statut'             => 'actif',
+                'nom'                   => 'Super Administrateur',
+                'password'              => Hash::make($motDePasseSuper),
+                'role'                  => 'superadmin',
+                'statut'                => 'actif',
+                'doit_changer_password' => true,
             ]
         );
 
@@ -122,7 +130,8 @@ class DonneesInitialesSeeder extends Seeder
             [
                 'entreprise_id'      => $entreprise->id,
                 'nom'                => 'Administrateur',
-                'password'           => Hash::make('12345678'),
+                'password'           => Hash::make(env('ADMIN_DEMO_PASSWORD') ?: Str::password(16)),
+                'doit_changer_password' => true,
                 'role'               => 'admin',
                 'statut'             => 'actif',
             ]
@@ -134,7 +143,8 @@ class DonneesInitialesSeeder extends Seeder
                 'entreprise_id'      => $entreprise2->id,
                 'point_de_vente_id'  => $pdvEntreprise2->id,
                 'nom'                => 'Admin B2B Agro',
-                'password'           => Hash::make('12345678'),
+                'password'           => Hash::make(env('ADMIN_DEMO_PASSWORD') ?: Str::password(16)),
+                'doit_changer_password' => true,
                 'role'               => 'admin',
                 'statut'             => 'actif',
             ]
@@ -146,7 +156,8 @@ class DonneesInitialesSeeder extends Seeder
                 'entreprise_id'      => $entreprise->id,
                 'point_de_vente_id'  => $pdv1->id,
                 'nom'                => 'Koné Fatou',
-                'password'           => Hash::make('12345678'),
+                'password'           => Hash::make(env('ADMIN_DEMO_PASSWORD') ?: Str::password(16)),
+                'doit_changer_password' => true,
                 'role'               => 'caissier',
                 'statut'             => 'actif',
             ]

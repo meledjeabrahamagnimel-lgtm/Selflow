@@ -250,7 +250,14 @@ class SeedMassiveCommand extends Command
             'tiers_clients', 'tresorerie_encaissements',
         ];
 
-        $motDePasse = Hash::make('Selflow2026@');
+        // Comptes de demonstration : mot de passe publie lui aussi. Il est
+        // desormais tire au hasard, ou impose par DEMO_PASSWORD.
+        $motDePasseDemo = env('DEMO_PASSWORD') ?: \Illuminate\Support\Str::password(16);
+        $motDePasse = Hash::make($motDePasseDemo);
+
+        if (!env('DEMO_PASSWORD')) {
+            $this->warn("    Mot de passe des comptes de démonstration : {$motDePasseDemo}");
+        }
 
         $adminId = Utilisateur::create([
             'entreprise_id' => $entrepriseId,
@@ -1409,12 +1416,35 @@ class SeedMassiveCommand extends Command
     // SUPERADMIN
     // ═══════════════════════════════════════════════════════════════
 
+    /**
+     * Le compte de la plateforme.
+     *
+     * Son mot de passe valait « 12345678SUPER@ », en clair dans ce fichier,
+     * versionne — un avertissement le signalait meme, sans rien y changer.
+     * Il vient desormais de `SUPERADMIN_PASSWORD`, ou est tire au hasard et
+     * affiche une seule fois.
+     */
     private function creerSuperAdmin(): void
     {
-        $existant = Utilisateur::where('email', 'superadmin@gmail.com')->first();
+        $adresse = env('SUPERADMIN_EMAIL', 'superadmin@gmail.com');
+        $motDePasse = env('SUPERADMIN_PASSWORD') ?: \Illuminate\Support\Str::password(20);
+
+        $annoncer = function () use ($motDePasse) {
+            if (!env('SUPERADMIN_PASSWORD')) {
+                $this->warn("    Mot de passe tiré au hasard : {$motDePasse}");
+                $this->warn('    Notez-le maintenant : il ne sera plus affiché.');
+            }
+        };
+
+        $existant = Utilisateur::where('email', $adresse)->first();
         if ($existant) {
-            $existant->update(['password' => Hash::make('12345678SUPER@'), 'role' => 'superadmin', 'statut' => 'actif']);
-            $this->warn('    ⚠️  Le compte superadmin@gmail.com existait déjà — mot de passe réinitialisé.');
+            $existant->update([
+                'password' => Hash::make($motDePasse),
+                'role' => 'superadmin', 'statut' => 'actif',
+                'doit_changer_password' => true,
+            ]);
+            $this->warn('    ⚠️  Le compte superadmin existait déjà — mot de passe réinitialisé.');
+            $annoncer();
             return;
         }
 
@@ -1423,17 +1453,17 @@ class SeedMassiveCommand extends Command
             'point_de_vente_id' => null,
             'nom' => 'ADMIN',
             'prenom' => 'Super',
-            'email' => 'superadmin@gmail.com',
-            'password' => Hash::make('12345678SUPER@'),
+            'email' => env('SUPERADMIN_EMAIL', 'superadmin@gmail.com'),
+            'password' => Hash::make($motDePasse),
             'role' => 'superadmin',
             'fonction' => 'Super Administrateur',
             'statut' => 'actif',
             'habilitations' => json_encode([]),
-            'doit_changer_password' => false,
+            'doit_changer_password' => true,
         ]);
 
-        $this->info('    ✅ Compte superadmin@gmail.com créé (mot de passe : 12345678SUPER@)');
-        $this->warn('    ⚠️  IMPORTANT : ce mot de passe est en clair dans ce fichier source, versionné sur GitHub.');
+        $this->info('    ✅ Compte superadmin créé.');
+        $annoncer();
         $this->warn('       Recommandé : le changer dès la première connexion, ou définir SUPERADMIN_PASSWORD en variable');
         $this->warn('       d\'environnement et l\'utiliser à la place d\'une valeur codée en dur, avant tout usage en production réelle.');
     }

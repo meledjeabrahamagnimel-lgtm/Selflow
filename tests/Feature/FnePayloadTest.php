@@ -1008,6 +1008,65 @@ class FnePayloadTest extends TestCase
         return $achat->fresh();
     }
 
+    public function test_une_quantite_fractionnee_part_telle_quelle_a_la_dgi(): void
+    {
+        // `intval` etait applique aux six points ou une quantite part a la DGI.
+        // Depuis que les lignes portent des decimales, une vente de 12,5 kg de
+        // cacao partait certifiee pour 12 kg : la piece etablie dans Selflow et
+        // la piece certifiee divergeaient, sans que rien ne le signale.
+        //
+        // Le referentiel technique est formel — `quantity | number | Quantite | O`,
+        // dans les trois tableaux de champs : certification (l. 272), recu
+        // normalise (l. 508) et avoir (l. 684). Un `number` JSON n'est pas un
+        // entier.
+        $this->simulerReponseFne();
+
+        $vente = $this->venteMinimale();
+        // La TVA suit la quantite : le garde-fou des taux DGI refuse — a juste
+        // titre — une ligne dont le taux reconstitue ne vaut aucun code FNE.
+        $vente->details()->first()->update(['quantite' => 12.5, 'montant_tva' => 45000]);
+
+        FneService::normaliserFacture($vente->fresh());
+
+        $this->assertSame(12.5, $this->payloadEnvoye()['items'][0]['quantity']);
+    }
+
+    public function test_une_quantite_entiere_part_sans_decimale(): void
+    {
+        // La forme sur le fil ne change pas pour ce qui passait deja : les
+        // exemples du referentiel montrent des entiers nus, et modifier la
+        // forme d'un champ accepte serait un risque gratuit.
+        $this->simulerReponseFne();
+
+        $vente = $this->venteMinimale();
+        // La TVA suit la quantite : le garde-fou des taux DGI refuse — a juste
+        // titre — une ligne dont le taux reconstitue ne vaut aucun code FNE.
+        $vente->details()->first()->update(['quantite' => 30, 'montant_tva' => 108000]);
+
+        FneService::normaliserFacture($vente->fresh());
+
+        $corps = json_encode($this->payloadEnvoye());
+
+        $this->assertStringContainsString('"quantity":30,', $corps);
+        $this->assertStringNotContainsString('"quantity":30.0', $corps);
+    }
+
+    public function test_la_quantite_transmise_s_aligne_sur_la_precision_de_la_base(): void
+    {
+        // Transmettre plus de decimales que la colonne `decimal(15,3)` n'en
+        // garde rendrait la piece certifiee irreproductible depuis nos donnees.
+        $this->simulerReponseFne();
+
+        $vente = $this->venteMinimale();
+        // La TVA suit la quantite : le garde-fou des taux DGI refuse — a juste
+        // titre — une ligne dont le taux reconstitue ne vaut aucun code FNE.
+        $vente->details()->first()->update(['quantite' => 12.5555, 'montant_tva' => 45199.8]);
+
+        FneService::normaliserFacture($vente->fresh());
+
+        $this->assertSame(12.556, $this->payloadEnvoye()['items'][0]['quantity']);
+    }
+
     private function venteMinimale(array $attributs = [], ?Produit $produit = null): Vente
     {
         $produit ??= $this->creerProduit(['reference' => 'ref-' . uniqid()]);

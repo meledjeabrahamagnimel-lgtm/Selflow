@@ -78,9 +78,9 @@ class SelflowCompleteSeeder extends Seeder
         $this->command->table(
             ['Rôle', 'Email', 'Mot de passe'],
             [
-                ['SuperAdmin',      'superadmin@gmail.com', '12345678SUPER@'],
-                ['Admin DC-KNOWING','dcknowing@gmail.com',  'ADMIN@@@###123'],
-                ['Admin B-HOME',    'bhome@gmail.com',      'ADMIN@@@###123'],
+                ['SuperAdmin',      env('SUPERADMIN_EMAIL', 'superadmin@gmail.com'), 'voir ci-dessus'],
+                ['Admin DC-KNOWING','dcknowing@gmail.com',  'voir ci-dessus'],
+                ['Admin B-HOME',    'bhome@gmail.com',      'voir ci-dessus'],
             ]
         );
     }
@@ -117,18 +117,55 @@ class SelflowCompleteSeeder extends Seeder
     // ──────────────────────────────────────────────────────────────
     // SUPERADMIN
     // ──────────────────────────────────────────────────────────────
+    /**
+     * Le compte de la plateforme.
+     *
+     * Son mot de passe ne figure plus dans ce fichier. Il valait
+     * « 12345678SUPER@ », en clair, versionné sur un dépôt distant, et le
+     * compte partait avec `doit_changer_password => false` : rien n'obligeait
+     * jamais à le changer. Un déploiement qui exécutait ce seeder livrait donc
+     * à quiconque a lu le dépôt un accès à **toutes les entreprises de la
+     * plateforme** — leurs chiffres d'affaires, leurs clients, leurs clés FNE.
+     *
+     * Désormais : le mot de passe vient de `SUPERADMIN_PASSWORD`, ou est tiré
+     * au hasard et affiché **une seule fois**, à l'exécution. Et le compte
+     * doit le changer à la première connexion, quoi qu'il arrive.
+     */
+    /** Mot de passe des comptes de démonstration : tiré une fois, annoncé une fois. */
+    private ?string $motDePasseDemo = null;
+
+    private function motDePasseDemo(): string
+    {
+        if ($this->motDePasseDemo === null) {
+            $this->motDePasseDemo = env('DEMO_PASSWORD') ?: Str::password(16);
+
+            if (!env('DEMO_PASSWORD')) {
+                $this->command->warn("Mot de passe des comptes de démonstration : {$this->motDePasseDemo}");
+            }
+        }
+
+        return $this->motDePasseDemo;
+    }
+
     private function creerSuperAdmin(): void
     {
+        $motDePasse = env('SUPERADMIN_PASSWORD') ?: Str::password(20);
+
         Utilisateur::create([
             'entreprise_id'         => null,
             'nom'                   => 'SUPERADMIN',
             'prenom'                => 'Selflow',
-            'email'                 => 'superadmin@gmail.com',
-            'password'              => Hash::make('12345678SUPER@'),
+            'email'                 => env('SUPERADMIN_EMAIL', 'superadmin@gmail.com'),
+            'password'              => Hash::make($motDePasse),
             'role'                  => 'superadmin',
             'statut'                => 'actif',
-            'doit_changer_password' => false,
+            'doit_changer_password' => true,
         ]);
+
+        if (!env('SUPERADMIN_PASSWORD')) {
+            $this->command->warn("Mot de passe superadmin tiré au hasard : {$motDePasse}");
+            $this->command->warn('Notez-le maintenant : il ne sera plus affiché.');
+        }
     }
 
     // ──────────────────────────────────────────────────────────────
@@ -181,7 +218,8 @@ class SelflowCompleteSeeder extends Seeder
             'nom'                   => 'AGNIMEL',
             'prenom'                => 'MELEDJE',
             'email'                 => 'dcknowing@gmail.com',
-            'password'              => Hash::make('ADMIN@@@###123'),
+            'password'              => Hash::make($this->motDePasseDemo()),
+            'doit_changer_password' => true,
             'role'                  => 'admin',
             'fonction'              => 'Gérant',
             'statut'                => 'actif',
@@ -204,7 +242,8 @@ class SelflowCompleteSeeder extends Seeder
                 'nom'                   => $nom,
                 'prenom'                => $prenom,
                 'email'                 => $email,
-                'password'              => Hash::make('Caissier@2025'),
+                'password'              => Hash::make($this->motDePasseDemo()),
+                'doit_changer_password' => true,
                 'role'                  => $role,
                 'fonction'              => $fonction,
                 'statut'                => 'actif',
@@ -265,7 +304,8 @@ class SelflowCompleteSeeder extends Seeder
             'nom'                   => 'KOFFI',
             'prenom'                => 'KONE',
             'email'                 => 'bhome@gmail.com',
-            'password'              => Hash::make('ADMIN@@@###123'),
+            'password'              => Hash::make($this->motDePasseDemo()),
+            'doit_changer_password' => true,
             'role'                  => 'admin',
             'fonction'              => 'Directeur Général',
             'statut'                => 'actif',
@@ -288,7 +328,8 @@ class SelflowCompleteSeeder extends Seeder
                 'nom'                   => $nom,
                 'prenom'                => $prenom,
                 'email'                 => $email,
-                'password'              => Hash::make('Caissier@2025'),
+                'password'              => Hash::make($this->motDePasseDemo()),
+                'doit_changer_password' => true,
                 'role'                  => $role,
                 'fonction'              => $fonction,
                 'statut'                => 'actif',

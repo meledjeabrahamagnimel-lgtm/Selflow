@@ -98,7 +98,7 @@ class FneService
                     'id'          => $detail->fne_invoice_item_id,
                     'reference'   => $detail->produit?->reference ?? ($detail->reference ?? null),
                     'description' => $detail->produit?->nom ?? $detail->libelle_virtuel ?? null,
-                    'quantity'    => intval($detail->quantite),
+                    'quantity'    => self::quantiteFne($detail->quantite),
                     'amount'      => floatval($detail->prix_unitaire),
                 ];
             })
@@ -130,7 +130,7 @@ class FneService
             return [
                 'reference'      => $d->produit?->reference ?? ($d->reference ?? ''),
                 'description'    => $d->produit ? $d->produit->nom : $d->libelle_virtuel,
-                'quantity'       => intval($d->quantite),
+                'quantity'       => self::quantiteFne($d->quantite),
                 'amount'         => floatval($d->prix_unitaire),
                 'discount'       => self::normaliserTaux($d->remise_taux ?? 0),
                 'measurementUnit'=> $d->unite ?? 'pcs',
@@ -321,7 +321,7 @@ class FneService
             return [
                 'reference'      => $d->produit?->reference ?? ($d->reference ?? ''),
                 'description'    => $d->produit ? $d->produit->nom : $d->libelle_virtuel,
-                'quantity'       => intval($d->quantite),
+                'quantity'       => self::quantiteFne($d->quantite),
                 'amount'         => floatval($d->prix_unitaire),
                 'discount'       => self::normaliserTaux($d->remise_taux ?? 0),
                 'measurementUnit'=> $d->unite ?? 'pcs',
@@ -743,7 +743,7 @@ class FneService
         foreach ($details as $detail) {
             $reference = $detail->produit?->reference ?? ($detail->reference ?? null);
             $description = $detail->produit?->nom ?? $detail->libelle_virtuel ?? null;
-            $quantity = intval($detail->quantite);
+            $quantity = self::quantiteFne($detail->quantite);
             $amount = floatval($detail->prix_unitaire);
             $matchedIndex = null;
 
@@ -787,13 +787,40 @@ class FneService
         return $mapping;
     }
 
+    /**
+     * La quantité d'une ligne, telle que la plateforme l'attend.
+     *
+     * `intval` était appliqué ici, sur les six points où une quantité part à la
+     * DGI. Depuis que les lignes portent des décimales, une vente de 12,5 kg de
+     * cacao partait certifiée pour **12 kg** : la pièce établie dans Selflow et
+     * la pièce certifiée divergeaient, sans que rien ne le signale.
+     *
+     * Le référentiel technique est formel — `quantity | number | Quantité | O`,
+     * dans les trois tableaux de champs : certification (l. 272), reçu
+     * normalisé (l. 508) et avoir (l. 684). Un `number` JSON n'est pas un
+     * entier.
+     *
+     * L'arrondi au millième aligne l'envoi sur ce que la colonne
+     * `decimal(15,3)` retient : transmettre plus de décimales que la base n'en
+     * garde rendrait la pièce certifiée irreproductible depuis nos données.
+     *
+     * La forme envoyée sur le fil ne change pas pour les quantités entières :
+     * `json_encode` écrit `30` et non `30.0` pour un flottant sans partie
+     * décimale. Les pièces déjà certifiées partent donc à l'identique, et seul
+     * ce qui était tronqué change.
+     */
+    private static function quantiteFne($quantite): float
+    {
+        return round((float) $quantite, 3);
+    }
+
     private static function buildRefundItem($detail, array $originalInvoiceItems = []): array
     {
         $existingFneItemId = $detail->fne_invoice_item_id ?? null;
         if (!empty($existingFneItemId)) {
             return [
                 'id'       => $existingFneItemId,
-                'quantity' => intval($detail->quantite),
+                'quantity' => self::quantiteFne($detail->quantite),
             ];
         }
 
@@ -803,7 +830,7 @@ class FneService
 
         $reference = $detail->produit?->reference ?? ($detail->reference ?? null);
         $description = $detail->produit?->nom ?? $detail->libelle_virtuel ?? null;
-        $quantity = intval($detail->quantite);
+        $quantity = self::quantiteFne($detail->quantite);
         $amount = floatval($detail->prix_unitaire ?? 0);
 
         $match = null;
