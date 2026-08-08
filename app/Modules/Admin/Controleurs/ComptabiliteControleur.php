@@ -21,6 +21,9 @@ use Illuminate\View\View;
 use App\Modules\Admin\Regles\Appartenance;
 use App\Modules\Admin\Services\BalanceService;
 use App\Modules\Admin\Services\FiltrePeriodeService;
+use App\Modules\Admin\Services\GrandLivreService;
+use App\Modules\Admin\Services\LettrageService;
+use App\Modules\Admin\Modeles\PlanComptable;
 
 class ComptabiliteControleur
 {
@@ -597,6 +600,132 @@ class ComptabiliteControleur
             'pointsDeVente'  => $entreprise->pointsDeVente()->orderBy('nom')->get(),
             'pointDeVenteId' => $pointDeVenteId,
         ]);
+    }
+
+    /**
+     * Le grand livre.
+     *
+     * La balance dit combien un compte a bougé ; le grand livre dit **pourquoi**.
+     * La logique — plage de comptes, soldes initiaux, solde progressif, colonne
+     * de lettrage — est reprise de Comptaflow, pour que les deux applications
+     * disent la même chose du même exercice.
+     */
+    public function grandLivre(Request $request): View
+    {
+        $entreprise = Auth::user()->entreprise;
+
+        [$debut, $fin] = FiltrePeriodeService::intervalle($request);
+
+        $comptes = PlanComptable::where('entreprise_id', $entreprise->id)
+            ->orderBy('numero')
+            ->get();
+
+        // Les bornes viennent de l'URL : on ne retient que des numéros qui
+        // figurent au plan de **cette** entreprise. Un numéro libre laisserait
+        // lire les écritures d'un compte que l'utilisateur n'a pas.
+        $numeros = $comptes->pluck('numero')->all();
+        $borne = fn (?string $valeur) => in_array($valeur, $numeros, true) ? $valeur : null;
+
+        $compteDebut = $borne($request->query('compte_debut'));
+        $compteFin   = $borne($request->query('compte_fin'));
+
+        $pointDeVenteId = $this->siteDemande($request, $entreprise->id);
+
+        $livre = GrandLivreService::etablir(
+            $entreprise->id, $compteDebut, $compteFin,
+            $debut?->toDateString(), $fin?->toDateString(), $pointDeVenteId
+        );
+
+        return view('admin::comptabilite.grand_livre', [
+            'livre'          => $livre,
+            'comptes'        => $comptes,
+            'compteDebut'    => $compteDebut,
+            'compteFin'      => $compteFin,
+            'libellePeriode' => FiltrePeriodeService::libelle($request),
+            'pointsDeVente'  => $entreprise->pointsDeVente()->orderBy('nom')->get(),
+            'pointDeVenteId' => $pointDeVenteId,
+        ]);
+    }
+
+    /**
+     * L'écran de lettrage d'un compte.
+     */
+    public function lettrage(Request $request): View
+    {
+        $entreprise = Auth::user()->entreprise;
+
+        $comptes = PlanComptable::where('entreprise_id', $entreprise->id)
+            ->orderBy('numero')
+            ->get();
+
+        $compte = in_array($request->query('compte'), $comptes->pluck('numero')->all(), true)
+            ? $request->query('compte')
+            : null;
+
+        return view('admin::comptabilite.lettrage', [
+            'comptes'   => $comptes,
+            'compte'    => $compte,
+            'ouvertes'  => $compte ? LettrageService::ouvertes($entreprise->id, $compte) : collect(),
+            'resteDu'   => $compte ? LettrageService::resteDu($entreprise->id, $compte) : 0.0,
+            'lettrages' => \App\Modules\Admin\Modeles\Lettrage::where('entreprise_id', $entreprise->id)
+                ->withCount('ecritures')->latest('id')->limit(20)->get(),
+        ]);
+    }
+
+    /**
+     * Poser un lettrage.
+     */
+    public function lettrer(Request $request): RedirectResponse
+    {
+        $donnees = $request->validate([
+            'compte'      => ['required', 'string', 'max:20'],
+            'ecritures'   => ['required', 'array', 'min:2'],
+            'ecritures.*' => ['required', 'integer'],
+        ]);
+
+        try {
+            // Le service confronte lui-même les identifiants à l'entreprise :
+            // une écriture du voisin n'entre pas dans un lettrage.
+            $lettrage = LettrageService::lettrer(
+                Auth::user()->entreprise_id,
+                $donnees['compte'],
+                $donnees['ecritures']
+            );
+        } catch (\InvalidArgumentException $e) {
+            return back()->with('erreur', $e->getMessage());
+        }
+
+        return back()->with('succes', "Lettrage « {$lettrage->code} » posé.");
+    }
+
+    /**
+     * Défaire un lettrage.
+     */
+    public function delettrer(\App\Modules\Admin\Modeles\Lettrage $lettrage): RedirectResponse
+    {
+        abort_unless($lettrage->entreprise_id === Auth::user()->entreprise_id, 403);
+
+        $nombre = LettrageService::delettrer($lettrage);
+
+        return back()->with('succes', "Lettrage défait : {$nombre} écriture(s) redeviennent ouvertes.");
+    }
+
+    /**
+     * Le site demandé, confronté à l'entreprise.
+     *
+     * Sans ce contrôle, `?pdv_id=` afficherait les écritures du concurrent.
+     */
+    private function siteDemande(Request $request, int $entrepriseId): ?int
+    {
+        $demande = $request->query('pdv_id');
+
+        if (!$demande || $demande === 'tous') {
+            return null;
+        }
+
+        return \App\Modules\Admin\Modeles\PointDeVente::where('id', $demande)
+            ->where('entreprise_id', $entrepriseId)
+            ->value('id');
     }
 
     /**

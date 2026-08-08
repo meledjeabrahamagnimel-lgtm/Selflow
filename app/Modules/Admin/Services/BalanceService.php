@@ -39,7 +39,7 @@ class BalanceService
      * @param  string|null  $debut  date incluse, `null` pour depuis l'origine
      * @param  string|null  $fin    date incluse, `null` pour jusqu'à aujourd'hui
      * @return array{
-     *     lignes: array<int, array{compte: string, libelle: string, debit: float, credit: float, solde: float}>,
+     *     lignes: array<int, array{compte: string, libelle: string, solde_initial: float, debit: float, credit: float, solde: float}>,
      *     total_debit: float,
      *     total_credit: float,
      *     ecart: float,
@@ -49,27 +49,44 @@ class BalanceService
     public static function etablir(int $entrepriseId, ?string $debut = null, ?string $fin = null, ?int $pointDeVenteId = null): array
     {
         $mouvements = self::totauxParCompte($entrepriseId, $debut, $fin, $pointDeVenteId);
-        $intitules = self::intitules($entrepriseId, array_keys($mouvements));
+
+        // Le solde initial : le cumul de tout ce qui precede la periode. C'est
+        // ce que Comptaflow calcule sous le nom de « soldes initiaux », et sans
+        // lui la balance d'un mois de mars donnerait le solde **de mars** et non
+        // le solde du compte — un client qui doit 500 000 depuis janvier et n'a
+        // rien bouge en mars apparaitrait a zero.
+        $initiaux = $debut
+            ? self::totauxParCompte($entrepriseId, null, self::veille($debut), $pointDeVenteId)
+            : [];
+
+        $comptes = array_unique(array_merge(array_keys($mouvements), array_keys($initiaux)));
+        sort($comptes, SORT_STRING);
+
+        $intitules = self::intitules($entrepriseId, $comptes);
 
         $lignes = [];
         $totalDebit = 0.0;
         $totalCredit = 0.0;
 
-        ksort($mouvements, SORT_STRING);
+        foreach ($comptes as $compte) {
+            $debit = round($mouvements[$compte]['debit'] ?? 0, 2);
+            $credit = round($mouvements[$compte]['credit'] ?? 0, 2);
 
-        foreach ($mouvements as $compte => $totaux) {
-            $debit = round($totaux['debit'], 2);
-            $credit = round($totaux['credit'], 2);
+            $soldeInitial = round(
+                ($initiaux[$compte]['debit'] ?? 0) - ($initiaux[$compte]['credit'] ?? 0),
+                2
+            );
 
             $lignes[] = [
-                'compte'  => (string) $compte,
-                'libelle' => $intitules[$compte] ?? Compte::nommer((string) $compte) ?? 'Compte non nommé',
-                'debit'   => $debit,
-                'credit'  => $credit,
+                'compte'        => (string) $compte,
+                'libelle'       => $intitules[$compte] ?? Compte::nommer((string) $compte) ?? 'Compte non nommé',
+                'solde_initial' => $soldeInitial,
+                'debit'         => $debit,
+                'credit'        => $credit,
                 // Positif = solde débiteur, négatif = solde créditeur. Une
                 // seule colonne signée plutôt que deux : l'écran présentera ce
                 // qu'il veut, mais le calcul n'a pas à choisir pour lui.
-                'solde'   => round($debit - $credit, 2),
+                'solde'         => round($soldeInitial + $debit - $credit, 2),
             ];
 
             $totalDebit += $debit;
@@ -114,6 +131,18 @@ class BalanceService
     }
 
     // ─────────────────────────────────────────────────────────────────
+
+    /**
+     * La veille d'une date : la borne haute du solde initial.
+     *
+     * Le solde initial cumule tout ce qui précède **strictement** la période :
+     * inclure le premier jour compterait ses écritures deux fois, une fois au
+     * report et une fois aux mouvements.
+     */
+    private static function veille(string $date): string
+    {
+        return \Carbon\Carbon::parse($date)->subDay()->toDateString();
+    }
 
     /**
      * Totaux débit et crédit par numéro de compte.

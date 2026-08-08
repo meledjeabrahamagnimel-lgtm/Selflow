@@ -139,6 +139,15 @@ Route::prefix('admin')
             // Balance de controle : ce qui permet a un client sans abonnement
             // Comptaflow de verifier ce que Selflow a ecrit.
             Route::get('/balance', [\App\Modules\Admin\Controleurs\ComptabiliteControleur::class, 'balance'])->name('balance');
+
+            // Grand livre : la balance dit combien un compte a bouge, le grand
+            // livre dit pourquoi.
+            Route::get('/grand-livre', [\App\Modules\Admin\Controleurs\ComptabiliteControleur::class, 'grandLivre'])->name('grand_livre');
+
+            // Lettrage : rapprocher une facture du reglement qui la solde.
+            Route::get('/lettrage',  [\App\Modules\Admin\Controleurs\ComptabiliteControleur::class, 'lettrage'])->name('lettrage');
+            Route::post('/lettrage', [\App\Modules\Admin\Controleurs\ComptabiliteControleur::class, 'lettrer'])->name('lettrer');
+            Route::delete('/lettrage/{lettrage}', [\App\Modules\Admin\Controleurs\ComptabiliteControleur::class, 'delettrer'])->name('delettrer');
         });
 
         // ── Module Fiscalité & DGI (Gestion FNE) ──

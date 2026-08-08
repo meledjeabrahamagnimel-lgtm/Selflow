@@ -98,6 +98,7 @@ class EcritureComptable extends Model
         'compte_tiers',
         'debit',
         'credit',
+        'lettrage_id',
         'description',
         'comptaflow_sync_status',
     ];
@@ -124,5 +125,16 @@ class EcritureComptable extends Model
     public function operation(): BelongsTo
     {
         return $this->belongsTo(Operation::class, 'operation_id');
+    }
+
+    /**
+     * Le lettrage qui rapproche cette écriture d'une autre.
+     *
+     * Nul tant que la pièce n'est pas soldée : c'est précisément ce qui permet
+     * de répondre à « que me doit-on encore ? ».
+     */
+    public function lettrage()
+    {
+        return $this->belongsTo(Lettrage::class, 'lettrage_id');
     }
 }

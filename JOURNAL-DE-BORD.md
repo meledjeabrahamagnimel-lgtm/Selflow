@@ -6,8 +6,8 @@ et ce fichier. Tout ce qui a été décidé, tout ce qui a été écarté et pou
 tout ce qui reste à faire doit donc figurer ici — et y être tenu à jour à chaque
 lot terminé.
 
-Dernière mise à jour : 8 août 2026 — lot 4 : imputation, CUMP (Coût Unitaire
-Moyen Pondéré), BAPA sans TVA indue, et une balance de contrôle.
+Dernière mise à jour : 8 août 2026 — lot 4 quasi terminé : imputation, CUMP
+(Coût Unitaire Moyen Pondéré), balance, grand livre et lettrage.
 
 ---
 
@@ -613,7 +613,8 @@ besoin s'en fait sentir. Le test le constate au lieu de le passer sous silence.
 |---|---|
 | 4.1 · Chaîne d'imputation article → rayon → défaut | **TERMINÉ** |
 | 4.2 · CUMP (Coût Unitaire Moyen Pondéré) et inventaire permanent | **TERMINÉ** |
-| 4.3 · Règlements et lettrage | à faire |
+| 4.3 · Lettrage | **TERMINÉ** |
+| 4.6 · Grand livre | **TERMINÉ** |
 | 4.4 · BAPA sans TVA déductible | **TERMINÉ** |
 | 4.5 · Balance de contrôle dans Selflow | **TERMINÉ** |
 
@@ -761,6 +762,60 @@ Comptaflow.
 - `tests/Feature/BalanceTest.php` — 15 tests, dont le filtre de site confronté à
   l'identifiant d'une autre entreprise : sans ce contrôle, `?pdv_id=`
   afficherait le chiffre d'affaires du concurrent.
+
+#### 4.3 et 4.6 — Lettrage et grand livre, d'après Comptaflow
+
+Le dépôt `guysergekouassi/comptaflow` a servi de référence, sur demande du
+propriétaire. Ce que j'y ai lu et repris :
+
+| Chez Comptaflow | Dans Selflow |
+|---|---|
+| `lettrages` : `code`, `date_lettrage`, `user_id`, `company_id` | idem, avec `entreprise_id` et `utilisateur_id` |
+| `ecriture_comptables.lettrage_id` | `ecritures_comptables.lettrage_id` |
+| Grand livre sur une **plage de comptes**, du compte A au compte B | idem |
+| `fetchSoldesInitiaux()` : cumul de tout ce qui précède `date_debut` | `GrandLivreService::soldesInitiaux()` |
+| Colonne de lettrage au grand livre (`leftJoin lettrages`) | idem, par relation Eloquent |
+
+**Une différence de structure, et elle décide de tout le reste.** Chez
+Comptaflow, une écriture porte **un** compte — `plan_comptable_id`, avec son
+débit et son crédit ; une opération compte donc plusieurs écritures. Dans
+Selflow, une écriture porte **les deux** comptes sur la même ligne.
+
+Conséquence directe : **une écriture de Selflow produit deux lignes de grand
+livre**, une sur le compte débité, une sur le compte crédité, chacune portant
+l'autre compte en contrepartie. C'est aussi la traduction que le déversement du
+lot 5 devra faire — et c'est ici qu'elle se lit le plus clairement.
+
+**Le défaut que cette différence a failli me faire écrire.** J'avais d'abord
+contrôlé l'équilibre d'un lettrage par `SUM(debit) − SUM(credit)`, comme le
+ferait Comptaflow. Dans Selflow, chaque écriture porte un débit et un crédit
+**égaux** sur la même ligne : cette somme vaut donc toujours zéro, et
+**n'importe quel ensemble aurait passé pour équilibré** — une facture de 100 000
+se serait lettrée avec un acompte de 40 000, déclarant éteinte une créance dont
+il restait 60 000 dus. Le test l'a montré avant le premier utilisateur.
+
+L'équilibre se juge donc **du point de vue du compte lettré** : la facture le
+débite, le règlement le crédite, et l'écart est ce qui reste dû. C'est pourquoi
+`LettrageService::lettrer()` prend le compte en paramètre — ce n'est pas un
+détail de signature.
+
+Deux règles portées par le code :
+
+- **un lettrage équilibre** — un règlement partiel se lettre quand le solde est
+  atteint, pas avant ;
+- **un lettrage ne se réécrit pas** — on le défait et on recommence. Un code
+  n'est jamais recyclé : il désignerait deux rapprochements différents dans
+  l'histoire du compte, et le grand livre d'un exercice clos deviendrait faux.
+
+Les codes suivent la convention comptable — `A`, `B`, … `Z`, puis `AA` — et non
+un identifiant numérique : c'est ce qu'un comptable s'attend à lire.
+
+**La balance gagne son solde initial** au passage, de la même source. Sans lui,
+la balance d'un mois de mars donnerait le solde *de mars* et non le solde du
+compte. Le premier jour de la période n'entre pas dans le report : il serait
+compté deux fois.
+
+- `tests/Feature/GrandLivreLettrageTest.php` — 21 tests.
 
 ### Lot 5 — La passerelle Comptaflow — les deux dépôts
 

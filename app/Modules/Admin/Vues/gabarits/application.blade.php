@@ -733,6 +733,12 @@
             <a href="{{ route('admin.comptabilite.balance') }}" class="nav-item {{ request()->routeIs('admin.comptabilite.balance') ? 'active' : '' }}">
                 <i class="fas fa-scale-balanced"></i> Balance de contrôle
             </a>
+            <a href="{{ route('admin.comptabilite.grand_livre') }}" class="nav-item {{ request()->routeIs('admin.comptabilite.grand_livre') ? 'active' : '' }}">
+                <i class="fas fa-book-open"></i> Grand livre
+            </a>
+            <a href="{{ route('admin.comptabilite.lettrage') }}" class="nav-item {{ request()->routeIs('admin.comptabilite.lettrage') ? 'active' : '' }}">
+                <i class="fas fa-link"></i> Lettrage
+            </a>
             @endif
             @endif
 
