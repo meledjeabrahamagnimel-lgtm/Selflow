@@ -260,11 +260,16 @@ class StockService
             $apres = round($sens === MouvementStock::ENTREE ? $avant + $quantite : $avant - $quantite,
                 Stock::DECIMALES);
 
-            $fiche->update(['quantite_disponible' => $apres]);
+            // Le **CUMP** (Coût Unitaire Moyen Pondéré) se recalcule à chaque
+            // entrée, et jamais à une sortie : une sortie consomme le coût
+            // moyen, elle ne le déplace pas.
+            [$cout, $cumpApres] = self::valoriser($fiche, $sens, $quantite, $avant, $apres, $contexte);
+
+            $fiche->update(['quantite_disponible' => $apres, 'cump' => $cumpApres]);
 
             $piece = $contexte['piece'] ?? null;
 
-            return MouvementStock::create([
+            $mouvement = MouvementStock::create([
                 'produit_id'                     => $produit->id,
                 'point_de_vente_id'              => $pointDeVenteId,
                 'type_mouvement'                 => $sens,
@@ -272,6 +277,8 @@ class StockService
                 'quantite'                       => $quantite,
                 'stock_avant'                    => $avant,
                 'stock_apres'                    => $apres,
+                'cout_unitaire'                  => $cout,
+                'cump_apres'                     => $cumpApres,
                 'point_de_vente_contrepartie_id' => $contexte['contrepartie_id'] ?? null,
                 'utilisateur_id'                 => $contexte['utilisateur_id'] ?? Auth::id(),
                 'fournisseur_id'                 => $contexte['fournisseur_id'] ?? null,
@@ -281,7 +288,102 @@ class StockService
                 'piece_id'                       => $piece?->getKey(),
                 'contrepasse_id'                 => $contexte['contrepasse_id'] ?? null,
             ]);
+
+            // L'inventaire permanent, c'est cela : le stock se met a jour en
+            // valeur a chaque mouvement, et non une fois l'an au comptage.
+            // L'ecriture n'est donc pas une consequence du mouvement — elle en
+            // fait partie, et se declenche depuis la porte unique plutot que
+            // depuis les huit endroits qui deplacent de la marchandise.
+            //
+            // Aucun compte de classe 3 n'etait mouvemente jusqu'ici : le stock
+            // existait en quantite, pas en valeur, et aucun bilan ne pouvait
+            // etre etabli.
+            $mouvement->setRelation('produit', $produit);
+            InventairePermanentService::comptabiliser($mouvement);
+
+            return $mouvement;
         });
+    }
+
+    /**
+     * Valoriser un mouvement, et en déduire le nouveau CUMP (Coût Unitaire
+     * Moyen Pondéré).
+     *
+     * `produits.prix_achat` tenait lieu de coût : un prix de catalogue, figé,
+     * saisi une fois. La marge affichée était donc fausse dès que le
+     * fournisseur changeait ses prix — un sac acheté 12 000 puis 15 000 restait
+     * valorisé au prix de la fiche — et le bilan ne pouvait pas être établi.
+     *
+     * **À l'entrée**, le coût moyen se recalcule en pondérant l'ancien stock
+     * par son coût et l'entrée par le sien :
+     *
+     *     CUMP = (Q_ancienne × CUMP_ancien + Q_entrée × coût_entrée)
+     *            ÷ (Q_ancienne + Q_entrée)
+     *
+     * **À la sortie**, rien ne bouge : une sortie consomme le coût moyen, elle
+     * ne le déplace pas. C'est la définition même du procédé, et c'est ce qui
+     * le rend indépendant de l'ordre des ventes.
+     *
+     * Trois situations demandent une décision, et chacune a sa raison :
+     *
+     * - **entrée sans coût connu** — un transfert, un retour client, un écart
+     *   d'inventaire en plus. On reprend le CUMP en place : la marchandise
+     *   n'a pas changé de valeur en changeant de main. Pour un premier
+     *   mouvement sur une fiche vide, on retombe sur `prix_achat`, faute de
+     *   mieux, plutôt que de valoriser à zéro ;
+     * - **stock négatif ou nul après l'entrée** — la moyenne pondérée n'a plus
+     *   de sens sur une quantité qui ne peut pas la porter. On garde le coût de
+     *   l'entrée, qui est la seule information sûre ;
+     * - **stock à zéro avant l'entrée** — pas de moyenne à faire : le coût de
+     *   l'entrée devient le CUMP.
+     *
+     * @return array{0: float, 1: float} le coût du mouvement, et le CUMP après
+     */
+    private static function valoriser(
+        Stock $fiche,
+        string $sens,
+        float $quantite,
+        float $avant,
+        float $apres,
+        array $contexte
+    ): array {
+        $cumpAvant = (float) $fiche->cump;
+
+        if ($sens === MouvementStock::SORTIE) {
+            // La sortie est valorisée au coût moyen, qui ne bouge pas.
+            return [$cumpAvant, $cumpAvant];
+        }
+
+        $cout = isset($contexte['cout_unitaire'])
+            ? round((float) $contexte['cout_unitaire'], Stock::DECIMALES_COUT)
+            : ($cumpAvant > 0 ? $cumpAvant : (float) ($fiche->produit?->prix_achat ?? 0));
+
+        if ($avant <= 0 || $apres <= 0) {
+            return [$cout, round($cout, Stock::DECIMALES_COUT)];
+        }
+
+        $cump = (($avant * $cumpAvant) + ($quantite * $cout)) / $apres;
+
+        return [$cout, round($cump, Stock::DECIMALES_COUT)];
+    }
+
+    /**
+     * Valeur du stock d'un article sur un site : quantité × CUMP (Coût
+     * Unitaire Moyen Pondéré).
+     *
+     * C'est ce qu'un compte de classe 3 doit porter au bilan.
+     */
+    public static function valeurDuStock(Produit $produit, int $pointDeVenteId): float
+    {
+        $fiche = Stock::where('produit_id', $produit->id)
+            ->where('point_de_vente_id', $pointDeVenteId)
+            ->first();
+
+        if (!$fiche) {
+            return 0.0;
+        }
+
+        return round((float) $fiche->quantite_disponible * (float) $fiche->cump, 2);
     }
 
     /**

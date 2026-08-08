@@ -67,6 +67,8 @@ class MouvementStock extends Model
         'quantite',
         'stock_avant',
         'stock_apres',
+        'cout_unitaire',
+        'cump_apres',
         'reference_document',
         'piece_type',
         'piece_id',
@@ -83,6 +85,8 @@ class MouvementStock extends Model
             'quantite'    => 'float',
             'stock_avant' => 'float',
             'stock_apres' => 'float',
+            'cout_unitaire' => 'float',
+            'cump_apres'    => 'float',
         ];
     }
 
@@ -98,6 +102,7 @@ class MouvementStock extends Model
     private const IMMUABLES = [
         'produit_id', 'point_de_vente_id', 'type_mouvement', 'sous_type',
         'quantite', 'stock_avant', 'stock_apres', 'piece_type', 'piece_id',
+        'cout_unitaire', 'cump_apres',
     ];
 
     protected static function booted(): void

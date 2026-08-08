@@ -6,6 +6,7 @@ use App\Modules\Admin\Modeles\Categorie;
 use App\Modules\Admin\Modeles\Entreprise;
 use App\Modules\Admin\Modeles\PlanComptable;
 use App\Modules\Admin\Modeles\Produit;
+use App\Modules\Admin\Services\ImputationService;
 use App\Modules\Admin\Services\SouscriptionProfilService;
 use Database\Seeders\ReferentielSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -59,9 +60,19 @@ class SouscriptionProfilTest extends TestCase
         $this->assertSame('Riz sac 25 kg', $riz->nom);
         $this->assertSame('marchandise', $riz->type);
         $this->assertSame('sac', $riz->unite);
-        $this->assertSame('701000', $riz->compte_vente);
-        $this->assertSame('601000', $riz->compte_achat);
         $this->assertSame('Vivres et alimentation', $riz->categorieRelation->nom);
+
+        // L'imputation se lit sur le rayon, pas sur l'article. La recopier sur
+        // chaque fiche obligeait a toutes les rouvrir pour changer le compte
+        // d'un rayon, et un article cree a la main apres la souscription
+        // n'heritait de rien — il tombait sur le compte generique 701000.
+        $this->assertNull($riz->compte_vente);
+        $this->assertSame('701000', $riz->categorieRelation->compte_vente);
+        $this->assertSame('601000', $riz->categorieRelation->compte_achat);
+
+        // La chaine article -> rayon -> defaut donne le meme resultat qu'avant.
+        $this->assertSame('701000', ImputationService::compteVente($riz));
+        $this->assertSame('601000', ImputationService::compteAchat($riz));
 
         // Les prix restent a saisir : le classeur les laisse volontairement
         // vides, ils varient selon la zone et la periode.

@@ -167,10 +167,17 @@ class SouscriptionProfilService
             return [$existante, false];
         }
 
+        // Les quatre comptes de la famille suivent le rayon, et non chaque
+        // article : c'est le rayon qui porte la regle, et un article cree a la
+        // main apres la souscription en herite sans qu'on ait rien a redire.
         return [Categorie::create([
-            'entreprise_id' => $entreprise->id,
-            'nom'           => $famille->nom,
-            'prefixe'       => self::prefixeLibre($entreprise, $famille->code),
+            'entreprise_id'    => $entreprise->id,
+            'nom'              => $famille->nom,
+            'prefixe'          => self::prefixeLibre($entreprise, $famille->code),
+            'compte_vente'     => $famille->compte_vente,
+            'compte_achat'     => $famille->compte_achat,
+            'compte_stock'     => $famille->compte_stock,
+            'compte_variation' => $famille->compte_variation,
         ]), true];
     }
 
@@ -244,8 +251,11 @@ class SouscriptionProfilService
             'unite'         => $article->unite,
             'prix_achat'    => 0,
             'prix_vente'    => 0,
-            'compte_vente'  => $article->compte_vente,
-            'compte_achat'  => $article->compte_achat,
+            // Rien ici : l'imputation se lit sur le rayon. La recopier sur
+            // chaque article obligeait a rouvrir toutes les fiches pour
+            // changer le compte d'un rayon, et le lien entre le rayon et son
+            // imputation — la regle metier — disparaissait apres la copie.
+            // `ImputationService` resout la chaine article -> rayon -> defaut.
         ]);
 
         return true;

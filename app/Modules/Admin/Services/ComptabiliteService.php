@@ -653,6 +653,10 @@ class ComptabiliteService
      */
     private static function ventilationVente(Vente $vente): array
     {
+        // L'imputation lit le rayon de l'article : sans ce chargement, une
+        // facture de cinquante lignes declenche cinquante requetes.
+        $vente->loadMissing('details.produit.categorieRelation');
+
         $pourcentageRemise = ($vente->remise > 0 && $vente->montant_ht > 0)
             ? ($vente->remise / $vente->montant_ht)
             : 0;
@@ -667,7 +671,11 @@ class ComptabiliteService
                 $ht = $ht - ($ht * $pourcentageRemise);
             }
             if ($ht > 0) {
-                $compte = $detail->produit?->compte_vente ?? config('selflow.plan_comptable_defaut.vente_defaut');
+                // Chaine article -> rayon -> defaut : le rayon manquait, et
+                // un article cree apres la souscription tombait sur le
+                // compte generique 701000. La balance d'un magasin qui a
+                // reparti ses rayons n'avait alors qu'une ligne de ventes.
+                $compte = ImputationService::compteVente($detail->produit);
                 if (!isset($comptes[$compte])) {
                     $comptes[$compte] = ['montant' => 0, 'produits' => []];
                 }
@@ -687,13 +695,15 @@ class ComptabiliteService
      */
     private static function ventilationAchat(Achat $achat): array
     {
+        $achat->loadMissing('details.produit.categorieRelation');
+
         $comptes = [];
         $totalTva = 0;
         foreach ($achat->details as $detail) {
             $remiseLigne = (float) ($detail->remise_taux ?? 0);
             $ht = $detail->quantite * $detail->prix_unitaire * (1 - $remiseLigne / 100);
             if ($ht > 0) {
-                $compte = $detail->produit?->compte_achat ?? config('selflow.plan_comptable_defaut.achat_defaut');
+                $compte = ImputationService::compteAchat($detail->produit);
                 if (!isset($comptes[$compte])) {
                     $comptes[$compte] = ['montant' => 0, 'produits' => []];
                 }

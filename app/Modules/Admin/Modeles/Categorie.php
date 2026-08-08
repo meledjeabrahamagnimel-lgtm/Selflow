@@ -12,6 +12,12 @@ class Categorie extends Model
 
     protected $fillable = [
         'entreprise_id',
+        // Les quatre comptes du rayon. C'est ici que se lit la regle metier :
+        // « tout ce qui entre dans Boissons fraiches s'impute la ».
+        'compte_vente',
+        'compte_achat',
+        'compte_stock',
+        'compte_variation',
         'nom',
         'prefixe',
     ];

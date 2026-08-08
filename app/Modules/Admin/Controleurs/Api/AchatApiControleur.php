@@ -160,7 +160,8 @@ class AchatApiControleur
                     StockService::entree($produit, (int) $pointDeVenteId, (float) $article['quantite'],
                         MouvementStock::RECEPTION,
                         ['piece' => $achat, 'reference' => $numero,
-                         'fournisseur_id' => $achat->fournisseur_id]);
+                         'fournisseur_id' => $achat->fournisseur_id,
+                         'cout_unitaire' => (float) $article['prix_unitaire']]);
                 }
             }
 

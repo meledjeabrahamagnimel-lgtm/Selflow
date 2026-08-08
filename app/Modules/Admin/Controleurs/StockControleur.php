@@ -430,6 +430,10 @@ class StockControleur
                             'piece'          => $achat,
                             'reference'      => $achat->numero_facture,
                             'fournisseur_id' => $achat->fournisseur_id,
+                            // Le cout d'entree est le prix reellement paye sur
+                            // la ligne, remise deduite.
+                            'cout_unitaire'  => (float) $detail->prix_unitaire
+                                * (1 - (float) ($detail->remise_taux ?? 0) / 100),
                         ]);
                 }
             }

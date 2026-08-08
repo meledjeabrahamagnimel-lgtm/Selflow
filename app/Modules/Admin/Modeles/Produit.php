@@ -183,6 +183,8 @@ class Produit extends Model
         'code_tva_manuel',  // false = code déduit du taux et du régime
         'compte_vente',
         'compte_achat',
+        'compte_stock',
+        'compte_variation',
         // Phase 1 — catalogue enrichi
         'photo',
         'date_arrivee',

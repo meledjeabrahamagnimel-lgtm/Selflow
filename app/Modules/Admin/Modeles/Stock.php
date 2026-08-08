@@ -13,6 +13,7 @@ class Stock extends Model
         'produit_id',
         'point_de_vente_id',
         'quantite_disponible',
+        'cump',
         'stock_minimum',
         'stock_maximum',
     ];
@@ -22,6 +23,15 @@ class Stock extends Model
      * sur le litre. Un `integer` faisait entrer 12,5 kg de cacao pour 12.
      */
     public const DECIMALES = 3;
+
+    /**
+     * Précision du **CUMP** (Coût Unitaire Moyen Pondéré) : quatre décimales.
+     *
+     * Une de plus que les quantités. Le coût unitaire d'un article vendu au
+     * gramme se joue au centime du millier, et arrondir le coût avant de le
+     * multiplier par la quantité propage l'erreur sur toute la sortie.
+     */
+    public const DECIMALES_COUT = 4;
 
     /**
      * Les quantités sont lues en `float` et non en `decimal:3`.
@@ -38,6 +48,7 @@ class Stock extends Model
     {
         return [
             'quantite_disponible' => 'float',
+            'cump'                => 'float',
             'stock_minimum'       => 'float',
             'stock_maximum'       => 'float',
         ];

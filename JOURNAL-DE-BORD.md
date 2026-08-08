@@ -6,8 +6,8 @@ et ce fichier. Tout ce qui a été décidé, tout ce qui a été écarté et pou
 tout ce qui reste à faire doit donc figurer ici — et y être tenu à jour à chaque
 lot terminé.
 
-Dernière mise à jour : 8 août 2026 — lot 3 terminé ; quantités décimales admises
-par la DGI ; 41 attaques simulées, dont un mot de passe superadmin publié.
+Dernière mise à jour : 8 août 2026 — lots 4.1 et 4.2 : l’imputation se lit sur
+le rayon, et le stock prend enfin une valeur.
 
 ---
 
@@ -607,11 +607,107 @@ pas. Aucun code du dépôt ne le fait plus, et le seul appelant qui le faisait a
 été corrigé. Une contrainte de base de données serait le cran suivant, si le
 besoin s'en fait sentir. Le test le constate au lieu de le passer sous silence.
 
-### Lot 4 — Les imputations — après 1 et 3
+### Lot 4 — Les imputations — **EN COURS**
 
-Chaîne article → famille → type → défaut. Inventaire permanent au **CUMP**
-(Coût Unitaire Moyen Pondéré). Codes
-journaux imposés. Règlements et lettrage. BAPA sans TVA déductible.
+| Étape | État |
+|---|---|
+| 4.1 · Chaîne d'imputation article → rayon → défaut | **TERMINÉ** |
+| 4.2 · CUMP (Coût Unitaire Moyen Pondéré) et inventaire permanent | **TERMINÉ** |
+| 4.3 · Règlements et lettrage | à faire |
+| 4.4 · BAPA sans TVA déductible | à faire |
+| 4.5 · Balance de contrôle dans Selflow | à faire |
+
+#### 4.1 — L'imputation se lit sur le rayon
+
+La question « sur quel compte s'impute cet article » se résolvait par une paire,
+recopiée à chaque endroit :
+
+    $detail->produit?->compte_vente ?? config('…vente_defaut')
+
+Deux niveaux là où le référentiel en prévoit trois, et le plus utile — **le
+rayon** — sautait. `SouscriptionProfilService` copiait en effet les comptes de
+la famille **sur chaque produit**, et la catégorie de l'entreprise n'en gardait
+aucun. Trois conséquences :
+
+- un article créé à la main après la souscription n'héritait de rien et tombait
+  sur le compte générique `701000` : la balance d'un magasin qui a soigneusement
+  réparti ses rayons n'avait **qu'une seule ligne de ventes** ;
+- changer le compte d'un rayon obligeait à rouvrir chacun de ses articles ;
+- le lien entre le rayon et son imputation — la règle métier — ne figurait plus
+  nulle part une fois la copie faite.
+
+Les quatre comptes rejoignent `categories`, et `ImputationService` résout la
+chaîne :
+
+| Rang | Source | Ce que cela veut dire |
+|---|---|---|
+| 1 | `produits.compte_*` | L'exception que l'utilisateur assume, article par article |
+| 2 | `categories.compte_*` | Le rayon — la règle métier, celle du référentiel |
+| 3 | `config('selflow.plan_comptable_defaut')` | Le filet, quand rien n'est renseigné |
+
+**Le stock n'a pas de filet** : il n'existe pas de « compte de stock générique »
+qui voudrait dire quelque chose. Les marchandises vont en 31, les matières en
+32, les produits finis en 36 ; les confondre rendrait le bilan **faux** plutôt
+qu'imprécis. Un article sans compte de stock ne produit donc pas d'écriture
+d'inventaire, et `manqueUnCompte()` permet aux écrans de le dire — un article
+mal imputé ne se voit pas avant la balance, et à ce moment-là le mois est passé.
+
+- `tests/Feature/ImputationTest.php` — 12 tests.
+
+#### 4.2 — Le stock prend une valeur
+
+`produits.prix_achat` tenait lieu de coût : un prix de catalogue, figé, saisi
+une fois. **La marge affichée était fausse** dès que le fournisseur changeait
+ses prix — un sac acheté 12 000 puis 15 000 restait valorisé au prix de la
+fiche, et la vente à 17 000 annonçait une marge qu'on n'avait pas faite. Et le
+bilan ne pouvait pas être établi : valoriser un stock demande un coût, pas un
+prix indicatif.
+
+Le **CUMP** (Coût Unitaire Moyen Pondéré) se recalcule à chaque entrée :
+
+    CUMP = (Q_ancienne × CUMP_ancien + Q_entrée × coût_entrée) ÷ (Q_ancienne + Q_entrée)
+
+À la sortie, rien ne bouge : une sortie **consomme** le coût moyen, elle ne le
+déplace pas. C'est la définition du procédé, et ce qui le rend indépendant de
+l'ordre des ventes.
+
+Il est porté par la **fiche de stock** — le couple article / site — et non par
+l'article : le même sac de riz arrive à des coûts différents à Abidjan et à
+Bouaké, transport compris. Un CUMP (Coût Unitaire Moyen Pondéré) global
+mélangerait les deux et fausserait les deux. Quatre décimales, une de plus que
+les quantités : le coût unitaire d'un article vendu au gramme se joue au centime
+du millier.
+
+Le coût d'entrée est le **prix réellement payé**, remise de ligne déduite, et
+non le prix de catalogue. Trois situations demandent une décision :
+
+| Situation | Décision | Pourquoi |
+|---|---|---|
+| Entrée sans coût connu — transfert, retour, écart d'inventaire | On reprend le CUMP en place | La marchandise n'a pas changé de valeur en changeant de main |
+| Première entrée sur une fiche vide, sans coût | Repli sur `prix_achat` | Faute de mieux, mais mieux que zéro |
+| Stock nul ou négatif après l'entrée | Le coût de l'entrée devient le CUMP | La moyenne pondérée n'a plus de sens sur une quantité qui ne peut pas la porter |
+
+**Les écritures d'inventaire permanent.** Aucun compte de classe 3 n'était
+mouvementé — ni 31, ni 32, ni 36, ni les variations 603 et 736. Le stock
+existait en quantité, pas en valeur.
+
+| Mouvement | Débit | Crédit |
+|---|---|---|
+| **Entrée** — le stock grossit | Compte de stock (3x) | Compte de variation (603x, 736) |
+| **Sortie** — le stock diminue | Compte de variation | Compte de stock |
+
+L'écriture n'est pas une *conséquence* du mouvement : en inventaire permanent,
+elle en **fait partie**. Elle se déclenche donc depuis `StockService`, la porte
+unique du lot 3, et non depuis les huit endroits qui déplacent de la
+marchandise. Le libellé porte le motif — « Mise au rebut — Riz sac 25 kg » —
+pour qu'on retrouve au grand livre la raison du mouvement sans revenir au
+journal de stock.
+
+Un ajustement d'inventaire n'a pas d'autre pièce que lui-même : il porte alors
+sa propre référence, `MVT-{id}`. La colonne n'accepte pas le vide, et une
+écriture sans référence serait introuvable au grand livre.
+
+- `tests/Feature/InventairePermanentTest.php` — 16 tests.
 
 ### Lot 5 — La passerelle Comptaflow — les deux dépôts
 
@@ -717,9 +813,12 @@ Elles sont documentées pour ne pas être redécouvertes.
 
 ### Comptabilité
 
-- Aucun compte de stock (31, 32, 33, 36) ni de variation (6031, 6032, 6033, 736)
-  n'est mouvementé.
-- Pas de coût de revient : `produits.prix_achat` est un prix catalogue figé.
+- ~~Aucun compte de stock (31, 32, 33, 36) ni de variation (6031, 6032, 6033,
+  736) n'est mouvementé.~~ **CORRIGÉ au lot 4.2** : `InventairePermanentService`,
+  appelé depuis la porte unique du stock.
+- ~~Pas de coût de revient : `produits.prix_achat` est un prix catalogue
+  figé.~~ **CORRIGÉ au lot 4.2** : CUMP (Coût Unitaire Moyen Pondéré) par fiche
+  de stock, alimenté par le prix réellement payé.
 
 ### Passerelle Comptaflow
 

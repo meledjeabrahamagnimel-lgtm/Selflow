@@ -255,7 +255,10 @@ class AchatControleur
                     StockService::entree($produit, (int) $pointDeVenteId, (float) $article['quantite'],
                         MouvementStock::RECEPTION,
                         ['piece' => $achat, 'reference' => $numero,
-                         'fournisseur_id' => $achat->fournisseur_id]);
+                         'fournisseur_id' => $achat->fournisseur_id,
+                         // Le cout d'entree est le prix reellement paye, remise
+                         // deduite — pas le prix de catalogue de la fiche.
+                         'cout_unitaire' => self::coutDEntree($article['prix_unitaire'], $article['remise_taux'] ?? 0)]);
                 }
             }
 
@@ -513,6 +516,19 @@ class AchatControleur
         ]);
     }
 
+    /**
+     * Le coût auquel une marchandise entre en stock.
+     *
+     * Le prix réellement payé, remise de ligne déduite — et non
+     * `produits.prix_achat`, qui est un prix de catalogue figé. C'est lui qui
+     * nourrit le **CUMP** (Coût Unitaire Moyen Pondéré) et, de là, la marge et
+     * la valeur du stock au bilan.
+     */
+    private static function coutDEntree($prixUnitaire, $remiseTaux): float
+    {
+        return round((float) $prixUnitaire * (1 - self::tauxBorne($remiseTaux) / 100), 4);
+    }
+
     private function autoriserAcces(Achat $achat): void
     {
         $entrepriseId = Auth::user()->entreprise_id;
@@ -558,7 +574,8 @@ class AchatControleur
                     StockService::entree($produit, (int) $achat->point_de_vente_id, (float) $detail->quantite,
                         MouvementStock::RECEPTION,
                         ['piece' => $achat, 'reference' => $achat->numero_facture,
-                         'fournisseur_id' => $achat->fournisseur_id]);
+                         'fournisseur_id' => $achat->fournisseur_id,
+                         'cout_unitaire' => self::coutDEntree($detail->prix_unitaire, $detail->remise_taux ?? 0)]);
                 }
             }
 
