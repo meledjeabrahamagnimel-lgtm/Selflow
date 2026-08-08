@@ -10,6 +10,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
 use Laravel\Socialite\Facades\Socialite;
+use App\Modules\Admin\Services\TrousseauEntrepriseService;
 
 class GoogleAuthControleur
 {
@@ -68,6 +69,12 @@ class GoogleAuthControleur
                 'plan_abonnement'     => 'Starter',
                 'statut'              => 'actif',
             ]);
+
+            // Sans plan comptable ni journal, la premiere vente s'impute sur des
+            // comptes inventes a la volee. L'entreprise recoit donc de quoi
+            // travailler des le premier jour ; ce qui ne lui sert pas, elle
+            // l'archivera.
+            TrousseauEntrepriseService::doter($entreprise);
 
 
             // Créer l'utilisateur admin

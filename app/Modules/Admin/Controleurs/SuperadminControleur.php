@@ -12,6 +12,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
+use App\Modules\Admin\Services\TrousseauEntrepriseService;
 
 class SuperadminControleur
 {
@@ -163,6 +164,12 @@ class SuperadminControleur
             'secteur_activite'       => $request->secteur_activite,
             'modules_actifs'         => $modules,
         ]);
+
+        // Sans plan comptable ni journal, la premiere vente s'impute sur des
+        // comptes inventes a la volee. L'entreprise recoit donc de quoi
+        // travailler des le premier jour ; ce qui ne lui sert pas, elle
+        // l'archivera.
+        TrousseauEntrepriseService::doter($entreprise);
 
         // Création automatique du Siège comme point de vente par défaut
         PointDeVente::create([

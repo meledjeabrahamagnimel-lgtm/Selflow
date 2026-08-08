@@ -6,7 +6,7 @@ et ce fichier. Tout ce qui a été décidé, tout ce qui a été écarté et pou
 tout ce qui reste à faire doit donc figurer ici — et y être tenu à jour à chaque
 lot terminé.
 
-Dernière mise à jour : 7 août 2026 — lot 1 en cours, numérotation tranchée.
+Dernière mise à jour : 7 août 2026 — lot 1 quasi terminé.
 
 ---
 
@@ -128,12 +128,34 @@ Poussé sur **Selflow**. Ce qui est fait :
 - La numérotation des comptes du référentiel **corrigée et alignée sur l'acte
   uniforme** — voir la section 5 bis.
 
+- Le **trousseau de départ** d'une entreprise : `TrousseauEntrepriseService`
+  pose les 34 comptes communs et 9 journaux dès la création, sur les quatre
+  chemins qui créent une entreprise — inscription, Google, superadmin,
+  synchronisation Comptaflow. Sans lui, la première vente s'imputait sur des
+  comptes inventés à la volée.
+
+  Les journaux couvrent les quatre types que `ComptabiliteService` interroge
+  (Vente, Achat, OD, Banque) plus la caisse, et le mobile money ivoirien —
+  MTN, Orange, Moov, Wave. Chaque journal de trésorerie a son compte au plan.
+
+  Le mobile money est rangé en subdivision de `521` « Banques locales », à
+  partir de `521500` : c'est un avoir détenu chez un établissement agréé, pas
+  de l'espèce en caisse. L'acte uniforme est antérieur à ces moyens de paiement
+  et n'en prévoit aucun compte ; `5211` à `5214` restent libres pour les
+  banques de l'entreprise.
+
+  Rien n'écrase ce que l'utilisateur a modifié, et **ce qui ne sert pas
+  s'archive** — `archive_le` sur `plan_comptable` et `codes_journaux`, avec les
+  portées `actifs()` et `archives()`. Un compte supprimé après avoir servi
+  laisserait des écritures orphelines.
+
+- `tests/Feature/TrousseauEntrepriseTest.php` — 9 tests.
+
 Reste à faire dans ce lot :
 
-- Comptes, produits et journaux **par défaut de l'entreprise**, livrés avec
-  l'application indépendamment de Comptaflow, tous archivables. Journaux de
-  trésorerie nommés librement (MTN, Orange, Caisse, nom de banque).
 - Écran superadmin de consultation du référentiel.
+- Produits par défaut : ils viendront avec la souscription d'un profil (lot 2),
+  puisqu'ils dépendent du profil choisi.
 
 ### Lot 2 — Le parcours de souscription — après le lot 1
 

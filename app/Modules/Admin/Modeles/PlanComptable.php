@@ -13,6 +13,7 @@ class PlanComptable extends Model
         'numero',
         'numero_original',
         'libelle',
+        'archive_le',
         'source',
     ];
 
@@ -26,5 +27,24 @@ class PlanComptable extends Model
             $q->whereNull('entreprise_id')
               ->orWhere('entreprise_id', $entrepriseId);
         })->orderBy('numero')->get();
+    }
+
+    /**
+     * Ce qui ne sert pas s'archive, il ne se supprime pas : un compte ou un
+     * journal efface apres avoir servi laisserait des ecritures orphelines.
+     */
+    public function scopeActifs($query)
+    {
+        return $query->whereNull('archive_le');
+    }
+
+    public function scopeArchives($query)
+    {
+        return $query->whereNotNull('archive_le');
+    }
+
+    public function estArchive(): bool
+    {
+        return $this->archive_le !== null;
     }
 }

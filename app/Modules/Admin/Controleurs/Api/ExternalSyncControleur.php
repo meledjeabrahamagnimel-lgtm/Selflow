@@ -11,6 +11,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Validator;
+use App\Modules\Admin\Services\TrousseauEntrepriseService;
 
 /**
  * ExternalSyncControleur
@@ -91,6 +92,12 @@ class ExternalSyncControleur
                 'comptaflow_sync_status' => 'active',
                 'comptaflow_last_sync_at' => now(),
             ]);
+
+            // Sans plan comptable ni journal, la premiere vente s'impute sur des
+            // comptes inventes a la volee. L'entreprise recoit donc de quoi
+            // travailler des le premier jour ; ce qui ne lui sert pas, elle
+            // l'archivera.
+            TrousseauEntrepriseService::doter($entreprise);
 
             // 2. Créer l'utilisateur admin
             $utilisateur = Utilisateur::create([

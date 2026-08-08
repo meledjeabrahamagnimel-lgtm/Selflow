@@ -1,0 +1,65 @@
+[
+ {
+  "code": "VTE",
+  "type": "Vente",
+  "intitule": "Journal des ventes",
+  "compte": null,
+  "renommable": false
+ },
+ {
+  "code": "ACH",
+  "type": "Achat",
+  "intitule": "Journal des achats",
+  "compte": null,
+  "renommable": false
+ },
+ {
+  "code": "OD",
+  "type": "OD",
+  "intitule": "Opérations diverses",
+  "compte": null,
+  "renommable": false
+ },
+ {
+  "code": "CAI",
+  "type": "Caisse",
+  "intitule": "Caisse",
+  "compte": "571000",
+  "renommable": true
+ },
+ {
+  "code": "BQE",
+  "type": "Banque",
+  "intitule": "Banque",
+  "compte": "521100",
+  "renommable": true
+ },
+ {
+  "code": "MTN",
+  "type": "Banque",
+  "intitule": "MTN Mobile Money",
+  "compte": "521500",
+  "renommable": true
+ },
+ {
+  "code": "OMY",
+  "type": "Banque",
+  "intitule": "Orange Money",
+  "compte": "521600",
+  "renommable": true
+ },
+ {
+  "code": "MOOV",
+  "type": "Banque",
+  "intitule": "Moov Money",
+  "compte": "521700",
+  "renommable": true
+ },
+ {
+  "code": "WAVE",
+  "type": "Banque",
+  "intitule": "Wave",
+  "compte": "521800",
+  "renommable": true
+ }
+]
