@@ -635,8 +635,6 @@ class SeedMassiveCommand extends Command
                     'taux_tva' => $tauxTva,
                     'compte_vente' => $compteVente,
                     'compte_achat' => $compteAchat,
-                    'quantite_commandee' => 0,
-                    'quantite_a_receptionner' => 0,
                     'photo' => "https://picsum.photos/seed/p{$entrepriseId}-{$compteurGlobal}/400/400",
                     'statut' => 'actif',
                     'created_at' => now(),

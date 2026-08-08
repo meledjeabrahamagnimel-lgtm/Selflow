@@ -12,12 +12,15 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\View\View;
 use App\Modules\Admin\Regles\Appartenance;
 use App\Modules\Admin\Regles\Quantite;
+use App\Modules\Admin\Modeles\PointDeVente;
 use App\Modules\Admin\Modeles\Stock;
 use App\Modules\Admin\Services\StockService;
 use Illuminate\Support\Facades\DB;
 
 class StockControleur
 {
+    use \App\Modules\Admin\Traits\JournaliseActions;
+
     public function index(Request $request): View
     {
         $entreprise = Auth::user()->entreprise;
@@ -137,6 +140,132 @@ class StockControleur
         $mouvements = $query->latest()->paginate(30);
 
         return view('admin::stock.mouvements', compact('mouvements', 'section'));
+    }
+
+    /**
+     * L'écran de comptage physique.
+     *
+     * Le stock théorique est ce que l'application croit ; l'inventaire est ce
+     * que l'on trouve dans le magasin. L'écart existe toujours — casse non
+     * déclarée, erreur de saisie, vol — et il n'avait jusqu'ici aucun moyen
+     * d'entrer dans Selflow : la seule correction possible était de passer un
+     * rebut, ce qui ne sait pas dire « il y en a plus que prévu ».
+     */
+    public function inventaire(Request $request): View
+    {
+        $entreprise = Auth::user()->entreprise;
+
+        // Un comptage se fait dans un magasin, pas dans une entreprise : sans
+        // site désigné, il n'y a rien à compter.
+        $pointDeVenteId = $this->siteDeTravail($request);
+
+        $produits = collect();
+
+        if ($pointDeVenteId) {
+            $produits = Produit::where('entreprise_id', $entreprise->id)
+                ->whereIn('type', Produit::TYPES_STOCKABLES)
+                ->with(['stocks' => fn ($q) => $q->where('point_de_vente_id', $pointDeVenteId)])
+                ->orderBy('nom')
+                ->get();
+        }
+
+        $pointsDeVente = $entreprise->pointsDeVente()->orderBy('nom')->get();
+
+        return view('admin::stock.inventaire', compact('produits', 'pointDeVenteId', 'pointsDeVente'));
+    }
+
+    /**
+     * Enregistrer un comptage physique.
+     *
+     * Seules les lignes réellement comptées sont retenues : un champ laissé
+     * vide veut dire « pas compté », et non « zéro ». Confondre les deux
+     * viderait le magasin de tout ce que l'inventaire n'a pas parcouru.
+     *
+     * Chaque écart devient un mouvement, dans le sens qu'il faut. Un comptage
+     * conforme n'écrit rien.
+     */
+    public function enregistrerInventaire(Request $request): \Illuminate\Http\RedirectResponse
+    {
+        $donnees = $request->validate([
+            'point_de_vente_id'  => ['required', 'integer', Appartenance::a('points_de_vente', 'id')],
+            'comptages'          => ['required', 'array', 'min:1'],
+            'comptages.*'        => Quantite::facultative(),
+        ]);
+
+        $entreprise = Auth::user()->entreprise;
+
+        // `Appartenance` a deja ecarte le site d'une autre entreprise ; la
+        // verification ci-dessous est la ceinture apres les bretelles.
+        $site = PointDeVente::where('id', $donnees['point_de_vente_id'])
+            ->where('entreprise_id', $entreprise->id)
+            ->firstOrFail();
+
+        // Les identifiants d'articles viennent du formulaire : ils sont
+        // confrontes au catalogue de l'entreprise avant tout. Sans cela, il
+        // suffirait de poster l'identifiant du produit du voisin pour ecrire
+        // dans son stock.
+        $comptages = array_filter(
+            $donnees['comptages'],
+            fn ($valeur) => $valeur !== null && $valeur !== ''
+        );
+
+        if ($comptages === []) {
+            return back()->with('erreur', "Aucune quantité comptée : rien n'a été enregistré.");
+        }
+
+        $produits = Produit::where('entreprise_id', $entreprise->id)
+            ->whereIn('id', array_keys($comptages))
+            ->get()
+            ->keyBy('id');
+
+        $ecarts = 0;
+
+        DB::transaction(function () use ($comptages, $produits, $site, &$ecarts) {
+            foreach ($comptages as $produitId => $quantite) {
+                $produit = $produits->get((int) $produitId);
+
+                if (!$produit) {
+                    continue;
+                }
+
+                $mouvement = StockService::inventorier(
+                    $produit,
+                    (int) $site->id,
+                    round((float) $quantite, Stock::DECIMALES),
+                    ['reference' => 'INV-' . now()->format('YmdHis')]
+                );
+
+                $ecarts += $mouvement ? 1 : 0;
+            }
+        });
+
+        $this->journaliser('inventaire_physique', 'PointDeVente', $site->id);
+
+        return back()->with('succes', $ecarts === 0
+            ? 'Comptage enregistré : aucun écart, le stock théorique était juste.'
+            : "Comptage enregistré : {$ecarts} écart(s) ajusté(s) sur « {$site->nom} ».");
+    }
+
+    /**
+     * Le site sur lequel on travaille, ou `null` si l'utilisateur regarde
+     * « tous les sites » — auquel cas aucune écriture n'est possible.
+     */
+    private function siteDeTravail(Request $request): ?int
+    {
+        $demande = $request->input('point_de_vente_id')
+            ?? session('point_de_vente_actif_id')
+            ?? Auth::user()->point_de_vente_id;
+
+        if (!$demande || $demande === 'tout') {
+            return null;
+        }
+
+        // Un identifiant venu de l'URL est confronte a l'entreprise avant
+        // d'etre retenu : sans cela, `?point_de_vente_id=` afficherait le stock
+        // du voisin.
+        return PointDeVente::where('id', $demande)
+            ->where('entreprise_id', Auth::user()->entreprise_id)
+            ->value('id');
     }
 
     /**

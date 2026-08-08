@@ -671,6 +671,9 @@
             <a href="{{ route('admin.stock.mouvements') }}" class="nav-item {{ request()->routeIs('admin.stock.mouvements') ? 'active' : '' }}">
                 <i class="fas fa-arrows-up-down"></i> Mouvements
             </a>
+            <a href="{{ route('admin.stock.inventaire') }}" class="nav-item {{ request()->routeIs('admin.stock.inventaire*') ? 'active' : '' }}">
+                <i class="fas fa-clipboard-check"></i> Inventaire physique
+            </a>
             @endif
             @endif
             <!-- 5. Production -->

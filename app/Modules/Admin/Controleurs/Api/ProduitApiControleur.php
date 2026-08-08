@@ -6,6 +6,7 @@ use App\Modules\Admin\Modeles\Produit;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use App\Modules\Admin\Regles\Appartenance;
 
 class ProduitApiControleur
 {
@@ -31,8 +32,8 @@ class ProduitApiControleur
 
         $request->validate([
             'nom'           => ['required', 'string', 'max:200'],
-            'categorie_id'  => ['nullable', 'integer', 'exists:categories,id'],
-            'sous_categorie_id' => ['nullable', 'integer', 'exists:sous_categories,id'],
+            'categorie_id'  => ['nullable', 'integer', Appartenance::a('categories')],
+            'sous_categorie_id' => ['nullable', 'integer', Appartenance::a('sous_categories')],
             'prix_achat'    => ['required', 'numeric', 'min:0'],
             'prix_vente'    => ['required', 'numeric', 'min:0'],
             'stock_actuel'  => ['required', 'integer', 'min:0'],
@@ -80,8 +81,8 @@ class ProduitApiControleur
 
         $request->validate([
             'nom'           => ['required', 'string', 'max:200'],
-            'categorie_id'  => ['nullable', 'integer', 'exists:categories,id'],
-            'sous_categorie_id' => ['nullable', 'integer', 'exists:sous_categories,id'],
+            'categorie_id'  => ['nullable', 'integer', Appartenance::a('categories')],
+            'sous_categorie_id' => ['nullable', 'integer', Appartenance::a('sous_categories')],
             'prix_achat'    => ['required', 'numeric', 'min:0'],
             'prix_vente'    => ['required', 'numeric', 'min:0'],
             'stock_minimum' => ['required', 'integer', 'min:0'],

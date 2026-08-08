@@ -93,6 +93,10 @@ Route::prefix('admin')
             Route::get('/',           [StockControleur::class, 'index'])->name('index');
             Route::get('/mouvements', [StockControleur::class, 'mouvements'])->name('mouvements');
             Route::get('/rebut',      [StockControleur::class, 'rebut'])->name('rebut');
+
+            // Inventaire physique : le comptage, et l'ecart qu'il produit.
+            Route::get('/inventaire',  [StockControleur::class, 'inventaire'])->name('inventaire');
+            Route::post('/inventaire', [StockControleur::class, 'enregistrerInventaire'])->name('inventaire.enregistrer');
             Route::post('/rebut',     [StockControleur::class, 'retirerRebut'])->name('rebut.retirer');
             
             // Réceptions (Achats)

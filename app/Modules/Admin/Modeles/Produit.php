@@ -5,6 +5,7 @@ namespace App\Modules\Admin\Modeles;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Support\Facades\DB;
 
 class Produit extends Model
 {
@@ -182,8 +183,6 @@ class Produit extends Model
         'code_tva_manuel',  // false = code déduit du taux et du régime
         'compte_vente',
         'compte_achat',
-        'quantite_commandee',
-        'quantite_a_receptionner',
         // Phase 1 — catalogue enrichi
         'photo',
         'date_arrivee',
@@ -203,8 +202,6 @@ class Produit extends Model
             'code_tva_manuel'         => 'boolean',
             'categorie_id'            => 'integer',
             'sous_categorie_id'       => 'integer',
-            'quantite_commandee'      => 'float',
-            'quantite_a_receptionner' => 'float',
             'date_arrivee'            => 'date',
             'date_peremption'         => 'date',
         ];
@@ -540,8 +537,57 @@ class Produit extends Model
     }
 
     /**
-     * Calcule la quantité prévisionnelle de stock :
-     * Prévision = Stock Actuel - Quantité Commandée + Quantité à Réceptionner
+     * Quantité engagée par des bons de commande client, sur un site.
+     *
+     * Déduite des lignes, jamais stockée. Une colonne
+     * `produits.quantite_commandee` existait, s'affichait sur trois écrans et
+     * entrait dans le prévisionnel — mais **rien ne l'écrivait jamais**. Un
+     * compteur dénormalisé doit être incrémenté à la commande, décrémenté à la
+     * livraison, corrigé à l'annulation, à la modification et à l'avoir : cinq
+     * occasions de dériver, aucune traitée. Une valeur déduite ne dérive pas.
+     *
+     * Un devis n'engage rien : c'est une proposition, le client peut ne jamais
+     * la retourner. Seul le bon de commande engage.
+     */
+    public function quantiteCommandee(?int $pointDeVenteId = null): float
+    {
+        return (float) $this->venteDetails()
+            ->whereColumn('quantite', '>', 'quantite_livree')
+            ->whereHas('vente', function ($q) use ($pointDeVenteId) {
+                $q->where('etape', 'Bon de commande')
+                  ->when($pointDeVenteId, fn ($r) => $r->where('point_de_vente_id', $pointDeVenteId));
+            })
+            ->sum(DB::raw('quantite - quantite_livree'));
+    }
+
+    /**
+     * Quantité attendue de fournisseurs, sur un site. Voir
+     * `quantiteCommandee()` : même raisonnement, sens inverse.
+     */
+    public function quantiteAReceptionner(?int $pointDeVenteId = null): float
+    {
+        return (float) $this->achatDetails()
+            ->whereColumn('quantite', '>', 'quantite_receptionnee')
+            ->whereHas('achat', function ($q) use ($pointDeVenteId) {
+                $q->where('etape', 'Bon de commande')
+                  ->when($pointDeVenteId, fn ($r) => $r->where('point_de_vente_id', $pointDeVenteId));
+            })
+            ->sum(DB::raw('quantite - quantite_receptionnee'));
+    }
+
+    public function getQuantiteCommandeeAttribute(): float
+    {
+        return $this->quantiteCommandee(self::getActivePdvId());
+    }
+
+    public function getQuantiteAReceptionnerAttribute(): float
+    {
+        return $this->quantiteAReceptionner(self::getActivePdvId());
+    }
+
+    /**
+     * Ce dont on disposera une fois les engagements dénoués :
+     * disponible − commandé par les clients + attendu des fournisseurs.
      */
     public function getPrevisionAttribute(): float
     {

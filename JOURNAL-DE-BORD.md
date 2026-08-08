@@ -6,8 +6,8 @@ et ce fichier. Tout ce qui a été décidé, tout ce qui a été écarté et pou
 tout ce qui reste à faire doit donc figurer ici — et y être tenu à jour à chaque
 lot terminé.
 
-Dernière mise à jour : 8 août 2026 — lots 3.1 à 3.4 : le stock passe par une
-seule porte, et son journal ne s’efface plus.
+Dernière mise à jour : 8 août 2026 — lot 3 terminé : le stock passe par une seule
+porte, son journal ne s’efface plus, et 16 attaques simulées le vérifient.
 
 ---
 
@@ -315,7 +315,7 @@ créer — les codes viennent d'un formulaire.
   cela, un catalogue de deux cents lignes déclenchait deux cents requêtes à
   l'affichage de l'étape 5.
 
-### Lot 3 — Le stock suit l'événement — le plus lourd — **EN COURS**
+### Lot 3 — Le stock suit l'événement — **TERMINÉ**
 
 | Étape | État |
 |---|---|
@@ -323,8 +323,8 @@ créer — les codes viennent d'un formulaire.
 | 3.2 · `StockService` unique, journal en écriture seule | **TERMINÉ** |
 | 3.3 · Rebrancher les appelants, fermer la double porte d'achat | **TERMINÉ** |
 | 3.4 · Sort de la marchandise sur les avoirs | **TERMINÉ** |
-| 3.5 · Module d'inventaire physique | à faire |
-| 3.6 · Engagements sur devis et bons de commande | à faire |
+| 3.5 · Module d'inventaire physique | **TERMINÉ** |
+| 3.6 · Engagements calculés, plus stockés | **TERMINÉ** |
 
 #### 3.1 — Les quantités cessent d'être entières
 
@@ -460,12 +460,79 @@ là où il est lu.
   non par le service : les défauts corrigés ici n'étaient pas dans le service,
   ils étaient dans la façon dont douze endroits l'imitaient chacun à sa manière.
 
-#### 3.5 et 3.6 — reste à faire
+#### 3.5 — L'inventaire physique
 
-Module d'inventaire physique — `StockService::inventorier()` existe, l'écran de
-saisie de comptage non — et engagements de stock sur les devis et bons de
-commande, pour que le prévisionnel cesse d'être une soustraction faite à
-l'affichage.
+Le stock théorique est ce que l'application croit ; l'inventaire est ce que l'on
+trouve dans le magasin. L'écart existe toujours — casse non déclarée, erreur de
+saisie, vol — et il n'avait aucun moyen d'entrer dans Selflow : la seule
+correction possible était de passer un rebut, ce qui ne sait pas dire « il y en
+a **plus** que prévu ».
+
+`/admin/stock/inventaire` : un site, la liste des articles qui se comptent, le
+théorique en regard, un champ de saisie, et l'écart affiché à la frappe — c'est
+le moment où l'on peut encore recompter.
+
+Deux règles portées par le code, pas par la consigne :
+
+- **un champ vide veut dire « pas compté », pas « zéro »**. Confondre les deux
+  viderait le magasin de tout ce que l'inventaire n'a pas parcouru ;
+- **un comptage à zéro reste légitime** : un rayon vide se compte. C'est pour
+  cela que le calcul d'écart n'emploie pas `quantiteSaisie()`, qui ramène toute
+  valeur nulle au plus petit pas.
+
+#### 3.6 — Les engagements cessent d'être des compteurs
+
+`produits.quantite_commandee` et `quantite_a_receptionner` existaient depuis
+l'origine, s'affichaient sur trois écrans, entraient dans le prévisionnel — et
+**rien ne les écrivait jamais**. Seul le jeu de démonstration les posait, à
+zéro. Le prévisionnel valait donc toujours le stock disponible, et la colonne
+« Commandé » d'un magasin qui attend trente sacs affichait 0.
+
+Deux défauts, pas un : personne ne les alimentait, et **elles étaient sur
+`produits`, donc globales** — trente sacs commandés à Abidjan seraient apparus
+comme engagés à Bouaké.
+
+La correction n'est pas de les écrire partout où il aurait fallu : un compteur
+dénormalisé doit être incrémenté à la commande, décrémenté à la livraison,
+corrigé à l'annulation, à la modification et à l'avoir — cinq occasions de
+dériver. Les colonnes sont supprimées ; l'engagement se déduit des lignes qui
+l'ont créé, par site. Une valeur déduite ne dérive pas.
+
+Un devis n'engage rien : c'est une proposition. Seul le bon de commande engage.
+
+#### Simulation d'attaques — `tests/Feature/AttaquesStockTest.php`
+
+16 tentatives, du point de vue d'un utilisateur **légitime** d'une entreprise A
+qui forge des requêtes contre l'entreprise B. C'est la surface réelle : un
+formulaire ne protège rien, il ne fait que suggérer.
+
+| Tentative | Résultat |
+|---|---|
+| Inventorier le dépôt du voisin (`point_de_vente_id` forgé) | refusé par `Appartenance` |
+| Compter un article du voisin sur son propre site | ignoré, aucun mouvement |
+| Lire le stock du voisin par `?point_de_vente_id=` | site non retenu, page vide |
+| Mettre au rebut l'article du voisin | refusé |
+| Rebut de quantité négative — une entrée déguisée | refusé |
+| Quantité à seize chiffres — erreur SQL et page 500 | refusé avant la base |
+| `1' OR '1'='1` dans une quantité | refusé |
+| Supprimer une ligne du journal | refusé par le modèle |
+| Réécrire la quantité d'un mouvement | refusé par le modèle |
+| Écrans de stock sans connexion / module fermé | redirection / 403 |
+| Nom d'article contenant `<script>` | échappé |
+| Ranger son article dans le rayon du voisin | **faille trouvée et corrigée** |
+
+**La faille trouvée** : `ProduitApiControleur` validait `categorie_id` et
+`sous_categorie_id` par un `exists:` **sans cloisonnement**. Un appelant de
+l'API pouvait rattacher son article à un rayon du concurrent, dont le nom
+ressortait ensuite dans ses propres écrans. `Appartenance` reçoit un troisième
+mode, `RATTACHEMENT_PAR_CATEGORIE` : `sous_categories` ne porte pas
+`entreprise_id`, elle pend à une catégorie qui en porte un.
+
+**Une limite documentée plutôt que tue** : `MouvementStock::where(...)->delete()`
+court-circuite les événements Eloquent — le garde-fou du modèle ne s'y applique
+pas. Aucun code du dépôt ne le fait plus, et le seul appelant qui le faisait a
+été corrigé. Une contrainte de base de données serait le cran suivant, si le
+besoin s'en fait sentir. Le test le constate au lieu de le passer sous silence.
 
 ### Lot 4 — Les imputations — après 1 et 3
 

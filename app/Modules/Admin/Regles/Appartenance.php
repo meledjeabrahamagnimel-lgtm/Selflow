@@ -2,6 +2,7 @@
 
 namespace App\Modules\Admin\Regles;
 
+use App\Modules\Admin\Modeles\Categorie;
 use App\Modules\Admin\Modeles\PointDeVente;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Validation\Rule;
@@ -30,9 +31,24 @@ class Appartenance
         'clients',
         'fournisseurs',
         'produits',
+        'categories',
         'codes_journaux',
         'utilisateurs',
         'periodes',
+    ];
+
+    /**
+     * Tables rattachées à l'entreprise par leur catégorie.
+     *
+     * `sous_categories` ne porte pas `entreprise_id` : elle pend à une
+     * catégorie, qui elle en porte un. Sans ce troisième mode, la table serait
+     * refusée par la règle — ce qui est le bon comportement par défaut, mais
+     * laissait `SousCategorie` sans cloisonnement du tout dans l'API produits.
+     *
+     * @var array<int, string>
+     */
+    private const RATTACHEMENT_PAR_CATEGORIE = [
+        'sous_categories',
     ];
 
     /**
@@ -74,12 +90,20 @@ class Appartenance
             );
         }
 
+        if (in_array($table, self::RATTACHEMENT_PAR_CATEGORIE, true)) {
+            return Rule::exists($table, $colonne)->whereIn(
+                'categorie_id',
+                Categorie::where('entreprise_id', $entrepriseId)->pluck('id')
+            );
+        }
+
         // Une table inconnue est une table dont on ignore le cloisonnement :
         // mieux vaut echouer bruyamment au developpement que laisser passer
         // silencieusement en production.
         throw new \InvalidArgumentException(
-            "Cloisonnement inconnu pour la table « {$table} ». "
-            . "Ajoutez-la a RATTACHEMENT_DIRECT ou RATTACHEMENT_PAR_POINT_DE_VENTE."
+            "Cloisonnement inconnu pour la table « {$table} ». Ajoutez-la a "
+            . "RATTACHEMENT_DIRECT, RATTACHEMENT_PAR_POINT_DE_VENTE ou "
+            . "RATTACHEMENT_PAR_CATEGORIE."
         );
     }
 }
