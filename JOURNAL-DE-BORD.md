@@ -136,26 +136,29 @@ Poussé sur **Selflow**. Ce qui est fait :
 
   **Les dix journaux livrés :**
 
-  | Code | Type | Compte | Intitulé |
-  |---|---|---|---|
-  | `VTE` | Vente | — | Journal des ventes |
-  | `ACH` | Achat | — | Journal des achats |
-  | `OD` | OD | — | Opérations diverses |
-  | `RAN` | RAN | — | Report à nouveau |
-  | `CAI` | Caisse | `571000` | Caisse |
-  | `BQ` | Banque | `521100` | Banque |
-  | `MTN` | Banque | `521500` | MTN Mobile Money |
-  | `OMY` | Banque | `521600` | Orange Money |
-  | `MOOV` | Banque | `521700` | Moov Money |
-  | `WAVE` | Banque | `521800` | Wave |
+  | Code | Type | Compte | Intitulé | |
+  |---|---|---|---|---|
+  | `VTE` | Vente | — | Journal des ventes | |
+  | `ACH` | Achat | — | Journal des achats | |
+  | `OD` | OD | — | Opérations diverses | |
+  | `RAN` | RAN | — | Report à nouveau | *système* |
+  | `CAI` | Caisse | `571000` | Caisse | |
+  | `BQE` | Banque | `521000` | Banque | |
+  | `MTN` | Banque | `521500` | MTN Mobile Money | |
+  | `OMY` | Banque | `521600` | Orange Money | |
+  | `MOOV` | Banque | `521700` | Moov Money | |
+  | `WAVE` | Banque | `521800` | Wave | |
 
   Seuls les journaux de trésorerie portent un compte général : `VTE`, `ACH`,
   `OD` et `RAN` n'en ont aucun, et la colonne est devenue facultative pour
-  cela. Chaque journal de trésorerie a en revanche son compte au plan, sans
-  quoi l'écriture de règlement s'imputerait nulle part.
+  cela. La caisse pointe sur `571000` et la banque sur `521000` — deux racines
+  de même rang ; `521100` aurait désigné « Banque X », une des places que
+  l'acte uniforme réserve aux banques de l'entreprise.
 
-  Le repli codé en dur dans `ComptabiliteService` est aligné sur ces codes —
-  il annonçait `BQE`, qui n'existait dans aucun plan.
+  Le report à nouveau est marqué **`systeme`** : la clôture l'écrit, personne
+  ne le saisit. Il disparaît des listes de saisie — portée `saisissables()` —
+  et reste visible en consultation, le grand livre devant afficher les
+  écritures de clôture.
 
   Le mobile money est rangé en subdivision de `521` « Banques locales », à
   partir de `521500` : c'est un avoir détenu chez un établissement agréé, pas

@@ -53,7 +53,7 @@ class TrousseauEntrepriseTest extends TestCase
         // `ComptabiliteService` cherche ses journaux par type et retombe sur un
         // code en dur s'il n'en trouve pas. Le trousseau doit couvrir les
         // quatre types qu'il interroge, sinon le repli sert toujours.
-        foreach (['Vente' => 'VTE', 'Achat' => 'ACH', 'OD' => 'OD', 'RAN' => 'RAN', 'Banque' => 'BQ'] as $type => $code) {
+        foreach (['Vente' => 'VTE', 'Achat' => 'ACH', 'OD' => 'OD', 'RAN' => 'RAN', 'Banque' => 'BQE'] as $type => $code) {
             $journal = CodeJournal::where('entreprise_id', $this->entreprise->id)
                 ->where('type', $type)
                 ->first();
@@ -122,6 +122,34 @@ class TrousseauEntrepriseTest extends TestCase
         $this->assertSame('RAN', $ran->type);
         $this->assertSame('Report à nouveau', $ran->intitule);
         $this->assertNull($ran->compte);
+
+        // Pilote par le systeme : il existe, mais il ne s'offre pas a la saisie.
+        // Le proposer dans une liste inviterait a passer une ecriture a la main
+        // dans un journal que la cloture recalcule.
+        $this->assertTrue($ran->systeme);
+        $this->assertFalse(CodeJournal::saisissables()
+            ->where('entreprise_id', $this->entreprise->id)
+            ->where('code', 'RAN')->exists());
+
+        // Il reste visible en consultation : le grand livre doit pouvoir
+        // afficher les ecritures de cloture.
+        $this->assertTrue(CodeJournal::actifs()
+            ->where('entreprise_id', $this->entreprise->id)
+            ->where('code', 'RAN')->exists());
+    }
+
+    public function test_les_journaux_de_tresorerie_pointent_sur_la_racine(): void
+    {
+        TrousseauEntrepriseService::doter($this->entreprise);
+
+        // La caisse pointe sur 571000 et la banque sur 521000 : deux racines de
+        // meme rang. Un 521100 aurait designe « Banque X », une des places
+        // reservees aux banques de l'entreprise.
+        $compte = fn (string $code) => CodeJournal::where('entreprise_id', $this->entreprise->id)
+            ->where('code', $code)->value('compte');
+
+        $this->assertSame('571000', $compte('CAI'));
+        $this->assertSame('521000', $compte('BQE'));
     }
 
     public function test_doter_deux_fois_ne_duplique_rien(): void
@@ -138,13 +166,13 @@ class TrousseauEntrepriseTest extends TestCase
         TrousseauEntrepriseService::doter($this->entreprise);
 
         CodeJournal::where('entreprise_id', $this->entreprise->id)
-            ->where('code', 'BQ')
+            ->where('code', 'BQE')
             ->update(['intitule' => 'Ecobank Cocody']);
 
         TrousseauEntrepriseService::doter($this->entreprise);
 
         $this->assertSame('Ecobank Cocody', CodeJournal::where('entreprise_id', $this->entreprise->id)
-            ->where('code', 'BQ')->value('intitule'));
+            ->where('code', 'BQE')->value('intitule'));
     }
 
     public function test_ce_qui_ne_sert_pas_s_archive_et_disparait_des_listes(): void

@@ -8,7 +8,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 class CodeJournal extends Model
 {
     protected $table = 'codes_journaux';
-    protected $fillable = ['entreprise_id', 'type', 'code', 'numero_original', 'intitule', 'compte', 'source', 'archive_le'];
+    protected $fillable = ['entreprise_id', 'type', 'code', 'numero_original', 'intitule', 'compte', 'source', 'archive_le', 'systeme'];
 
     public function entreprise(): BelongsTo
     {
@@ -38,8 +38,25 @@ class CodeJournal extends Model
         return $query->whereNotNull('archive_le');
     }
 
+    /**
+     * Journaux proposés à la saisie : ni archivés, ni pilotés par le système.
+     *
+     * Le report à nouveau est écrit par la clôture ; le proposer dans une liste
+     * de saisie inviterait à passer une écriture à la main dans un journal que
+     * l'application recalcule.
+     */
+    public function scopeSaisissables($query)
+    {
+        return $query->whereNull('archive_le')->where('systeme', false);
+    }
+
     public function estArchive(): bool
     {
         return $this->archive_le !== null;
+    }
+
+    protected function casts(): array
+    {
+        return ['systeme' => 'boolean', 'archive_le' => 'datetime'];
     }
 }

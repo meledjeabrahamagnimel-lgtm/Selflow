@@ -639,10 +639,10 @@ class ComptabiliteService
         if ($journalObj) {
             return [$journalObj->compte, $journalObj->code];
         }
-        // « BQ », comme le journal que toute entreprise recoit a sa creation :
-        // un repli qui invente un code absent du plan produirait des ecritures
+        // « BQE », comme le journal que toute entreprise recoit a sa creation :
+        // un repli qui inventerait un autre code produirait des ecritures
         // rattachees a un journal inexistant.
-        return [config('selflow.plan_comptable_defaut.banque_defaut'), 'BQ'];
+        return [config('selflow.plan_comptable_defaut.banque_defaut'), 'BQE'];
     }
 
     /**

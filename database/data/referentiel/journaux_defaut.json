@@ -4,69 +4,79 @@
   "type": "Vente",
   "intitule": "Journal des ventes",
   "compte": null,
-  "renommable": false
+  "renommable": false,
+  "systeme": false
  },
  {
   "code": "ACH",
   "type": "Achat",
   "intitule": "Journal des achats",
   "compte": null,
-  "renommable": false
+  "renommable": false,
+  "systeme": false
  },
  {
   "code": "OD",
   "type": "OD",
   "intitule": "Opérations diverses",
   "compte": null,
-  "renommable": false
+  "renommable": false,
+  "systeme": false
  },
  {
   "code": "RAN",
   "type": "RAN",
   "intitule": "Report à nouveau",
   "compte": null,
-  "renommable": false
+  "renommable": false,
+  "systeme": true
  },
  {
   "code": "CAI",
   "type": "Caisse",
   "intitule": "Caisse",
   "compte": "571000",
-  "renommable": true
+  "renommable": true,
+  "systeme": false
  },
  {
-  "code": "BQ",
+  "code": "BQE",
   "type": "Banque",
   "intitule": "Banque",
-  "compte": "521100",
-  "renommable": true
+  "compte": "521000",
+  "renommable": true,
+  "systeme": false
  },
  {
   "code": "MTN",
   "type": "Banque",
   "intitule": "MTN Mobile Money",
   "compte": "521500",
-  "renommable": true
+  "renommable": true,
+  "systeme": false
  },
  {
   "code": "OMY",
   "type": "Banque",
   "intitule": "Orange Money",
   "compte": "521600",
-  "renommable": true
+  "renommable": true,
+  "systeme": false
  },
  {
   "code": "MOOV",
   "type": "Banque",
   "intitule": "Moov Money",
   "compte": "521700",
-  "renommable": true
+  "renommable": true,
+  "systeme": false
  },
  {
   "code": "WAVE",
   "type": "Banque",
   "intitule": "Wave",
   "compte": "521800",
-  "renommable": true
+  "renommable": true,
+  "systeme": false
  }
 ]

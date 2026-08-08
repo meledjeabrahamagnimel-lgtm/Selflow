@@ -99,6 +99,7 @@ class TrousseauEntrepriseService
                 'type'          => $journal['type'],
                 'intitule'      => $journal['intitule'],
                 'compte'        => $journal['compte'],
+                'systeme'       => $journal['systeme'] ?? false,
             ]);
             $crees++;
 
