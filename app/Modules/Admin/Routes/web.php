@@ -268,6 +268,22 @@ Route::prefix('admin')
     });
 
 // ───────────────────────────────────────────────────────────────────────
+// Parcours de configuration de l'entreprise
+//
+// Il vit hors du groupe « modules » : une entreprise qui n'a encore rien
+// configure n'a aucun module actif, et le middleware la rejetterait de son
+// propre parcours de configuration.
+// ───────────────────────────────────────────────────────────────────────
+Route::prefix('admin/souscription')
+    ->middleware(['auth', 'role:admin'])
+    ->name('admin.souscription.')
+    ->group(function () {
+        Route::get('/', [\App\Modules\Admin\Controleurs\SouscriptionControleur::class, 'index'])->name('index');
+        Route::post('/{etape}', [\App\Modules\Admin\Controleurs\SouscriptionControleur::class, 'enregistrer'])
+            ->whereNumber('etape')->name('enregistrer');
+    });
+
+// ───────────────────────────────────────────────────────────────────────
 // Routes pour l'interface SuperAdmin
 // ───────────────────────────────────────────────────────────────────────
 Route::prefix('superadmin')

@@ -42,10 +42,16 @@ class SouscriptionProfilService
      * avant tout, et un code inconnu interrompt l'opération. Rien ne se crée
      * sur la foi d'une valeur envoyée par le navigateur.
      *
+     * `$famillesRetenues` limite la copie aux familles désignées, par leur
+     * code. Un tableau vide vaut « toutes » : l'utilisateur qui ne décoche rien
+     * reçoit son métier entier. C'est ce qui permet à une boutique de refuser
+     * le rayon cosmétiques sans renoncer au profil.
+     *
      * @param  array<int, string>  $codesProfils
+     * @param  array<int, string>  $famillesRetenues
      * @return array{profils: int, familles: int, articles: int, comptes: int, modules: array<int, string>}
      */
-    public static function souscrire(Entreprise $entreprise, array $codesProfils): array
+    public static function souscrire(Entreprise $entreprise, array $codesProfils, array $famillesRetenues = []): array
     {
         $codes = array_values(array_unique(array_filter($codesProfils)));
 
@@ -59,7 +65,9 @@ class SouscriptionProfilService
             );
         }
 
-        return DB::transaction(function () use ($entreprise, $profils) {
+        $retenues = array_values(array_unique(array_filter($famillesRetenues)));
+
+        return DB::transaction(function () use ($entreprise, $profils, $retenues) {
             // L'entreprise doit avoir son plan et ses journaux avant de recevoir
             // des articles : un article sans compte au plan s'imputerait nulle
             // part. Le trousseau ne fait rien s'il est déjà posé.
@@ -72,7 +80,7 @@ class SouscriptionProfilService
                     continue;
                 }
 
-                $resultat = self::copierProfil($entreprise, $profil);
+                $resultat = self::copierProfil($entreprise, $profil, $retenues);
 
                 $entreprise->profils()->attach($profil->id, [
                     'familles_creees' => $resultat['familles'],
@@ -97,12 +105,18 @@ class SouscriptionProfilService
      *
      * @return array{familles: int, articles: int, comptes: int}
      */
-    private static function copierProfil(Entreprise $entreprise, Profil $profil): array
+    private static function copierProfil(Entreprise $entreprise, Profil $profil, array $retenues = []): array
     {
         $bilan = ['familles' => 0, 'articles' => 0, 'comptes' => 0];
         $categories = [];
 
-        foreach (Famille::with('typeArticle')->where('profil_id', $profil->id)->orderBy('code')->get() as $famille) {
+        $familles = Famille::with('typeArticle')
+            ->where('profil_id', $profil->id)
+            ->when($retenues !== [], fn ($q) => $q->whereIn('code', $retenues))
+            ->orderBy('code')
+            ->get();
+
+        foreach ($familles as $famille) {
             [$categorie, $creee] = self::categoriePour($entreprise, $famille);
             $categories[$famille->id] = $categorie;
             $bilan['familles'] += $creee ? 1 : 0;
@@ -118,8 +132,14 @@ class SouscriptionProfilService
             }
         }
 
+        // Un article dont la famille n'a pas été retenue n'a nulle part où
+        // aller : le créer sans catégorie le rendrait invisible dans les listes.
         foreach (Article::with('typeArticle')->where('profil_id', $profil->id)->orderBy('code')->get() as $article) {
-            if (self::creerProduit($entreprise, $article, $categories[$article->famille_id] ?? null)) {
+            if (!isset($categories[$article->famille_id])) {
+                continue;
+            }
+
+            if (self::creerProduit($entreprise, $article, $categories[$article->famille_id])) {
                 $bilan['articles']++;
             }
         }

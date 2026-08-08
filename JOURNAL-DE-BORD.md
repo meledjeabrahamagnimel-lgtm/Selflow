@@ -6,7 +6,7 @@ et ce fichier. Tout ce qui a été décidé, tout ce qui a été écarté et pou
 tout ce qui reste à faire doit donc figurer ici — et y être tenu à jour à chaque
 lot terminé.
 
-Dernière mise à jour : 8 août 2026 — lot 2 entamé.
+Dernière mise à jour : 8 août 2026 — parcours de souscription en place.
 
 ---
 
@@ -212,7 +212,38 @@ Trois garanties tenues par des tests : une activité mixte cumule sans doubler
 à une nouvelle souscription, et un code de profil inconnu est refusé sans rien
 créer — les codes viennent d'un formulaire.
 
-Reste à faire : l'écran en sept étapes, et le champ « Autre » dans les listes.
+- **Le parcours de configuration** : `/admin/souscription`, cinq étapes qui se
+  déplient — domaine, métier, modules, rayons, prix. Chacune fait quelque chose ;
+  je n'en ai pas gardé sept, trois se réduisaient à de la consultation que les
+  écrans ordinaires assurent déjà.
+
+  | Étape | Ce qu'elle fait |
+  |---|---|
+  | 1 · Domaine | Restreint la liste suivante |
+  | 2 · Métier | Choix multiple — activité mixte — ou champ **« Autre »** |
+  | 3 · Modules | Ce que les métiers ouvrent, décochable |
+  | 4 · Rayons | Tous cochés ; décocher retire les articles et les comptes |
+  | 5 · Prix | Renommer et fixer les montants que le classeur laisse vides |
+
+  La souscription s'effectue à l'étape 4 : tout ce qui précède n'est qu'un choix.
+  L'étape atteinte est retenue sur l'entreprise, pas en session — un changement
+  de poste ne fait pas tout recommencer. Le parcours vit hors du groupe
+  « modules » : une entreprise qui n'a rien configuré n'a aucun module actif, et
+  le middleware la rejetterait de son propre écran de configuration.
+
+- `tests/Feature/ParcoursSouscriptionTest.php` — 11 tests.
+
+**Sécurité du parcours**, chaque point tenu par un test :
+
+- une étape non atteinte est refusée — sans quoi un formulaire forgé sauterait
+  le choix des métiers et souscrirait à des familles qui n'appartiennent à
+  aucun d'eux ;
+- un module non autorisé ne s'active pas en l'ajoutant à la requête ;
+- fixer le prix d'un produit d'une autre entreprise est refusé par
+  `Appartenance`, avec la vérification de propriétaire en second rideau.
+
+Reste à faire : le stock initial à l'étape 5, et le champ « Autre » sur les
+listes d'unités et de types.
 
 ### Lot 3 — Le stock suit l'événement — le plus lourd
 
