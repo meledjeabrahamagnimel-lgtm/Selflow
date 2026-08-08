@@ -160,7 +160,18 @@ class ProduitControleur
 
         $this->enregistrerTaxesProduit($produit, $request->input('taxes_produit', []));
 
-        // Initialisation automatique des stocks par point de vente
+        // Initialisation des stocks par point de vente.
+        //
+        // Uniquement pour ce qui se compte. Une fiche etait creee pour tous les
+        // types, services compris, avec un stock minimum de 5 : une prestation
+        // restait donc a 0 pour un seuil de 5 et figurait en permanence dans
+        // « Alertes stock ». Pour un cabinet comptable, dont tous les articles
+        // sont des missions, le tableau de bord n'annoncait que des ruptures —
+        // sur des choses qui ne s'epuisent pas.
+        if (!$produit->estStockable()) {
+            return back()->with('succes', 'Produit ajouté au catalogue avec succès. Référence générée : ' . $produit->reference);
+        }
+
         $pdvs = $entreprise->pointsDeVente;
         $defaultPdvId = session('point_de_vente_actif_id') 
             ?? auth()->user()->point_de_vente_id 

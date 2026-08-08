@@ -303,7 +303,8 @@
                 </div>
                 <div class="form-group">
                     <label class="form-label">Unité</label>
-                    <input type="text" name="unite" class="form-control" value="{{ $produit->unite }}">
+                    <input type="text" name="unite" class="form-control" list="unites-suggerees"
+                           value="{{ $produit->unite }}" placeholder="pièce, kg, forfait… ou la vôtre">
                 </div>
                 <div class="form-group">
                     <label class="form-label">Prix achat</label>
@@ -445,4 +446,6 @@ function ajouterDetailLibre() {
     container.appendChild(div);
 }
 </script>
+@include('admin::partials.unites-suggerees')
+
 @endsection

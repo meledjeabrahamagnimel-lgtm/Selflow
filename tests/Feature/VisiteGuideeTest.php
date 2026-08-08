@@ -70,17 +70,42 @@ class VisiteGuideeTest extends TestCase
 
     public function test_la_visite_se_rejoue_a_la_demande(): void
     {
+        // L'entree de menu est un formulaire ordinaire : elle doit ramener
+        // l'utilisateur sur un ecran, la visite ouverte.
         $this->admin->forceFill(['visite_guidee_terminee_le' => now()])->save();
 
         $this->actingAs($this->admin)
             ->post(route('admin.visite.rejouer'))
-            ->assertOk();
+            ->assertRedirect(route('admin.tableau_de_bord'));
 
         $this->assertNull($this->admin->fresh()->visite_guidee_terminee_le);
 
         $this->actingAs($this->admin)
             ->get(route('admin.tableau_de_bord'))
             ->assertSee('Bienvenue dans Selflow');
+    }
+
+    public function test_rejouer_repond_en_json_a_un_appel_de_script(): void
+    {
+        $this->admin->forceFill(['visite_guidee_terminee_le' => now()])->save();
+
+        $this->actingAs($this->admin)
+            ->postJson(route('admin.visite.rejouer'))
+            ->assertOk()
+            ->assertJson(['statut' => 'ok']);
+    }
+
+    public function test_le_menu_propose_de_revoir_la_visite(): void
+    {
+        // Une visite qu'on ne peut pas relancer se ferme une fois pour toutes,
+        // souvent par mégarde des la premiere seconde.
+        $this->admin->forceFill(['visite_guidee_terminee_le' => now()])->save();
+
+        $this->actingAs($this->admin)
+            ->get(route('admin.tableau_de_bord'))
+            ->assertOk()
+            ->assertSee('Revoir la visite guidée', false)
+            ->assertSee(route('admin.visite.rejouer'), false);
     }
 
     public function test_chaque_utilisateur_a_sa_propre_visite(): void

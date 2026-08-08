@@ -33,6 +33,25 @@ class Produit extends Model
     ];
 
     /**
+     * Unités proposées à la saisie.
+     *
+     * Ce n'est pas une liste fermée : le champ reste libre et cette énumération
+     * n'est qu'une suggestion. Une liste déroulante obligerait à prévoir tous
+     * les métiers — le tâcheron facture au « voyage », le vétérinaire à la
+     * « tête », l'école à l'« élève » — et le premier conditionnement absent
+     * bloquerait la fiche. Ces valeurs sont celles que le référentiel emploie
+     * le plus, complétées à l'affichage par celles déjà saisies par
+     * l'entreprise.
+     */
+    public const UNITES_COURANTES = [
+        'pièce', 'kg', 'g', 'tonne', 'litre', 'm', 'm²', 'm³',
+        'sac', 'carton', 'paquet', 'boîte', 'sachet', 'bouteille', 'bidon',
+        'flacon', 'pot', 'rouleau', 'barre', 'lot', 'kit', 'pack', 'casier',
+        'heure', 'jour', 'mois', 'an', 'forfait', 'séance', 'intervention',
+        'dossier', 'acte', 'examen', 'course', 'voyage', 'page', 'tête',
+    ];
+
+    /**
      * Indique si ce produit gère un stock physique.
      */
     public function estStockable(): bool
@@ -328,6 +347,23 @@ class Produit extends Model
     public function stocks(): HasMany
     {
         return $this->hasMany(Stock::class, 'produit_id');
+    }
+
+    /**
+     * Quantité disponible de l'article sur un site donné.
+     *
+     * Lue depuis la collection déjà chargée quand elle l'est, pour qu'un
+     * tableau de deux cents lignes ne déclenche pas deux cents requêtes. Un
+     * article sans fiche sur ce site vaut zéro : l'absence de fiche est une
+     * absence de stock, pas une erreur.
+     */
+    public function stockSur(int $pointDeVenteId): float
+    {
+        $fiche = $this->relationLoaded('stocks')
+            ? $this->stocks->firstWhere('point_de_vente_id', $pointDeVenteId)
+            : $this->stocks()->where('point_de_vente_id', $pointDeVenteId)->first();
+
+        return (float) ($fiche->quantite_disponible ?? 0);
     }
 
     public function venteDetails(): HasMany

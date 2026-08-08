@@ -6,7 +6,8 @@ et ce fichier. Tout ce qui a été décidé, tout ce qui a été écarté et pou
 tout ce qui reste à faire doit donc figurer ici — et y être tenu à jour à chaque
 lot terminé.
 
-Dernière mise à jour : 8 août 2026 — visite guidée et bannière de configuration.
+Dernière mise à jour : 8 août 2026 — lot 2 terminé : stock d’ouverture, unités
+libres, relance de la visite guidée.
 
 ---
 
@@ -182,10 +183,9 @@ Poussé sur **Selflow**. Ce qui est fait :
 **Lot 1 terminé.** Les produits par défaut viendront avec la souscription d'un
 profil (lot 2), puisqu'ils en dépendent.
 
-### Lot 2 — Le parcours de souscription — **EN COURS**
+### Lot 2 — Le parcours de souscription — **TERMINÉ**
 
-Poussé sur **Selflow**. Les fondations sont posées ; l'écran en sept étapes
-reste à faire.
+Poussé sur **Selflow**.
 
 - Table `entreprise_profils` : une entreprise souscrit à un ou plusieurs
   profils, et l'on garde trace de ce que chaque souscription a créé.
@@ -223,7 +223,7 @@ créer — les codes viennent d'un formulaire.
   | 2 · Métier | Choix multiple — activité mixte — ou champ **« Autre »** |
   | 3 · Modules | Ce que les métiers ouvrent, décochable |
   | 4 · Rayons | Tous cochés ; décocher retire les articles et les comptes |
-  | 5 · Prix | Renommer et fixer les montants que le classeur laisse vides |
+  | 5 · Prix et stock | Renommer, fixer les montants que le classeur laisse vides, et compter l'inventaire d'ouverture |
 
   La souscription s'effectue à l'étape 4 : tout ce qui précède n'est qu'un choix.
   L'étape atteinte est retenue sur l'entreprise, pas en session — un changement
@@ -231,7 +231,18 @@ créer — les codes viennent d'un formulaire.
   « modules » : une entreprise qui n'a rien configuré n'a aucun module actif, et
   le middleware la rejetterait de son propre écran de configuration.
 
-- `tests/Feature/ParcoursSouscriptionTest.php` — 11 tests.
+- **Le stock d'ouverture, à l'étape 5** : une colonne de plus, qui reçoit les
+  quantités comptées le jour du démarrage sur le site actif. Elle n'apparaît que
+  si les trois conditions sont réunies — module `stock` ouvert, un point de vente
+  existant, et au moins un article qui se compte. Sans site, le champ n'aurait
+  nulle part où écrire et avalerait la saisie en silence ; pour un cabinet
+  comptable, dont tous les articles sont des missions, ce serait une colonne de
+  tirets. Le formulaire et l'enregistrement lisent la même méthode
+  (`siteDuStock()`) : la colonne affichée est exactement celle qui sera écrite.
+  Un identifiant de site resté en session après un changement de compte est
+  vérifié contre l'entreprise avant d'être retenu.
+
+- `tests/Feature/ParcoursSouscriptionTest.php` — 16 tests.
 
 **Sécurité du parcours**, chaque point tenu par un test :
 
@@ -260,10 +271,30 @@ créer — les codes viennent d'un formulaire.
   pas. Une étape dont la cible est absente — un module fermé — est sautée.
   `Échap` ferme, et `prefers-reduced-motion` coupe les animations.
 
-- `tests/Feature/VisiteGuideeTest.php` — 9 tests.
+  Elle se relance depuis le menu du profil — **« Revoir la visite guidée »** —
+  par un formulaire ordinaire et non par un appel JavaScript : une visite doit
+  pouvoir se rouvrir même quand un script a échoué, ce qui est précisément le
+  moment où l'utilisateur en a besoin. La route répond en JSON à un appel de
+  script, et par un retour au tableau de bord sinon.
 
-Reste à faire : le stock initial à l'étape 5, le champ « Autre » sur les listes
-d'unités et de types, et l'entrée de menu pour revoir la visite.
+- `tests/Feature/VisiteGuideeTest.php` — 11 tests.
+
+- **Les unités restent à saisie libre**, avec des suggestions. Un `datalist`
+  (`admin::partials.unites-suggerees`) et non une liste fermée : le tâcheron
+  facture au « voyage », le vétérinaire à la « tête », l'école à l'« élève », et
+  le premier conditionnement absent d'une liste fermée bloquerait la fiche. Les
+  unités déjà employées par l'entreprise passent en tête, suivies de
+  `Produit::UNITES_COURANTES` ; la comparaison ignore la casse, ce qui évite
+  d'avoir « pièce », « piece » et « Pièce » comme trois unités distinctes.
+
+**Deux défauts trouvés et corrigés en cours de lot :**
+
+- une ligne de l'étape 5 sans clé `nom` — corps de requête partiel, et non le
+  formulaire — produisait un 500 sur `$ligne['nom']`. Chaque clé est désormais
+  facultative, une valeur absente laissant l'existante en place ;
+- `Produit::stockSur()` lit la relation déjà chargée quand elle l'est : sans
+  cela, un catalogue de deux cents lignes déclenchait deux cents requêtes à
+  l'affichage de l'étape 5.
 
 ### Lot 3 — Le stock suit l'événement — le plus lourd
 
@@ -360,9 +391,14 @@ Elles sont documentées pour ne pas être redécouvertes.
 - Le couple « décrémenter puis écrire le mouvement » est recopié dans plus de
   douze endroits, sur sept contrôleurs et deux contrôleurs d'API.
 - `reference_document` est une chaîne libre, pas une relation.
-- Une **fiche de stock est créée pour tous les types de produits**, y compris les
-  services, avec un minimum de 5 : un service apparaît en permanence dans les
-  alertes de rupture. `ProduitControleur:171`, `PointDeVenteControleur:56`.
+- ~~Une **fiche de stock est créée pour tous les types de produits**, y compris
+  les services, avec un minimum de 5 : un service apparaît en permanence dans
+  les alertes de rupture.~~ **CORRIGÉ au lot 2** : `ProduitControleur` sort
+  avant la boucle et `PointDeVenteControleur` saute l'article si
+  `estStockable()` est faux. Même règle dans `poserStockInitial()`. Pour un
+  cabinet comptable, dont tous les articles sont des missions, le tableau de
+  bord n'annonçait jusqu'ici que des ruptures sur des choses qui ne s'épuisent
+  pas.
 - Les avoirs réinjectent le stock automatiquement, sans jamais demander si la
   marchandise revient vendable, en rebut, ou pas du tout.
 

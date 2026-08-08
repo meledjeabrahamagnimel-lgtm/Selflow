@@ -203,18 +203,34 @@
 
     {{-- ══ 5. Prix et stock ══ --}}
     @elseif($etape === 5)
+        @php
+            // La colonne de stock n'a de sens que si le module est ouvert, qu'un
+            // site existe pour l'accueillir, et qu'au moins un article se compte :
+            // pour un cabinet comptable, dont tous les articles sont des
+            // missions, elle serait une colonne de tirets.
+            $avecStock = $siteDuStock && $articles->contains(fn ($a) => $a->estStockable());
+            $colonnes  = $avecStock ? 6 : 5;
+        @endphp
+
         <div class="sous-tete">
-            <h2>Vos prix</h2>
+            <h2>Vos prix{{ $avecStock ? ' et votre stock de départ' : '' }}</h2>
             <p>Le catalogue livré ne porte aucun prix : ils varient selon la zone et la
                période. Renommez ce qui doit l'être et saisissez vos montants — vous pouvez
-               aussi passer et les compléter article par article plus tard.</p>
+               aussi passer et les compléter article par article plus tard.
+               @if($avecStock)
+                   La dernière colonne reçoit les quantités comptées aujourd'hui
+                   à « {{ $siteDuStock->nom }} » : c'est votre inventaire d'ouverture.
+               @endif
+            </p>
         </div>
 
         <div class="cadre-defilant">
             <table class="tableau-prix">
                 <thead>
                     <tr><th>Référence</th><th>Article</th><th>Rayon</th>
-                        <th style="width:130px;">Prix d'achat</th><th style="width:130px;">Prix de vente</th></tr>
+                        <th style="width:130px;">Prix d'achat</th><th style="width:130px;">Prix de vente</th>
+                        @if($avecStock)<th style="width:130px;">Stock de départ</th>@endif
+                    </tr>
                 </thead>
                 <tbody>
                     @forelse($articles as $i => $article)
@@ -229,9 +245,20 @@
                                    value="{{ $article->prix_achat > 0 ? (int) $article->prix_achat : '' }}"></td>
                         <td><input type="number" name="articles[{{ $i }}][prix_vente]" min="0" step="1"
                                    value="{{ $article->prix_vente > 0 ? (int) $article->prix_vente : '' }}"></td>
+                        @if($avecStock)
+                        <td>
+                            @if($article->estStockable())
+                                <input type="number" name="articles[{{ $i }}][stock_initial]" min="0" step="1"
+                                       placeholder="0" value="{{ $article->stockSur($siteDuStock->id) ?: '' }}">
+                            @else
+                                {{-- Une prestation ne s'épuise pas : rien à compter. --}}
+                                <span class="vide" title="Cet article ne se stocke pas">—</span>
+                            @endif
+                        </td>
+                        @endif
                     </tr>
                     @empty
-                    <tr><td colspan="5" style="text-align:center; padding:26px; color:var(--text-3);">
+                    <tr><td colspan="{{ $colonnes }}" style="text-align:center; padding:26px; color:var(--text-3);">
                         Votre catalogue est vide — vous le remplirez depuis l'écran des produits.
                     </td></tr>
                     @endforelse

@@ -3,7 +3,9 @@
 namespace App\Modules\Admin\Controleurs;
 
 use App\Modules\Admin\Modeles\Entreprise;
+use App\Modules\Admin\Modeles\PointDeVente;
 use App\Modules\Admin\Modeles\Produit;
+use App\Modules\Admin\Modeles\Stock;
 use App\Modules\Admin\Modeles\Referentiel\Categorie;
 use App\Modules\Admin\Modeles\Referentiel\Famille;
 use App\Modules\Admin\Modeles\Referentiel\Profil;
@@ -173,18 +175,32 @@ class SouscriptionControleur
             'articles.*.nom'           => ['nullable', 'string', 'max:255'],
             'articles.*.prix_achat'    => ['nullable', 'numeric', 'min:0', 'max:99999999999'],
             'articles.*.prix_vente'    => ['nullable', 'numeric', 'min:0', 'max:99999999999'],
+            'articles.*.stock_initial' => ['nullable', 'integer', 'min:0', 'max:9999999'],
         ]);
+
+        $pointDeVenteId = $this->siteDuStock($entreprise)?->id;
 
         foreach ($donnees['articles'] ?? [] as $ligne) {
             // `Appartenance` a déjà écarté les produits d'une autre entreprise ;
             // la condition ci-dessous est la ceinture après les bretelles.
-            Produit::where('id', $ligne['id'])
+            $produit = Produit::where('id', $ligne['id'])
                 ->where('entreprise_id', $entreprise->id)
-                ->update(array_filter([
-                    'nom'        => $ligne['nom'] ?: null,
-                    'prix_achat' => $ligne['prix_achat'] ?? null,
-                    'prix_vente' => $ligne['prix_vente'] ?? null,
-                ], fn ($v) => $v !== null));
+                ->first();
+
+            if (!$produit) {
+                continue;
+            }
+
+            // Chaque clé est facultative : le corps de la requête n'est pas le
+            // formulaire, et une ligne partielle ne doit pas faire tomber
+            // l'écran. Une valeur absente laisse l'existante en place.
+            $produit->update(array_filter([
+                'nom'        => ($ligne['nom'] ?? null) ?: null,
+                'prix_achat' => $ligne['prix_achat'] ?? null,
+                'prix_vente' => $ligne['prix_vente'] ?? null,
+            ], fn ($v) => $v !== null));
+
+            $this->poserStockInitial($produit, $pointDeVenteId, $ligne['stock_initial'] ?? null);
         }
 
         $entreprise->update([
@@ -194,6 +210,61 @@ class SouscriptionControleur
 
         return redirect()->route('admin.tableau_de_bord')
             ->with('succes', 'Votre entreprise est configurée. Bonne vente !');
+    }
+
+    /**
+     * Le site sur lequel s'inscrit le stock d'ouverture.
+     *
+     * Celui de la session si l'utilisateur en a choisi un et qu'il appartient
+     * bien à son entreprise — un identifiant resté en session après un
+     * changement de compte ne doit pas désigner le dépôt du voisin. À défaut,
+     * le premier site enregistré. Aucun site, aucun stock : la colonne
+     * disparaît de l'écran plutôt que d'avaler la saisie.
+     *
+     * Le formulaire et l'enregistrement lisent la même méthode : la colonne
+     * affichée est exactement celle qui sera écrite.
+     */
+    private function siteDuStock(Entreprise $entreprise): ?PointDeVente
+    {
+        if (!$entreprise->moduleEstActif('stock')) {
+            return null;
+        }
+
+        $sites = PointDeVente::where('entreprise_id', $entreprise->id)->orderBy('id');
+
+        if ($choisi = session('point_de_vente_actif_id')) {
+            $site = (clone $sites)->where('id', $choisi)->first();
+
+            if ($site) {
+                return $site;
+            }
+        }
+
+        return $sites->first();
+    }
+
+    /**
+     * Poser le stock d'ouverture d'un article.
+     *
+     * Seuls les articles qui se comptent en reçoivent un : un service n'a ni
+     * quantité disponible, ni seuil, ni rupture. Créer sa fiche le ferait
+     * figurer en permanence dans les alertes de stock — pour un cabinet
+     * comptable, dont tous les articles sont des missions, le tableau de bord
+     * n'annoncerait que des ruptures sur des choses qui ne s'épuisent pas.
+     *
+     * C'est un inventaire d'ouverture : la quantité constatée au jour du
+     * démarrage, sur le point de vente actif.
+     */
+    private function poserStockInitial(Produit $produit, ?int $pointDeVenteId, $quantite): void
+    {
+        if (!$produit->estStockable() || !$pointDeVenteId || $quantite === null || $quantite === '') {
+            return;
+        }
+
+        Stock::updateOrCreate(
+            ['produit_id' => $produit->id, 'point_de_vente_id' => $pointDeVenteId],
+            ['quantite_disponible' => (int) $quantite, 'stock_minimum' => 5, 'stock_maximum' => 100]
+        );
     }
 
     // ─────────────────────────────────────────────────────────────────
@@ -269,9 +340,13 @@ class SouscriptionControleur
                     ->withCount('articles')
                     ->orderBy('profil_id')->orderBy('code')->get()],
 
-            5 => ['articles' => Produit::with('categorieRelation')
+            // Le stock d'ouverture se pose sur un point de vente : sans site
+            // enregistré, la colonne n'aurait nulle part où écrire, et le champ
+            // ne ferait qu'avaler la saisie. On la retire plutôt que de mentir.
+            5 => ['articles' => Produit::with(['categorieRelation', 'stocks'])
                     ->where('entreprise_id', $entreprise->id)
-                    ->orderBy('reference')->get()],
+                    ->orderBy('reference')->get(),
+                  'siteDuStock' => $this->siteDuStock($entreprise)],
 
             default => [],
         };

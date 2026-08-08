@@ -866,6 +866,14 @@
                 <a href="{{ route('admin.entreprise.parametres') }}" style="display:flex; align-items:center; gap:8px; padding:8px 14px; font-size:12.5px; color:var(--text); text-decoration:none; transition:background 0.15s;" onmouseover="this.style.background='#F1F5F9'" onmouseout="this.style.background='none'">
                     <i class="far fa-credit-card" style="width:14px; color:var(--text-2);"></i> Facturation
                 </a>
+                {{-- Revoir la visite guidée : un formulaire, pas un script, pour
+                     qu'elle se relance même quand le JavaScript a échoué. --}}
+                <form method="POST" action="{{ route('admin.visite.rejouer') }}" style="margin:0;">
+                    @csrf
+                    <button type="submit" style="width:100%; display:flex; align-items:center; gap:8px; padding:8px 14px; font-size:12.5px; color:var(--text); border:none; background:none; cursor:pointer; text-align:left; font-family:inherit; transition:background 0.15s;" onmouseover="this.style.background='#F1F5F9'" onmouseout="this.style.background='none'">
+                        <i class="far fa-circle-question" style="width:14px; color:var(--text-2);"></i> Revoir la visite guidée
+                    </button>
+                </form>
                 <div style="border-top:1px solid var(--border); margin:4px 0;"></div>
                 <form method="POST" action="{{ route('deconnexion') }}" id="formDeconnexionDropdown" style="margin:0;">
                     @csrf

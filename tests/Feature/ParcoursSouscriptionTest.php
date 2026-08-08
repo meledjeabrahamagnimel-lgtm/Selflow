@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Modules\Admin\Modeles\Entreprise;
+use App\Modules\Admin\Modeles\PointDeVente;
 use App\Modules\Admin\Modeles\Produit;
 use App\Modules\Admin\Modeles\Referentiel\Categorie;
 use App\Modules\Authentification\Modeles\Utilisateur;
@@ -201,6 +202,105 @@ class ParcoursSouscriptionTest extends TestCase
         ])->assertSessionHasErrors('articles.0.id');
 
         $this->assertSame('Ciment', $etranger->fresh()->nom);
+    }
+
+    /**
+     * Amener l'entreprise jusqu'à l'étape des prix, catalogue rempli.
+     */
+    private function allerJusquAuxPrix(array $modules = ['principal', 'ventes', 'stock']): void
+    {
+        $this->post(route('admin.souscription.enregistrer', 1), ['categorie_id' => $this->commerce()->id]);
+        $this->post(route('admin.souscription.enregistrer', 2), ['profils' => ['boutique_quartier']]);
+        $this->post(route('admin.souscription.enregistrer', 3), ['modules' => $modules]);
+        $this->post(route('admin.souscription.enregistrer', 4), ['familles' => ['VIV']]);
+    }
+
+    private function unSite(): PointDeVente
+    {
+        return PointDeVente::create([
+            'entreprise_id' => $this->entreprise->id,
+            'nom' => 'Magasin central', 'ville' => 'Abidjan', 'commune' => 'Cocody',
+        ]);
+    }
+
+    public function test_le_stock_d_ouverture_est_pose_sur_le_site(): void
+    {
+        $site = $this->unSite();
+
+        $this->actingAs($this->admin);
+        $this->allerJusquAuxPrix();
+
+        $riz = Produit::where('entreprise_id', $this->entreprise->id)->firstOrFail();
+
+        $this->post(route('admin.souscription.enregistrer', 5), [
+            'articles' => [['id' => $riz->id, 'prix_vente' => 17500, 'stock_initial' => 42]],
+        ])->assertRedirect(route('admin.tableau_de_bord'));
+
+        $this->assertDatabaseHas('stocks', [
+            'produit_id' => $riz->id,
+            'point_de_vente_id' => $site->id,
+            'quantite_disponible' => 42,
+        ]);
+    }
+
+    public function test_un_service_ne_recoit_aucune_fiche_de_stock(): void
+    {
+        // Une prestation ne s'epuise pas : lui creer une fiche la ferait
+        // figurer en permanence dans « Alertes stock », sous un seuil de 5.
+        $site = $this->unSite();
+
+        $this->actingAs($this->admin);
+        $this->allerJusquAuxPrix();
+
+        $mission = Produit::create([
+            'entreprise_id' => $this->entreprise->id, 'reference' => 'PRESTA-001',
+            'nom' => 'Livraison à domicile', 'type' => 'service',
+            'prix_achat' => 0, 'prix_vente' => 2000,
+        ]);
+
+        $this->post(route('admin.souscription.enregistrer', 5), [
+            'articles' => [['id' => $mission->id, 'stock_initial' => 99]],
+        ]);
+
+        $this->assertDatabaseMissing('stocks', ['produit_id' => $mission->id]);
+    }
+
+    public function test_sans_site_le_stock_d_ouverture_ne_s_affiche_pas(): void
+    {
+        // Le champ n'aurait nulle part ou ecrire : mieux vaut ne pas le montrer
+        // que d'avaler la saisie en silence.
+        $this->actingAs($this->admin);
+        $this->allerJusquAuxPrix();
+
+        $this->get(route('admin.souscription.index', ['etape' => 5]))
+            ->assertOk()
+            ->assertDontSee('Stock de départ');
+    }
+
+    public function test_le_stock_d_ouverture_ne_s_affiche_pas_sans_le_module(): void
+    {
+        $this->unSite();
+
+        $this->actingAs($this->admin);
+        $this->allerJusquAuxPrix(['principal', 'ventes']);
+
+        $this->get(route('admin.souscription.index', ['etape' => 5]))
+            ->assertOk()
+            ->assertSee('Prix de vente')
+            ->assertDontSee('Stock de départ');
+    }
+
+    public function test_le_stock_d_ouverture_s_affiche_avec_un_site_et_le_module(): void
+    {
+        $this->unSite();
+
+        $this->actingAs($this->admin);
+        $this->allerJusquAuxPrix();
+
+        $this->get(route('admin.souscription.index', ['etape' => 5]))
+            ->assertOk()
+            ->assertSee('Stock de départ')
+            ->assertSee('Magasin central');
     }
 
     public function test_le_parcours_est_ferme_aux_visiteurs(): void

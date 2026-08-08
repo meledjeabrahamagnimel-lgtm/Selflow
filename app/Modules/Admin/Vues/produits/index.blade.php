@@ -290,7 +290,8 @@
                                 </div>
                                 <div class="form-group">
                                     <label class="form-label">Unité</label>
-                                    <input type="text" name="unite" class="form-control" value="{{ $p->unite }}">
+                                    <input type="text" name="unite" class="form-control" list="unites-suggerees"
+                                           value="{{ $p->unite }}" placeholder="pièce, kg, forfait… ou la vôtre">
                                 </div>
                                 @include('admin::composants.champs_fne_produit', [
                                     'cle'     => $p->id,
@@ -449,7 +450,8 @@
                                 </div>
                 <div class="form-group">
                     <label class="form-label">Unité</label>
-                    <input type="text" name="unite" class="form-control" placeholder="pcs, kg, L…">
+                    <input type="text" name="unite" class="form-control" list="unites-suggerees"
+                           placeholder="pièce, kg, forfait… ou la vôtre">
                 </div>
                 @include('admin::composants.champs_fne_produit', [
                     'cle'     => 'nouveau',
@@ -921,5 +923,7 @@ document.addEventListener('input', function (e) {
     if (valeur < parseFloat(champ.min || 0)) champ.value = champ.min || 0;
 });
 </script>
+
+@include('admin::partials.unites-suggerees')
 
 @endsection
