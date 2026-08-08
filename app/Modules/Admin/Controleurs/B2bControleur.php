@@ -25,6 +25,7 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\View\View;
 use App\Modules\Admin\Regles\Appartenance;
+use App\Modules\Admin\Regles\Quantite;
 
 class B2bControleur extends Controller
 {
@@ -86,7 +87,7 @@ class B2bControleur extends Controller
             'fournisseur_id' => ['required', 'integer', Appartenance::a('fournisseurs', 'id')],
             'articles'       => ['required', 'array', 'min:1'],
             'articles.*.produit_id' => ['required', 'integer', Appartenance::a('produits', 'id')],
-            'articles.*.quantite'   => ['required', 'numeric', 'min:0.0001'],
+            'articles.*.quantite'   => Quantite::physique(),
             'articles.*.prix'       => ['nullable', 'numeric', 'min:0'],
             'articles.*.prix_unitaire' => ['nullable', 'numeric', 'min:0'],
         ]);

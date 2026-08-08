@@ -15,6 +15,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use App\Modules\Admin\Regles\Appartenance;
+use App\Modules\Admin\Regles\Quantite;
 
 class VenteApiControleur
 {
@@ -69,7 +70,7 @@ class VenteApiControleur
             'articles'       => ['required', 'array', 'min:1'],
             'articles.*.produit_id'      => ['nullable', 'integer', Appartenance::a('produits', 'id')],
             'articles.*.libelle_virtuel' => ['nullable', 'string', 'max:255'],
-            'articles.*.quantite'        => ['required', 'integer', 'min:1'],
+            'articles.*.quantite'        => Quantite::physique(),
             'articles.*.unite'           => ['nullable', 'string', 'max:50'],
             'articles.*.prix_unitaire'   => ['nullable', 'numeric', 'min:0'],
         ], [

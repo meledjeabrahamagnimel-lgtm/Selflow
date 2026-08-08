@@ -928,7 +928,7 @@ function ajouterArticleDuCatalogue() {
     // Return Qty
     const tdReturnQty = document.createElement('td');
     tdReturnQty.style.padding = '10px';
-    tdReturnQty.innerHTML = `<input type="number" name="items[${rowId}][quantite]" class="form-control" value="${qty}" min="0.01" required style="width: 100%; padding: 6px; border: 1px solid #cbd5e1; border-radius: 6px; text-align: center;">`;
+    tdReturnQty.innerHTML = `<input type="number" name="items[${rowId}][quantite]" class="form-control" value="${qty}" min="0.001" step="0.001" required style="width: 100%; padding: 6px; border: 1px solid #cbd5e1; border-radius: 6px; text-align: center;">`;
     tr.appendChild(tdReturnQty);
     
     // Price
@@ -1003,7 +1003,7 @@ function ajouterSaisieLibre() {
     // Return Qty
     const tdReturnQty = document.createElement('td');
     tdReturnQty.style.padding = '10px';
-    tdReturnQty.innerHTML = `<input type="number" name="items[${rowId}][quantite]" class="form-control" value="${qty}" min="0.01" required style="width: 100%; padding: 6px; border: 1px solid #cbd5e1; border-radius: 6px; text-align: center;">`;
+    tdReturnQty.innerHTML = `<input type="number" name="items[${rowId}][quantite]" class="form-control" value="${qty}" min="0.001" step="0.001" required style="width: 100%; padding: 6px; border: 1px solid #cbd5e1; border-radius: 6px; text-align: center;">`;
     tr.appendChild(tdReturnQty);
     
     // Price
@@ -1135,7 +1135,7 @@ function selectionnerFacturePourAvoir(id) {
                 // Return Qty
                 const tdReturnQty = document.createElement('td');
                 tdReturnQty.style.padding = '10px';
-                tdReturnQty.innerHTML = `<input type="number" name="items[${item.id}][quantite]" class="form-control" value="${restante}" min="0" max="${restante}" ${restante <= 0 ? 'disabled' : 'required'} style="width: 100%; padding: 6px; border: 1px solid #cbd5e1; border-radius: 6px; text-align: center;">`;
+                tdReturnQty.innerHTML = `<input type="number" name="items[${item.id}][quantite]" class="form-control" value="${restante}" min="0" step="0.001" max="${restante}" ${restante <= 0 ? 'disabled' : 'required'} style="width: 100%; padding: 6px; border: 1px solid #cbd5e1; border-radius: 6px; text-align: center;">`;
                 tr.appendChild(tdReturnQty);
                 
                 // Price

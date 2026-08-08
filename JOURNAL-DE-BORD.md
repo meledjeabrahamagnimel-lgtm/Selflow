@@ -6,8 +6,8 @@ et ce fichier. Tout ce qui a été décidé, tout ce qui a été écarté et pou
 tout ce qui reste à faire doit donc figurer ici — et y être tenu à jour à chaque
 lot terminé.
 
-Dernière mise à jour : 8 août 2026 — lot 2 terminé : stock d’ouverture, unités
-libres, relance de la visite guidée.
+Dernière mise à jour : 8 août 2026 — lot 3.1 : les quantités passent en décimal
+sur toute la chaîne.
 
 ---
 
@@ -33,6 +33,25 @@ propriétaire.
 
 Seul point de contact autorisé : l'écriture comptable du BAPA, en lecture seule
 de ce que la plateforme a déjà retourné.
+
+### Un point signalé, non corrigé — décision du propriétaire
+
+`FneService` transmet les quantités par `intval($detail->quantite)`, à six
+endroits (lignes 101, 133, 324, 746, 796 et 806). Depuis le lot 3.1, la ligne de
+vente porte des décimales : **une vente de 12,5 kg de cacao part à la DGI pour
+12 kg**, et la pièce certifiée diffère de la pièce établie dans Selflow — le
+genre d'écart silencieux que la règle d'or existe pour éviter.
+
+Je n'y touche pas : aucune des trois exceptions ne s'applique. Le champ
+`quantity` de l'API attend peut-être un entier, auquel cas la correction n'est
+pas dans `FneService` mais dans la façon dont on facture une quantité fractionnée
+— facturer en grammes plutôt qu'en kilos, par exemple.
+
+**Ce qu'il faut vérifier avant de décider** : le type du champ `quantity` dans le
+référentiel technique de la DGI. S'il accepte un décimal, c'est le cas 1 ou 3
+des exceptions et la correction tient en six `intval` → `floatval`. S'il n'en
+accepte pas, il faut interdire les quantités fractionnées sur les pièces
+normalisées, et le dire à la saisie.
 
 ---
 
@@ -296,13 +315,62 @@ créer — les codes viennent d'un formulaire.
   cela, un catalogue de deux cents lignes déclenchait deux cents requêtes à
   l'affichage de l'étape 5.
 
-### Lot 3 — Le stock suit l'événement — le plus lourd
+### Lot 3 — Le stock suit l'événement — le plus lourd — **EN COURS**
 
-Quantités décimales, `StockService` unique, journal en écriture seule, relation
-polymorphe vers la pièce, quatre portes (réception, livraison, production,
-inventaire), cycle d'achat complet, engagements pour devis et commandes, aucune
-fiche de stock pour les articles non stockables, sort de la marchandise choisi
-ligne par ligne sur les avoirs.
+| Étape | État |
+|---|---|
+| 3.1 · Quantités décimales de bout en bout | **TERMINÉ** |
+| 3.2 · `StockService` unique, journal en écriture seule | à faire |
+| 3.3 · Rebrancher les appelants, fermer la double porte d'achat | à faire |
+| 3.4 · Sort de la marchandise sur les avoirs | à faire |
+
+#### 3.1 — Les quantités cessent d'être entières
+
+`quantite_disponible` était un `integer`. Le référentiel livre pourtant des
+kilos, des litres et des mètres carrés : 12,5 kg de cacao entraient en stock
+pour 12, sans erreur ni trace. Au bout d'un an de réceptions, l'écart entre le
+stock théorique et le comptage physique n'avait plus d'explication.
+
+La correction porte sur **toute la chaîne**, pas seulement sur la fiche de
+stock — une quantité tronquée sur la ligne de vente l'est déjà avant d'atteindre
+le stock :
+
+| Niveau | Ce qui a changé |
+|---|---|
+| Base | Six tables passées en `decimal(15,3)` : `stocks`, `mouvements_stock`, `vente_details`, `achat_details`, `produits`, `transferts_stock` |
+| Modèles | Casts en `float`, `Produit::stockActuel()` et ses voisines retypées `int` → `float` |
+| Contrôleurs | Quatre `intval` / `(int)` qui tronquaient à la lecture ou à l'écriture |
+| Validation | `App\Modules\Admin\Regles\Quantite`, énoncée une fois pour onze contrôleurs |
+| Navigateur | `parseInt` → `quantiteSaisie()`, et `step="0.001"` sur onze champs |
+
+**Trois décimales**, et pas davantage : le gramme sur le kilo, le millilitre sur
+le litre. Deux colonnes gardent leurs quatre décimales,
+`fiche_technique_details.quantite` et `ordres_production.quantite_cible` : la
+première n'est pas une quantité mais un coefficient de nomenclature — 0,0125 kg
+de colorant par unité produite — et arrondir un coefficient fausse toute la
+série qu'il multiplie.
+
+`Quantite::physique()` refuse le zéro, le négatif et la quatrième décimale.
+Refuser plutôt qu'arrondir : la colonne n'en garde que trois, et un arrondi
+silencieux est précisément ce que ce lot corrige. Le sens d'un mouvement est
+porté par son type — jamais par le signe de sa quantité.
+
+**Un défaut de saisie trouvé au passage** : les champs de quantité des avoirs
+portaient `min="0.01"` sans `step`. En HTML, la base du pas est `min` : les
+seules valeurs acceptées étaient 0,01 / 1,01 / 2,01… et « 12 » était refusé par
+le navigateur, sans message compréhensible.
+
+**Un point signalé et laissé au propriétaire** : `FneService` transmet
+`intval($detail->quantite)`. Voir la section 2 — code gelé.
+
+- `tests/Feature/QuantitesDecimalesTest.php` — 15 tests.
+
+#### 3.2 à 3.4 — reste à faire
+
+`StockService` unique et journal en écriture seule, relation polymorphe vers la
+pièce, quatre portes (réception, livraison, production, inventaire), cycle
+d'achat complet, engagements pour devis et commandes, sort de la marchandise
+choisi ligne par ligne sur les avoirs.
 
 ### Lot 4 — Les imputations — après 1 et 3
 
@@ -381,8 +449,9 @@ Elles sont documentées pour ne pas être redécouvertes.
 
 ### Stock
 
-- `quantite_disponible` est un `integer` — le référentiel livre des kg, litres,
-  sacs. 12,5 kg de cacao deviennent 12.
+- ~~`quantite_disponible` est un `integer` — le référentiel livre des kg,
+  litres, sacs. 12,5 kg de cacao deviennent 12.~~ **CORRIGÉ au lot 3.1** — voir
+  le lot 3 pour le détail de la chaîne.
 - Deux portes pour la même entrée : `AchatControleur:242` incrémente à
   l'enregistrement de la facture, `StockControleur:301` incrémente à la
   réception. Rien n'interdit les deux.

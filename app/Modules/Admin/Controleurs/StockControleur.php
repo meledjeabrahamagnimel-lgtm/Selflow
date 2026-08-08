@@ -11,6 +11,8 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\View\View;
 use App\Modules\Admin\Regles\Appartenance;
+use App\Modules\Admin\Regles\Quantite;
+use App\Modules\Admin\Modeles\Stock;
 
 class StockControleur
 {
@@ -177,7 +179,7 @@ class StockControleur
     {
         $request->validate([
             'produit_id' => ['required', 'integer', Appartenance::a('produits', 'id')],
-            'quantite'   => ['required', 'integer', 'min:1'],
+            'quantite'   => Quantite::physique(),
         ]);
 
         $produit = Produit::findOrFail($request->produit_id);
@@ -195,7 +197,7 @@ class StockControleur
             ->first();
 
         $stockDisponible = $stockObj ? $stockObj->quantite_disponible : 0;
-        $quantiteRetrait = intval($request->quantite);
+        $quantiteRetrait = round((float) $request->quantite, Stock::DECIMALES);
 
         if ($quantiteRetrait > $stockDisponible) {
             return back()->with('erreur', "Quantité insuffisante en stock (Disponible: $stockDisponible).");

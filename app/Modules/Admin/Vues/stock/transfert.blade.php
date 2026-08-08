@@ -78,7 +78,7 @@
 
             <div class="form-group" style="margin-bottom:12px;">
                 <label class="form-label">Quantité <span style="color:var(--danger)">*</span></label>
-                <input type="number" name="quantite" class="form-control" min="1" placeholder="10" required>
+                <input type="number" name="quantite" class="form-control" min="0.001" step="0.001" placeholder="10" required>
             </div>
 
             <div class="form-group" style="margin-bottom:18px;">

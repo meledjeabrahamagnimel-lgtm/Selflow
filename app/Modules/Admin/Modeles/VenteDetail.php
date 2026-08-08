@@ -12,7 +12,13 @@ class VenteDetail extends Model
 
     protected function casts(): array
     {
-        return ['remise_taux' => 'decimal:2'];
+        return [
+            'remise_taux' => 'decimal:2',
+            // Quantités en float : le stock se compte aussi en kilos et en
+            // litres, et la ligne de vente ne doit pas tronquer avant lui.
+            'quantite'        => 'float',
+            'quantite_livree' => 'float',
+        ];
     }
 
     public function vente(): BelongsTo

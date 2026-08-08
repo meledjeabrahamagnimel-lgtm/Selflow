@@ -416,7 +416,7 @@ function ajouterLigne(prefill = null) {
         </div>
         <div class="form-group" style="margin-bottom:0;">
             <label class="form-label">Quantité</label>
-            <input type="number" name="articles[${idx}][quantite]" class="form-control qte-inp" min="1" value="${prefill ? prefill.quantite : 1}" oninput="recalculer(); savePanier();" required>
+            <input type="number" name="articles[${idx}][quantite]" class="form-control qte-inp" min="0.001" step="0.001" value="${prefill ? prefill.quantite : 1}" oninput="recalculer(); savePanier();" required>
         </div>
         <div class="form-group" style="margin-bottom:0;">
             <label class="form-label">Prix unitaire</label>

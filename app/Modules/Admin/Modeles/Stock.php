@@ -17,12 +17,29 @@ class Stock extends Model
         'stock_maximum',
     ];
 
+    /**
+     * Précision des quantités physiques : le gramme sur le kilo, le millilitre
+     * sur le litre. Un `integer` faisait entrer 12,5 kg de cacao pour 12.
+     */
+    public const DECIMALES = 3;
+
+    /**
+     * Les quantités sont lues en `float` et non en `decimal:3`.
+     *
+     * Le cast `decimal` de Laravel rend des chaînes — « 12.500 » — qui se
+     * comparent mal, ne s'additionnent pas dans un `array_sum` et ressortent
+     * telles quelles en JSON. Le `float` garde l'arithmétique naturelle ; la
+     * dérive binaire est écartée autrement : la colonne est un `decimal(15,3)`
+     * en base, elle fait foi, et toute écriture passe par `StockService` qui
+     * arrondit à trois décimales. Aucun cumul ne se fait en mémoire d'une
+     * opération à l'autre.
+     */
     protected function casts(): array
     {
         return [
-            'quantite_disponible' => 'integer',
-            'stock_minimum'       => 'integer',
-            'stock_maximum'       => 'integer',
+            'quantite_disponible' => 'float',
+            'stock_minimum'       => 'float',
+            'stock_maximum'       => 'float',
         ];
     }
 

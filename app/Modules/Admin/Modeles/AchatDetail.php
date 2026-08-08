@@ -12,7 +12,12 @@ class AchatDetail extends Model
 
     protected function casts(): array
     {
-        return ['remise_taux' => 'decimal:2'];
+        return [
+            'remise_taux' => 'decimal:2',
+            // Voir VenteDetail : une réception de 12,5 kg ne s'arrondit pas.
+            'quantite'              => 'float',
+            'quantite_receptionnee' => 'float',
+        ];
     }
 
     public function achat(): BelongsTo

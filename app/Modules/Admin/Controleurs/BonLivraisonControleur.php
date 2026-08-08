@@ -72,8 +72,10 @@ class BonLivraisonControleur extends Controller
                 ->where('point_de_vente_id', $pointDeVenteId)
                 ->first();
 
-            $stockDispo    = $stock ? max(0, (int) $stock->quantite_disponible) : 0;
-            $qteCom        = (int) $detail->quantite;
+            // En float : le stock se compte aussi en kilos et en litres, et
+            // (int) faisait apparaitre 12,5 kg comme 12 disponibles.
+            $stockDispo    = $stock ? max(0, (float) $stock->quantite_disponible) : 0;
+            $qteCom        = (float) $detail->quantite;
             $qteSuggestion = min($qteCom, $stockDispo);
             $estInsuffisant = $stockDispo < $qteCom;
 

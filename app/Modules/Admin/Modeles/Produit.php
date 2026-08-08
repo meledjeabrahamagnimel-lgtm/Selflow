@@ -203,8 +203,8 @@ class Produit extends Model
             'code_tva_manuel'         => 'boolean',
             'categorie_id'            => 'integer',
             'sous_categorie_id'       => 'integer',
-            'quantite_commandee'      => 'integer',
-            'quantite_a_receptionner' => 'integer',
+            'quantite_commandee'      => 'float',
+            'quantite_a_receptionner' => 'float',
             'date_arrivee'            => 'date',
             'date_peremption'         => 'date',
         ];
@@ -388,29 +388,34 @@ class Produit extends Model
 
     /**
      * Obtenir la quantité disponible pour un point de vente donné.
+     *
+     * En `float` : les quantités se comptent en kilos, en litres et en mètres
+     * carrés autant qu'en pièces. Le type de retour était `int`, et PHP
+     * tronquait 12,5 kg à 12 au passage — silencieusement, à la lecture, même
+     * quand la base tenait la bonne valeur.
      */
-    public function stockActuel($pointDeVenteId): int
+    public function stockActuel($pointDeVenteId): float
     {
         $stock = $this->stocks->where('point_de_vente_id', $pointDeVenteId)->first();
-        return $stock ? $stock->quantite_disponible : 0;
+        return (float) ($stock->quantite_disponible ?? 0);
     }
 
     /**
      * Obtenir le stock minimum pour un point de vente donné.
      */
-    public function stockMinimum($pointDeVenteId): int
+    public function stockMinimum($pointDeVenteId): float
     {
         $stock = $this->stocks->where('point_de_vente_id', $pointDeVenteId)->first();
-        return $stock ? $stock->stock_minimum : 5;
+        return (float) ($stock->stock_minimum ?? 5);
     }
 
     /**
      * Obtenir le stock maximum pour un point de vente donné.
      */
-    public function stockMaximum($pointDeVenteId): int
+    public function stockMaximum($pointDeVenteId): float
     {
         $stock = $this->stocks->where('point_de_vente_id', $pointDeVenteId)->first();
-        return $stock ? $stock->stock_maximum : 100;
+        return (float) ($stock->stock_maximum ?? 100);
     }
 
     /**
@@ -444,22 +449,22 @@ class Produit extends Model
         return null;
     }
 
-    public function getStockActuelAttribute(): int
+    public function getStockActuelAttribute(): float
     {
         $pdvId = self::getActivePdvId();
         if (!$pdvId) {
             $stock = $this->stocks->first();
-            return $stock ? $stock->quantite_disponible : 0;
+            return (float) ($stock->quantite_disponible ?? 0);
         }
         return $this->stockActuel($pdvId);
     }
 
-    public function getStockMinimumAttribute(): int
+    public function getStockMinimumAttribute(): float
     {
         $pdvId = self::getActivePdvId();
         if (!$pdvId) {
             $stock = $this->stocks->first();
-            return $stock ? $stock->stock_minimum : 5;
+            return (float) ($stock->stock_minimum ?? 5);
         }
         return $this->stockMinimum($pdvId);
     }
@@ -528,7 +533,7 @@ class Produit extends Model
      * Calcule la quantité prévisionnelle de stock :
      * Prévision = Stock Actuel - Quantité Commandée + Quantité à Réceptionner
      */
-    public function getPrevisionAttribute(): int
+    public function getPrevisionAttribute(): float
     {
         return $this->stock_actuel - $this->quantite_commandee + $this->quantite_a_receptionner;
     }

@@ -445,7 +445,7 @@
                 </div>
                 <div class="form-group">
                     <label class="form-label">Quantité <span style="color:var(--danger)">*</span></label>
-                    <input type="number" id="saisieQteInput" class="form-control" min="1" value="1" required>
+                    <input type="number" id="saisieQteInput" class="form-control" min="0.001" step="0.001" value="1" required>
                 </div>
             </div>
             <div style="display:grid; grid-template-columns: 1fr 1fr; gap: 16px;">
@@ -850,7 +850,7 @@ function ajouterSaisieLibre(e, fermer = true) {
     
     const nom = nomInput.value.trim();
     const prix = parseFloat(prixInput.value);
-    const qte = parseInt(qteInput.value);
+    const qte = quantiteSaisie(qteInput.value);
     const unite = uniteInput.value.trim() || 'Unité';
     // Le code choisi porte son taux : c'est lui qui fait foi, des deux cotes.
     const codeTva = codeTvaSelect?.value || 'TVA';
@@ -953,8 +953,7 @@ function changerQte(id, delta) {
 }
 
 function saisirQte(id, val) {
-    let q = parseInt(val);
-    if (isNaN(q) || q <= 0) q = 1;
+    let q = quantiteSaisie(val);
 
     const item = panier[id];
     if (!item) return;
@@ -1115,7 +1114,7 @@ function renderPanier() {
             </div>
             <div class="qte-ctrl">
                 <button type="button" class="qte-btn" onclick="changerQte('${id}', -1)">−</button>
-                <input type="number" class="qte-input" value="${item.qte}" min="1" onchange="saisirQte('${id}', this.value)">
+                <input type="number" class="qte-input" value="${item.qte}" min="0.001" step="0.001" onchange="saisirQte('${id}', this.value)">
                 <button type="button" class="qte-btn" onclick="changerQte('${id}', 1)">+</button>
             </div>
             <button type="button" class="remove-btn" onclick="supprimerItem('${id}')">

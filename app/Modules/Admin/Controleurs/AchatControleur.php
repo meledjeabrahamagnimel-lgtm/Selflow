@@ -20,6 +20,7 @@ use App\Jobs\NormaliserAchatBapaJob;
 use App\Modules\Admin\Modeles\B2bNegotiation;
 use App\Modules\Admin\Modeles\Entreprise;
 use App\Modules\Admin\Regles\Appartenance;
+use App\Modules\Admin\Regles\Quantite;
 
 class AchatControleur
 {
@@ -86,7 +87,7 @@ class AchatControleur
             'articles'                   => ['required', 'array', 'min:1'],
             'articles.*.produit_id'      => ['nullable', 'integer', Appartenance::a('produits', 'id')],
             'articles.*.libelle_virtuel' => ['nullable', 'string', 'max:255'],
-            'articles.*.quantite'        => ['required', 'integer', 'min:1'],
+            'articles.*.quantite'        => Quantite::physique(),
             'articles.*.prix_unitaire'   => ['required', 'numeric', 'min:0'],
             'articles.*.unite'           => ['nullable', 'string', 'max:50'],
         ] + self::reglesChampsFne(), [

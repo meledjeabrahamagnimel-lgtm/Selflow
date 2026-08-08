@@ -25,6 +25,19 @@ class MouvementStock extends Model
         'reference_document',
     ];
 
+    /**
+     * Quantités en `float` : mêmes raisons que sur `Stock`, la colonne
+     * `decimal(15,3)` faisant foi en base.
+     */
+    protected function casts(): array
+    {
+        return [
+            'quantite'    => 'float',
+            'stock_avant' => 'float',
+            'stock_apres' => 'float',
+        ];
+    }
+
     public function produit(): BelongsTo
     {
         return $this->belongsTo(Produit::class, 'produit_id');

@@ -14,6 +14,7 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\View\View;
 use App\Modules\Admin\Regles\Appartenance;
+use App\Modules\Admin\Regles\Quantite;
 
 class TransfertStockControleur
 {
@@ -51,7 +52,7 @@ class TransfertStockControleur
             'produit_id'                   => ['required', 'integer', Appartenance::a('produits', 'id')],
             'point_de_vente_source_id'      => ['required', 'integer', Appartenance::a('points_de_vente', 'id')],
             'point_de_vente_destination_id'=> ['required', 'integer', Appartenance::a('points_de_vente', 'id'), 'different:point_de_vente_source_id'],
-            'quantite'                     => ['required', 'numeric', 'min:1'],
+            'quantite'                     => Quantite::physique(),
             'note'                         => ['nullable', 'string', 'max:500'],
         ], [
             'point_de_vente_destination_id.different' => 'Le point de vente de destination doit être différent de la source.',
@@ -62,7 +63,7 @@ class TransfertStockControleur
 
         $sourceId = $request->point_de_vente_source_id;
         $destId   = $request->point_de_vente_destination_id;
-        $qty      = intval($request->quantite);
+        $qty      = round((float) $request->quantite, Stock::DECIMALES);
 
         // Vérifier le stock disponible à la source
         $stockSource = Stock::where('produit_id', $produit->id)

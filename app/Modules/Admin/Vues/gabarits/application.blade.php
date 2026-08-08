@@ -990,6 +990,33 @@
 </div>
 
 <script>
+    /**
+     * Lit une quantité physique saisie par l'utilisateur.
+     *
+     * Les écrans lisaient `parseInt` : une réception de 12,5 kg de cacao
+     * devenait 12 avant même de quitter le navigateur, et le serveur n'avait
+     * plus rien à corriger. On lit désormais un décimal, arrondi au millième —
+     * la précision de la colonne en base, et celle d'une balance commerciale.
+     *
+     * Une saisie vide, nulle ou négative vaut le plus petit pas : le sens d'un
+     * mouvement de stock est porté par son type, jamais par le signe de sa
+     * quantité.
+     */
+    const PAS_QUANTITE = 0.001;
+
+    function quantiteSaisie(valeur) {
+        const q = Math.round(parseFloat(valeur) * 1000) / 1000;
+
+        return (isNaN(q) || q <= 0) ? PAS_QUANTITE : q;
+    }
+
+    /** Affichage court : « 12,5 » plutôt que « 12,500 », « 3 » plutôt que « 3,000 ». */
+    function quantiteAffichee(valeur) {
+        const q = parseFloat(valeur);
+
+        return isNaN(q) ? '0' : String(Math.round(q * 1000) / 1000).replace('.', ',');
+    }
+
     // Horloge en temps réel
     function majHorloge() {
         const el = document.getElementById('horloge');

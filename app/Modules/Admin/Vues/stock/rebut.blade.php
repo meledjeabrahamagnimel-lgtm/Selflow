@@ -165,7 +165,7 @@
 
             <div class="form-group" style="margin-bottom:20px;">
                 <label class="form-label" style="font-weight:600; margin-bottom:6px; display:block;">Quantité à retirer (<span id="rebut_max_quantite"></span> max)</label>
-                <input type="number" name="quantite" id="rebut_quantite" class="form-control" min="1" required style="width:100%; padding:10px; border-radius:8px; border:1px solid var(--border); background:var(--bg2); color:var(--text-1);">
+                <input type="number" name="quantite" id="rebut_quantite" class="form-control" min="0.001" step="0.001" required style="width:100%; padding:10px; border-radius:8px; border:1px solid var(--border); background:var(--bg2); color:var(--text-1);">
             </div>
 
             <div style="display:flex; gap:10px; justify-content:flex-end;">

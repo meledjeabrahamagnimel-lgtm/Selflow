@@ -15,6 +15,7 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\View\View;
+use App\Modules\Admin\Regles\Quantite;
 
 /**
  * Le parcours de configuration d'une entreprise.
@@ -175,7 +176,7 @@ class SouscriptionControleur
             'articles.*.nom'           => ['nullable', 'string', 'max:255'],
             'articles.*.prix_achat'    => ['nullable', 'numeric', 'min:0', 'max:99999999999'],
             'articles.*.prix_vente'    => ['nullable', 'numeric', 'min:0', 'max:99999999999'],
-            'articles.*.stock_initial' => ['nullable', 'integer', 'min:0', 'max:9999999'],
+            'articles.*.stock_initial' => Quantite::facultative(),
         ]);
 
         $pointDeVenteId = $this->siteDuStock($entreprise)?->id;
@@ -263,7 +264,8 @@ class SouscriptionControleur
 
         Stock::updateOrCreate(
             ['produit_id' => $produit->id, 'point_de_vente_id' => $pointDeVenteId],
-            ['quantite_disponible' => (int) $quantite, 'stock_minimum' => 5, 'stock_maximum' => 100]
+            ['quantite_disponible' => round((float) $quantite, Stock::DECIMALES),
+             'stock_minimum' => 5, 'stock_maximum' => 100]
         );
     }
 
