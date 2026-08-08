@@ -6,8 +6,8 @@ et ce fichier. Tout ce qui a été décidé, tout ce qui a été écarté et pou
 tout ce qui reste à faire doit donc figurer ici — et y être tenu à jour à chaque
 lot terminé.
 
-Dernière mise à jour : 8 août 2026 — lot 4 quasi terminé : imputation, CUMP
-(Coût Unitaire Moyen Pondéré), balance, grand livre et lettrage.
+Dernière mise à jour : 8 août 2026 — lot 4 terminé : imputation, CUMP (Coût
+Unitaire Moyen Pondéré), balance, grand livre et lettrage automatique.
 
 ---
 
