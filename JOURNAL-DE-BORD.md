@@ -6,7 +6,7 @@ et ce fichier. Tout ce qui a été décidé, tout ce qui a été écarté et pou
 tout ce qui reste à faire doit donc figurer ici — et y être tenu à jour à chaque
 lot terminé.
 
-Dernière mise à jour : 7 août 2026 — lot 1 terminé.
+Dernière mise à jour : 8 août 2026 — lot 2 entamé.
 
 ---
 
@@ -182,10 +182,37 @@ Poussé sur **Selflow**. Ce qui est fait :
 **Lot 1 terminé.** Les produits par défaut viendront avec la souscription d'un
 profil (lot 2), puisqu'ils en dépendent.
 
-### Lot 2 — Le parcours de souscription — après le lot 1
+### Lot 2 — Le parcours de souscription — **EN COURS**
 
-Sept étapes qui se déplient. Activité mixte. Droits et préférences séparés en
-deux colonnes, les droits ouverts en grand. Champ « Autre » partout.
+Poussé sur **Selflow**. Les fondations sont posées ; l'écran en sept étapes
+reste à faire.
+
+- Table `entreprise_profils` : une entreprise souscrit à un ou plusieurs
+  profils, et l'on garde trace de ce que chaque souscription a créé.
+- **Droits et préférences séparés** : `modules_autorises` (superadmin, tout
+  ouvert par défaut) et `modules_actifs` (choix de l'utilisateur). Un module
+  n'est actif que s'il est aussi autorisé. Personne ne savait jusqu'ici si un
+  module absent venait d'un abonnement restreint ou d'une préférence.
+- `souscription_etape` et `souscription_terminee_le` : le parcours se quitte
+  et se reprend.
+- `activite_autre` : ce que l'utilisateur saisit quand aucun profil ne lui
+  convient, plutôt que d'être forcé dans une case. Alimentera les versions
+  suivantes du classeur.
+- `SouscriptionProfilService::souscrire()` copie chez l'entreprise les familles
+  (en `categories`), les articles (en `produits`) et les quatre comptes de
+  chaque famille (au `plan_comptable`), puis ouvre les modules du profil dans
+  la limite des droits. Le trousseau est posé au passage s'il ne l'était pas.
+- `TypeArticle::typeProduit()` traduit les dix natures comptables du référentiel
+  vers les six types du catalogue. Travaux, services, sous-traitance et
+  financements se rejoignent sous « service » : aucun ne se stocke.
+- `tests/Feature/SouscriptionProfilTest.php` — 12 tests.
+
+Trois garanties tenues par des tests : une activité mixte cumule sans doubler
+(ni catégorie, ni préfixe en collision), ce que l'utilisateur a modifié survit
+à une nouvelle souscription, et un code de profil inconnu est refusé sans rien
+créer — les codes viennent d'un formulaire.
+
+Reste à faire : l'écran en sept étapes, et le champ « Autre » dans les listes.
 
 ### Lot 3 — Le stock suit l'événement — le plus lourd
 
@@ -331,6 +358,20 @@ cherchant `/wp-admin` inondait la boîte aux lettres.
 `App\Exceptions\Panne::estUne()` fait le tri : seules les erreurs serveur
 méritent la page de panne. Découvert en écrivant les tests de l'écran
 superadmin, qui recevaient 500 là où ils attendaient 403 et 404.
+
+### Comptes de produit — **CORRIGÉ**
+
+`produits.compte_vente` et `compte_achat` étaient obligatoires, avec pour
+valeurs par défaut `701100` et `601100` — précisément les positions que l'acte
+uniforme réserve à la ventilation géographique. Tout produit créé sans compte
+explicite atterrissait donc en « Dans la Région ». Et l'obligation forçait à
+inventer un compte pour une matière première, qui ne se vend pas.
+
+Les deux colonnes sont devenues facultatives, sans valeur par défaut.
+
+Au passage : `Produit` n'avait aucune relation vers sa catégorie, et une
+colonne `categorie` — l'ancien libellé libre — masquait toute relation
+homonyme. D'où `categorieRelation()`.
 
 ### Importations
 

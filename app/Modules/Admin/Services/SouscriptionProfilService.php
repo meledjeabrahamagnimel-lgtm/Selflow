@@ -1,0 +1,269 @@
+<?php
+
+namespace App\Modules\Admin\Services;
+
+use App\Modules\Admin\Modeles\Categorie;
+use App\Modules\Admin\Modeles\Entreprise;
+use App\Modules\Admin\Modeles\PlanComptable;
+use App\Modules\Admin\Modeles\Produit;
+use App\Modules\Admin\Modeles\Referentiel\Article;
+use App\Modules\Admin\Modeles\Referentiel\Compte;
+use App\Modules\Admin\Modeles\Referentiel\Famille;
+use App\Modules\Admin\Modeles\Referentiel\Profil;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
+
+/**
+ * Souscription d'une entreprise à un profil d'activité.
+ *
+ * C'est le moment où le secteur cesse d'être une étiquette. Choisir « Boutique
+ * de quartier » ne décidait de rien : l'utilisateur repartait avec un catalogue
+ * vide et un plan comptable de dix-neuf comptes. Il reçoit désormais les
+ * familles, les articles et les comptes de son métier, et les modules
+ * correspondants s'ouvrent.
+ *
+ * Trois principes :
+ *
+ * - **Le référentiel propose, il n'impose pas.** Tout ce qui est copié devient
+ *   la propriété de l'entreprise : elle renomme, complète, archive. Une
+ *   nouvelle version du classeur ne réécrira jamais son catalogue.
+ * - **Une activité mixte cumule sans doubler.** Une quincaillerie qui livre des
+ *   chantiers souscrit aux deux profils ; les familles communes ne sont créées
+ *   qu'une fois.
+ * - **Rien n'est jamais écrasé.** Souscrire deux fois au même profil ne crée
+ *   rien de nouveau et ne touche pas à ce que l'utilisateur a modifié.
+ */
+class SouscriptionProfilService
+{
+    /**
+     * Faire souscrire une entreprise aux profils désignés par leur code.
+     *
+     * Les codes viennent d'un formulaire : ils sont confrontés au référentiel
+     * avant tout, et un code inconnu interrompt l'opération. Rien ne se crée
+     * sur la foi d'une valeur envoyée par le navigateur.
+     *
+     * @param  array<int, string>  $codesProfils
+     * @return array{profils: int, familles: int, articles: int, comptes: int, modules: array<int, string>}
+     */
+    public static function souscrire(Entreprise $entreprise, array $codesProfils): array
+    {
+        $codes = array_values(array_unique(array_filter($codesProfils)));
+
+        $profils = Profil::whereIn('code', $codes)->get();
+
+        if ($profils->count() !== count($codes)) {
+            $inconnus = array_diff($codes, $profils->pluck('code')->all());
+
+            throw new \InvalidArgumentException(
+                'Profil inconnu du référentiel : ' . implode(', ', $inconnus)
+            );
+        }
+
+        return DB::transaction(function () use ($entreprise, $profils) {
+            // L'entreprise doit avoir son plan et ses journaux avant de recevoir
+            // des articles : un article sans compte au plan s'imputerait nulle
+            // part. Le trousseau ne fait rien s'il est déjà posé.
+            TrousseauEntrepriseService::doter($entreprise);
+
+            $bilan = ['profils' => 0, 'familles' => 0, 'articles' => 0, 'comptes' => 0, 'modules' => []];
+
+            foreach ($profils as $profil) {
+                if ($entreprise->profils()->where('profil_id', $profil->id)->exists()) {
+                    continue;
+                }
+
+                $resultat = self::copierProfil($entreprise, $profil);
+
+                $entreprise->profils()->attach($profil->id, [
+                    'familles_creees' => $resultat['familles'],
+                    'articles_crees'  => $resultat['articles'],
+                    'souscrit_le'     => now(),
+                ]);
+
+                $bilan['profils']++;
+                $bilan['familles'] += $resultat['familles'];
+                $bilan['articles'] += $resultat['articles'];
+                $bilan['comptes']  += $resultat['comptes'];
+            }
+
+            $bilan['modules'] = self::ouvrirLesModules($entreprise);
+
+            return $bilan;
+        });
+    }
+
+    /**
+     * Copier chez l'entreprise les familles, articles et comptes d'un profil.
+     *
+     * @return array{familles: int, articles: int, comptes: int}
+     */
+    private static function copierProfil(Entreprise $entreprise, Profil $profil): array
+    {
+        $bilan = ['familles' => 0, 'articles' => 0, 'comptes' => 0];
+        $categories = [];
+
+        foreach (Famille::with('typeArticle')->where('profil_id', $profil->id)->orderBy('code')->get() as $famille) {
+            [$categorie, $creee] = self::categoriePour($entreprise, $famille);
+            $categories[$famille->id] = $categorie;
+            $bilan['familles'] += $creee ? 1 : 0;
+
+            // Les quatre comptes de la famille rejoignent le plan de
+            // l'entreprise, nommés depuis le type d'article : « Ventes de
+            // marchandises — Vivres et alimentation » et non le libellé brut du
+            // numéro, qui dirait « Dans la Région » sur des vivres.
+            foreach (['compte_vente', 'compte_achat', 'compte_stock', 'compte_variation'] as $champ) {
+                if ($famille->$champ && self::inscrireAuPlan($entreprise, $famille->$champ, $famille->intituleCompte($champ))) {
+                    $bilan['comptes']++;
+                }
+            }
+        }
+
+        foreach (Article::with('typeArticle')->where('profil_id', $profil->id)->orderBy('code')->get() as $article) {
+            if (self::creerProduit($entreprise, $article, $categories[$article->famille_id] ?? null)) {
+                $bilan['articles']++;
+            }
+        }
+
+        return $bilan;
+    }
+
+    /**
+     * Catégorie de l'entreprise correspondant à une famille du référentiel.
+     *
+     * Une famille du même nom existant déjà — cas d'une activité mixte — est
+     * réutilisée telle quelle. Le préfixe, lui, doit rester unique dans
+     * l'entreprise : deux profils peuvent porter le code `DIV`, et le second
+     * reçoit alors un suffixe.
+     *
+     * @return array{0: Categorie, 1: bool} la catégorie, et si elle vient d'être créée
+     */
+    private static function categoriePour(Entreprise $entreprise, Famille $famille): array
+    {
+        $existante = Categorie::where('entreprise_id', $entreprise->id)
+            ->where('nom', $famille->nom)
+            ->first();
+
+        if ($existante) {
+            return [$existante, false];
+        }
+
+        return [Categorie::create([
+            'entreprise_id' => $entreprise->id,
+            'nom'           => $famille->nom,
+            'prefixe'       => self::prefixeLibre($entreprise, $famille->code),
+        ]), true];
+    }
+
+    /**
+     * Préfixe disponible, dérivé du code de la famille.
+     */
+    private static function prefixeLibre(Entreprise $entreprise, string $souhaite): string
+    {
+        $base = Str::upper(Str::substr(preg_replace('/[^A-Za-z0-9]/', '', $souhaite) ?: 'FAM', 0, 8));
+        $prefixe = $base;
+        $suffixe = 2;
+
+        while (Categorie::where('entreprise_id', $entreprise->id)->where('prefixe', $prefixe)->exists()) {
+            $prefixe = Str::substr($base, 0, 8) . $suffixe;
+            $suffixe++;
+        }
+
+        return $prefixe;
+    }
+
+    /**
+     * Inscrire un compte au plan de l'entreprise s'il n'y figure pas.
+     *
+     * @return bool vrai s'il vient d'être créé
+     */
+    private static function inscrireAuPlan(Entreprise $entreprise, string $numero, ?string $intitule): bool
+    {
+        $existe = PlanComptable::where('entreprise_id', $entreprise->id)
+            ->where('numero', $numero)
+            ->exists();
+
+        if ($existe) {
+            return false;
+        }
+
+        PlanComptable::create([
+            'entreprise_id' => $entreprise->id,
+            'numero'        => $numero,
+            'libelle'       => $intitule ?? Compte::nommer($numero) ?? "Compte {$numero}",
+        ]);
+
+        return true;
+    }
+
+    /**
+     * Créer l'article type dans le catalogue de l'entreprise.
+     *
+     * Les prix et le stock initial restent vides : le classeur les laisse
+     * volontairement à saisir, ils varient selon la zone et la période.
+     *
+     * @return bool vrai s'il vient d'être créé
+     */
+    private static function creerProduit(Entreprise $entreprise, Article $article, ?Categorie $categorie): bool
+    {
+        $reference = $article->code;
+
+        $existe = Produit::where('entreprise_id', $entreprise->id)
+            ->where('reference', $reference)
+            ->exists();
+
+        if ($existe) {
+            return false;
+        }
+
+        Produit::create([
+            'entreprise_id' => $entreprise->id,
+            'reference'     => $reference,
+            'nom'           => $article->designation,
+            'type'          => $article->typeArticle->typeProduit(),
+            'categorie_id'  => $categorie?->id,
+            'unite'         => $article->unite,
+            'prix_achat'    => 0,
+            'prix_vente'    => 0,
+            'compte_vente'  => $article->compte_vente,
+            'compte_achat'  => $article->compte_achat,
+        ]);
+
+        return true;
+    }
+
+    /**
+     * Ouvrir les modules des profils souscrits, dans la limite des droits.
+     *
+     * Le superadmin décide de ce que l'entreprise a le droit d'activer ; les
+     * profils disent ce dont le métier a besoin. On ouvre l'intersection, et
+     * on n'ôte jamais un module que l'utilisateur avait déjà.
+     *
+     * @return array<int, string>
+     */
+    private static function ouvrirLesModules(Entreprise $entreprise): array
+    {
+        $entreprise->refresh();
+
+        $actifs = $entreprise->modules_actifs;
+        if (is_string($actifs)) {
+            $actifs = json_decode($actifs, true);
+        }
+        $actifs = is_array($actifs) ? $actifs : [];
+
+        $demandes = ['principal', 'ventes', 'achats', 'tiers', 'produits', 'rapports', 'comptabilite'];
+
+        foreach ($entreprise->profils as $profil) {
+            $demandes = array_merge($demandes, $profil->modulesOuverts());
+        }
+
+        $autorises = $entreprise->modulesAutorises();
+        $ouverts = array_values(array_unique(array_intersect(
+            array_merge($actifs, $demandes),
+            $autorises
+        )));
+
+        $entreprise->update(['modules_actifs' => $ouverts]);
+
+        return $ouverts;
+    }
+}

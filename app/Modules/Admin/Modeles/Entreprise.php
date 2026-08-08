@@ -5,6 +5,7 @@ namespace App\Modules\Admin\Modeles;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 
 class Entreprise extends Model
 {
@@ -31,6 +32,10 @@ class Entreprise extends Model
         'plan_abonnement',
         'secteur_activite',
         'modules_actifs',
+        'modules_autorises',
+        'souscription_etape',
+        'souscription_terminee_le',
+        'activite_autre',
         'comptaflow_sync_key',
         'comptaflow_sync_status',
         'comptaflow_last_sync_at',
@@ -59,6 +64,8 @@ class Entreprise extends Model
     protected $casts = [
         'secteur_activite'   => 'array',
         'modules_actifs'     => 'array',
+        'modules_autorises'  => 'array',
+        'souscription_terminee_le' => 'datetime',
         'timbre_quittance'   => 'boolean',
         'bapa'               => 'boolean',
         'sticker_solde_alerte' => 'integer',
@@ -119,5 +126,65 @@ class Entreprise extends Model
             && is_array($this->secteur_activite)
             && count($this->secteur_activite) > 0;
     }
-}
 
+    /**
+     * Profils d'activité auxquels cette entreprise a souscrit.
+     *
+     * Une activité mixte en cumule plusieurs : une quincaillerie qui livre des
+     * chantiers souscrit au profil commerce et au profil BTP.
+     */
+    public function profils(): BelongsToMany
+    {
+        return $this->belongsToMany(
+            \App\Modules\Admin\Modeles\Referentiel\Profil::class,
+            'entreprise_profils',
+            'entreprise_id',
+            'profil_id'
+        )->withPivot(['familles_creees', 'articles_crees', 'souscrit_le'])->withTimestamps();
+    }
+
+    /**
+     * Modules que l'entreprise a le droit d'activer.
+     *
+     * C'est le superadmin qui en décide, et il ouvre tout par défaut : une
+     * entreprise sans restriction explicite peut tout activer.
+     */
+    public function modulesAutorises(): array
+    {
+        $autorises = $this->modules_autorises;
+
+        if (is_string($autorises)) {
+            $autorises = json_decode($autorises, true);
+        }
+
+        return is_array($autorises) && $autorises !== [] ? $autorises : self::TOUS_LES_MODULES;
+    }
+
+    /**
+     * Un module ne peut être actif que s'il est autorisé.
+     *
+     * Les deux notions vivaient dans un seul tableau : personne ne savait si un
+     * module absent venait d'un abonnement restreint ou d'une préférence.
+     */
+    public function moduleEstActif(string $module): bool
+    {
+        $actifs = $this->modules_actifs;
+
+        if (is_string($actifs)) {
+            $actifs = json_decode($actifs, true);
+        }
+
+        if (!is_array($actifs) || $actifs === []) {
+            $actifs = $this->modulesAutorises();
+        }
+
+        return in_array($module, $actifs, true)
+            && in_array($module, $this->modulesAutorises(), true);
+    }
+
+    public const TOUS_LES_MODULES = [
+        'principal', 'ventes', 'achats', 'stock', 'production', 'chantiers',
+        'cycles', 'comptabilite', 'points_de_vente', 'produits', 'tiers',
+        'rapports', 'b2b', 'fne',
+    ];
+}

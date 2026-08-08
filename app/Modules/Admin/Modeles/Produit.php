@@ -295,6 +295,18 @@ class Produit extends Model
         return $this->belongsTo(Categorie::class, 'categorie_id');
     }
 
+    /**
+     * Catégorie du produit.
+     *
+     * Le suffixe est nécessaire : une colonne `categorie` — l'ancien libellé
+     * libre — porte déjà ce nom, et une relation homonyme serait masquée par
+     * elle sans que rien ne le signale.
+     */
+    public function categorieRelation(): BelongsTo
+    {
+        return $this->belongsTo(Categorie::class, 'categorie_id');
+    }
+
     public function sousCategorieRelation(): BelongsTo
     {
         return $this->belongsTo(SousCategorie::class, 'sous_categorie_id');

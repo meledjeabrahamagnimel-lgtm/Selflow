@@ -26,4 +26,33 @@ class TypeArticle extends Model
     {
         return (bool) $this->stockable;
     }
+
+    /**
+     * Type de produit correspondant, dans le vocabulaire de `Produit`.
+     *
+     * Le référentiel distingue dix natures comptables ; le catalogue n'en
+     * connaît que six, et ne se soucie que d'une chose : le stock se compte-t-il
+     * ou non. Travaux, services, sous-traitance et financements se rejoignent
+     * donc sous « service » — aucun ne se stocke.
+     */
+    public function typeProduit(): string
+    {
+        return self::CORRESPONDANCE[$this->code] ?? 'service';
+    }
+
+    /**
+     * @var array<string, string>
+     */
+    private const CORRESPONDANCE = [
+        'MARCHANDISE'      => 'marchandise',
+        'PRODUIT_FINI'     => 'produit_fini',
+        'MATIERE_PREMIERE' => 'matiere_premiere',
+        'CONSOMMABLE'      => 'consommable_stockable',
+        'AUTRES_ACHATS'    => 'consommable_non_stockable',
+        'SERVICE'          => 'service',
+        'TRAVAUX'          => 'service',
+        'ACCESSOIRE'       => 'service',
+        'SOUS_TRAITANCE'   => 'service',
+        'FINANCEMENT'      => 'service',
+    ];
 }
