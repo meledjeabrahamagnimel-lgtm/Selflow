@@ -218,6 +218,13 @@ class ComptabiliteService
                 $libellePaiement, null, $compteClientGeneral, $compteClientTiers, 0, $montant, $descriptionProduits);
 
             $operation->cloturerEquilibre();
+
+            // Si l'encaissement eteint la creance, le lettrage se pose de
+            // lui-meme. Le demander en seconde manipulation reviendrait a ne
+            // jamais l'obtenir, et le compte client redeviendrait illisible en
+            // trois mois. Un reglement partiel ne lettre rien : le service s'en
+            // abstient plutot que de mal faire.
+            LettrageService::lettrerLaPiece($entrepriseId, $compteClientGeneral, $refDoc);
         });
     }
 
@@ -364,6 +371,10 @@ class ComptabiliteService
                 $libellePaiement, null, $compteFinancier, null, 0, $montant, $descriptionProduits);
 
             $operation->cloturerEquilibre();
+
+            // Symetrique du reglement client : si le decaissement eteint la
+            // dette, le lettrage se pose de lui-meme.
+            LettrageService::lettrerLaPiece($entrepriseId, $compteFournisseurGeneral, $refDoc);
         });
     }
 

@@ -607,7 +607,7 @@ pas. Aucun code du dépôt ne le fait plus, et le seul appelant qui le faisait a
 été corrigé. Une contrainte de base de données serait le cran suivant, si le
 besoin s'en fait sentir. Le test le constate au lieu de le passer sous silence.
 
-### Lot 4 — Les imputations — **EN COURS**
+### Lot 4 — Les imputations — **TERMINÉ**
 
 | Étape | État |
 |---|---|
@@ -815,7 +815,14 @@ la balance d'un mois de mars donnerait le solde *de mars* et non le solde du
 compte. Le premier jour de la période n'entre pas dans le report : il serait
 compté deux fois.
 
-- `tests/Feature/GrandLivreLettrageTest.php` — 21 tests.
+**Le lettrage se pose de lui-même au règlement.** Demander le rapprochement en
+seconde manipulation reviendrait à ne jamais l'obtenir, et le compte client
+redeviendrait illisible en trois mois. `LettrageService::lettrerLaPiece()` est
+appelé après chaque règlement, client comme fournisseur : si l'encaissement
+éteint la créance, il lettre ; sinon il **ne fait rien** plutôt que de mal faire.
+Un règlement partiel reste ouvert, et c'est le bon résultat — il reste dû.
+
+- `tests/Feature/GrandLivreLettrageTest.php` — 25 tests.
 
 ### Lot 5 — La passerelle Comptaflow — les deux dépôts
 

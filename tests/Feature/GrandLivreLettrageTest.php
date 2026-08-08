@@ -349,6 +349,52 @@ class GrandLivreLettrageTest extends TestCase
         $this->assertSame(['A', 'A'], array_column($clients['lignes'], 'lettrage'));
     }
 
+    // ══════════════ Le lettrage automatique au règlement ══════════════
+
+    public function test_un_reglement_qui_solde_lettre_de_lui_meme(): void
+    {
+        // Demander le rapprochement en seconde manipulation reviendrait a ne
+        // jamais l'obtenir, et le compte client redeviendrait illisible en
+        // trois mois.
+        $this->ecriture('2026-03-01', '411000', '701000', 100000, 'FAC-7');
+        $this->ecriture('2026-03-20', '571000', '411000', 100000, 'FAC-7');
+
+        $lettrage = LettrageService::lettrerLaPiece($this->entreprise->id, '411000', 'FAC-7');
+
+        $this->assertNotNull($lettrage);
+        $this->assertSame(0.0, LettrageService::resteDu($this->entreprise->id, '411000'));
+    }
+
+    public function test_un_reglement_partiel_ne_lettre_rien(): void
+    {
+        // C'est exactement le cas que `lettrer()` refuse, et il le refuse pour
+        // de bonnes raisons : il resterait 60 000 dus.
+        $this->ecriture('2026-03-01', '411000', '701000', 100000, 'FAC-8');
+        $this->ecriture('2026-03-20', '571000', '411000', 40000, 'FAC-8');
+
+        $this->assertNull(LettrageService::lettrerLaPiece($this->entreprise->id, '411000', 'FAC-8'));
+        $this->assertSame(60000.0, LettrageService::resteDu($this->entreprise->id, '411000'));
+    }
+
+    public function test_une_facture_seule_ne_lettre_rien(): void
+    {
+        $this->ecriture('2026-03-01', '411000', '701000', 100000, 'FAC-9');
+
+        $this->assertNull(LettrageService::lettrerLaPiece($this->entreprise->id, '411000', 'FAC-9'));
+    }
+
+    public function test_le_lettrage_automatique_ne_reprend_pas_ce_qui_est_deja_lettre(): void
+    {
+        $a = $this->ecriture('2026-03-01', '411000', '701000', 100000, 'FAC-10');
+        $b = $this->ecriture('2026-03-20', '571000', '411000', 100000, 'FAC-10');
+
+        $premier = LettrageService::lettrerLaPiece($this->entreprise->id, '411000', 'FAC-10');
+
+        $this->assertNotNull($premier);
+        $this->assertNull(LettrageService::lettrerLaPiece($this->entreprise->id, '411000', 'FAC-10'));
+        $this->assertSame(1, Lettrage::count());
+    }
+
     // ══════════════════════ Les écrans ══════════════════════
 
     public function test_l_ecran_du_grand_livre_repond(): void

@@ -117,6 +117,47 @@ class LettrageService
     }
 
     /**
+     * Lettrer d'office les écritures d'une pièce, si elles se soldent.
+     *
+     * Appelé après chaque règlement : quand l'encaissement éteint la créance,
+     * il n'y a aucune raison de demander à l'utilisateur de refaire le
+     * rapprochement à la main. Un lettrage qui demande une seconde manipulation
+     * ne se fait pas, et le compte client redevient illisible en trois mois.
+     *
+     * **Ne fait rien plutôt que de mal faire** : si les écritures de la pièce
+     * ne se soldent pas — règlement partiel, acompte —, on n'écrit rien et on
+     * laisse l'écran de lettrage à l'utilisateur. C'est exactement le cas que
+     * `lettrer()` refuse, et il le refuse pour de bonnes raisons.
+     *
+     * @return Lettrage|null le lettrage posé, ou `null` s'il n'y avait pas lieu
+     */
+    public static function lettrerLaPiece(int $entrepriseId, string $compte, string $reference): ?Lettrage
+    {
+        $ecritures = EcritureComptable::where('entreprise_id', $entrepriseId)
+            ->where('reference_document', $reference)
+            ->whereNull('lettrage_id')
+            ->where(fn ($q) => $q->where('compte_debit', $compte)->orWhere('compte_credit', $compte))
+            ->get();
+
+        if ($ecritures->count() < 2) {
+            return null;
+        }
+
+        if (abs(round(self::mouvementSurLeCompte($ecritures, $compte), 2)) > self::TOLERANCE) {
+            return null;
+        }
+
+        try {
+            return self::lettrer($entrepriseId, $compte, $ecritures->pluck('id')->all());
+        } catch (\InvalidArgumentException) {
+            // Une condition a changé entre la lecture et l'écriture — une autre
+            // session a lettré entre-temps. Le lettrage manuel reste possible ;
+            // faire échouer l'encaissement pour autant serait disproportionné.
+            return null;
+        }
+    }
+
+    /**
      * Défaire un lettrage.
      *
      * Les écritures redeviennent ouvertes ; le code n'est pas réattribué. Un
