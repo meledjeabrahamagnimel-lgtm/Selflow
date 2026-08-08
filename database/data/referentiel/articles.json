@@ -6,8 +6,8 @@
   "designation": "Riz sac 25 kg",
   "unite": "sac",
   "type_article": "MARCHANDISE",
-  "compte_vente": "701100",
-  "compte_achat": "601100",
+  "compte_vente": "701000",
+  "compte_achat": "601000",
   "compte_stock": "311000"
  },
  {
@@ -17,8 +17,8 @@
   "designation": "Huile végétale 5 L",
   "unite": "bidon",
   "type_article": "MARCHANDISE",
-  "compte_vente": "701100",
-  "compte_achat": "601100",
+  "compte_vente": "701000",
+  "compte_achat": "601000",
   "compte_stock": "311000"
  },
  {
@@ -28,8 +28,8 @@
   "designation": "Sucre 1 kg",
   "unite": "paquet",
   "type_article": "MARCHANDISE",
-  "compte_vente": "701100",
-  "compte_achat": "601100",
+  "compte_vente": "701000",
+  "compte_achat": "601000",
   "compte_stock": "311000"
  },
  {
@@ -39,8 +39,8 @@
   "designation": "Lait en poudre 400 g",
   "unite": "boîte",
   "type_article": "MARCHANDISE",
-  "compte_vente": "701100",
-  "compte_achat": "601100",
+  "compte_vente": "701000",
+  "compte_achat": "601000",
   "compte_stock": "311000"
  },
  {
@@ -50,8 +50,8 @@
   "designation": "Tomate concentrée 70 g",
   "unite": "boîte",
   "type_article": "MARCHANDISE",
-  "compte_vente": "701100",
-  "compte_achat": "601100",
+  "compte_vente": "701000",
+  "compte_achat": "601000",
   "compte_stock": "311000"
  },
  {
@@ -61,8 +61,8 @@
   "designation": "Spaghetti 500 g",
   "unite": "paquet",
   "type_article": "MARCHANDISE",
-  "compte_vente": "701100",
-  "compte_achat": "601100",
+  "compte_vente": "701000",
+  "compte_achat": "601000",
   "compte_stock": "311000"
  },
  {
@@ -72,8 +72,8 @@
   "designation": "Cube assaisonnement",
   "unite": "carton",
   "type_article": "MARCHANDISE",
-  "compte_vente": "701100",
-  "compte_achat": "601100",
+  "compte_vente": "701000",
+  "compte_achat": "601000",
   "compte_stock": "311000"
  },
  {
@@ -83,8 +83,8 @@
   "designation": "Eau minérale 1,5 L",
   "unite": "pack",
   "type_article": "MARCHANDISE",
-  "compte_vente": "701200",
-  "compte_achat": "601200",
+  "compte_vente": "701000",
+  "compte_achat": "601000",
   "compte_stock": "312000"
  },
  {
@@ -94,8 +94,8 @@
   "designation": "Sucrerie 30 cl",
   "unite": "casier",
   "type_article": "MARCHANDISE",
-  "compte_vente": "701200",
-  "compte_achat": "601200",
+  "compte_vente": "701000",
+  "compte_achat": "601000",
   "compte_stock": "312000"
  },
  {
@@ -105,8 +105,8 @@
   "designation": "Jus en canette",
   "unite": "carton",
   "type_article": "MARCHANDISE",
-  "compte_vente": "701200",
-  "compte_achat": "601200",
+  "compte_vente": "701000",
+  "compte_achat": "601000",
   "compte_stock": "312000"
  },
  {
@@ -116,8 +116,8 @@
   "designation": "Savon de ménage",
   "unite": "pièce",
   "type_article": "MARCHANDISE",
-  "compte_vente": "701300",
-  "compte_achat": "601300",
+  "compte_vente": "701000",
+  "compte_achat": "601000",
   "compte_stock": "313000"
  },
  {
@@ -127,8 +127,8 @@
   "designation": "Eau de javel 1 L",
   "unite": "bouteille",
   "type_article": "MARCHANDISE",
-  "compte_vente": "701300",
-  "compte_achat": "601300",
+  "compte_vente": "701000",
+  "compte_achat": "601000",
   "compte_stock": "313000"
  },
  {
@@ -138,8 +138,8 @@
   "designation": "Dentifrice",
   "unite": "pièce",
   "type_article": "MARCHANDISE",
-  "compte_vente": "701300",
-  "compte_achat": "601300",
+  "compte_vente": "701000",
+  "compte_achat": "601000",
   "compte_stock": "313000"
  },
  {
@@ -149,8 +149,8 @@
   "designation": "Couches bébé",
   "unite": "paquet",
   "type_article": "MARCHANDISE",
-  "compte_vente": "701300",
-  "compte_achat": "601300",
+  "compte_vente": "701000",
+  "compte_achat": "601000",
   "compte_stock": "313000"
  },
  {
@@ -160,8 +160,8 @@
   "designation": "Bougie",
   "unite": "paquet",
   "type_article": "MARCHANDISE",
-  "compte_vente": "701400",
-  "compte_achat": "601400",
+  "compte_vente": "701000",
+  "compte_achat": "601000",
   "compte_stock": "314000"
  },
  {
@@ -171,8 +171,8 @@
   "designation": "Pile",
   "unite": "paquet",
   "type_article": "MARCHANDISE",
-  "compte_vente": "701400",
-  "compte_achat": "601400",
+  "compte_vente": "701000",
+  "compte_achat": "601000",
   "compte_stock": "314000"
  },
  {
@@ -182,8 +182,8 @@
   "designation": "Recharge téléphonique",
   "unite": "carte",
   "type_article": "MARCHANDISE",
-  "compte_vente": "701400",
-  "compte_achat": "601400",
+  "compte_vente": "701000",
+  "compte_achat": "601000",
   "compte_stock": "314000"
  },
  {
@@ -193,8 +193,8 @@
   "designation": "Pagne wax 6 yards",
   "unite": "complet",
   "type_article": "MARCHANDISE",
-  "compte_vente": "701100",
-  "compte_achat": "601100",
+  "compte_vente": "701000",
+  "compte_achat": "601000",
   "compte_stock": "311000"
  },
  {
@@ -204,8 +204,8 @@
   "designation": "Pagne fancy 6 yards",
   "unite": "complet",
   "type_article": "MARCHANDISE",
-  "compte_vente": "701100",
-  "compte_achat": "601100",
+  "compte_vente": "701000",
+  "compte_achat": "601000",
   "compte_stock": "311000"
  },
  {
@@ -215,8 +215,8 @@
   "designation": "Bazin riche 5 m",
   "unite": "coupon",
   "type_article": "MARCHANDISE",
-  "compte_vente": "701100",
-  "compte_achat": "601100",
+  "compte_vente": "701000",
+  "compte_achat": "601000",
   "compte_stock": "311000"
  },
  {
@@ -226,8 +226,8 @@
   "designation": "Dentelle",
   "unite": "mètre",
   "type_article": "MARCHANDISE",
-  "compte_vente": "701100",
-  "compte_achat": "601100",
+  "compte_vente": "701000",
+  "compte_achat": "601000",
   "compte_stock": "311000"
  },
  {
@@ -237,8 +237,8 @@
   "designation": "Robe dame",
   "unite": "pièce",
   "type_article": "MARCHANDISE",
-  "compte_vente": "701200",
-  "compte_achat": "601200",
+  "compte_vente": "701000",
+  "compte_achat": "601000",
   "compte_stock": "312000"
  },
  {
@@ -248,8 +248,8 @@
   "designation": "Chemise homme",
   "unite": "pièce",
   "type_article": "MARCHANDISE",
-  "compte_vente": "701200",
-  "compte_achat": "601200",
+  "compte_vente": "701000",
+  "compte_achat": "601000",
   "compte_stock": "312000"
  },
  {
@@ -259,8 +259,8 @@
   "designation": "Jean",
   "unite": "pièce",
   "type_article": "MARCHANDISE",
-  "compte_vente": "701200",
-  "compte_achat": "601200",
+  "compte_vente": "701000",
+  "compte_achat": "601000",
   "compte_stock": "312000"
  },
  {
@@ -270,8 +270,8 @@
   "designation": "Tenue enfant",
   "unite": "pièce",
   "type_article": "MARCHANDISE",
-  "compte_vente": "701200",
-  "compte_achat": "601200",
+  "compte_vente": "701000",
+  "compte_achat": "601000",
   "compte_stock": "312000"
  },
  {
@@ -281,8 +281,8 @@
   "designation": "Foulard",
   "unite": "pièce",
   "type_article": "MARCHANDISE",
-  "compte_vente": "701300",
-  "compte_achat": "601300",
+  "compte_vente": "701000",
+  "compte_achat": "601000",
   "compte_stock": "313000"
  },
  {
@@ -292,8 +292,8 @@
   "designation": "Sac à main",
   "unite": "pièce",
   "type_article": "MARCHANDISE",
-  "compte_vente": "701300",
-  "compte_achat": "601300",
+  "compte_vente": "701000",
+  "compte_achat": "601000",
   "compte_stock": "313000"
  },
  {
@@ -303,8 +303,8 @@
   "designation": "Chaussures",
   "unite": "paire",
   "type_article": "MARCHANDISE",
-  "compte_vente": "701300",
-  "compte_achat": "601300",
+  "compte_vente": "701000",
+  "compte_achat": "601000",
   "compte_stock": "313000"
  },
  {
@@ -314,8 +314,8 @@
   "designation": "Balle jeans 45 kg",
   "unite": "balle",
   "type_article": "MARCHANDISE",
-  "compte_vente": "701100",
-  "compte_achat": "601100",
+  "compte_vente": "701000",
+  "compte_achat": "601000",
   "compte_stock": "311000"
  },
  {
@@ -325,8 +325,8 @@
   "designation": "Balle chemises 45 kg",
   "unite": "balle",
   "type_article": "MARCHANDISE",
-  "compte_vente": "701100",
-  "compte_achat": "601100",
+  "compte_vente": "701000",
+  "compte_achat": "601000",
   "compte_stock": "311000"
  },
  {
@@ -336,8 +336,8 @@
   "designation": "Balle robes 45 kg",
   "unite": "balle",
   "type_article": "MARCHANDISE",
-  "compte_vente": "701100",
-  "compte_achat": "601100",
+  "compte_vente": "701000",
+  "compte_achat": "601000",
   "compte_stock": "311000"
  },
  {
@@ -347,8 +347,8 @@
   "designation": "Balle chaussures",
   "unite": "balle",
   "type_article": "MARCHANDISE",
-  "compte_vente": "701100",
-  "compte_achat": "601100",
+  "compte_vente": "701000",
+  "compte_achat": "601000",
   "compte_stock": "311000"
  },
  {
@@ -358,8 +358,8 @@
   "designation": "Jean friperie",
   "unite": "pièce",
   "type_article": "MARCHANDISE",
-  "compte_vente": "701200",
-  "compte_achat": "601200",
+  "compte_vente": "701000",
+  "compte_achat": "601000",
   "compte_stock": "312000"
  },
  {
@@ -369,8 +369,8 @@
   "designation": "Chemise friperie",
   "unite": "pièce",
   "type_article": "MARCHANDISE",
-  "compte_vente": "701200",
-  "compte_achat": "601200",
+  "compte_vente": "701000",
+  "compte_achat": "601000",
   "compte_stock": "312000"
  },
  {
@@ -380,8 +380,8 @@
   "designation": "Robe friperie",
   "unite": "pièce",
   "type_article": "MARCHANDISE",
-  "compte_vente": "701200",
-  "compte_achat": "601200",
+  "compte_vente": "701000",
+  "compte_achat": "601000",
   "compte_stock": "312000"
  },
  {
@@ -391,8 +391,8 @@
   "designation": "Chaussures friperie",
   "unite": "paire",
   "type_article": "MARCHANDISE",
-  "compte_vente": "701200",
-  "compte_achat": "601200",
+  "compte_vente": "701000",
+  "compte_achat": "601000",
   "compte_stock": "312000"
  },
  {
@@ -402,8 +402,8 @@
   "designation": "Ciment sac 50 kg",
   "unite": "sac",
   "type_article": "MARCHANDISE",
-  "compte_vente": "701100",
-  "compte_achat": "601100",
+  "compte_vente": "701000",
+  "compte_achat": "601000",
   "compte_stock": "311000"
  },
  {
@@ -413,8 +413,8 @@
   "designation": "Fer à béton 8 mm",
   "unite": "barre",
   "type_article": "MARCHANDISE",
-  "compte_vente": "701100",
-  "compte_achat": "601100",
+  "compte_vente": "701000",
+  "compte_achat": "601000",
   "compte_stock": "311000"
  },
  {
@@ -424,8 +424,8 @@
   "designation": "Pointe",
   "unite": "kg",
   "type_article": "MARCHANDISE",
-  "compte_vente": "701100",
-  "compte_achat": "601100",
+  "compte_vente": "701000",
+  "compte_achat": "601000",
   "compte_stock": "311000"
  },
  {
@@ -435,8 +435,8 @@
   "designation": "Marteau",
   "unite": "pièce",
   "type_article": "MARCHANDISE",
-  "compte_vente": "701200",
-  "compte_achat": "601200",
+  "compte_vente": "701000",
+  "compte_achat": "601000",
   "compte_stock": "312000"
  },
  {
@@ -446,8 +446,8 @@
   "designation": "Pelle",
   "unite": "pièce",
   "type_article": "MARCHANDISE",
-  "compte_vente": "701200",
-  "compte_achat": "601200",
+  "compte_vente": "701000",
+  "compte_achat": "601000",
   "compte_stock": "312000"
  },
  {
@@ -457,8 +457,8 @@
   "designation": "Brouette",
   "unite": "pièce",
   "type_article": "MARCHANDISE",
-  "compte_vente": "701200",
-  "compte_achat": "601200",
+  "compte_vente": "701000",
+  "compte_achat": "601000",
   "compte_stock": "312000"
  },
  {
@@ -468,8 +468,8 @@
   "designation": "Tube PVC Ø100",
   "unite": "barre",
   "type_article": "MARCHANDISE",
-  "compte_vente": "701300",
-  "compte_achat": "601300",
+  "compte_vente": "701000",
+  "compte_achat": "601000",
   "compte_stock": "313000"
  },
  {
@@ -479,8 +479,8 @@
   "designation": "Robinet",
   "unite": "pièce",
   "type_article": "MARCHANDISE",
-  "compte_vente": "701300",
-  "compte_achat": "601300",
+  "compte_vente": "701000",
+  "compte_achat": "601000",
   "compte_stock": "313000"
  },
  {
@@ -490,8 +490,8 @@
   "designation": "Colle PVC",
   "unite": "pot",
   "type_article": "MARCHANDISE",
-  "compte_vente": "701300",
-  "compte_achat": "601300",
+  "compte_vente": "701000",
+  "compte_achat": "601000",
   "compte_stock": "313000"
  },
  {
@@ -501,8 +501,8 @@
   "designation": "Câble 2,5 mm² (rouleau)",
   "unite": "rouleau",
   "type_article": "MARCHANDISE",
-  "compte_vente": "701400",
-  "compte_achat": "601400",
+  "compte_vente": "701000",
+  "compte_achat": "601000",
   "compte_stock": "314000"
  },
  {
@@ -512,8 +512,8 @@
   "designation": "Interrupteur",
   "unite": "pièce",
   "type_article": "MARCHANDISE",
-  "compte_vente": "701400",
-  "compte_achat": "601400",
+  "compte_vente": "701000",
+  "compte_achat": "601000",
   "compte_stock": "314000"
  },
  {
@@ -523,8 +523,8 @@
   "designation": "Ampoule LED",
   "unite": "pièce",
   "type_article": "MARCHANDISE",
-  "compte_vente": "701400",
-  "compte_achat": "601400",
+  "compte_vente": "701000",
+  "compte_achat": "601000",
   "compte_stock": "314000"
  },
  {
@@ -534,8 +534,8 @@
   "designation": "Pneu moto",
   "unite": "pièce",
   "type_article": "MARCHANDISE",
-  "compte_vente": "701100",
-  "compte_achat": "601100",
+  "compte_vente": "701000",
+  "compte_achat": "601000",
   "compte_stock": "311000"
  },
  {
@@ -545,8 +545,8 @@
   "designation": "Bougie moto",
   "unite": "pièce",
   "type_article": "MARCHANDISE",
-  "compte_vente": "701100",
-  "compte_achat": "601100",
+  "compte_vente": "701000",
+  "compte_achat": "601000",
   "compte_stock": "311000"
  },
  {
@@ -556,8 +556,8 @@
   "designation": "Kit chaîne",
   "unite": "kit",
   "type_article": "MARCHANDISE",
-  "compte_vente": "701100",
-  "compte_achat": "601100",
+  "compte_vente": "701000",
+  "compte_achat": "601000",
   "compte_stock": "311000"
  },
  {
@@ -567,8 +567,8 @@
   "designation": "Filtre à huile",
   "unite": "pièce",
   "type_article": "MARCHANDISE",
-  "compte_vente": "701200",
-  "compte_achat": "601200",
+  "compte_vente": "701000",
+  "compte_achat": "601000",
   "compte_stock": "312000"
  },
  {
@@ -578,8 +578,8 @@
   "designation": "Plaquettes de frein",
   "unite": "jeu",
   "type_article": "MARCHANDISE",
-  "compte_vente": "701200",
-  "compte_achat": "601200",
+  "compte_vente": "701000",
+  "compte_achat": "601000",
   "compte_stock": "312000"
  },
  {
@@ -589,8 +589,8 @@
   "designation": "Batterie 12 V",
   "unite": "pièce",
   "type_article": "MARCHANDISE",
-  "compte_vente": "701200",
-  "compte_achat": "601200",
+  "compte_vente": "701000",
+  "compte_achat": "601000",
   "compte_stock": "312000"
  },
  {
@@ -600,8 +600,8 @@
   "designation": "Huile moteur 1 L",
   "unite": "bidon",
   "type_article": "MARCHANDISE",
-  "compte_vente": "701300",
-  "compte_achat": "601300",
+  "compte_vente": "701000",
+  "compte_achat": "601000",
   "compte_stock": "313000"
  },
  {
@@ -611,8 +611,8 @@
   "designation": "Liquide de frein",
   "unite": "bouteille",
   "type_article": "MARCHANDISE",
-  "compte_vente": "701300",
-  "compte_achat": "601300",
+  "compte_vente": "701000",
+  "compte_achat": "601000",
   "compte_stock": "313000"
  },
  {
@@ -622,8 +622,8 @@
   "designation": "Casier bière 65 cl",
   "unite": "casier",
   "type_article": "MARCHANDISE",
-  "compte_vente": "701100",
-  "compte_achat": "601100",
+  "compte_vente": "701000",
+  "compte_achat": "601000",
   "compte_stock": "311000"
  },
  {
@@ -633,8 +633,8 @@
   "designation": "Casier bière 33 cl",
   "unite": "casier",
   "type_article": "MARCHANDISE",
-  "compte_vente": "701100",
-  "compte_achat": "601100",
+  "compte_vente": "701000",
+  "compte_achat": "601000",
   "compte_stock": "311000"
  },
  {
@@ -644,8 +644,8 @@
   "designation": "Casier sucrerie 30 cl",
   "unite": "casier",
   "type_article": "MARCHANDISE",
-  "compte_vente": "701200",
-  "compte_achat": "601200",
+  "compte_vente": "701000",
+  "compte_achat": "601000",
   "compte_stock": "312000"
  },
  {
@@ -655,8 +655,8 @@
   "designation": "Pack eau 1,5 L",
   "unite": "pack",
   "type_article": "MARCHANDISE",
-  "compte_vente": "701200",
-  "compte_achat": "601200",
+  "compte_vente": "701000",
+  "compte_achat": "601000",
   "compte_stock": "312000"
  },
  {
@@ -666,8 +666,8 @@
   "designation": "Pack eau 0,5 L",
   "unite": "pack",
   "type_article": "MARCHANDISE",
-  "compte_vente": "701200",
-  "compte_achat": "601200",
+  "compte_vente": "701000",
+  "compte_achat": "601000",
   "compte_stock": "312000"
  },
  {
@@ -677,8 +677,8 @@
   "designation": "Smartphone entrée de gamme",
   "unite": "pièce",
   "type_article": "MARCHANDISE",
-  "compte_vente": "701100",
-  "compte_achat": "601100",
+  "compte_vente": "701000",
+  "compte_achat": "601000",
   "compte_stock": "311000"
  },
  {
@@ -688,8 +688,8 @@
   "designation": "Téléphone à touches",
   "unite": "pièce",
   "type_article": "MARCHANDISE",
-  "compte_vente": "701100",
-  "compte_achat": "601100",
+  "compte_vente": "701000",
+  "compte_achat": "601000",
   "compte_stock": "311000"
  },
  {
@@ -699,8 +699,8 @@
   "designation": "Smartphone occasion",
   "unite": "pièce",
   "type_article": "MARCHANDISE",
-  "compte_vente": "701100",
-  "compte_achat": "601100",
+  "compte_vente": "701000",
+  "compte_achat": "601000",
   "compte_stock": "311000"
  },
  {
@@ -710,8 +710,8 @@
   "designation": "Écouteurs",
   "unite": "pièce",
   "type_article": "MARCHANDISE",
-  "compte_vente": "701200",
-  "compte_achat": "601200",
+  "compte_vente": "701000",
+  "compte_achat": "601000",
   "compte_stock": "312000"
  },
  {
@@ -721,8 +721,8 @@
   "designation": "Chargeur",
   "unite": "pièce",
   "type_article": "MARCHANDISE",
-  "compte_vente": "701200",
-  "compte_achat": "601200",
+  "compte_vente": "701000",
+  "compte_achat": "601000",
   "compte_stock": "312000"
  },
  {
@@ -732,8 +732,8 @@
   "designation": "Coque",
   "unite": "pièce",
   "type_article": "MARCHANDISE",
-  "compte_vente": "701200",
-  "compte_achat": "601200",
+  "compte_vente": "701000",
+  "compte_achat": "601000",
   "compte_stock": "312000"
  },
  {
@@ -743,8 +743,8 @@
   "designation": "Carte mémoire 32 Go",
   "unite": "pièce",
   "type_article": "MARCHANDISE",
-  "compte_vente": "701200",
-  "compte_achat": "601200",
+  "compte_vente": "701000",
+  "compte_achat": "601000",
   "compte_stock": "312000"
  },
  {
@@ -754,8 +754,8 @@
   "designation": "Vitre de protection",
   "unite": "pièce",
   "type_article": "MARCHANDISE",
-  "compte_vente": "701200",
-  "compte_achat": "601200",
+  "compte_vente": "701000",
+  "compte_achat": "601000",
   "compte_stock": "312000"
  },
  {
@@ -787,8 +787,8 @@
   "designation": "Mèche synthétique",
   "unite": "paquet",
   "type_article": "MARCHANDISE",
-  "compte_vente": "701100",
-  "compte_achat": "601100",
+  "compte_vente": "701000",
+  "compte_achat": "601000",
   "compte_stock": "311000"
  },
  {
@@ -798,8 +798,8 @@
   "designation": "Tissage naturel",
   "unite": "paquet",
   "type_article": "MARCHANDISE",
-  "compte_vente": "701100",
-  "compte_achat": "601100",
+  "compte_vente": "701000",
+  "compte_achat": "601000",
   "compte_stock": "311000"
  },
  {
@@ -809,8 +809,8 @@
   "designation": "Perruque",
   "unite": "pièce",
   "type_article": "MARCHANDISE",
-  "compte_vente": "701100",
-  "compte_achat": "601100",
+  "compte_vente": "701000",
+  "compte_achat": "601000",
   "compte_stock": "311000"
  },
  {
@@ -820,8 +820,8 @@
   "designation": "Lait de toilette",
   "unite": "flacon",
   "type_article": "MARCHANDISE",
-  "compte_vente": "701200",
-  "compte_achat": "601200",
+  "compte_vente": "701000",
+  "compte_achat": "601000",
   "compte_stock": "312000"
  },
  {
@@ -831,8 +831,8 @@
   "designation": "Crème hydratante",
   "unite": "pot",
   "type_article": "MARCHANDISE",
-  "compte_vente": "701200",
-  "compte_achat": "601200",
+  "compte_vente": "701000",
+  "compte_achat": "601000",
   "compte_stock": "312000"
  },
  {
@@ -842,8 +842,8 @@
   "designation": "Parfum",
   "unite": "flacon",
   "type_article": "MARCHANDISE",
-  "compte_vente": "701200",
-  "compte_achat": "601200",
+  "compte_vente": "701000",
+  "compte_achat": "601000",
   "compte_stock": "312000"
  },
  {
@@ -853,8 +853,8 @@
   "designation": "Vernis à ongles",
   "unite": "flacon",
   "type_article": "MARCHANDISE",
-  "compte_vente": "701200",
-  "compte_achat": "601200",
+  "compte_vente": "701000",
+  "compte_achat": "601000",
   "compte_stock": "312000"
  },
  {
@@ -974,8 +974,8 @@
   "designation": "Recharge bouteille 6 kg",
   "unite": "recharge",
   "type_article": "MARCHANDISE",
-  "compte_vente": "701100",
-  "compte_achat": "601100",
+  "compte_vente": "701000",
+  "compte_achat": "601000",
   "compte_stock": "311000"
  },
  {
@@ -985,8 +985,8 @@
   "designation": "Recharge bouteille 12 kg",
   "unite": "recharge",
   "type_article": "MARCHANDISE",
-  "compte_vente": "701100",
-  "compte_achat": "601100",
+  "compte_vente": "701000",
+  "compte_achat": "601000",
   "compte_stock": "311000"
  },
  {
@@ -996,8 +996,8 @@
   "designation": "Bouteille neuve 6 kg",
   "unite": "pièce",
   "type_article": "MARCHANDISE",
-  "compte_vente": "701100",
-  "compte_achat": "601100",
+  "compte_vente": "701000",
+  "compte_achat": "601000",
   "compte_stock": "311000"
  },
  {
@@ -1007,8 +1007,8 @@
   "designation": "Détendeur",
   "unite": "pièce",
   "type_article": "MARCHANDISE",
-  "compte_vente": "701200",
-  "compte_achat": "601200",
+  "compte_vente": "701000",
+  "compte_achat": "601000",
   "compte_stock": "312000"
  },
  {
@@ -1018,8 +1018,8 @@
   "designation": "Tuyau de gaz",
   "unite": "mètre",
   "type_article": "MARCHANDISE",
-  "compte_vente": "701200",
-  "compte_achat": "601200",
+  "compte_vente": "701000",
+  "compte_achat": "601000",
   "compte_stock": "312000"
  },
  {
@@ -1029,8 +1029,8 @@
   "designation": "Brûleur",
   "unite": "pièce",
   "type_article": "MARCHANDISE",
-  "compte_vente": "701200",
-  "compte_achat": "601200",
+  "compte_vente": "701000",
+  "compte_achat": "601000",
   "compte_stock": "312000"
  },
  {
@@ -1095,7 +1095,7 @@
   "designation": "Livraison au marché",
   "unite": "course",
   "type_article": "ACCESSOIRE",
-  "compte_vente": "707000",
+  "compte_vente": "707100",
   "compte_achat": null,
   "compte_stock": null
  },
@@ -1150,7 +1150,7 @@
   "designation": "Livraison Abidjan",
   "unite": "course",
   "type_article": "ACCESSOIRE",
-  "compte_vente": "707000",
+  "compte_vente": "707100",
   "compte_achat": null,
   "compte_stock": null
  },
@@ -1161,7 +1161,7 @@
   "designation": "Livraison villes de l'intérieur",
   "unite": "course",
   "type_article": "ACCESSOIRE",
-  "compte_vente": "707000",
+  "compte_vente": "707100",
   "compte_achat": null,
   "compte_stock": null
  },
@@ -1216,7 +1216,7 @@
   "designation": "Commission sur vente tierce",
   "unite": "vente",
   "type_article": "ACCESSOIRE",
-  "compte_vente": "707100",
+  "compte_vente": "707200",
   "compte_achat": null,
   "compte_stock": null
  },
@@ -1227,7 +1227,7 @@
   "designation": "Livraison client",
   "unite": "course",
   "type_article": "ACCESSOIRE",
-  "compte_vente": "707200",
+  "compte_vente": "707100",
   "compte_achat": null,
   "compte_stock": null
  },
@@ -2019,7 +2019,7 @@
   "designation": "Livraison chantier",
   "unite": "voyage",
   "type_article": "ACCESSOIRE",
-  "compte_vente": "707000",
+  "compte_vente": "707100",
   "compte_achat": null,
   "compte_stock": null
  },
@@ -5187,7 +5187,7 @@
   "designation": "Frais d'inscription",
   "unite": "élève",
   "type_article": "SERVICE",
-  "compte_vente": "706100",
+  "compte_vente": "706000",
   "compte_achat": null,
   "compte_stock": null
  },
@@ -5198,7 +5198,7 @@
   "designation": "Scolarité mensuelle préscolaire",
   "unite": "mois",
   "type_article": "SERVICE",
-  "compte_vente": "706100",
+  "compte_vente": "706000",
   "compte_achat": null,
   "compte_stock": null
  },
@@ -5209,7 +5209,7 @@
   "designation": "Scolarité mensuelle primaire",
   "unite": "mois",
   "type_article": "SERVICE",
-  "compte_vente": "706100",
+  "compte_vente": "706000",
   "compte_achat": null,
   "compte_stock": null
  },
@@ -5220,7 +5220,7 @@
   "designation": "Frais d'examen (CEPE)",
   "unite": "élève",
   "type_article": "SERVICE",
-  "compte_vente": "706100",
+  "compte_vente": "706000",
   "compte_achat": null,
   "compte_stock": null
  },
@@ -5231,7 +5231,7 @@
   "designation": "Cantine",
   "unite": "mois",
   "type_article": "SERVICE",
-  "compte_vente": "706200",
+  "compte_vente": "706000",
   "compte_achat": null,
   "compte_stock": null
  },
@@ -5242,7 +5242,7 @@
   "designation": "Transport scolaire",
   "unite": "mois",
   "type_article": "SERVICE",
-  "compte_vente": "706200",
+  "compte_vente": "706000",
   "compte_achat": null,
   "compte_stock": null
  },
@@ -5253,7 +5253,7 @@
   "designation": "Cours de renforcement",
   "unite": "mois",
   "type_article": "SERVICE",
-  "compte_vente": "706200",
+  "compte_vente": "706000",
   "compte_achat": null,
   "compte_stock": null
  },
@@ -5264,7 +5264,7 @@
   "designation": "Garderie / étude du soir",
   "unite": "mois",
   "type_article": "SERVICE",
-  "compte_vente": "706200",
+  "compte_vente": "706000",
   "compte_achat": null,
   "compte_stock": null
  },
@@ -5341,7 +5341,7 @@
   "designation": "Frais d'inscription",
   "unite": "élève",
   "type_article": "SERVICE",
-  "compte_vente": "706100",
+  "compte_vente": "706000",
   "compte_achat": null,
   "compte_stock": null
  },
@@ -5352,7 +5352,7 @@
   "designation": "Scolarité mensuelle 1er cycle (6e-3e)",
   "unite": "mois",
   "type_article": "SERVICE",
-  "compte_vente": "706100",
+  "compte_vente": "706000",
   "compte_achat": null,
   "compte_stock": null
  },
@@ -5363,7 +5363,7 @@
   "designation": "Scolarité mensuelle 2nd cycle (2nde-Tle)",
   "unite": "mois",
   "type_article": "SERVICE",
-  "compte_vente": "706100",
+  "compte_vente": "706000",
   "compte_achat": null,
   "compte_stock": null
  },
@@ -5374,7 +5374,7 @@
   "designation": "Frais d'examen (BEPC / BAC)",
   "unite": "élève",
   "type_article": "SERVICE",
-  "compte_vente": "706100",
+  "compte_vente": "706000",
   "compte_achat": null,
   "compte_stock": null
  },
@@ -5385,7 +5385,7 @@
   "designation": "Cantine",
   "unite": "mois",
   "type_article": "SERVICE",
-  "compte_vente": "706200",
+  "compte_vente": "706000",
   "compte_achat": null,
   "compte_stock": null
  },
@@ -5396,7 +5396,7 @@
   "designation": "Transport scolaire",
   "unite": "mois",
   "type_article": "SERVICE",
-  "compte_vente": "706200",
+  "compte_vente": "706000",
   "compte_achat": null,
   "compte_stock": null
  },
@@ -5407,7 +5407,7 @@
   "designation": "Internat",
   "unite": "trimestre",
   "type_article": "SERVICE",
-  "compte_vente": "706200",
+  "compte_vente": "706000",
   "compte_achat": null,
   "compte_stock": null
  },
@@ -5869,7 +5869,7 @@
   "designation": "Consultation généraliste",
   "unite": "consultation",
   "type_article": "SERVICE",
-  "compte_vente": "706100",
+  "compte_vente": "706000",
   "compte_achat": null,
   "compte_stock": null
  },
@@ -5880,7 +5880,7 @@
   "designation": "Consultation spécialiste",
   "unite": "consultation",
   "type_article": "SERVICE",
-  "compte_vente": "706100",
+  "compte_vente": "706000",
   "compte_achat": null,
   "compte_stock": null
  },
@@ -5891,7 +5891,7 @@
   "designation": "Consultation prénatale",
   "unite": "consultation",
   "type_article": "SERVICE",
-  "compte_vente": "706100",
+  "compte_vente": "706000",
   "compte_achat": null,
   "compte_stock": null
  },
@@ -5902,7 +5902,7 @@
   "designation": "Soins infirmiers (injection, pansement)",
   "unite": "acte",
   "type_article": "SERVICE",
-  "compte_vente": "706200",
+  "compte_vente": "706000",
   "compte_achat": null,
   "compte_stock": null
  },
@@ -5913,7 +5913,7 @@
   "designation": "Accouchement",
   "unite": "acte",
   "type_article": "SERVICE",
-  "compte_vente": "706200",
+  "compte_vente": "706000",
   "compte_achat": null,
   "compte_stock": null
  },
@@ -5924,7 +5924,7 @@
   "designation": "Petite chirurgie",
   "unite": "acte",
   "type_article": "SERVICE",
-  "compte_vente": "706200",
+  "compte_vente": "706000",
   "compte_achat": null,
   "compte_stock": null
  },
@@ -5935,7 +5935,7 @@
   "designation": "Échographie",
   "unite": "examen",
   "type_article": "SERVICE",
-  "compte_vente": "706200",
+  "compte_vente": "706000",
   "compte_achat": null,
   "compte_stock": null
  },
@@ -5946,7 +5946,7 @@
   "designation": "Hospitalisation",
   "unite": "jour",
   "type_article": "SERVICE",
-  "compte_vente": "706200",
+  "compte_vente": "706000",
   "compte_achat": null,
   "compte_stock": null
  },
@@ -6122,8 +6122,8 @@
   "designation": "Médicaments spécialités",
   "unite": "boîte",
   "type_article": "MARCHANDISE",
-  "compte_vente": "701100",
-  "compte_achat": "601100",
+  "compte_vente": "701000",
+  "compte_achat": "601000",
   "compte_stock": "311000"
  },
  {
@@ -6133,8 +6133,8 @@
   "designation": "Médicaments génériques",
   "unite": "boîte",
   "type_article": "MARCHANDISE",
-  "compte_vente": "701100",
-  "compte_achat": "601100",
+  "compte_vente": "701000",
+  "compte_achat": "601000",
   "compte_stock": "311000"
  },
  {
@@ -6144,8 +6144,8 @@
   "designation": "Solutés et sirops",
   "unite": "flacon",
   "type_article": "MARCHANDISE",
-  "compte_vente": "701100",
-  "compte_achat": "601100",
+  "compte_vente": "701000",
+  "compte_achat": "601000",
   "compte_stock": "311000"
  },
  {
@@ -6155,8 +6155,8 @@
   "designation": "Lait infantile",
   "unite": "boîte",
   "type_article": "MARCHANDISE",
-  "compte_vente": "701200",
-  "compte_achat": "601200",
+  "compte_vente": "701000",
+  "compte_achat": "601000",
   "compte_stock": "312000"
  },
  {
@@ -6166,8 +6166,8 @@
   "designation": "Produits dermo-cosmétiques",
   "unite": "pièce",
   "type_article": "MARCHANDISE",
-  "compte_vente": "701200",
-  "compte_achat": "601200",
+  "compte_vente": "701000",
+  "compte_achat": "601000",
   "compte_stock": "312000"
  },
  {
@@ -6177,8 +6177,8 @@
   "designation": "Compléments alimentaires",
   "unite": "boîte",
   "type_article": "MARCHANDISE",
-  "compte_vente": "701200",
-  "compte_achat": "601200",
+  "compte_vente": "701000",
+  "compte_achat": "601000",
   "compte_stock": "312000"
  },
  {
@@ -6188,8 +6188,8 @@
   "designation": "Tensiomètre",
   "unite": "pièce",
   "type_article": "MARCHANDISE",
-  "compte_vente": "701300",
-  "compte_achat": "601300",
+  "compte_vente": "701000",
+  "compte_achat": "601000",
   "compte_stock": "313000"
  },
  {
@@ -6199,8 +6199,8 @@
   "designation": "Thermomètre",
   "unite": "pièce",
   "type_article": "MARCHANDISE",
-  "compte_vente": "701300",
-  "compte_achat": "601300",
+  "compte_vente": "701000",
+  "compte_achat": "601000",
   "compte_stock": "313000"
  },
  {
@@ -6210,8 +6210,8 @@
   "designation": "Pansements et bandages",
   "unite": "paquet",
   "type_article": "MARCHANDISE",
-  "compte_vente": "701300",
-  "compte_achat": "601300",
+  "compte_vente": "701000",
+  "compte_achat": "601000",
   "compte_stock": "313000"
  },
  {

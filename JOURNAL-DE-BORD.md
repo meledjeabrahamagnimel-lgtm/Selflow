@@ -6,7 +6,7 @@ et ce fichier. Tout ce qui a été décidé, tout ce qui a été écarté et pou
 tout ce qui reste à faire doit donc figurer ici — et y être tenu à jour à chaque
 lot terminé.
 
-Dernière mise à jour : 7 août 2026 — lot 1 entamé.
+Dernière mise à jour : 7 août 2026 — lot 1 en cours, numérotation tranchée.
 
 ---
 
@@ -125,6 +125,9 @@ Poussé sur **Selflow**. Ce qui est fait :
   illisible. `Compte::nommer()` résout un numéro absent par sa racine la plus
   longue.
 
+- La numérotation des comptes du référentiel **corrigée et alignée sur l'acte
+  uniforme** — voir la section 5 bis.
+
 Reste à faire dans ce lot :
 
 - Comptes, produits et journaux **par défaut de l'entreprise**, livrés avec
@@ -173,37 +176,46 @@ scénario de bout en bout par combinaison de modules.
 
 ---
 
-## 5 bis. Une question comptable à trancher
+## 5 bis. La numérotation des comptes — tranché
 
-**Le classeur subdivise les comptes sur des positions que SYSCOHADA réserve.**
+Le classeur subdivisait certaines racines sur des positions que l'acte uniforme
+réserve à un autre usage. Le relevé du plan OHADA a permis de distinguer trois
+situations, et deux seulement demandaient correction.
 
-L'acte uniforme définit `7011` à `7014` comme la ventilation *géographique* des
-ventes de marchandises :
+**Ce qui était juste et n'a pas bougé — les stocks.** Sur `31`, `32`, `33` et
+`36`, l'acte uniforme prescrit lui-même une ventilation par famille : `311`
+« Marchandises A », `312` « Marchandises B ». Le classeur y range Vivres,
+Boissons, Hygiène : c'est exactement l'usage prévu. Les comptes de variation
+`6031x` suivent les stocks, et `6031` n'a aucune subdivision prescrite.
 
-| Compte | Acte uniforme OHADA | Usage dans le classeur |
+**Ce qui était faux — les ventes et les achats.** Sur `701`, `702`, `705`, `706`,
+`601` et `602`, la quatrième position porte la ventilation *géographique* :
+
+| Compte | Acte uniforme | Le classeur y mettait |
 |---|---|---|
 | `7011` | Dans la Région | Vivres et alimentation |
 | `7012` | Hors Région | Boissons |
 | `7013` | Aux entreprises du groupe dans la Région | Hygiène et entretien |
-| `7014` | Aux entreprises du groupe hors Région | Divers |
+| `6011` | Achats dans la Région | Vivres et alimentation |
 
-Le classeur le sait — son « Lisez-moi » écrit que « ces subdivisions sont libres
-en SYSCOHADA ». C'est vrai des positions plus profondes, pas de celles-ci.
+Une entreprise ainsi paramétrée n'aurait plus pu produire la ventilation
+attendue par la liasse fiscale — celle que Comptaflow établit. **Décision : les
+ventes et les achats sont ramenés sur leur racine** (`701000`, `601000`,
+`706000`). Le grand livre porte la nature de l'opération ; le détail par famille
+reste dans Selflow, et l'analytique le portera jusqu'à Comptaflow. C'est aussi
+ce que font en pratique les entreprises ivoiriennes, qui imputent à plat sur
+`701`.
 
-Deux conséquences. Une entreprise qui ventile ses familles sur `7011`–`7014` ne
-pourra plus produire la ventilation géographique attendue par la liasse fiscale.
-Et Comptaflow, qui produit justement cette liasse, recevra des montants rangés
-sous des intitulés qui ne correspondent pas.
+**Ce qui était inversé — les produits accessoires.** Sur `707`, l'acte uniforme
+prescrit des natures, et le classeur les avait interverties :
 
-**Contournement en place :** le nom d'un compte de famille ne se lit plus sur son
-numéro mais se construit depuis le compte du *type d'article*. La famille
-« Vivres » affiche donc « Ventes de marchandises — Vivres et alimentation », et
-non « Dans la Région ». L'affichage est juste ; la numérotation reste à arbitrer.
+| Famille | Le classeur | Corrigé en | Acte uniforme |
+|---|---|---|---|
+| Livraison facturée | `7072` | `707100` | Ports, emballages perdus et autres frais facturés |
+| Commissions dépôt-vente | `7071` | `707200` | Commissions et courtages |
 
-**Option recommandée**, à valider avec votre expert-comptable : déplacer les
-familles sur `7010xx` — `701001`, `701002`… — qui n'est pas défini par l'acte
-uniforme, et laisser `7011`–`7014` à leur usage géographique. Le changement se
-fait dans le JSON du référentiel, avant toute mise en service.
+276 imputations corrigées au total, dans le JSON du référentiel. Trois tests
+verrouillent les trois situations.
 
 ---
 

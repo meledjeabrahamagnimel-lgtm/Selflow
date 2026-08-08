@@ -86,17 +86,49 @@ class ReferentielTest extends TestCase
         $this->assertSame('706000', $service->compte_vente);
     }
 
-    public function test_la_famille_subdivise_la_racine_de_son_type(): void
+    public function test_les_ventes_et_achats_ne_subdivisent_plus_la_racine(): void
     {
+        // L'acte uniforme reserve la quatrieme position de 701, 601 et 706 a la
+        // ventilation geographique — « Dans la Region », « Hors Region ». Le
+        // classeur y logeait des familles produit, ce qui aurait rendu la
+        // liasse fiscale fausse. Le detail par famille reste dans Selflow et
+        // dans l'analytique ; le grand livre porte la nature.
         $vivres = Famille::whereHas('profil', fn ($q) => $q->where('code', 'boutique_quartier'))
             ->where('code', 'VIV')
             ->firstOrFail();
 
         $this->assertSame('MARCHANDISE', $vivres->typeArticle->code);
-        // 7011 dans le classeur, donc 701100 ici : la subdivision du 701.
-        $this->assertSame('701100', $vivres->compte_vente);
-        $this->assertSame('601100', $vivres->compte_achat);
-        $this->assertStringStartsWith('701', $vivres->compte_vente);
+        $this->assertSame('701000', $vivres->compte_vente);
+        $this->assertSame('601000', $vivres->compte_achat);
+        $this->assertSame('Ventes de marchandises', Compte::nommer($vivres->compte_vente));
+    }
+
+    public function test_les_stocks_gardent_leur_ventilation_par_famille(): void
+    {
+        // Sur les stocks, l'acte uniforme prescrit justement une ventilation par
+        // famille : 311 « Marchandises A », 312 « Marchandises B ». Le classeur
+        // est ici dans son droit, et on n'y touche pas.
+        $boutique = fn (string $code) => Famille::whereHas('profil', fn ($q) => $q->where('code', 'boutique_quartier'))
+            ->where('code', $code)->firstOrFail();
+
+        $this->assertSame('311000', $boutique('VIV')->compte_stock);
+        $this->assertSame('312000', $boutique('BOI')->compte_stock);
+        $this->assertSame('603110', $boutique('VIV')->compte_variation);
+        $this->assertSame('603120', $boutique('BOI')->compte_variation);
+    }
+
+    public function test_les_produits_accessoires_suivent_leur_nature(): void
+    {
+        // Sur 707, l'acte uniforme prescrit des natures, pas de la geographie —
+        // et le classeur les avait interverties : la livraison facturee etait
+        // rangee en « Commissions et courtages », les commissions en « Ports ».
+        $parNom = fn (string $nom) => Famille::where('nom', $nom)->firstOrFail();
+
+        $this->assertSame('707100', $parNom('Livraison facturée')->compte_vente);
+        $this->assertStringContainsString('Ports', Compte::nommer('707100'));
+
+        $this->assertSame('707200', $parNom('Commissions dépôt-vente')->compte_vente);
+        $this->assertStringContainsString('Commissions', Compte::nommer('707200'));
     }
 
     public function test_l_article_herite_des_comptes_de_sa_famille(): void
@@ -166,7 +198,8 @@ class ReferentielTest extends TestCase
         }
 
         $utilises = $utilises->unique();
-        $this->assertGreaterThan(35, $utilises->count());
+        // L'aplatissement des ventes et achats a ramene 41 comptes distincts a 31.
+        $this->assertGreaterThan(25, $utilises->count());
 
         foreach ($utilises as $numero) {
             $this->assertNotNull(
@@ -188,19 +221,13 @@ class ReferentielTest extends TestCase
         );
     }
 
-    public function test_une_famille_ne_prend_pas_l_intitule_geographique_du_plan(): void
+    public function test_le_nom_d_un_compte_de_famille_reste_lisible(): void
     {
-        // Piege : le classeur subdivise `701` en `7011`, `7012`… pour ses
-        // familles, alors que l'acte uniforme reserve ces positions a la
-        // ventilation geographique des ventes. Lire l'intitule du numero de la
-        // famille donnerait « Dans la Region » sur les vivres d'une boutique.
-        $this->assertSame('Dans la Région [5]', Compte::nommer('701100'));
-
+        // Le grand livre porte la nature ; la famille la qualifie a l'affichage.
         $vivres = Famille::whereHas('profil', fn ($q) => $q->where('code', 'boutique_quartier'))
             ->where('code', 'VIV')
             ->firstOrFail();
 
-        $this->assertSame('701100', $vivres->compte_vente);
         $this->assertSame(
             'Ventes de marchandises — Vivres et alimentation',
             $vivres->intituleCompte('compte_vente')
