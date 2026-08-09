@@ -334,7 +334,7 @@ class StockControleur
         ]);
 
         $produit = Produit::findOrFail($request->produit_id);
-        abort_unless($produit->entreprise_id === Auth::user()->entreprise_id, 403);
+        abort_unless($produit->entreprise_id === Auth::user()->entreprise_id, 404);
 
         $pointDeVenteId = session('point_de_vente_actif_id') 
             ?? Auth::user()->point_de_vente_id;
@@ -400,7 +400,7 @@ class StockControleur
      */
     public function ficheReception(Achat $achat): View
     {
-        abort_unless($achat->pointDeVente->entreprise_id === Auth::user()->entreprise_id, 403);
+        abort_unless($achat->pointDeVente->entreprise_id === Auth::user()->entreprise_id, 404);
         $achat->load(['fournisseur', 'pointDeVente', 'details.produit']);
 
         return view('admin::stock.reception_fiche', compact('achat'));
@@ -411,7 +411,7 @@ class StockControleur
      */
     public function validerReception(Request $request, Achat $achat): \Illuminate\Http\RedirectResponse
     {
-        abort_unless($achat->pointDeVente->entreprise_id === Auth::user()->entreprise_id, 403);
+        abort_unless($achat->pointDeVente->entreprise_id === Auth::user()->entreprise_id, 404);
         
         $request->validate([
             'reception'   => ['required', 'array', 'min:1'],
@@ -502,7 +502,7 @@ class StockControleur
      */
     public function ficheLivraison(Vente $vente): View
     {
-        abort_unless($vente->pointDeVente->entreprise_id === Auth::user()->entreprise_id, 403);
+        abort_unless($vente->pointDeVente->entreprise_id === Auth::user()->entreprise_id, 404);
         $vente->load(['client', 'pointDeVente', 'details.produit']);
 
         return view('admin::stock.livraison_fiche', compact('vente'));
@@ -513,7 +513,7 @@ class StockControleur
      */
     public function validerLivraison(Request $request, Vente $vente): \Illuminate\Http\RedirectResponse
     {
-        abort_unless($vente->pointDeVente->entreprise_id === Auth::user()->entreprise_id, 403);
+        abort_unless($vente->pointDeVente->entreprise_id === Auth::user()->entreprise_id, 404);
 
         $request->validate([
             'livraison'   => ['required', 'array', 'min:1'],

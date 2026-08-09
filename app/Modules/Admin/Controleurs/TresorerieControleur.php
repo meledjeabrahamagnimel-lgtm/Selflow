@@ -168,7 +168,7 @@ class TresorerieControleur
 
     public function supprimerCodeJournal(CodeJournal $code): RedirectResponse
     {
-        abort_unless($code->entreprise_id === Auth::user()->entreprise_id, 403);
+        abort_unless($code->entreprise_id === Auth::user()->entreprise_id, 404);
         $code->delete();
         return redirect()->back()->with('succes', 'Code journal supprimé avec succès !');
     }

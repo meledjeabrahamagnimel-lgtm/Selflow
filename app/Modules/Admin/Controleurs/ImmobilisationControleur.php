@@ -102,7 +102,7 @@ class ImmobilisationControleur extends Controller
 
     public function fiche(Immobilisation $bien): View
     {
-        abort_unless($bien->entreprise_id === Auth::user()->entreprise_id, 403);
+        abort_unless($bien->entreprise_id === Auth::user()->entreprise_id, 404);
 
         $bien->load(['dotations', 'pointDeVente', 'fournisseur']);
 
@@ -111,7 +111,7 @@ class ImmobilisationControleur extends Controller
 
     public function modifier(Request $request, Immobilisation $bien): RedirectResponse
     {
-        abort_unless($bien->entreprise_id === Auth::user()->entreprise_id, 403);
+        abort_unless($bien->entreprise_id === Auth::user()->entreprise_id, 404);
 
         // Une fiche dont une dotation est passée ne se retouche plus : changer
         // la durée ou la valeur d'un bien à moitié amorti mettrait le plan en
@@ -136,7 +136,7 @@ class ImmobilisationControleur extends Controller
      */
     public function passerLaDotation(DotationAmortissement $dotation): RedirectResponse
     {
-        abort_unless($dotation->entreprise_id === Auth::user()->entreprise_id, 403);
+        abort_unless($dotation->entreprise_id === Auth::user()->entreprise_id, 404);
 
         if ($dotation->estComptabilisee()) {
             return back()->with('info', 'Cette dotation est déjà passée.');
@@ -168,7 +168,7 @@ class ImmobilisationControleur extends Controller
      */
     public function ceder(Request $request, Immobilisation $bien): RedirectResponse
     {
-        abort_unless($bien->entreprise_id === Auth::user()->entreprise_id, 403);
+        abort_unless($bien->entreprise_id === Auth::user()->entreprise_id, 404);
 
         $request->validate([
             'date_sortie'  => ['required', 'date'],

@@ -548,6 +548,11 @@ class AmortissementTest extends TestCase
 
     public function test_la_fiche_d_un_bien_d_une_autre_entreprise_est_fermee(): void
     {
+        // **404 et non 403.** Repondre « acces refuse » sur la piece d'un
+        // autre et « introuvable » sur une piece inexistante distingue les
+        // deux : les identifiants etant sequentiels, compter les 403
+        // donnait le volume de toute la plateforme. Ce qui n'est pas a
+        // vous n'existe pas pour vous.
         // Le parc immobilise dit ce qu'un concurrent possede et ce qu'il l'a
         // paye : c'est une information commerciale.
         $this->connecte();
@@ -562,12 +567,12 @@ class AmortissementTest extends TestCase
         ]);
         AmortissementService::etablirLePlan($sonBien);
 
-        $this->get(route('admin.immobilisations.fiche', $sonBien))->assertForbidden();
+        $this->get(route('admin.immobilisations.fiche', $sonBien))->assertNotFound();
         $this->post(route('admin.immobilisations.ceder', $sonBien), [
             'date_sortie' => '2026-12-31', 'prix_cession' => 1,
-        ])->assertForbidden();
+        ])->assertNotFound();
         $this->post(route('admin.immobilisations.dotation', $sonBien->dotations()->first()))
-            ->assertForbidden();
+            ->assertNotFound();
 
         $this->assertSame(Immobilisation::EN_SERVICE, $sonBien->fresh()->statut);
         $this->assertNull($sonBien->dotations()->first()->comptabilise_at);

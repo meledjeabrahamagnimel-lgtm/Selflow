@@ -588,7 +588,7 @@ class VenteControleur
     {
         abort_unless(
             $vente->pointDeVente->entreprise_id === Auth::user()->entreprise_id,
-            403
+            404
         );
 
         $vendeur = $vente->utilisateur;
@@ -606,7 +606,7 @@ class VenteControleur
     {
         abort_unless(
             $vente->pointDeVente->entreprise_id === Auth::user()->entreprise_id,
-            403
+            404
         );
 
         $vendeur = $vente->utilisateur;
@@ -628,7 +628,7 @@ class VenteControleur
     {
         abort_unless(
             $vente->pointDeVente->entreprise_id === Auth::user()->entreprise_id,
-            403
+            404
         );
 
         if ($vente->normalise) {
@@ -658,7 +658,7 @@ class VenteControleur
     {
         abort_unless(
             $vente->pointDeVente->entreprise_id === Auth::user()->entreprise_id,
-            403
+            404
         );
 
         if ($vente->normalise) {
@@ -1010,7 +1010,7 @@ class VenteControleur
      */
     public function accepterOffre(Request $request, Vente $vente): RedirectResponse
     {
-        abort_unless($vente->pointDeVente->entreprise_id === Auth::user()->entreprise_id, 403);
+        abort_unless($vente->pointDeVente->entreprise_id === Auth::user()->entreprise_id, 404);
         abort_unless($vente->estUneOffre(), 403);
 
         $request->validate([
@@ -1051,7 +1051,7 @@ class VenteControleur
      */
     public function prolongerOffre(Request $request, Vente $vente): RedirectResponse
     {
-        abort_unless($vente->pointDeVente->entreprise_id === Auth::user()->entreprise_id, 403);
+        abort_unless($vente->pointDeVente->entreprise_id === Auth::user()->entreprise_id, 404);
         abort_unless($vente->estUneOffre(), 403);
 
         $request->validate([
@@ -1073,7 +1073,7 @@ class VenteControleur
 
     public function confirmerCommande(Vente $vente): RedirectResponse
     {
-        abort_unless($vente->pointDeVente->entreprise_id === Auth::user()->entreprise_id, 403);
+        abort_unless($vente->pointDeVente->entreprise_id === Auth::user()->entreprise_id, 404);
         if ($vente->etape !== 'Devis') {
             return back()->with('info', 'Le document n\'est pas à l\'étape Devis.');
         }
@@ -1089,7 +1089,7 @@ class VenteControleur
 
     public function facturer(Vente $vente): RedirectResponse
     {
-        abort_unless($vente->pointDeVente->entreprise_id === Auth::user()->entreprise_id, 403);
+        abort_unless($vente->pointDeVente->entreprise_id === Auth::user()->entreprise_id, 404);
         if ($vente->etape === 'Facture') {
             return back()->with('info', 'Cette facture est déjà validée.');
         }
@@ -1179,7 +1179,7 @@ class VenteControleur
      */
     public function creerAvoir(Request $request, Vente $vente): RedirectResponse
     {
-        abort_unless($vente->pointDeVente->entreprise_id === Auth::user()->entreprise_id, 403);
+        abort_unless($vente->pointDeVente->entreprise_id === Auth::user()->entreprise_id, 404);
         abort_if($vente->type_facture === 'avoir', 400, "Impossible de générer un avoir sur une facture d'avoir.");
 
         $request->validate([
@@ -1292,7 +1292,7 @@ class VenteControleur
         // facture d'une autre entreprise en changeant l'identifiant dans l'URL.
         abort_unless(
             $vente->pointDeVente->entreprise_id === Auth::user()->entreprise_id,
-            403
+            404
         );
 
         if ($vente->normalise) {
@@ -1319,7 +1319,7 @@ class VenteControleur
      */
     public function envoyer(Vente $vente): RedirectResponse
     {
-        abort_unless($vente->pointDeVente->entreprise_id === Auth::user()->entreprise_id, 403);
+        abort_unless($vente->pointDeVente->entreprise_id === Auth::user()->entreprise_id, 404);
         abort_unless(in_array($vente->etape, ['Devis', 'Bon de commande']), 403);
 
         $vente->update(['statut' => 'Envoyé']);
@@ -1333,7 +1333,7 @@ class VenteControleur
      */
     public function convertirEnCommande(Vente $vente): RedirectResponse
     {
-        abort_unless($vente->pointDeVente->entreprise_id === Auth::user()->entreprise_id, 403);
+        abort_unless($vente->pointDeVente->entreprise_id === Auth::user()->entreprise_id, 404);
         if ($vente->etape !== 'Devis') {
             return back()->with('erreur', 'Ce document n\'est pas un devis.');
         }
@@ -1393,7 +1393,7 @@ class VenteControleur
      */
     public function convertirEnFacture(Vente $vente): RedirectResponse
     {
-        abort_unless($vente->pointDeVente->entreprise_id === Auth::user()->entreprise_id, 403);
+        abort_unless($vente->pointDeVente->entreprise_id === Auth::user()->entreprise_id, 404);
         if ($vente->etape !== 'Bon de commande') {
             return back()->with('erreur', 'Ce document n\'est pas un bon de commande.');
         }
@@ -1467,7 +1467,7 @@ class VenteControleur
      */
     public function convertirPiece(Vente $vente): RedirectResponse
     {
-        abort_unless($vente->pointDeVente->entreprise_id === Auth::user()->entreprise_id, 403);
+        abort_unless($vente->pointDeVente->entreprise_id === Auth::user()->entreprise_id, 404);
 
         if ($vente->type_facture === 'avoir') {
             return back()->with('erreur', 'Un avoir ne peut pas être converti.');
@@ -1548,7 +1548,7 @@ class VenteControleur
      */
     public function supprimer(Vente $vente): RedirectResponse
     {
-        abort_unless($vente->pointDeVente->entreprise_id === Auth::user()->entreprise_id, 403);
+        abort_unless($vente->pointDeVente->entreprise_id === Auth::user()->entreprise_id, 404);
         abort_if($vente->type_facture === 'avoir', 403, "Impossible de supprimer une facture d'avoir.");
         abort_unless($vente->archived, 403, 'Seuls les documents archivés peuvent être supprimés.');
 
@@ -1612,7 +1612,7 @@ class VenteControleur
 
     public function detailsFacturePourAvoir(Vente $vente): \Illuminate\Http\JsonResponse
     {
-        abort_unless($vente->pointDeVente->entreprise_id === Auth::user()->entreprise_id, 403);
+        abort_unless($vente->pointDeVente->entreprise_id === Auth::user()->entreprise_id, 404);
         $vente->load(['details.produit', 'client']);
 
         // Une facture peut recevoir plusieurs avoirs successifs : la modale
@@ -1778,7 +1778,7 @@ class VenteControleur
         ]);
 
         $parent = Vente::findOrFail($request->parent_id);
-        abort_unless($parent->pointDeVente->entreprise_id === Auth::user()->entreprise_id, 403);
+        abort_unless($parent->pointDeVente->entreprise_id === Auth::user()->entreprise_id, 404);
         abort_if($parent->type_facture === 'avoir', 400, "Impossible de générer un avoir sur une facture d'avoir.");
 
         // Plusieurs avoirs peuvent se succéder sur une même facture, mais leur

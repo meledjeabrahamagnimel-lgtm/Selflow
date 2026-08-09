@@ -121,7 +121,7 @@ class FournisseurControleur
     public function modifier(Request $request, Fournisseur $fournisseur): RedirectResponse
     {
         $entreprise = Auth::user()->entreprise;
-        abort_unless($fournisseur->entreprise_id === $entreprise->id, 403);
+        abort_unless($fournisseur->entreprise_id === $entreprise->id, 404);
 
         if ($fournisseur->source === 'comptaflow') {
             // Normaliser le NCC en entrée
@@ -190,7 +190,7 @@ class FournisseurControleur
     public function supprimer(Request $request, Fournisseur $fournisseur): RedirectResponse
     {
         $entreprise = Auth::user()->entreprise;
-        abort_unless($fournisseur->entreprise_id === $entreprise->id, 403);
+        abort_unless($fournisseur->entreprise_id === $entreprise->id, 404);
 
         if ($fournisseur->achats()->exists()) {
             return back()->with('erreur', 'Impossible de supprimer ce fournisseur : il est lié à des achats enregistrés.');

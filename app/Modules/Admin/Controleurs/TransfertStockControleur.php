@@ -60,7 +60,7 @@ class TransfertStockControleur
         ]);
 
         $produit = Produit::findOrFail($request->produit_id);
-        abort_unless($produit->entreprise_id === Auth::user()->entreprise_id, 403);
+        abort_unless($produit->entreprise_id === Auth::user()->entreprise_id, 404);
 
         $sourceId = $request->point_de_vente_source_id;
         $destId   = $request->point_de_vente_destination_id;
@@ -133,7 +133,7 @@ class TransfertStockControleur
     public function valider(TransfertStock $transfert): RedirectResponse
     {
         abort_unless(Auth::user()->role === 'admin', 403);
-        abort_unless($transfert->produit->entreprise_id === Auth::user()->entreprise_id, 403);
+        abort_unless($transfert->produit->entreprise_id === Auth::user()->entreprise_id, 404);
 
         if ($transfert->statut !== 'en_attente') {
             return back()->with('erreur', 'Ce transfert a déjà été traité.');
@@ -185,7 +185,7 @@ class TransfertStockControleur
     public function rejeter(TransfertStock $transfert): RedirectResponse
     {
         abort_unless(Auth::user()->role === 'admin', 403);
-        abort_unless($transfert->produit->entreprise_id === Auth::user()->entreprise_id, 403);
+        abort_unless($transfert->produit->entreprise_id === Auth::user()->entreprise_id, 404);
 
         if ($transfert->statut !== 'en_attente') {
             return back()->with('erreur', 'Ce transfert a déjà été traité.');

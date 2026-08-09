@@ -554,6 +554,11 @@ class DevisOpposableTest extends TestCase
 
     public function test_le_devis_d_une_autre_entreprise_ne_s_accepte_pas(): void
     {
+        // **404 et non 403.** Repondre « acces refuse » sur la piece d'un
+        // autre et « introuvable » sur une piece inexistante distingue les
+        // deux : les identifiants etant sequentiels, compter les 403
+        // donnait le volume de toute la plateforme. Ce qui n'est pas a
+        // vous n'existe pas pour vous.
         $autre = Entreprise::create(['nom' => 'Quincaillerie rivale']);
         $sonMagasin = PointDeVente::create([
             'entreprise_id' => $autre->id,
@@ -570,10 +575,10 @@ class DevisOpposableTest extends TestCase
             'statut'            => 'Brouillon', 'etape' => 'Devis',
         ]);
 
-        $this->post(route('admin.ventes.accepter', $sonDevis))->assertForbidden();
+        $this->post(route('admin.ventes.accepter', $sonDevis))->assertNotFound();
         $this->post(route('admin.ventes.prolonger', $sonDevis), [
             'date_validite' => now()->addYear()->toDateString(),
-        ])->assertForbidden();
+        ])->assertNotFound();
 
         $this->assertNull($sonDevis->fresh()->date_acceptation);
         $this->assertSame(now()->addDays(10)->toDateString(),

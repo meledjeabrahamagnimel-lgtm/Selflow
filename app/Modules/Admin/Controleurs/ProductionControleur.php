@@ -168,7 +168,7 @@ class ProductionControleur extends Controller
     public function modifierFicheTechnique(FicheTechnique $fiche): View
     {
         $entrepriseId = Auth::user()->entreprise_id;
-        abort_unless($fiche->entreprise_id === $entrepriseId, 403);
+        abort_unless($fiche->entreprise_id === $entrepriseId, 404);
 
         $fiche->load(['details.ingredient', 'produitFini']);
 
@@ -195,7 +195,7 @@ class ProductionControleur extends Controller
     public function enregistrerModificationFicheTechnique(Request $request, FicheTechnique $fiche): RedirectResponse
     {
         $entrepriseId = Auth::user()->entreprise_id;
-        abort_unless($fiche->entreprise_id === $entrepriseId, 403);
+        abort_unless($fiche->entreprise_id === $entrepriseId, 404);
 
         $request->validate([
             'description' => ['nullable', 'string'],
@@ -232,7 +232,7 @@ class ProductionControleur extends Controller
      */
     public function supprimerFicheTechnique(FicheTechnique $fiche): RedirectResponse
     {
-        abort_unless($fiche->entreprise_id === Auth::user()->entreprise_id, 403);
+        abort_unless($fiche->entreprise_id === Auth::user()->entreprise_id, 404);
         $fiche->delete();
 
         return redirect()->route('admin.production.fiches_techniques.index')
@@ -320,7 +320,7 @@ class ProductionControleur extends Controller
     public function validerOrdre(OrdreProduction $ordre): RedirectResponse
     {
         $entrepriseId = Auth::user()->entreprise_id;
-        abort_unless($ordre->entreprise_id === $entrepriseId, 403);
+        abort_unless($ordre->entreprise_id === $entrepriseId, 404);
 
         if ($ordre->statut === 'Terminé') {
             return back()->with('info', 'Cet ordre de production est déjà terminé.');

@@ -52,7 +52,7 @@ class BonLivraisonControleur extends Controller
         $entreprise = Auth::user()->entreprise;
 
         // Sécurité : le BC doit appartenir à l'entreprise
-        abort_unless($vente->pointDeVente->entreprise_id === $entreprise->id, 403);
+        abort_unless($vente->pointDeVente->entreprise_id === $entreprise->id, 404);
 
         // Seulement si c'est bien un Bon de Commande sans BL existant
         if ($vente->etape !== 'Bon de commande') {
@@ -106,7 +106,7 @@ class BonLivraisonControleur extends Controller
     public function enregistrer(Request $request, Vente $vente): RedirectResponse
     {
         $entreprise = Auth::user()->entreprise;
-        abort_unless($vente->pointDeVente->entreprise_id === $entreprise->id, 403);
+        abort_unless($vente->pointDeVente->entreprise_id === $entreprise->id, 404);
 
         if ($vente->etape !== 'Bon de commande') {
             return back()->with('erreur', 'Ce document n\'est pas un bon de commande.');
@@ -257,7 +257,7 @@ class BonLivraisonControleur extends Controller
     public function imprimer(BonLivraison $bl): View
     {
         $entreprise = Auth::user()->entreprise;
-        abort_unless($bl->pointDeVente->entreprise_id === $entreprise->id, 403);
+        abort_unless($bl->pointDeVente->entreprise_id === $entreprise->id, 404);
 
         $bl->load(['details.produit', 'bonDeCommande.utilisateur', 'facture', 'client', 'pointDeVente']);
 
@@ -277,7 +277,7 @@ class BonLivraisonControleur extends Controller
     public function marquerLivre(BonLivraison $bl): RedirectResponse
     {
         $entreprise = Auth::user()->entreprise;
-        abort_unless($bl->pointDeVente->entreprise_id === $entreprise->id, 403);
+        abort_unless($bl->pointDeVente->entreprise_id === $entreprise->id, 404);
 
         if ($bl->statut === 'facture') {
             return back()->with('info', 'Ce BL est déjà facturé.');
@@ -303,7 +303,7 @@ class BonLivraisonControleur extends Controller
     public function convertirEnFacture(Request $request, BonLivraison $bl): RedirectResponse
     {
         $entreprise = Auth::user()->entreprise;
-        abort_unless($bl->pointDeVente->entreprise_id === $entreprise->id, 403);
+        abort_unless($bl->pointDeVente->entreprise_id === $entreprise->id, 404);
 
         if ($bl->statut === 'facture') {
             return back()->with('erreur', 'Ce BL est déjà facturé.');

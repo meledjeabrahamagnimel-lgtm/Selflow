@@ -703,7 +703,7 @@ class ComptabiliteControleur
      */
     public function delettrer(\App\Modules\Admin\Modeles\Lettrage $lettrage): RedirectResponse
     {
-        abort_unless($lettrage->entreprise_id === Auth::user()->entreprise_id, 403);
+        abort_unless($lettrage->entreprise_id === Auth::user()->entreprise_id, 404);
 
         $nombre = LettrageService::delettrer($lettrage);
 

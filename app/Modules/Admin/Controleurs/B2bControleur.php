@@ -475,7 +475,7 @@ class B2bControleur extends Controller
     public function accepterAchatB2b(Achat $achat): RedirectResponse
     {
         $entrepriseId = Auth::user()->entreprise_id;
-        abort_unless($achat->pointDeVente->entreprise_id === $entrepriseId, 403);
+        abort_unless($achat->pointDeVente->entreprise_id === $entrepriseId, 404);
 
         if ($achat->statut !== 'En attente B2B') {
             return back()->with('info', 'Cet achat B2B a déjà été comptabilisé.');

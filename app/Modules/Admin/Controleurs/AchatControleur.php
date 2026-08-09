@@ -551,7 +551,7 @@ class AchatControleur
         $entrepriseId = Auth::user()->entreprise_id;
         abort_unless(
             $achat->pointDeVente->entreprise_id === $entrepriseId,
-            403,
+            404,
             'Accès non autorisé.'
         );
     }

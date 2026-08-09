@@ -424,6 +424,11 @@ class GrandLivreLettrageTest extends TestCase
 
     public function test_on_ne_defait_pas_le_lettrage_d_une_autre_entreprise(): void
     {
+        // **404 et non 403.** Repondre « acces refuse » sur la piece d'un
+        // autre et « introuvable » sur une piece inexistante distingue les
+        // deux : les identifiants etant sequentiels, compter les 403
+        // donnait le volume de toute la plateforme. Ce qui n'est pas a
+        // vous n'existe pas pour vous.
         $voisine = Entreprise::create(['nom' => 'Coopérative du Bandama']);
         $etranger = Lettrage::create([
             'entreprise_id' => $voisine->id, 'code' => 'A',
@@ -432,7 +437,7 @@ class GrandLivreLettrageTest extends TestCase
 
         $this->actingAs($this->admin)
             ->delete(route('admin.comptabilite.delettrer', $etranger))
-            ->assertForbidden();
+            ->assertNotFound();
 
         $this->assertNotNull($etranger->fresh());
     }

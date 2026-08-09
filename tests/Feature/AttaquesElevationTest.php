@@ -176,6 +176,11 @@ class AttaquesElevationTest extends TestCase
 
     public function test_un_admin_ne_peut_pas_modifier_l_employe_d_une_autre_entreprise(): void
     {
+        // **404 et non 403.** Repondre « acces refuse » sur la piece d'un
+        // autre et « introuvable » sur une piece inexistante distingue les
+        // deux : les identifiants etant sequentiels, compter les 403
+        // donnait le volume de toute la plateforme. Ce qui n'est pas a
+        // vous n'existe pas pour vous.
         $voisine = Entreprise::create(['nom' => 'Coopérative du Bandama']);
         $etranger = Utilisateur::create([
             'nom' => 'A', 'prenom' => 'B', 'email' => 'voisin@exemple.ci',
@@ -187,7 +192,7 @@ class AttaquesElevationTest extends TestCase
             ->put(route('admin.personnel.modifier', $etranger), [
                 'nom' => 'Détourné', 'prenom' => 'B', 'email' => 'voisin@exemple.ci',
                 'role' => 'admin',
-            ])->assertForbidden();
+            ])->assertNotFound();
 
         $this->assertSame('caissier', $etranger->fresh()->role);
         $this->assertSame('A', $etranger->fresh()->nom);

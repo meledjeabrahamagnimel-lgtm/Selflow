@@ -110,7 +110,7 @@ class ConsignationControleur extends Controller
 
     public function rendre(Request $request, Consignation $consignation): RedirectResponse
     {
-        abort_unless($consignation->entreprise_id === Auth::user()->entreprise_id, 403);
+        abort_unless($consignation->entreprise_id === Auth::user()->entreprise_id, 404);
 
         $request->validate([
             'quantite'         => Quantite::physique(),
@@ -141,7 +141,7 @@ class ConsignationControleur extends Controller
      */
     public function constaterLeNonRetour(Request $request, Consignation $consignation): RedirectResponse
     {
-        abort_unless($consignation->entreprise_id === Auth::user()->entreprise_id, 403);
+        abort_unless($consignation->entreprise_id === Auth::user()->entreprise_id, 404);
 
         $request->validate(['date' => ['nullable', 'date']]);
 

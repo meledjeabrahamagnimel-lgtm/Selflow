@@ -228,7 +228,7 @@ class EntrepriseControleur
     public function cloturerPeriode(\App\Modules\Admin\Modeles\Periode $periode): RedirectResponse
     {
         $entreprise = Auth::user()->entreprise;
-        abort_unless($periode->entreprise_id === $entreprise->id, 403);
+        abort_unless($periode->entreprise_id === $entreprise->id, 404);
 
         // Si la période à clôturer est la période active en session, on la retire
         if (session('active_periode_id') == $periode->id) {

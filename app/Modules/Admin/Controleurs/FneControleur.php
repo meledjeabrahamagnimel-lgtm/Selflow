@@ -105,7 +105,7 @@ class FneControleur
         // ID doit appartenir à l'entreprise de l'utilisateur connecté — même
         // règle que partout ailleurs dans l'application (voir MEMOIRE-SELFLOW,
         // section 3, "Sécurité multi-tenant (IDOR)").
-        abort_unless($vente->pointDeVente->entreprise_id === Auth::user()->entreprise_id, 403);
+        abort_unless($vente->pointDeVente->entreprise_id === Auth::user()->entreprise_id, 404);
 
         $request->validate([
             'numero_fne' => 'required|string|min:5|max:100',
@@ -126,7 +126,7 @@ class FneControleur
     public function attacherFneAchat(Request $request, Achat $achat): JsonResponse
     {
         // Sécurité (faille corrigée le 23/07/2026) : même règle que ci-dessus.
-        abort_unless($achat->pointDeVente->entreprise_id === Auth::user()->entreprise_id, 403);
+        abort_unless($achat->pointDeVente->entreprise_id === Auth::user()->entreprise_id, 404);
 
         $request->validate([
             'numero_fne' => 'required|string|min:5|max:100',

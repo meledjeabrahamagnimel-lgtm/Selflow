@@ -1275,6 +1275,63 @@ n'est pas arrêté.
 - `App\Providers\LimitesDeDebit`
 - `tests/Feature/LimitesDeDebitTest.php` — 15 tests.
 
+#### Lot 8.3 — L'oracle de volume — **TERMINÉ pour le 404 ; les identifiants opaques restent à faire**
+
+**Le cloisonnement tenait.** Les soixante-cinq gardes d'appartenance faisaient
+leur travail, et aucune donnée d'autrui n'était rendue — l'audit statique n'a
+relevé que des faux positifs, `AchatControleur` passant par un helper partagé
+que la recherche ne reconnaissait pas, et les routes `superadmin.` agissant sur
+toutes les entreprises par construction.
+
+**Mais ces gardes répondaient 403 là où une pièce inexistante répond 404**, et
+la différence se lit. Les identifiants étant séquentiels, il suffisait de
+demander `/admin/ventes/facture/1`, `/2`, `/3` … et de compter les 403 pour
+connaître **le nombre de factures de toute la plateforme** — puis, en
+recommençant une semaine plus tard, son rythme de croissance. Ce n'était pas une
+faille d'autorisation, c'était une **fuite de volume** ; et pour une plateforme
+vendue à des entreprises concurrentes, le volume est une information
+commerciale.
+
+Soixante-cinq gardes converties, dans dix-huit contrôleurs. Une pièce qui n'est
+pas la vôtre répond désormais comme tout ce qui n'existe pas.
+
+**Le 404 vaut pour l'appartenance, non pour le droit.** Dire à un caissier
+« introuvable » sur un écran qui existe et que son administrateur peut lui
+ouvrir le laisserait chercher une panne là où il n'y a qu'un droit manquant :
+les refus d'habilitation restent des 403, et un test le vérifie.
+
+Un second test empêche la dérive : il relit les contrôleurs et échoue si une
+garde d'appartenance neuve est écrite avec un 403.
+
+##### Ce qui n'a pas été fait, et pourquoi
+
+**Les identifiants restent numériques.** Le 404 supprime l'oracle, non le besoin
+d'identifiants opaques : une adresse qui porte `4213` dit encore quelque chose à
+qui la voit passer — dans un courriel transféré, une capture d'écran, un billet
+d'assistance.
+
+Le passage à des identifiants tirés au hasard se fait par une colonne `uuid` et
+`getRouteKeyName()`. La difficulté n'est pas là : **six modèles —
+`vente`, `achat`, `produit`, `pdv`, `personnel`, `code` — sont liés en route
+dans l'API mobile autant que sur le web**, et `getRouteKeyName()` vaut pour les
+deux. Changer la clé casserait un client que ce dépôt ne contient pas et que je
+ne peux pas éprouver.
+
+Trois chemins, à trancher par le propriétaire :
+
+1. **Lier par colonne, route par route** — `{vente:uuid}` sur le web, `{vente}`
+   sur l'API. Précis et réversible, mais il faut vérifier que la génération
+   d'URL suit le champ déclaré ;
+2. **Changer les deux à la fois**, en publiant l'`uuid` dans les réponses de
+   l'API et en mettant à jour le client mobile ;
+3. **S'en tenir au 404**, en jugeant que le résiduel ne justifie pas le risque.
+
+Le premier est le plus sûr ; il demande une vérification que je préfère faire
+avec vous plutôt que de la présumer.
+
+- `App\Modules\Admin\Regles\Cloisonnement`
+- `tests/Feature/CloisonnementTest.php` — 11 tests.
+
 ---
 
 ## 5 bis. La numérotation des comptes — tranché

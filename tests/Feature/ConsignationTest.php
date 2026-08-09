@@ -511,6 +511,11 @@ class ConsignationTest extends TestCase
 
     public function test_la_consignation_d_une_autre_entreprise_est_fermee(): void
     {
+        // **404 et non 403.** Repondre « acces refuse » sur la piece d'un
+        // autre et « introuvable » sur une piece inexistante distingue les
+        // deux : les identifiants etant sequentiels, compter les 403
+        // donnait le volume de toute la plateforme. Ce qui n'est pas a
+        // vous n'existe pas pour vous.
         // Ce qu'un concurrent a dehors dit combien il livre et a qui.
         $this->connecte();
 
@@ -527,8 +532,8 @@ class ConsignationTest extends TestCase
         );
 
         $this->post(route('admin.consignations.rendre', $sienne), ['quantite' => 30])
-            ->assertForbidden();
-        $this->post(route('admin.consignations.non_retour', $sienne))->assertForbidden();
+            ->assertNotFound();
+        $this->post(route('admin.consignations.non_retour', $sienne))->assertNotFound();
 
         $this->get(route('admin.consignations.index'))->assertOk()->assertDontSee('Casier rival');
 

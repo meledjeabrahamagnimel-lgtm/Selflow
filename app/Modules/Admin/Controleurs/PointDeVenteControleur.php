@@ -74,7 +74,7 @@ class PointDeVenteControleur
     public function modifier(Request $request, PointDeVente $pdv): RedirectResponse
     {
         $entreprise = Auth::user()->entreprise;
-        abort_unless($pdv->entreprise_id === $entreprise->id, 403);
+        abort_unless($pdv->entreprise_id === $entreprise->id, 404);
 
         $validated = $request->validate([
             'nom'         => ['required', 'string', 'max:100'],
@@ -93,7 +93,7 @@ class PointDeVenteControleur
     public function activerSession(Request $request, PointDeVente $pdv): RedirectResponse
     {
         $entreprise = Auth::user()->entreprise;
-        abort_unless($pdv->entreprise_id === $entreprise->id, 403);
+        abort_unless($pdv->entreprise_id === $entreprise->id, 404);
 
         session(['point_de_vente_actif_id' => $pdv->id, 'point_de_vente_actif_nom' => $pdv->nom]);
 
@@ -103,7 +103,7 @@ class PointDeVenteControleur
     public function activerApercu(PointDeVente $pdv): RedirectResponse
     {
         $entreprise = Auth::user()->entreprise;
-        abort_unless($pdv->entreprise_id === $entreprise->id, 403);
+        abort_unless($pdv->entreprise_id === $entreprise->id, 404);
 
         // Activons l'aperçu en stockant dans la session
         session([

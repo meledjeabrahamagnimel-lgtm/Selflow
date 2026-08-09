@@ -74,7 +74,7 @@ class PersonnelControleur
     public function details(Utilisateur $personnel): View
     {
         $entreprise = Auth::user()->entreprise;
-        abort_unless($personnel->entreprise_id === $entreprise->id, 403);
+        abort_unless($personnel->entreprise_id === $entreprise->id, 404);
 
         $pointsDeVente = PointDeVente::where('entreprise_id', $entreprise->id)
             ->orderBy('nom')
@@ -86,7 +86,7 @@ class PersonnelControleur
     public function modifier(Request $request, Utilisateur $personnel): RedirectResponse
     {
         $entreprise = Auth::user()->entreprise;
-        abort_unless($personnel->entreprise_id === $entreprise->id, 403);
+        abort_unless($personnel->entreprise_id === $entreprise->id, 404);
 
         $request->validate([
             'nom'                => ['required', 'string', 'max:150'],
@@ -129,7 +129,7 @@ class PersonnelControleur
     public function changerStatut(Utilisateur $personnel): RedirectResponse
     {
         $entreprise = Auth::user()->entreprise;
-        abort_unless($personnel->entreprise_id === $entreprise->id, 403);
+        abort_unless($personnel->entreprise_id === $entreprise->id, 404);
 
         if ($personnel->id === Auth::id()) {
             return back()->withErrors(['general' => 'Vous ne pouvez pas modifier votre propre statut.']);
@@ -148,7 +148,7 @@ class PersonnelControleur
     public function supprimer(Utilisateur $personnel): RedirectResponse
     {
         $entreprise = Auth::user()->entreprise;
-        abort_unless($personnel->entreprise_id === $entreprise->id, 403);
+        abort_unless($personnel->entreprise_id === $entreprise->id, 404);
 
         if ($personnel->id === Auth::id()) {
             return back()->withErrors(['general' => 'Vous ne pouvez pas supprimer votre propre compte.']);

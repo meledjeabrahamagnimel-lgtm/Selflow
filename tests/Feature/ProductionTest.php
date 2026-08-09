@@ -379,6 +379,11 @@ class ProductionTest extends TestCase
 
     public function test_un_ordre_d_une_autre_entreprise_ne_se_valide_pas(): void
     {
+        // **404 et non 403.** Repondre « acces refuse » sur la piece d'un
+        // autre et « introuvable » sur une piece inexistante distingue les
+        // deux : les identifiants etant sequentiels, compter les 403
+        // donnait le volume de toute la plateforme. Ce qui n'est pas a
+        // vous n'existe pas pour vous.
         $autre = Entreprise::create(['nom' => 'Boulangerie concurrente']);
         $sonAtelier = PointDeVente::create([
             'entreprise_id' => $autre->id,
@@ -397,7 +402,7 @@ class ProductionTest extends TestCase
             'date_production' => now()->toDateString(),
         ]);
 
-        $this->valider($sonOrdre)->assertForbidden();
+        $this->valider($sonOrdre)->assertNotFound();
 
         $this->assertSame('Brouillon', $sonOrdre->fresh()->statut);
     }

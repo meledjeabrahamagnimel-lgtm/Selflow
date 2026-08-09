@@ -219,7 +219,7 @@ class ProduitControleur
      */
     public function archiver(Produit $produit): RedirectResponse
     {
-        abort_unless($produit->entreprise_id === Auth::user()->entreprise_id, 403);
+        abort_unless($produit->entreprise_id === Auth::user()->entreprise_id, 404);
 
         $produit->update([
             'statut' => $produit->statut === 'actif' ? 'archive' : 'actif',
@@ -239,7 +239,7 @@ class ProduitControleur
      */
     public function uploaderPhoto(Request $request, Produit $produit): JsonResponse
     {
-        abort_unless($produit->entreprise_id === Auth::user()->entreprise_id, 403);
+        abort_unless($produit->entreprise_id === Auth::user()->entreprise_id, 404);
 
         $request->validate([
             'photo' => ['required', 'image', 'mimes:jpg,jpeg,png,webp', 'max:2048'],
@@ -264,7 +264,7 @@ class ProduitControleur
 
     public function modifier(Request $request, Produit $produit): RedirectResponse
     {
-        abort_unless($produit->entreprise_id === Auth::user()->entreprise_id, 403);
+        abort_unless($produit->entreprise_id === Auth::user()->entreprise_id, 404);
         $entreprise = Auth::user()->entreprise;
 
         $isService = ($request->input('type') === 'service');
@@ -407,7 +407,7 @@ class ProduitControleur
      */
     public function fiche(Produit $produit): View
     {
-        abort_unless($produit->entreprise_id === Auth::user()->entreprise_id, 403);
+        abort_unless($produit->entreprise_id === Auth::user()->entreprise_id, 404);
 
         $produit->load(['category', 'sousCategorieRelation', 'stocks.pointDeVente', 'detailsLibres']);
 
@@ -419,7 +419,7 @@ class ProduitControleur
      */
     public function description(Request $request, Produit $produit): RedirectResponse
     {
-        abort_unless($produit->entreprise_id === Auth::user()->entreprise_id, 403);
+        abort_unless($produit->entreprise_id === Auth::user()->entreprise_id, 404);
 
         $request->validate([
             'description_inventaire' => ['nullable', 'string', 'max:5000'],
@@ -435,7 +435,7 @@ class ProduitControleur
      */
     public function ajouterDetails(Request $request, Produit $produit): RedirectResponse
     {
-        abort_unless($produit->entreprise_id === Auth::user()->entreprise_id, 403);
+        abort_unless($produit->entreprise_id === Auth::user()->entreprise_id, 404);
 
         $request->validate([
             'details'             => ['required', 'array', 'min:1'],
@@ -468,7 +468,7 @@ class ProduitControleur
             Produit::where('id', $detail->produit_id)
                 ->where('entreprise_id', Auth::user()->entreprise_id)
                 ->exists(),
-            403
+            404
         );
 
         $detail->delete();
