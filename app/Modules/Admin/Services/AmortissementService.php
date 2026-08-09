@@ -100,7 +100,23 @@ class AmortissementService
         return DB::transaction(function () use ($bien) {
             $bien->dotations()->delete();
 
-            $base    = $bien->baseAmortissable();
+            $base = $bien->baseAmortissable();
+
+            // **Un bien qui ne s'amortit pas n'a pas de plan.** Un terrain, un
+            // fonds de commerce, un bien entièrement couvert par sa valeur
+            // résiduelle : la durée vaut zéro, et il n'y a rien à étaler.
+            //
+            // Sans cette sortie, la règle « la dernière annuité solde le plan »
+            // s'appliquait à l'unique exercice du parcours et écrivait une
+            // dotation **égale à la valeur entière du bien** : un terrain de
+            // 25 millions mis en service un 20 novembre passait 25 millions en
+            // charge. Le défaut ne se voyait pas sur une mise en service au
+            // 1er janvier, où la borne de fin tombe l'année précédente et la
+            // boucle ne s'exécute pas du tout.
+            if ($bien->duree_mois <= 0 || $base <= 0) {
+                return collect();
+            }
+
             $debut   = $bien->date_mise_en_service->copy();
             $fin     = $debut->copy()->addMonths($bien->duree_mois)->subDay();
             $annuite = $bien->duree_mois > 0 ? $base * 12 / $bien->duree_mois : 0.0;

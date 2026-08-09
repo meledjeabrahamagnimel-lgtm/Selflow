@@ -646,4 +646,35 @@ class AmortissementTest extends TestCase
 
         $this->assertSame(0.0, round((float) $terrain->dotations()->sum('dotation'), 2));
     }
+
+    public function test_un_terrain_mis_en_service_en_cours_d_annee_n_amortit_pas_davantage(): void
+    {
+        // **Le defaut ne se voyait pas au 1er janvier.** Ce jour-la, la borne de
+        // fin tombe l'annee precedente et la boucle ne s'execute pas du tout.
+        // Mis en service un 20 novembre, l'unique exercice du parcours
+        // declenchait la regle « la derniere annuite solde le plan », qui
+        // ecrivait une dotation **egale a la valeur entiere du bien** : un
+        // terrain de 25 millions passait 25 millions en charge.
+        $terrain = Immobilisation::create([
+            'entreprise_id' => $this->entreprise->id, 'point_de_vente_id' => $this->siege->id,
+            'code' => 'IMM-TERRAIN-NOV', 'libelle' => 'Terrain de Bingerville',
+            'compte_immobilisation' => '222000', 'compte_amortissement' => '282000',
+            'compte_dotation' => '681300',
+            'date_acquisition' => '2023-11-20', 'date_mise_en_service' => '2023-11-20',
+            'valeur_acquisition' => 25000000, 'duree_mois' => 0,
+        ]);
+
+        AmortissementService::etablirLePlan($terrain);
+
+        $this->assertSame(0, $terrain->dotations()->count());
+        $this->assertSame(25000000.0, $terrain->fresh()->valeurNette());
+    }
+
+    public function test_un_bien_couvert_par_sa_valeur_residuelle_n_a_pas_de_plan(): void
+    {
+        // Il n'y a rien a etaler : la base amortissable est nulle.
+        $camion = $this->camion(['code' => 'IMM-COUVERT', 'valeur_residuelle' => 12000000]);
+
+        $this->assertSame(0, $camion->dotations()->count());
+    }
 }

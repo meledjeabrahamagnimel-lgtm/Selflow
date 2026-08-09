@@ -9,6 +9,12 @@
         <p>Les biens que l'entreprise possède et qui servent plus d'un exercice, et ce qu'ils portent d'amortissement.</p>
     </div>
     <div>
+        {{-- Une entreprise qui migre a deja un parc : camions, fours,
+             ordinateurs, chacun avec son anteriorite. Les ressaisir un a un est
+             ce qui decide du sort de la migration. --}}
+        <button type="button" class="btn" onclick="ouvrirImport('modalImportImmobilisations')">
+            <i class="fas fa-file-import"></i> Importer un parc
+        </button>
         <a href="{{ route('admin.immobilisations.creer') }}" class="btn btn-primary">
             <i class="fas fa-plus"></i> Nouveau bien
         </a>
@@ -107,4 +113,9 @@
     </div>
     <div style="padding:14px;">{{ $biens->links() }}</div>
 </div>
+@include('admin::composants.modal-import', [
+    'type'  => 'immobilisations',
+    'label' => 'Immobilisations',
+    'id'    => 'modalImportImmobilisations',
+])
 @endsection

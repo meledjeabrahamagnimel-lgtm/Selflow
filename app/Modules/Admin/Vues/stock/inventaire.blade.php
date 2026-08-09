@@ -9,9 +9,17 @@
         <p>Comptez ce qui est réellement en magasin. L'écart avec le stock théorique
            devient un mouvement, dans le sens qu'il faut.</p>
     </div>
-    <a href="{{ route('admin.stock.index') }}" class="btn btn-outline">
-        <i class="fas fa-arrow-left"></i> Retour à l'inventaire
-    </a>
+    <div style="display:flex; gap:8px;">
+        {{-- Le stock d'ouverture d'un catalogue deja en place. Sans lui, un
+             magasin qui migre saisit ses deux mille quantites a la main : c'est
+             le moment ou l'on abandonne. --}}
+        <button type="button" class="btn" onclick="ouvrirImport('modalImportStockInitial')">
+            <i class="fas fa-file-import"></i> Importer un stock d'ouverture
+        </button>
+        <a href="{{ route('admin.stock.index') }}" class="btn btn-outline">
+            <i class="fas fa-arrow-left"></i> Retour à l'inventaire
+        </a>
+    </div>
 </div>
 
 @if(session('succes'))
@@ -149,4 +157,9 @@ document.querySelectorAll('.champ-compte').forEach(champ => {
 });
 </script>
 @endif
+@include('admin::composants.modal-import', [
+    'type'  => 'stock-initial',
+    'label' => 'Stock d\'ouverture',
+    'id'    => 'modalImportStockInitial',
+])
 @endsection

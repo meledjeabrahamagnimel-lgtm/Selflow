@@ -1128,6 +1128,55 @@ renvoie l'utilisateur vers la facture pour la part fiscale.
   que ce qui est dehors, consignation sans tiers, et la consignation d'une autre
   entreprise.
 
+#### Lot 6.6 — Les modèles d'importation — **TERMINÉ**
+
+L'import existait pour cinq modules. Quatre défauts, dont deux arrêtaient net
+une migration :
+
+| Défaut | Ce qu'il produisait |
+|---|---|
+| **Une ligne plus longue que l'en-tête tuait tout le fichier** | `array_combine` lève une erreur dès que les deux tableaux n'ont pas la même taille. **Un simple point-virgule en fin de ligne suffisait** — et Excel comme LibreOffice en produisent. Le fichier entier partait en « Erreur critique », sans dire quelle ligne |
+| **`firstOrCreate(['email' => …])` cherchait sur l'adresse seule** | L'adresse est unique sur toute la plateforme : celle d'un autre inscrit faisait que rien n'était créé, et **la ligne comptait pour un succès**. L'administrateur annonçait un accès à un salarié qui ne pourrait jamais se connecter. C'était aussi un **oracle d'existence** silencieux et gratuit : importer une liste d'adresses et lire le compteur suffisait à savoir lesquelles sont inscrites |
+| **Un service ne pouvait pas s'importer** | `prix_achat > 0` était exigé de tous. Un cabinet comptable, dont tous les articles sont des missions, ne passait aucune ligne |
+| **Le modèle des articles portait douze colonnes** | La fiche en compte deux fois plus. Stock d'ouverture, comptes de stock, suivi par lot, consignation : tout se ressaisissait fiche par fiche après l'import |
+
+**Deux modèles nouveaux.** `stock-initial` alimente un catalogue déjà en place,
+site par site et lot par lot ; `immobilisations` reprend un parc avec son
+antériorité et établit chaque plan. Le stock passe par `StockService`, la porte
+unique — un stock posé à côté n'aurait ni trace au journal, ni valeur au bilan —
+et le motif retenu est l'**inventaire** : une ouverture est un comptage, pas une
+réception, il n'y a pas de fournisseur derrière.
+
+**L'import des immobilisations ne passe aucune dotation en comptabilité.** Il
+établit le plan ; c'est la clôture qui écrit. Passer ici des dotations
+antérieures produirait des charges sur des exercices déjà arrêtés.
+
+Corrigé aussi : les en-têtes se lisent quels que soient la casse, les accents et
+les doublons ; les nombres à la française — « 12 000,50 », dont `(float)`
+rendait **12** — se lisent ; les dates acceptent jj/mm/aaaa comme aaaa-mm-jj ; et
+**le taux de TVA ne se rattrape plus en silence.** Une liste `[0, 9, 18]`
+recopiée dans l'import aurait dérivé de la source ; c'est `Produit::TAUX_TVA_DGI`
+qui fait foi, et un taux hors barème est refusé plutôt que ramené à 18 %.
+
+#### Le défaut du lot 6.4 que ce lot a mis au jour
+
+Un test d'import a fait tomber `AmortissementService::etablirLePlan()`. Pour un
+bien dont la durée vaut zéro — un terrain, un fonds de commerce —, la règle « la
+dernière annuité solde le plan » s'appliquait à l'unique exercice du parcours et
+écrivait une dotation **égale à la valeur entière du bien** : un terrain de 25
+millions passait 25 millions en charge.
+
+**Le défaut ne se voyait pas sur une mise en service au 1er janvier** — ce
+jour-là, la borne de fin tombe l'année précédente et la boucle ne s'exécute pas
+du tout, ce qui est exactement le cas que le test du lot 6.4 couvrait. Un plan
+vide est désormais rendu dès que la durée ou la base amortissable est nulle, et
+deux tests verrouillent les deux situations.
+
+- `tests/Feature/ImportTest.php` — 36 tests, dont sept de simulation d'attaque :
+  adresse d'une autre entreprise, rôle `superadmin` glissé dans le fichier,
+  `entreprise_id` injecté dans une colonne, et stock d'ouverture posé sur
+  l'article d'un concurrent.
+
 ### Lot 7 — La vitrine
 
 Landing page, documentation, politique, présentation de DC-Knowing et de ses
