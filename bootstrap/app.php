@@ -27,6 +27,20 @@ return Application::configure(basePath: dirname(__DIR__))
         ]);
 
 
+        // **Le groupe `api` n'existait pas.** Les modules posent leurs routes
+        // avec `Route::middleware('api')`, mais `withRouting()` n'ayant pas de
+        // volet `api`, le groupe n'était jamais défini : les cinquante et une
+        // routes d'API n'avaient donc **aucune limite de débit**, et
+        // l'authentification par jeton pouvait être éprouvée sans compter.
+        $middleware->group('api', [
+            'throttle:api',
+            \Illuminate\Routing\Middleware\SubstituteBindings::class,
+        ]);
+
+        // Les écrans ordinaires : large, mais borné. Une boucle dans une page
+        // ne doit pas pouvoir occuper le serveur à elle seule.
+        $middleware->appendToGroup('web', 'throttle:web');
+
         // En-têtes de sécurité HTTP sur toutes les réponses web (Section 17.11)
         $middleware->appendToGroup('web', \App\Http\Middleware\AjouterEntetesSecurite::class);
 

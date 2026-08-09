@@ -1241,6 +1241,40 @@ superadministrateur volontairement restreint garde sa restriction.
 - `2026_08_16_000001_habilitations_des_superadministrateurs.php`
 - `tests/Feature/HabilitationsTest.php` — 17 tests.
 
+#### Lot 8.2 — Les limites de débit — **TERMINÉ**
+
+La connexion comptait ses échecs — cinq essais par couple adresse/adresse IP, et
+c'était juste. **Tout le reste était libre.**
+
+| Porte | Ce qui n'était borné nulle part |
+|---|---|
+| **Les 51 routes d'API** | **Le groupe `api` n'existait pas.** Les modules posent leurs routes avec `Route::middleware('api')`, mais `withRouting()` n'ayant pas de volet `api`, le groupe n'était jamais défini : l'authentification par jeton — une chaîne dans une colonne — pouvait être éprouvée sans compter |
+| **`api/external/*`** | **La porte la plus précieuse de l'application** : aucune authentification, un secret partagé, et `list-companies` qui rend **toutes les entreprises de la plateforme avec leur administrateur**. Le secret est bien comparé en temps constant depuis le lot 5 — mais un secret se devine, et rien ne comptait les essais |
+| **La réinitialisation de mot de passe** | Demander un lien envoie un courriel : on inonde une boîte, on épuise le quota d'envoi, et l'on apprend au passage quelles adresses existent |
+| **L'import** | Un fichier de cinq mégaoctets, lu ligne à ligne, qui écrit articles, stock, immobilisations et comptes |
+| **La normalisation par lot, les stickers, les tests de connexion** | Ils appellent la plateforme de la DGI et Comptaflow. Les marteler expose l'entreprise à voir **sa propre clé** ralentie ou coupée : la conséquence est chez elle, pas chez nous |
+
+**Le principe des clés.** Une limite se compte par **acteur** — l'utilisateur
+authentifié, l'adresse IP sinon — et non par route : compter par route
+laisserait un même acteur épuiser trente portes voisines l'une après l'autre
+sans jamais franchir une limite. La réinitialisation porte deux bornes : l'une
+par acteur, l'autre par adresse IP, qui seule arrête le balayage d'adresses
+électroniques.
+
+Les limiteurs sont déclarés dans un fournisseur dédié, chargé **avant** celui
+des modules : `throttle:api` sur une route dont le limiteur n'est pas déclaré
+lève une erreur au premier appel, non au démarrage — le défaut ne se verrait
+qu'en production, sur la première requête. Un test le vérifie pour chacun.
+
+Les épreuves les plus importantes sont **de comportement, non de
+configuration** : c'est la réponse du serveur qui fait foi. Soixante-dix appels
+à une route d'API finissent bornés ; vingt-cinq tentatives de secret sur la
+synchronisation externe aussi ; et un caissier qui enchaîne quarante ventes
+n'est pas arrêté.
+
+- `App\Providers\LimitesDeDebit`
+- `tests/Feature/LimitesDeDebitTest.php` — 15 tests.
+
 ---
 
 ## 5 bis. La numérotation des comptes — tranché

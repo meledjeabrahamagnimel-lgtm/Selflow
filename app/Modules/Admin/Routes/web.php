@@ -165,13 +165,18 @@ Route::prefix('admin')
             Route::get('/factures/donnees',[\App\Modules\Admin\Controleurs\FneDashboardControleur::class, 'facturesJson'])->name('factures.donnees');
             // ── Gestion des Stickers ──
             Route::get('/stickers',         [\App\Modules\Admin\Controleurs\StickerControleur::class, 'index'])->name('stickers');
-            Route::post('/stickers/acheter',[\App\Modules\Admin\Controleurs\StickerControleur::class, 'acheter'])->name('stickers.acheter');
+            // Un achat de stickers engage la trésorerie de l'entreprise et
+            // appelle la plateforme : le répéter coûte de l'argent.
+            Route::post('/stickers/acheter',[\App\Modules\Admin\Controleurs\StickerControleur::class, 'acheter'])->middleware('throttle:plateforme')->name('stickers.acheter');
             // ── Configuration Fiscale (TVA / TSE / TDT) ──
             Route::get('/config',           [\App\Modules\Admin\Controleurs\FneDashboardControleur::class, 'obtenirConfig'])->name('config');
             Route::post('/config',          [\App\Modules\Admin\Controleurs\FneDashboardControleur::class, 'sauvegarderConfig'])->name('config.sauvegarder');
             // ── Traitement par Lot et Planification ──
-            Route::post('/batch-normaliser', [\App\Modules\Admin\Controleurs\FneDashboardControleur::class, 'batchNormaliser'])->name('batch_normaliser');
-            Route::post('/schedule-batch',   [\App\Modules\Admin\Controleurs\FneDashboardControleur::class, 'scheduleBatch'])->name('schedule_batch');
+            // **La normalisation par lot appelle la plateforme de la DGI.** La
+            // marteler expose l'entreprise à voir sa propre clé ralentie ou
+            // coupée : la conséquence est chez elle, pas chez nous.
+            Route::post('/batch-normaliser', [\App\Modules\Admin\Controleurs\FneDashboardControleur::class, 'batchNormaliser'])->middleware('throttle:plateforme')->name('batch_normaliser');
+            Route::post('/schedule-batch',   [\App\Modules\Admin\Controleurs\FneDashboardControleur::class, 'scheduleBatch'])->middleware('throttle:plateforme')->name('schedule_batch');
             Route::get('/batch-status',      [\App\Modules\Admin\Controleurs\FneDashboardControleur::class, 'batchStatus'])->name('batch_status');
         });
 
@@ -185,8 +190,12 @@ Route::prefix('admin')
             Route::post('/desactiver-apercu',    [PointDeVenteControleur::class, 'desactiverApercu'])->name('desactiver_apercu');
         });
 
-        // ── Import CSV (4 modules) ──
-        Route::prefix('import')->name('import.')->group(function () {
+        // ── Import CSV ──
+        //
+        // Un fichier de cinq mégaoctets, lu ligne à ligne, qui écrit des
+        // articles, du stock, des immobilisations et des comptes utilisateurs.
+        // Le répéter suffit à occuper le serveur.
+        Route::prefix('import')->name('import.')->middleware('throttle:import')->group(function () {
             Route::get('/{type}/exemple',  [\App\Modules\Admin\Controleurs\ImportControleur::class, 'telechargerExemple'])->name('exemple');
             Route::post('/{type}/preview', [\App\Modules\Admin\Controleurs\ImportControleur::class, 'preview'])->name('preview');
             Route::post('/{type}',         [\App\Modules\Admin\Controleurs\ImportControleur::class, 'importer'])->name('importer');
@@ -300,9 +309,12 @@ Route::prefix('admin')
         // ── Paramètres entreprise ──
         Route::get('/entreprise/parametres', [EntrepriseControleur::class, 'parametres'])->name('entreprise.parametres');
         Route::put('/entreprise/parametres', [EntrepriseControleur::class, 'enregistrerParametres'])->name('entreprise.parametres.enregistrer');
-        Route::post('/entreprise/fne/tester-connexion', [EntrepriseControleur::class, 'testerConnexionFne'])->name('entreprise.fne.tester_connexion');
-        Route::post('/entreprise/comptaflow/sync-simulation', [EntrepriseControleur::class, 'simulerSyncComptaflow'])->name('entreprise.comptaflow.sync');
-        Route::post('/entreprise/comptaflow/sync', [EntrepriseControleur::class, 'synchroniserComptaflow'])->name('entreprise.comptaflow.sync_real');
+        // Ces trois boutons appellent un service extérieur — la plateforme de
+        // la DGI, puis Comptaflow. Les marteler use un quota qui n'est pas le
+        // nôtre.
+        Route::post('/entreprise/fne/tester-connexion', [EntrepriseControleur::class, 'testerConnexionFne'])->middleware('throttle:plateforme')->name('entreprise.fne.tester_connexion');
+        Route::post('/entreprise/comptaflow/sync-simulation', [EntrepriseControleur::class, 'simulerSyncComptaflow'])->middleware('throttle:plateforme')->name('entreprise.comptaflow.sync');
+        Route::post('/entreprise/comptaflow/sync', [EntrepriseControleur::class, 'synchroniserComptaflow'])->middleware('throttle:plateforme')->name('entreprise.comptaflow.sync_real');
         Route::post('/entreprise/onboarding/entreprise-nom', [EntrepriseControleur::class, 'enregistrerNomOnboarding'])->name('onboarding.entreprise_nom');
 
 

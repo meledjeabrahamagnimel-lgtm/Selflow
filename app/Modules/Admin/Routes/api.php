@@ -110,7 +110,11 @@ Route::prefix('admin')
 // Routes de synchronisation externe (COMPTAFLOW ↔ Selflow)
 // Protégées par un secret partagé — SANS middleware auth
 // ═══════════════════════════════════════════════════════════════════════════
-Route::prefix('external')->group(function () {
+// **Ces routes n'ont pas d'authentification** : un secret partagé les protège,
+// comparé en temps constant. Mais un secret se devine, et `list-companies` rend
+// toutes les entreprises de la plateforme avec leur administrateur. Sans borne,
+// il s'éprouve à la vitesse du réseau.
+Route::prefix('external')->middleware('throttle:externe')->group(function () {
     Route::post('/register-enterprise', [\App\Modules\Admin\Controleurs\Api\ExternalSyncControleur::class, 'enregistrerEntreprise'])
         ->name('api.external.register-enterprise');
     Route::post('/company-info', [\App\Modules\Admin\Controleurs\Api\ExternalSyncControleur::class, 'companyInfo'])

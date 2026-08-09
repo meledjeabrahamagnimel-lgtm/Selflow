@@ -41,13 +41,19 @@ Route::middleware('guest')->group(function () {
     Route::get('/mot-de-passe/oublie', [\App\Modules\Authentification\Controleurs\PasswordResetControleur::class, 'afficherDemande'])
         ->name('password.request');
 
+    // Demander un lien envoie un courriel. Sans borne, on inonde la boîte d'un
+    // utilisateur, on épuise le quota du serveur d'envoi, et l'on apprend au
+    // passage quelles adresses existent.
     Route::post('/mot-de-passe/oublie', [\App\Modules\Authentification\Controleurs\PasswordResetControleur::class, 'envoyerLien'])
+        ->middleware('throttle:mot-de-passe')
         ->name('password.email');
 
     Route::get('/mot-de-passe/reinitialiser/{token}', [\App\Modules\Authentification\Controleurs\PasswordResetControleur::class, 'afficherReset'])
         ->name('password.reset');
 
+    // Le jeton de réinitialisation est une chaîne : sans borne, il s'éprouve.
     Route::post('/mot-de-passe/reinitialiser', [\App\Modules\Authentification\Controleurs\PasswordResetControleur::class, 'reinitialiser'])
+        ->middleware('throttle:mot-de-passe')
         ->name('password.update');
 });
 
