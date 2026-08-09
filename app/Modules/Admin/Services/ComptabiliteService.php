@@ -842,7 +842,7 @@ class ComptabiliteService
 
         try {
             $comptaflowUrl = config('selflow.comptaflow_api_url', 'http://127.0.0.1:8000');
-            $secret = config('selflow.comptaflow_api_secret', 'selflow-comptaflow-secret-2026');
+            $secret = config('selflow.comptaflow_api_secret');
 
             $clients = \App\Modules\Admin\Modeles\Client::where('entreprise_id', $entreprise->id)
                 ->select('id', 'nom', 'email', 'telephone', 'adresse')

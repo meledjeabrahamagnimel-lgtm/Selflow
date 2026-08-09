@@ -92,7 +92,17 @@ class InventairePermanentService
             $libelle
         );
 
-        return EcritureComptable::create([
+        // **Deux lignes, et non une seule portant les deux comptes.**
+        //
+        // C'est la convention de tout le reste du projet — `ComptabiliteService`
+        // écrit ainsi depuis l'origine — et c'est aussi celle de Comptaflow, où
+        // une écriture porte **un** compte. Une ligne portant les deux comptes
+        // se déverserait de travers : le point d'entrée de Comptaflow retient
+        // `compte_debit` s'il est présent et **ignore `compte_credit`**, si bien
+        // que les deux montants s'imputeraient sur le seul compte de stock. Le
+        // compte de variation resterait vide, et la balance de Comptaflow
+        // divergerait de celle de Selflow sans que rien ne le signale.
+        $commun = [
             'operation_id'       => $operation->id,
             'entreprise_id'      => $entrepriseId,
             'point_de_vente_id'  => $mouvement->point_de_vente_id,
@@ -100,11 +110,28 @@ class InventairePermanentService
             'libelle'            => $libelle,
             'reference_document' => $reference,
             'code_journal'       => $codeJournal,
-            'compte_debit'       => $estEntree ? $compteStock : $compteVariation,
-            'compte_credit'      => $estEntree ? $compteVariation : $compteStock,
-            'debit'              => $valeur,
-            'credit'             => $valeur,
+        ];
+
+        $compteDebite  = $estEntree ? $compteStock : $compteVariation;
+        $compteCredite = $estEntree ? $compteVariation : $compteStock;
+
+        $ligneDebit = EcritureComptable::create($commun + [
+            'compte_debit'  => $compteDebite,
+            'compte_credit' => null,
+            'debit'         => $valeur,
+            'credit'        => 0,
         ]);
+
+        EcritureComptable::create($commun + [
+            'compte_debit'  => null,
+            'compte_credit' => $compteCredite,
+            'debit'         => 0,
+            'credit'        => $valeur,
+        ]);
+
+        $operation->cloturerEquilibre();
+
+        return $ligneDebit;
     }
 
     /**

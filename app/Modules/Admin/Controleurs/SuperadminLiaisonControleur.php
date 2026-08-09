@@ -87,7 +87,7 @@ class SuperadminLiaisonControleur extends Controller
         }
 
         $comptaflowUrl = config('selflow.comptaflow_api_url', env('COMPTAFLOW_API_URL', 'http://127.0.0.1:8000'));
-        $secret        = config('selflow.comptaflow_api_secret', 'selflow-comptaflow-secret-2026');
+        $secret        = config('selflow.comptaflow_api_secret');
         $syncKey       = 'sf_' . Str::random(32);
 
         try {
@@ -152,7 +152,7 @@ class SuperadminLiaisonControleur extends Controller
     private function fetchComptaflowEntreprises(): array
     {
         $comptaflowUrl = config('selflow.comptaflow_api_url', env('COMPTAFLOW_API_URL', 'http://127.0.0.1:8000'));
-        $secret        = config('selflow.comptaflow_api_secret', 'selflow-comptaflow-secret-2026');
+        $secret        = config('selflow.comptaflow_api_secret');
 
         try {
             $response = Http::timeout(5)->post("{$comptaflowUrl}/api/external/list-companies", [

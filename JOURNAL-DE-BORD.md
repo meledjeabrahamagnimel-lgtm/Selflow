@@ -6,8 +6,8 @@ et ce fichier. Tout ce qui a été décidé, tout ce qui a été écarté et pou
 tout ce qui reste à faire doit donc figurer ici — et y être tenu à jour à chaque
 lot terminé.
 
-Dernière mise à jour : 8 août 2026 — lot 4 terminé : imputation, CUMP (Coût
-Unitaire Moyen Pondéré), balance, grand livre et lettrage automatique.
+Dernière mise à jour : 8 août 2026 — lot 5 côté Selflow : la passerelle
+Comptaflow devient idempotente, et le secret partagé cesse d’être public.
 
 ---
 
@@ -824,11 +824,70 @@ Un règlement partiel reste ouvert, et c'est le bon résultat — il reste dû.
 
 - `tests/Feature/GrandLivreLettrageTest.php` — 25 tests.
 
-### Lot 5 — La passerelle Comptaflow — les deux dépôts
+### Lot 5 — La passerelle Comptaflow — **CÔTÉ SELFLOW TERMINÉ**
 
-Concordance des exercices, déversement dans l'exercice qui contient la date,
-axe « Points de vente » et sections automatiques, rejeu idempotent, balance de
-contrôle dans Selflow.
+Le dépôt `guysergekouassi/comptaflow` a servi de référence **et** de cible. Le
+côté Selflow est poussé ; **le côté Comptaflow est écrit, vérifié, et attend
+d'être appliqué** — la session de développement n'autorise pas l'écriture sur un
+dépôt d'un autre propriétaire. Le correctif est versionné dans
+`PASSERELLE-COMPTAFLOW/`, avec son mode d'emploi.
+
+#### Un défaut que le lot 4.2 avait introduit, trouvé en lisant le déversement
+
+`ComptabiliteService` écrit **un compte par ligne** depuis l'origine — comme
+Comptaflow. Mon `InventairePermanentService` en écrivait **deux sur la même
+ligne**. Cela fonctionnait pour la balance et le grand livre de Selflow, qui
+gèrent les deux formes, mais le point d'entrée de Comptaflow retient
+`compte_debit` s'il est présent et **ignore `compte_credit`** : les deux montants
+se seraient imputés sur le seul compte de stock, le compte de variation serait
+resté vide, et les deux balances auraient divergé sans que rien ne le signale.
+
+Corrigé : deux lignes, comme partout ailleurs.
+
+#### Le secret partagé, des deux côtés
+
+`config/selflow.php` ne portait plus de valeur de repli depuis le lot 0 — mais
+**six sites passaient leur propre repli à l'appel**, ce qui annulait la
+correction. `config('selflow.comptaflow_api_secret', 'selflow-comptaflow-secret-2026')`
+rend la chaîne en dur quand la variable manque.
+
+Même défaut chez Comptaflow, à sept endroits, et une comparaison par `!==` qui
+révèle le secret caractère par caractère au chronomètre.
+
+#### Ce que Selflow envoie désormais
+
+| Champ | Pourquoi il manquait |
+|---|---|
+| `compte_tiers` | Comptaflow le cherchait dans son plan de tiers depuis le compte général, ne le trouvait pas, et rattachait tout au compte collectif. **Le relevé d'un client était impossible à établir** |
+| `cle_selflow` | `n_saisie` recevait la référence de pièce : rejouer une synchronisation dupliquait tout, et la balance doublait |
+| `point_de_vente` | Les points de vente sont les axes analytiques, leurs noms les sections. Sans lui, aucune ventilation par magasin |
+| `exercice_debut` / `exercice_fin` | Comptaflow prenait le sien sans comparer : une pièce d'un exercice clos se rangeait dans l'exercice courant |
+
+- `tests/Feature/PasserelleComptaflowTest.php` — 9 tests.
+
+#### Ce que le correctif Comptaflow corrige
+
+Secret sans repli et `hash_equals` ; idempotence par `cle_selflow` avec
+contrainte d'unicité ; compte de tiers retenu sans jamais créer de fiche ;
+exercices comparés, refus en 409 s'ils sont disjoints ; journal inconnu signalé
+au lieu de retomber sur le premier de la liste ; `type_de_compte` déduit de la
+classe SYSCOHADA au lieu d'`actif` en dur ; compte rendu portant `count`,
+`ignorees` et `refus`.
+
+**Le principe posé par le propriétaire est respecté** : code journal, plan
+comptable et plan de tiers déjà en place ne sont jamais réécrits par Selflow. Ce
+qui manque est créé en dessous, en respectant la configuration initiale de
+Comptaflow.
+
+#### Ce qui reste
+
+Pousser le correctif — voir `PASSERELLE-COMPTAFLOW/LISEZ-MOI.md` — et poser
+`EXTERNAL_SYNC_SECRET` des deux côtés. Sans elle, la synchronisation refuse
+désormais tout appel, ce qui est le comportement voulu.
+
+Reste aussi, côté Selflow : le déversement se fait dans un `created()` de modèle,
+par un appel HTTP synchrone de trois secondes. Chaque vente attend donc la
+réponse de Comptaflow. À passer en file d'attente.
 
 ### Lot 6 — Les manques métier
 

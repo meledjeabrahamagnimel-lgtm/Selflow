@@ -55,7 +55,7 @@ class SyncEcrituresToComptaflow extends Command
             $this->line("  → Entreprise : <comment>{$entreprise->nom}</comment> (ID: {$entreprise->id})");
 
             $comptaflowUrl = config('selflow.comptaflow_api_url', 'http://127.0.0.1:8000');
-            $secret = config('selflow.comptaflow_api_secret', 'selflow-comptaflow-secret-2026');
+            $secret = config('selflow.comptaflow_api_secret');
 
             // Récupérer les écritures à synchroniser
             $ecrituresQuery = EcritureComptable::withoutGlobalScopes()

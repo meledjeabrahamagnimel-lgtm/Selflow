@@ -186,14 +186,26 @@ class InventairePermanentTest extends TestCase
 
     public function test_une_entree_debite_le_stock_et_credite_la_variation(): void
     {
+        // **Deux lignes, et non une seule portant les deux comptes.** C'est la
+        // convention de tout le projet, et celle de Comptaflow. Une ligne
+        // portant les deux se deverserait de travers : Comptaflow retient
+        // `compte_debit` s'il est present et ignore `compte_credit`.
         $this->entree(10, 12000);
 
-        $ecriture = EcritureComptable::latest('id')->firstOrFail();
+        $this->assertSame(2, EcritureComptable::count());
 
-        $this->assertSame('311000', $ecriture->compte_debit);
-        $this->assertSame('603100', $ecriture->compte_credit);
-        $this->assertEquals(120000, $ecriture->debit);
-        $this->assertEquals(120000, $ecriture->credit);
+        $debit = EcritureComptable::whereNotNull('compte_debit')->firstOrFail();
+        $credit = EcritureComptable::whereNotNull('compte_credit')->firstOrFail();
+
+        $this->assertSame('311000', $debit->compte_debit);
+        $this->assertNull($debit->compte_credit);
+        $this->assertEquals(120000, $debit->debit);
+        $this->assertEquals(0, $debit->credit);
+
+        $this->assertSame('603100', $credit->compte_credit);
+        $this->assertNull($credit->compte_debit);
+        $this->assertEquals(120000, $credit->credit);
+        $this->assertEquals(0, $credit->debit);
     }
 
     public function test_une_sortie_inverse_les_deux_comptes(): void
@@ -201,11 +213,12 @@ class InventairePermanentTest extends TestCase
         $this->entree(10, 12000);
         StockService::sortie($this->riz, $this->magasin->id, 4, MouvementStock::LIVRAISON);
 
-        $ecriture = EcritureComptable::latest('id')->firstOrFail();
+        $sortie = EcritureComptable::where('reference_document', 'like', 'MVT-%')
+            ->orderByDesc('id')->take(2)->get();
 
-        $this->assertSame('603100', $ecriture->compte_debit);
-        $this->assertSame('311000', $ecriture->compte_credit);
-        $this->assertEquals(48000, $ecriture->debit);
+        $this->assertSame('603100', $sortie->firstWhere('compte_debit', '!=', null)?->compte_debit);
+        $this->assertSame('311000', $sortie->firstWhere('compte_credit', '!=', null)?->compte_credit);
+        $this->assertEquals(48000, $sortie->sum('debit'));
     }
 
     public function test_l_ecriture_dit_pourquoi_le_stock_a_bouge(): void

@@ -190,7 +190,7 @@ class SuperadminControleur
                 $comptaflowUrl = config('selflow.comptaflow_api_url', 'http://127.0.0.1:8002');
 
                 $response = Http::timeout(15)->post($comptaflowUrl . '/api/external/register-enterprise', [
-                    'secret'         => config('selflow.comptaflow_api_secret', 'selflow-local-secret'),
+                    'secret'         => config('selflow.comptaflow_api_secret'),
                     'company_name'   => $entreprise->nom,
                     'activity'       => implode(', ', $entreprise->secteur_activite ?? ['Commercial']),
                     'juridique_form' => $entreprise->forme_juridique ?? 'SARL',

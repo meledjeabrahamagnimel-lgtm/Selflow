@@ -43,7 +43,13 @@ class EcritureComptable extends Model
             if ($entreprise && $entreprise->comptaflow_sync_status === 'active' && $entreprise->comptaflow_sync_key) {
                 try {
                     $comptaflowUrl = config('selflow.comptaflow_api_url', 'http://127.0.0.1:8000');
-                    $secret = config('selflow.comptaflow_api_secret', 'selflow-comptaflow-secret-2026');
+                    $secret = config('selflow.comptaflow_api_secret');
+
+                    // L'exercice de l'entreprise, tel qu'il est ouvert chez
+                    // nous. Comptaflow prend le sien sans jamais comparer.
+                    $exercice = \App\Modules\Admin\Modeles\Periode::where('entreprise_id', $entreprise->id)
+                        ->where('est_active', true)
+                        ->first();
 
                     $dateStr = $ecriture->date_ecriture instanceof \Carbon\Carbon 
                         ? $ecriture->date_ecriture->toDateString() 
@@ -58,6 +64,34 @@ class EcritureComptable extends Model
                         'compte_credit'      => $ecriture->compte_credit,
                         'debit'              => (float) $ecriture->debit,
                         'credit'             => (float) $ecriture->credit,
+
+                        // Le compte de tiers — le client ou le fournisseur.
+                        // Il n'etait pas transmis : Comptaflow le cherchait
+                        // dans son `plan_tiers` a partir du compte general,
+                        // ne le trouvait pas, et rattachait l'ecriture au seul
+                        // compte collectif `411000`. Le releve d'un client
+                        // particulier devenait donc impossible a etablir.
+                        'compte_tiers'       => $ecriture->compte_tiers,
+
+                        // Cle d'idempotence : l'identifiant de l'ecriture chez
+                        // nous. Comptaflow posait `n_saisie` a la reference de
+                        // piece, ou a `SELF_ . time()` a defaut — deux valeurs
+                        // qui ne distinguent pas un renvoi d'une ecriture
+                        // nouvelle. Rejouer une synchronisation dupliquait donc
+                        // tout, et la balance doublait.
+                        'cle_selflow'        => 'SELFLOW-' . $entreprise->id . '-' . $ecriture->id,
+
+                        // Le point de vente : chez Comptaflow, un axe
+                        // analytique et sa section. Sans lui, aucune ventilation
+                        // par magasin n'est possible en aval.
+                        'point_de_vente'     => $ecriture->pointDeVente?->nom,
+
+                        // L'exercice auquel la piece appartient chez nous.
+                        // Comptaflow prenait le sien, actif, sans jamais
+                        // comparer : une piece de l'exercice clos se serait
+                        // rangee dans l'exercice courant.
+                        'exercice_debut'     => $exercice?->date_debut?->toDateString(),
+                        'exercice_fin'       => $exercice?->date_fin?->toDateString(),
                     ];
 
                     $response = \Illuminate\Support\Facades\Http::timeout(3)->post($comptaflowUrl . '/api/external/ecritures/deverser', [
