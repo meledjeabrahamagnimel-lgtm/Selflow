@@ -37,6 +37,12 @@ class SuperadminReferentielTest extends TestCase
             'password'      => bcrypt('secret-de-test'),
             'role'          => $role,
             'entreprise_id' => $entreprise->id,
+            // Le privilege d'administration est une donnee portee par la fiche,
+            // non une adresse ecrite en dur dans le middleware : un
+            // superadministrateur sans habilitation n'a plus acces a rien.
+            'habilitations' => $role === 'superadmin'
+                ? \App\Modules\Authentification\Regles\Habilitations::PLATEFORME
+                : null,
         ]);
     }
 

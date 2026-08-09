@@ -1187,6 +1187,60 @@ produits, écran superadmin de gestion de la vitrine.
 Identifiants opaques dans les URL, habilitations, limitation de débit, un
 scénario de bout en bout par combinaison de modules.
 
+#### Lot 8.1 — Les habilitations ferment par défaut — **TERMINÉ**
+
+Le dictionnaire vivait dans le middleware, et la vérification s'écrivait :
+
+```php
+if (isset($correspondances[$route])) { … }
+```
+
+**Une route absente du dictionnaire passait donc sans contrôle.** Ce n'était pas
+une décision, c'était un oubli qui s'aggravait à chaque lot : au moment de
+l'audit, **quatre-vingt-huit routes** n'y figuraient pas.
+
+**Ce qui était réellement atteignable, et ce qui ne l'était pas.** L'espace du
+caissier compte vingt-six routes ; **neuf d'entre elles** étaient dans les
+quatre-vingt-huit, et un caissier n'ayant que `nouvelle_vente` pouvait donc les
+emprunter : transformer une commande en facture, enregistrer l'acceptation d'un
+client, prolonger une offre, et surtout **créer puis valider des bons de
+livraison — qui font sortir la marchandise du stock**. Le reste des
+quatre-vingt-huit vit sous `admin.`, derrière `role:admin`, et n'était pas
+atteignable ; ce qui les rendait dangereuses n'est pas ce qu'elles ouvraient
+hier, mais qu'elles se seraient ouvertes sans bruit le jour où l'espace du
+caissier se serait élargi.
+
+**Le sens est inversé : ce qui n'est pas classé est refusé.** Le classement vit
+désormais dans `App\Modules\Authentification\Regles\Habilitations`, en deux
+tableaux — `PAR_ROUTE` et `OUVERTES`, chaque route ouverte portant sa raison
+écrite. Et **le test qui compte échoue tant qu'une route nouvelle n'a pas été
+rangée** : la dérive devient impossible au lieu d'être corrigée une fois de plus
+dans six mois. Il a d'ailleurs immédiatement trouvé deux routes
+`superadmin.referentiel.*` que le dictionnaire d'administration ignorait aussi.
+
+#### L'adresse écrite en dur
+
+```php
+if ($utilisateur->email === 'superadmin@gmail.com') return $next($request);
+```
+
+Elle n'était pas exploitable — `role:superadmin` s'exécute avant — mais elle
+publiait dans le dépôt **l'identité du compte le plus puissant de la
+plateforme**, ce qui suffit à en faire la cible de toute tentative. Elle est
+retirée.
+
+Le privilège devient une **donnée** : `Habilitations::PLATEFORME` porte les six
+habilitations d'administration, les semeurs les attribuent au compte principal,
+et une migration les donne aux superadministrateurs déjà en place — sans quoi ils
+se retrouveraient enfermés dehors au premier déploiement, personne ne pouvant
+leur rendre leurs droits puisque ce sont ces écrans-là qui les distribuent. La
+migration ne touche que les comptes dont la colonne est vide : un
+superadministrateur volontairement restreint garde sa restriction.
+
+- `App\Modules\Authentification\Regles\Habilitations`
+- `2026_08_16_000001_habilitations_des_superadministrateurs.php`
+- `tests/Feature/HabilitationsTest.php` — 17 tests.
+
 ---
 
 ## 5 bis. La numérotation des comptes — tranché

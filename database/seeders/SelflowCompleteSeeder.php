@@ -160,6 +160,9 @@ class SelflowCompleteSeeder extends Seeder
             'role'                  => 'superadmin',
             'statut'                => 'actif',
             'doit_changer_password' => true,
+            // Le privilège est une donnée, non une adresse écrite en dur dans
+            // le middleware : il se lit sur la fiche, s'audite et se retire.
+            'habilitations'         => \App\Modules\Authentification\Regles\Habilitations::PLATEFORME,
         ]);
 
         if (!env('SUPERADMIN_PASSWORD')) {

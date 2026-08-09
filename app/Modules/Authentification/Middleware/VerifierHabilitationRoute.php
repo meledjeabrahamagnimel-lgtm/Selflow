@@ -2,16 +2,84 @@
 
 namespace App\Modules\Authentification\Middleware;
 
+use App\Modules\Authentification\Regles\Habilitations;
 use Closure;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Symfony\Component\HttpFoundation\Response;
 
+/**
+ * L'habilitation exigée par la route demandée.
+ *
+ * ## Deux défauts corrigés
+ *
+ * **La vérification laissait passer ce qu'elle ne connaissait pas.** Elle
+ * s'écrivait `if (isset($correspondances[$route]))` : une route absente du
+ * dictionnaire passait sans contrôle. Ce n'était pas une décision, c'était un
+ * oubli qui s'aggravait à chaque lot — **quatre-vingt-huit routes** au moment
+ * de l'audit, dont l'import, par lequel on crée des comptes utilisateurs. Le
+ * sens est inversé : ce qui n'est pas classé est refusé, et `Habilitations`
+ * porte le classement.
+ *
+ * **Une adresse électronique était écrite en dur** :
+ *
+ *     if ($utilisateur->email === 'superadmin@gmail.com') return $next($request);
+ *
+ * Elle n'était pas exploitable — `role:superadmin` s'exécute avant — mais elle
+ * publiait dans le dépôt l'identité du compte le plus puissant de la
+ * plateforme, ce qui suffit à en faire la cible de toute tentative. Le
+ * privilège suit désormais le rôle et les habilitations, comme pour tout le
+ * monde.
+ */
 class VerifierHabilitationRoute
 {
     /**
-     * Gérer la requête entrante et vérifier l'habilitation de l'utilisateur.
+     * Les habilitations d'administration de la plateforme, par route.
+     *
+     * @var array<string, string>
      */
+    private const SUPERADMIN = [
+        'superadmin.tableau_de_bord'                  => 'tableau_de_bord_superadmin',
+        'superadmin.entreprises'                      => 'gestion_entreprises',
+        'superadmin.entreprises.creer'                => 'gestion_entreprises',
+        'superadmin.entreprises.creer.enregistrer'    => 'gestion_entreprises',
+        'superadmin.entreprises.modifier'             => 'gestion_entreprises',
+        'superadmin.entreprises.modifier.enregistrer' => 'gestion_entreprises',
+        'superadmin.entreprises.toggle_status'        => 'gestion_entreprises',
+        'superadmin.entreprises.supprimer'            => 'gestion_entreprises',
+        'superadmin.utilisateurs'                     => 'gestion_entreprises',
+        'superadmin.utilisateurs.modifier'            => 'gestion_entreprises',
+
+        'superadmin.liaisons.index'            => 'gestion_comptaflow',
+        'superadmin.liaisons.lier'             => 'gestion_comptaflow',
+        'superadmin.liaisons.delierEntreprise' => 'gestion_comptaflow',
+        'superadmin.liaisons.creerComptaflow'  => 'gestion_comptaflow',
+        'superadmin.liaisons.verifier'         => 'gestion_comptaflow',
+
+        'superadmin.fne.index'          => 'gestion_fne',
+        'superadmin.fne.cle_test'       => 'gestion_fne',
+        'superadmin.fne.cle_reelle'     => 'gestion_fne',
+        'superadmin.fne.voir_cle'       => 'gestion_fne',
+        'superadmin.fne.supprimer_cle'  => 'gestion_fne',
+        'superadmin.fne.notes'          => 'gestion_fne',
+
+        'superadmin.admins.index'         => 'administration_interne',
+        'superadmin.admins.creer'         => 'administration_interne',
+        'superadmin.admins.enregistrer'   => 'administration_interne',
+        'superadmin.admins.modifier'      => 'administration_interne',
+        'superadmin.admins.mettre_a_jour' => 'administration_interne',
+        'superadmin.admins.supprimer'     => 'administration_interne',
+
+        'superadmin.secteurs_modules.index'       => 'gestion_secteurs_modules',
+        'superadmin.secteurs_modules.sauvegarder' => 'gestion_secteurs_modules',
+
+        // Le référentiel des profils métier — les familles et les articles que
+        // chaque secteur reçoit à la souscription. Il se lit et ne s'écrit pas
+        // depuis l'écran ; il relève tout de même du paramétrage sectoriel.
+        'superadmin.referentiel.index'  => 'gestion_secteurs_modules',
+        'superadmin.referentiel.profil' => 'gestion_secteurs_modules',
+    ];
+
     public function handle(Request $request, Closure $next): Response
     {
         if (! Auth::check()) {
@@ -19,189 +87,74 @@ class VerifierHabilitationRoute
         }
 
         $utilisateur = Auth::user();
+        $nomRoute    = $request->route()?->getName();
 
-        // Le superadmin principal a accès à tout
-        if ($utilisateur->email === 'superadmin@gmail.com') {
-            return $next($request);
+        // Une route sans nom ne peut pas être classée. Elle ne devrait pas
+        // exister dans ces espaces ; la refuser vaut mieux que de la laisser
+        // passer sans qu'on sache ce qu'elle fait.
+        if (!$nomRoute) {
+            abort(403, 'Accès refusé : cette adresse n\'est rattachée à aucune fonctionnalité connue.');
         }
 
-        $nomRoute = $request->route()->getName();
-
-        // Vérification pour le Superadmin
         if ($utilisateur->estSuperAdmin()) {
-            // Dictionnaire des habilitations superadmin
-            $correspondancesSuperadmin = [
-                'superadmin.tableau_de_bord'                  => 'tableau_de_bord_superadmin',
-                'superadmin.entreprises'                      => 'gestion_entreprises',
-                'superadmin.entreprises.creer'                => 'gestion_entreprises',
-                'superadmin.entreprises.creer.enregistrer'    => 'gestion_entreprises',
-                'superadmin.entreprises.modifier'             => 'gestion_entreprises',
-                'superadmin.entreprises.modifier.enregistrer' => 'gestion_entreprises',
-                'superadmin.entreprises.toggle_status'        => 'gestion_entreprises',
-                'superadmin.entreprises.supprimer'            => 'gestion_entreprises',
-                'superadmin.utilisateurs'                     => 'gestion_entreprises',
-                'superadmin.utilisateurs.modifier'            => 'gestion_entreprises',
-                
-                'superadmin.liaisons.index'                   => 'gestion_comptaflow',
-                'superadmin.liaisons.lier'                    => 'gestion_comptaflow',
-                'superadmin.liaisons.delierEntreprise'        => 'gestion_comptaflow',
-                'superadmin.liaisons.creerComptaflow'         => 'gestion_comptaflow',
-                'superadmin.liaisons.verifier'                => 'gestion_comptaflow',
-                
-                'superadmin.fne.index'                        => 'gestion_fne',
-                'superadmin.fne.cle_test'                     => 'gestion_fne',
-                'superadmin.fne.cle_reelle'                   => 'gestion_fne',
-                'superadmin.fne.voir_cle'                     => 'gestion_fne',
-                'superadmin.fne.supprimer_cle'                => 'gestion_fne',
-                'superadmin.fne.notes'                        => 'gestion_fne',
-                
-                'superadmin.admins.index'                     => 'administration_interne',
-                'superadmin.admins.creer'                     => 'administration_interne',
-                'superadmin.admins.enregistrer'               => 'administration_interne',
-                'superadmin.admins.modifier'                  => 'administration_interne',
-                'superadmin.admins.mettre_a_jour'             => 'administration_interne',
-                'superadmin.admins.supprimer'                 => 'administration_interne',
-
-                'superadmin.secteurs_modules.index'           => 'gestion_secteurs_modules',
-                'superadmin.secteurs_modules.sauvegarder'     => 'gestion_secteurs_modules',
-            ];
-
-            if (str_starts_with($nomRoute, 'superadmin.')) {
-                $cleRequise = $correspondancesSuperadmin[$nomRoute] ?? null;
-                if ($cleRequise && (!is_array($utilisateur->habilitations) || !in_array($cleRequise, $utilisateur->habilitations))) {
-                    abort(403, "Accès refusé. Vous n'avez pas l'habilitation requise pour accéder à cette fonctionnalité d'administration.");
-                }
-            }
-            return $next($request);
+            return $this->superadmin($request, $next, $utilisateur, $nomRoute);
         }
 
-        // Les administrateurs d'entreprise possèdent toutes les habilitations par défaut
+        // Un administrateur d'entreprise possède toutes les habilitations de
+        // son entreprise : c'est lui qui les distribue.
         if ($utilisateur->estAdmin()) {
             return $next($request);
         }
 
-        $nomRoute = $request->route()->getName();
+        // **Ce qui n'est pas classé est refusé.** Oublier une route ferme une
+        // porte au lieu d'en ouvrir une.
+        if (!Habilitations::estClassee($nomRoute)) {
+            abort(403, 'Accès refusé : cette fonctionnalité n\'est ouverte à aucune habilitation.');
+        }
 
-        // Normaliser la route caissier en nom de route admin pour utiliser le même dictionnaire de droits
-        $routeNormalisee = str_replace('caissier.', 'admin.', $nomRoute);
+        $cle = Habilitations::pour($nomRoute);
 
-        // Correspondance entre les routes et les clés d'habilitations
-        $correspondances = [
-            'admin.tableau_de_bord'          => 'tableau_de_bord_personnel',
-            'admin.tableau_de_bord_general'  => 'tableau_de_bord_general',
-            
-            'admin.ventes.nouvelle'          => 'nouvelle_vente',
-            'admin.ventes.enregistrer'       => 'nouvelle_vente',
-            'admin.ventes.factures'          => 'factures_vente',
-            'admin.ventes.historique'        => 'historique_ventes',
-            'admin.ventes.imprimer'          => 'factures_vente',
-            'admin.ventes.ticket'            => 'factures_vente',
-            'admin.ventes.avoir'             => 'factures_vente',
-            'admin.ventes.normaliser'        => 'factures_vente',
-            
-            'admin.achats.nouveau'           => 'nouvel_achat',
-            'admin.achats.enregistrer'       => 'nouvel_achat',
-            'admin.achats.factures'          => 'factures_achat',
-            'admin.achats.historique'        => 'historique_achats',
-            'admin.achats.imprimer'          => 'factures_achat',
-            'admin.achats.bapa'              => 'factures_achat',
-            'admin.achats.avoir'             => 'factures_achat',
-            'admin.achats.normaliser'        => 'factures_achat',
-            
-            'admin.stock.index'              => 'stock_articles',
-            'admin.stock.mouvements'         => 'stock_mouvements',
-            'admin.stock.rebut'              => 'stock_articles',
-            'admin.stock.rebut.retirer'      => 'stock_articles',
-            'admin.stock.transferts.index'   => 'stock_articles',
-            'admin.stock.transferts.creer'   => 'stock_articles',
-            'admin.stock.transferts.valider' => 'stock_articles',
-            'admin.stock.transferts.rejeter' => 'stock_articles',
-            'admin.stock.receptions'         => 'stock_articles',
-            'admin.stock.receptions.fiche'   => 'stock_articles',
-            'admin.stock.receptions.valider' => 'stock_articles',
-            'admin.stock.livraisons'         => 'stock_articles',
-            'admin.stock.livraisons.fiche'   => 'stock_articles',
-            'admin.stock.livraisons.valider' => 'stock_articles',
-            
-            'admin.tresorerie.encaissements' => 'tresorerie_encaissements',
-            'admin.tresorerie.decaissements' => 'tresorerie_decaissements',
-            'admin.tresorerie.journal'       => 'tresorerie_journal',
-            'admin.tresorerie.codes_journaux' => 'tresorerie_codes_journaux',
-            'admin.tresorerie.creer_code_journal' => 'tresorerie_codes_journaux',
-            'admin.tresorerie.supprimer_code_journal' => 'tresorerie_codes_journaux',
-            'admin.banques.creer'            => 'nouvelle_vente',
-            
-            'admin.comptabilite.globale'     => 'comptabilite_globale',
-            'admin.comptabilite.creances'    => 'comptabilite_creances',
-            'admin.comptabilite.releve_tiers'=> 'comptabilite_creances',
-            'admin.comptabilite.reglement'   => 'comptabilite_creances',
-            'admin.comptabilite.plan_comptable' => 'comptabilite_plan_comptable',
-            'admin.comptabilite.creer_compte_comptable' => 'comptabilite_plan_comptable',
-            
-            'admin.pdv.index'                => 'gestion_pdv',
-            'admin.pdv.creer'                => 'gestion_pdv',
-            'admin.pdv.activer'              => 'gestion_pdv',
-            'admin.pdv.activer_apercu'       => 'gestion_pdv',
-            'admin.pdv.desactiver_apercu'    => 'gestion_pdv',
-            
-            'admin.personnel.index'          => 'gestion_personnel',
-            'admin.personnel.creer'          => 'gestion_personnel',
-            'admin.personnel.details'        => 'gestion_personnel',
-            'admin.personnel.modifier'       => 'gestion_personnel',
-            'admin.personnel.statut'         => 'gestion_personnel',
-            'admin.personnel.supprimer'      => 'gestion_personnel',
-            
-            'admin.produits.index'             => 'catalogue_produits',
-            'admin.produits.creer'             => 'catalogue_produits',
-            'admin.produits.modifier'          => 'catalogue_produits',
-            'admin.produits.fiche'             => 'catalogue_produits',
-            'admin.produits.archiver'          => 'catalogue_produits',
-            'admin.produits.description'       => 'catalogue_produits',
-            'admin.produits.photo'             => 'catalogue_produits',
-            'admin.produits.details.ajouter'   => 'catalogue_produits',
-            'admin.produits.details.supprimer' => 'catalogue_produits',
-            
-            // Production
-            'admin.production.fiches_techniques.index'    => 'production_recettes',
-            'admin.production.fiches_techniques.creer'    => 'production_recettes',
-            'admin.production.fiches_techniques.enregistrer'=> 'production_recettes',
-            'admin.production.fiches_techniques.modifier' => 'production_recettes',
-            'admin.production.fiches_techniques.modifier.enregistrer' => 'production_recettes',
-            'admin.production.fiches_techniques.supprimer'=> 'production_recettes',
-            'admin.production.ordres.index'              => 'production_ordres',
-            'admin.production.ordres.creer'              => 'production_ordres',
-            'admin.production.ordres.enregistrer'        => 'production_ordres',
-            'admin.production.ordres.valider'            => 'production_ordres',
-            
-            // Communication B2B
-            'admin.b2b.negociations.client'      => 'nouvel_achat',
-            'admin.b2b.negociations.fournisseur' => 'nouvelle_vente',
-            'admin.b2b.rfq.creer'                => 'nouvel_achat',
-            'admin.b2b.negociation.proposer'     => 'nouvel_achat',
-            'admin.b2b.negociation.stock'        => 'nouvelle_vente',
-            'admin.b2b.negociation.finaliser'    => 'nouvelle_vente',
-            'admin.b2b.achat.accepter'           => 'nouvel_achat',
-            
-            'admin.clients.index'            => 'tiers_clients',
-            'admin.clients.creer'            => 'tiers_clients',
-            
-            'admin.fournisseurs.index'       => 'tiers_fournisseurs',
-            'admin.fournisseurs.creer'       => 'tiers_fournisseurs',
+        if ($cle === null) {
+            return $next($request);
+        }
 
-            'admin.rapports.analyse_activite' => 'rapports_analyse',
-        ];
+        // L'onglet des habilitations, dans l'écran du personnel, distribue les
+        // droits : le voir n'est pas le même geste que gérer le personnel.
+        if (Habilitations::normaliser($nomRoute) === 'admin.personnel.index'
+            && $request->query('tab') === 'habilitations') {
+            $cle = 'gestion_habilitations';
+        }
 
-        if (isset($correspondances[$routeNormalisee])) {
-            $cleHabilitation = $correspondances[$routeNormalisee];
+        if (! $utilisateur->aHabilitation($cle)) {
+            abort(403, 'Accès refusé. Vous ne disposez pas de l\'habilitation requise pour cette page.');
+        }
 
-            // Distinction spécifique pour l'onglet d'habilitations du personnel
-            if ($routeNormalisee === 'admin.personnel.index' && $request->query('tab') === 'habilitations') {
-                $cleHabilitation = 'gestion_habilitations';
-            }
+        return $next($request);
+    }
 
-            if (! $utilisateur->aHabilitation($cleHabilitation)) {
-                abort(403, 'Accès refusé. Vous ne disposez pas de l\'habilitation requise pour cette page.');
-            }
+    /**
+     * Les écrans d'administration de la plateforme.
+     *
+     * Même principe : une route `superadmin.` que le dictionnaire ne connaît
+     * pas est refusée. Ce sont les écrans les plus puissants de
+     * l'application ; y laisser passer l'inconnu serait le pire endroit.
+     */
+    private function superadmin(Request $request, Closure $next, $utilisateur, string $nomRoute): Response
+    {
+        if (! str_starts_with($nomRoute, 'superadmin.')) {
+            return $next($request);
+        }
+
+        $cle = self::SUPERADMIN[$nomRoute] ?? null;
+
+        if ($cle === null) {
+            abort(403, 'Accès refusé : cette fonctionnalité d\'administration n\'est rattachée à aucune habilitation.');
+        }
+
+        $habilitations = is_array($utilisateur->habilitations) ? $utilisateur->habilitations : [];
+
+        if (! in_array($cle, $habilitations, true)) {
+            abort(403, "Accès refusé. Vous n'avez pas l'habilitation requise pour accéder à cette fonctionnalité d'administration.");
         }
 
         return $next($request);
