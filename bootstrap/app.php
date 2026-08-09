@@ -72,6 +72,9 @@ return Application::configure(basePath: dirname(__DIR__))
                 try {
                     $url = $request->fullUrl();
                     $msg  = "Alerte Production : Panne détectée sur Selflow\n\n";
+                    // La même référence que celle affichée à l'utilisateur :
+                    // c'est par elle que les deux bouts se rejoignent.
+                    $msg .= "Référence : " . \App\Exceptions\Panne::reference($e) . "\n";
                     $msg .= "URL de la page : " . $url . "\n";
                     $msg .= "Erreur : " . $e->getMessage() . "\n";
                     $msg .= "Fichier : " . $e->getFile() . "\n";
@@ -86,8 +89,26 @@ return Application::configure(basePath: dirname(__DIR__))
                     // Tolérance aux pannes : ignorer si l'envoi d'email échoue (ex: SMTP non configuré)
                 }
 
-                // Renvoyer la vue d'erreur 500 personnalisée
-                return response()->view('errors.500', [], 500);
+                // **La page de panne remplace la trace de Laravel.** Sur un
+                // écran de caisse, celle-ci montrait le nom des fichiers du
+                // serveur, les versions des bibliothèques et le contenu des
+                // variables : illisible pour l'utilisateur, et trop lisible
+                // pour qui passait par là.
+                //
+                // La page porte le message d'attente, une référence à donner au
+                // service informatique, et le détail replié.
+                return response()->view('errors.500', [
+                    'reference' => \App\Exceptions\Panne::reference($e),
+                    'detail'    => [
+                        'type'    => $e::class,
+                        'message' => $e->getMessage(),
+                        'fichier' => str_replace(base_path() . DIRECTORY_SEPARATOR, '', $e->getFile()),
+                        'ligne'   => $e->getLine(),
+                        'url'     => $request->fullUrl(),
+                        'moment'  => now()->format('d/m/Y à H:i:s'),
+                        'trace'   => substr($e->getTraceAsString(), 0, 4000),
+                    ],
+                ], 500);
             }
         });
     })->create();

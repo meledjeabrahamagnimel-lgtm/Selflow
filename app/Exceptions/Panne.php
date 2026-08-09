@@ -50,6 +50,30 @@ class Panne
     }
 
     /**
+     * Le numéro sous lequel cette panne est consignée.
+     *
+     * L'utilisateur qui appelle le service informatique n'a rien d'autre à
+     * donner que ce qu'il voit à l'écran : sans référence, la conversation
+     * commence par « quelle page, à quelle heure, quel message ? », et le
+     * journal du serveur contient mille lignes de la même minute.
+     *
+     * La référence se calcule à partir de l'endroit exact où la panne s'est
+     * produite : **deux occurrences du même défaut portent le même numéro**, ce
+     * qui permet de les regrouper, et un défaut nouveau se distingue tout de
+     * suite d'un défaut connu. La date les sépare ensuite dans le journal.
+     */
+    public static function reference(\Throwable $e): string
+    {
+        $empreinte = strtoupper(substr(
+            hash('crc32b', $e::class . '|' . $e->getFile() . '|' . $e->getLine()),
+            0,
+            6
+        ));
+
+        return 'SF-' . now()->format('ymd') . '-' . $empreinte;
+    }
+
+    /**
      * Exceptions dont Laravel sait déjà quoi faire.
      */
     private const PAS_DES_PANNES = [

@@ -1332,6 +1332,41 @@ avec vous plutôt que de la présumer.
 - `App\Modules\Admin\Regles\Cloisonnement`
 - `tests/Feature/CloisonnementTest.php` — 11 tests.
 
+#### Lot 8.3 bis — La page de panne — **TERMINÉ**
+
+Laravel affichait sa propre page de trace. Sur un écran de caisse, un
+utilisateur voyait le nom des fichiers du serveur, les versions des
+bibliothèques et le contenu des variables : **illisible pour lui, et trop
+lisible pour qui passait par là** — un chemin absolu dit le système
+d'exploitation et l'arborescence du déploiement, une version de bibliothèque dit
+quelles failles connues essayer.
+
+La page porte désormais le message d'attente demandé, une **référence** à donner
+au service informatique, et le détail technique **replié**, qu'on ouvre d'un
+clic. Le repli est un `<details>` : il s'ouvre sans une ligne de script et
+fonctionne même si le navigateur en refuse.
+
+**La référence se calcule depuis l'endroit exact où la panne s'est produite** —
+type, fichier, ligne. Deux occurrences du même défaut portent donc le même
+numéro, ce qui permet de les regrouper, et un défaut nouveau se distingue tout
+de suite d'un défaut connu. Elle tient en trois groupes courts (`SF-260816-A3F9C1`),
+dictables au téléphone, et figure aussi dans le courriel d'alerte : c'est par
+elle que les deux bouts se rejoignent.
+
+**Le fond est dessiné dans la page**, en SVG et en dégradés, à la palette de
+l'application — le bleu royal `#002B5C`, le gris-bleu `#F4F6F9`, la police
+Inter. Aucun fichier à déployer, aucune requête à faire : le jour où le serveur
+va mal est le pire moment pour dépendre d'une image qui doit se charger.
+
+**Une réserve, signalée.** La suite des appels porte l'arborescence du serveur :
+elle n'est dépliée que pour l'administration de la plateforme ou en mode
+développement. Tout le reste du détail — type, message, fichier, ligne, adresse,
+moment — est montré à tout le monde. Si vous préférez que la suite des appels
+soit visible de tous, c'est une ligne à changer dans la vue.
+
+- `resources/views/errors/500.blade.php`, `App\Exceptions\Panne::reference()`
+- `tests/Feature/PageDePanneTest.php` — 12 tests.
+
 ---
 
 ## 5 bis. La numérotation des comptes — tranché

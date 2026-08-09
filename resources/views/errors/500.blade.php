@@ -1,229 +1,308 @@
+{{--
+    La page de panne.
+
+    Laravel affichait sa propre page de trace : sur un écran de caisse, un
+    utilisateur voyait le nom des fichiers du serveur, les versions des
+    bibliothèques et le contenu des variables. C'est illisible pour lui, et
+    trop lisible pour qui passait par là.
+
+    Ici : le message d'attente, la référence à donner au service informatique,
+    et le détail technique replié — qu'on ouvre d'un clic quand on sait quoi en
+    faire.
+
+    Le fond reprend la palette de l'application — le bleu royal `#002B5C`, le
+    gris-bleu très clair `#F4F6F9`, la police Inter — et le motif est dessiné en
+    SVG dans la page : aucun fichier à déployer, aucune requête à faire, et rien
+    à recharger le jour où le serveur va mal.
+--}}
+@php
+    $detail = $detail ?? null;
+    $reference = $reference ?? null;
+
+    // Le détail complet — les appels successifs — n'est déplié que pour qui
+    // peut en faire quelque chose. Un utilisateur voit ce qui s'est passé et
+    // sous quelle référence ; il n'a pas à voir l'arborescence du serveur.
+    $montrerLaTrace = config('app.debug') || (auth()->check() && auth()->user()->role === 'superadmin');
+@endphp
 <!DOCTYPE html>
 <html lang="fr">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Page en maintenance - Support DC-KNOWING</title>
-    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <title>Page en maintenance — Selflow</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
     <style>
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
         :root {
-            --bg-color: #0f172a;
-            --card-bg: #1e293b;
-            --text-color: #f8fafc;
-            --text-secondary: #94a3b8;
-            --primary: #3b82f6;
-            --primary-glow: rgba(59, 130, 246, 0.15);
-            --danger: #ef4444;
-            --border: #334155;
+            --primary:   #002B5C;
+            --primary-d: #001F42;
+            --bg:        #F4F6F9;
+            --surface:   #ffffff;
+            --border:    #E2E8F0;
+            --text:      #1E293B;
+            --text-2:    #475569;
+            --text-3:    #94a3b8;
+            --warning:   #f59e0b;
+            --radius:    12px;
+            --shadow:    0 10px 30px rgba(0, 0, 0, 0.05);
         }
 
-        * {
-            box-sizing: border-box;
-            margin: 0;
-            padding: 0;
+        html, body {
+            min-height: 100%;
+            font-family: 'Inter', sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            font-size: 14px;
         }
 
+        /* Le fond : le bleu de l'application, un halo, et une trame de points
+           très discrète. Tout est dessiné ici — rien à déployer. */
         body {
-            font-family: 'Outfit', sans-serif;
-            background-color: var(--bg-color);
-            color: var(--text-color);
             display: flex;
             align-items: center;
             justify-content: center;
-            min-height: 100vh;
-            padding: 20px;
-            overflow: hidden;
+            padding: 28px 20px;
             position: relative;
+            overflow-x: hidden;
+            background:
+                radial-gradient(circle at 12% 18%, rgba(0, 43, 92, 0.10) 0%, transparent 45%),
+                radial-gradient(circle at 88% 82%, rgba(0, 43, 92, 0.07) 0%, transparent 45%),
+                url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='36' height='36'%3E%3Ccircle cx='2' cy='2' r='1.1' fill='%23002B5C' fill-opacity='0.07'/%3E%3C/svg%3E"),
+                var(--bg);
         }
 
-        /* Effets de lumière en arrière-plan */
+        /* La bande bleue du haut, comme la barre latérale de l'application. */
         body::before {
             content: '';
-            position: absolute;
-            width: 400px;
-            height: 400px;
-            background: radial-gradient(circle, rgba(59, 130, 246, 0.2) 0%, transparent 70%);
-            top: -100px;
-            right: -100px;
-            z-index: 1;
-        }
-        body::after {
-            content: '';
-            position: absolute;
-            width: 500px;
-            height: 500px;
-            background: radial-gradient(circle, rgba(239, 68, 68, 0.08) 0%, transparent 70%);
-            bottom: -150px;
-            left: -150px;
-            z-index: 1;
+            position: fixed;
+            inset: 0 0 auto 0;
+            height: 6px;
+            background: linear-gradient(90deg, var(--primary) 0%, var(--primary-d) 55%, var(--warning) 100%);
+            z-index: 2;
         }
 
-        .container {
-            max-width: 600px;
-            width: 100%;
-            background: var(--card-bg);
-            border: 1px solid var(--border);
-            border-radius: 24px;
-            padding: 40px;
-            text-align: center;
-            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.4);
+        .panne {
             position: relative;
-            z-index: 10;
-            backdrop-filter: blur(10px);
-        }
-
-        .error-illustration {
-            width: 120px;
-            height: 120px;
-            background: rgba(239, 68, 68, 0.1);
-            border: 2px solid rgba(239, 68, 68, 0.2);
-            color: var(--danger);
-            border-radius: 50%;
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 48px;
-            margin-bottom: 24px;
-            animation: pulse 2s infinite;
-        }
-
-        @keyframes pulse {
-            0% { transform: scale(1); box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.4); }
-            70% { transform: scale(1.05); box-shadow: 0 0 0 15px rgba(239, 68, 68, 0); }
-            100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }
-        }
-
-        h1 {
-            font-size: 26px;
-            font-weight: 700;
-            margin-bottom: 12px;
-            background: linear-gradient(135deg, #f8fafc 0%, #cbd5e1 100%);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-        }
-
-        p {
-            font-size: 15px;
-            color: var(--text-secondary);
-            line-height: 1.6;
-            margin-bottom: 30px;
-        }
-
-        .support-info {
-            background: rgba(15, 23, 42, 0.4);
+            z-index: 1;
+            width: 100%;
+            max-width: 760px;
+            background: var(--surface);
             border: 1px solid var(--border);
-            border-radius: 16px;
-            padding: 20px;
-            margin-bottom: 30px;
-            text-align: left;
+            border-radius: var(--radius);
+            box-shadow: var(--shadow);
+            overflow: hidden;
         }
 
-        .support-title {
-            font-weight: 600;
-            font-size: 13px;
-            text-transform: uppercase;
-            letter-spacing: 1px;
-            color: var(--primary);
-            margin-bottom: 14px;
+        .panne-entete {
+            padding: 30px 34px 24px;
+            border-bottom: 1px solid var(--border);
             display: flex;
-            align-items: center;
-            gap: 8px;
+            gap: 18px;
+            align-items: flex-start;
         }
 
-        .support-item {
-            display: flex;
-            align-items: center;
-            gap: 12px;
-            font-size: 14px;
-            color: var(--text-color);
-            margin-bottom: 10px;
-        }
-        .support-item:last-child {
-            margin-bottom: 0;
-        }
-
-        .support-item i {
-            color: var(--text-secondary);
-            width: 16px;
-            text-align: center;
-        }
-
-        .support-item a {
-            color: var(--primary);
-            text-decoration: none;
-            font-weight: 600;
-            transition: opacity 0.2s;
-        }
-        .support-item a:hover {
-            text-decoration: underline;
-        }
-
-        .btn-home {
-            display: inline-flex;
-            align-items: center;
-            gap: 8px;
+        .marque {
+            width: 46px; height: 46px; flex: none;
+            border-radius: 11px;
             background: var(--primary);
             color: #fff;
-            padding: 12px 24px;
-            border-radius: 12px;
-            font-weight: 600;
-            text-decoration: none;
-            font-size: 14px;
-            transition: all 0.2s;
-            box-shadow: 0 4px 14px var(--primary-glow);
-        }
-        .btn-home:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 6px 20px rgba(59, 130, 246, 0.3);
+            display: flex; align-items: center; justify-content: center;
+            font-size: 20px;
         }
 
-        .footer-logo {
-            font-size: 12px;
-            color: var(--text-secondary);
-            margin-top: 30px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 6px;
+        .panne-entete h1 {
+            font-size: 20px; font-weight: 800; letter-spacing: -0.01em;
+            color: var(--primary); margin-bottom: 6px;
+        }
+
+        .panne-entete .sous { font-size: 12.5px; color: var(--text-3); }
+
+        .panne-corps { padding: 26px 34px 30px; }
+
+        .message {
+            font-size: 15.5px; line-height: 1.65; color: var(--text-2);
+            padding: 18px 20px;
+            background: #EBF2FC;
+            border-left: 4px solid var(--primary);
+            border-radius: 10px;
+        }
+
+        .reference {
+            margin-top: 20px;
+            display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+            font-size: 13px; color: var(--text-2);
+        }
+        .reference code {
+            font-family: ui-monospace, 'SFMono-Regular', Menlo, monospace;
+            font-size: 13.5px; font-weight: 700;
+            background: var(--bg); border: 1px solid var(--border);
+            border-radius: 7px; padding: 5px 10px; color: var(--primary);
+        }
+
+        /* Le détail technique, replié. */
+        .repli { margin-top: 22px; border: 1px solid var(--border); border-radius: 10px; overflow: hidden; }
+
+        .repli > summary {
+            list-style: none; cursor: pointer; user-select: none;
+            padding: 13px 16px; background: var(--bg);
+            font-size: 13px; font-weight: 600; color: var(--text-2);
+            display: flex; align-items: center; gap: 9px;
+        }
+        .repli > summary::-webkit-details-marker { display: none; }
+        .repli > summary:hover { background: #EBF2FC; color: var(--primary); }
+        .repli > summary .chevron { transition: transform .18s ease; font-size: 11px; }
+        .repli[open] > summary .chevron { transform: rotate(90deg); }
+        .repli[open] > summary { border-bottom: 1px solid var(--border); }
+
+        .repli-contenu { padding: 16px; background: var(--surface); }
+
+        .ligne-detail {
+            display: grid; grid-template-columns: 130px 1fr; gap: 10px;
+            padding: 8px 0; border-bottom: 1px dashed var(--border);
+            font-size: 12.5px; align-items: start;
+        }
+        .ligne-detail:last-child { border-bottom: none; }
+        .ligne-detail dt { color: var(--text-3); font-weight: 600; }
+        .ligne-detail dd {
+            color: var(--text); word-break: break-word;
+            font-family: ui-monospace, 'SFMono-Regular', Menlo, monospace;
+        }
+
+        pre.trace {
+            margin-top: 12px; padding: 14px;
+            background: #0F172A; color: #CBD5E1;
+            border-radius: 9px; font-size: 11.5px; line-height: 1.6;
+            max-height: 320px; overflow: auto;
+            font-family: ui-monospace, 'SFMono-Regular', Menlo, monospace;
+        }
+
+        .actions { margin-top: 26px; display: flex; gap: 10px; flex-wrap: wrap; }
+
+        .btn {
+            display: inline-flex; align-items: center; gap: 8px;
+            padding: 10px 18px; border-radius: 9px; border: 1px solid var(--border);
+            background: var(--surface); color: var(--text-2);
+            font-size: 13.5px; font-weight: 600; text-decoration: none; cursor: pointer;
+            font-family: inherit;
+        }
+        .btn:hover { background: var(--bg); color: var(--primary); }
+        .btn-principal { background: var(--primary); border-color: var(--primary); color: #fff; }
+        .btn-principal:hover { background: var(--primary-d); color: #fff; }
+
+        .pied {
+            margin-top: 24px; padding-top: 18px; border-top: 1px solid var(--border);
+            font-size: 12px; color: var(--text-3); text-align: center;
+        }
+
+        @media (max-width: 560px) {
+            .panne-entete, .panne-corps { padding-left: 20px; padding-right: 20px; }
+            .ligne-detail { grid-template-columns: 1fr; gap: 2px; }
         }
     </style>
 </head>
 <body>
-
-<div class="container">
-    <div class="error-illustration">
-        <i class="fas fa-toolbox"></i>
-    </div>
-    <h1>Page en maintenance technique</h1>
-    <p>Cette page rencontre actuellement une anomalie ou est momentanément indisponible. Notre équipe technique a été automatiquement alertée pour résoudre cet incident dans les plus brefs délais.</p>
-    
-    <div class="support-info">
-        <div class="support-title">
-            <i class="fas fa-headset"></i> Support DC-KNOWING
+    <main class="panne">
+        <div class="panne-entete">
+            <div class="marque"><i class="fas fa-screwdriver-wrench"></i></div>
+            <div>
+                <h1>Page en maintenance</h1>
+                <div class="sous">Selflow — DC-Knowing</div>
+            </div>
         </div>
-        <div class="support-item">
-            <i class="fas fa-envelope"></i>
-            <span>Email : <a href="mailto:support@dc-knowing.com">support@dc-knowing.com</a></span>
-        </div>
-        <div class="support-item">
-            <i class="fab fa-whatsapp"></i>
-            <span>WhatsApp : <a href="https://wa.me/22507000000" target="_blank">+225 07 00 00 00</a></span>
-        </div>
-        <div class="support-item">
-            <i class="fas fa-phone-alt"></i>
-            <span>Support téléphonique : +225 27 00 00 00</span>
-        </div>
-    </div>
 
-    <a href="/" class="btn-home">
-        <i class="fas fa-arrow-left"></i> Retour à l'accueil
-    </a>
+        <div class="panne-corps">
+            <p class="message">
+                Cette page est en maintenance et notre service informatique s'en charge.
+                Veuillez patienter, et désolé pour le désagrément.
+            </p>
 
-    <div class="footer-logo">
-        <i class="fas fa-shield-halved"></i> Propulsé par DC-KNOWING
-    </div>
-</div>
+            @if($reference)
+                <div class="reference">
+                    <i class="fas fa-hashtag" style="color:var(--text-3);"></i>
+                    <span>Référence à donner au service informatique :</span>
+                    <code id="reference">{{ $reference }}</code>
+                    <button type="button" class="btn" style="padding:4px 10px; font-size:12px;"
+                            onclick="copierLaReference()">
+                        <i class="fas fa-copy"></i> Copier
+                    </button>
+                </div>
+            @endif
 
+            {{-- Le détail, replié : `<details>` s'ouvre au clic sans une ligne
+                 de script, et fonctionne même si le navigateur en refuse. --}}
+            @if($detail)
+                <details class="repli">
+                    <summary>
+                        <i class="fas fa-chevron-right chevron"></i>
+                        Détail technique
+                    </summary>
+                    <div class="repli-contenu">
+                        <dl>
+                            <div class="ligne-detail">
+                                <dt>Type</dt>
+                                <dd>{{ $detail['type'] }}</dd>
+                            </div>
+                            <div class="ligne-detail">
+                                <dt>Message</dt>
+                                <dd>{{ $detail['message'] }}</dd>
+                            </div>
+                            <div class="ligne-detail">
+                                <dt>Fichier</dt>
+                                <dd>{{ $detail['fichier'] }}:{{ $detail['ligne'] }}</dd>
+                            </div>
+                            <div class="ligne-detail">
+                                <dt>Adresse</dt>
+                                <dd>{{ $detail['url'] }}</dd>
+                            </div>
+                            <div class="ligne-detail">
+                                <dt>Moment</dt>
+                                <dd>{{ $detail['moment'] }}</dd>
+                            </div>
+                        </dl>
+
+                        @if($montrerLaTrace && !empty($detail['trace']))
+                            <pre class="trace">{{ $detail['trace'] }}</pre>
+                        @elseif(!empty($detail['trace']))
+                            <p style="margin-top:12px; font-size:12px; color:var(--text-3);">
+                                La suite des appels n'est visible que par l'administration de la
+                                plateforme : elle porte l'arborescence du serveur.
+                            </p>
+                        @endif
+                    </div>
+                </details>
+            @endif
+
+            <div class="actions">
+                <a href="javascript:location.reload()" class="btn btn-principal">
+                    <i class="fas fa-rotate-right"></i> Réessayer
+                </a>
+                <a href="{{ url('/') }}" class="btn">
+                    <i class="fas fa-house"></i> Retour à l'accueil
+                </a>
+            </div>
+
+            <div class="pied">
+                Le service informatique a été prévenu automatiquement.
+            </div>
+        </div>
+    </main>
+
+    <script>
+        function copierLaReference() {
+            const texte = document.getElementById('reference')?.textContent?.trim();
+
+            if (!texte || !navigator.clipboard) return;
+
+            navigator.clipboard.writeText(texte).then(() => {
+                const bouton = event.currentTarget;
+                const avant = bouton.innerHTML;
+                bouton.innerHTML = '<i class="fas fa-check"></i> Copiée';
+                setTimeout(() => { bouton.innerHTML = avant; }, 1800);
+            });
+        }
+    </script>
 </body>
 </html>
