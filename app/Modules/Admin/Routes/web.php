@@ -13,6 +13,7 @@ use App\Modules\Admin\Controleurs\PersonnelControleur;
 use App\Modules\Admin\Controleurs\EntrepriseControleur;
 use App\Modules\Admin\Controleurs\RapportControleur;
 use App\Modules\Admin\Controleurs\TransfertStockControleur;
+use App\Modules\Admin\Controleurs\ImmobilisationControleur;
 use App\Modules\Admin\Controleurs\ProductionControleur;
 use App\Modules\Admin\Controleurs\B2bControleur;
 use App\Modules\Admin\Controleurs\BonLivraisonControleur;
@@ -231,6 +232,23 @@ Route::prefix('admin')
                 Route::post('/creer',      [ProductionControleur::class, 'enregistrerOrdre'])->name('enregistrer');
                 Route::post('/{ordre}/valider', [ProductionControleur::class, 'validerOrdre'])->name('valider');
             });
+        });
+
+        // ── Immobilisations et amortissements ──
+        //
+        // Rien n'existait : un camion, un four, un ordinateur passaient en
+        // charge de l'exercice, ou ne passaient nulle part. Le bilan ne portait
+        // pas trace de l'actif immobilisé, et la charge d'amortissement,
+        // déductible, n'était pas prise.
+        Route::prefix('immobilisations')->name('immobilisations.')->middleware('modules:comptabilite')->group(function () {
+            Route::get('/',                 [ImmobilisationControleur::class, 'index'])->name('index');
+            Route::get('/creer',            [ImmobilisationControleur::class, 'creer'])->name('creer');
+            Route::post('/creer',           [ImmobilisationControleur::class, 'enregistrer'])->name('enregistrer');
+            Route::post('/cloturer',        [ImmobilisationControleur::class, 'cloturerLExercice'])->name('cloturer');
+            Route::get('/{bien}',           [ImmobilisationControleur::class, 'fiche'])->name('fiche');
+            Route::put('/{bien}',           [ImmobilisationControleur::class, 'modifier'])->name('modifier');
+            Route::post('/{bien}/ceder',    [ImmobilisationControleur::class, 'ceder'])->name('ceder');
+            Route::post('/dotation/{dotation}', [ImmobilisationControleur::class, 'passerLaDotation'])->name('dotation');
         });
 
         // ── Communication B2B ──

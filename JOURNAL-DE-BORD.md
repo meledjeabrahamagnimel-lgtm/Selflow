@@ -1018,6 +1018,71 @@ stock et la somme des lots dit ce qui reste à régulariser.
   d'attaque : vente de périmé par la route, préavis démesuré tronqué en base,
   lecture des lots d'une autre entreprise.
 
+#### Lot 6.4 — Les immobilisations et leur amortissement — **TERMINÉ**
+
+**Rien n'existait.** Un camion, un four, un ordinateur achetés par l'entreprise
+passaient en charge de l'exercice, ou ne passaient nulle part. Trois
+conséquences, et la troisième coûte de l'argent :
+
+- **le bilan était faux** — l'actif immobilisé, la classe 2, restait vide. Une
+  entreprise qui possède un camion de dix millions présentait un bilan qui n'en
+  portait pas trace ;
+- **le résultat était faux** — un investissement passé en charge écrase le
+  résultat de l'année où il est fait, et l'allège indûment les suivantes ;
+- **la charge d'amortissement, déductible, n'était pas prise.** Une entreprise
+  qui n'amortit pas **paie l'impôt sur un bénéfice qu'elle n'a pas.**
+
+**Le plan se calcule d'avance**, à la mise en service — c'est lui que le
+comptable présente au contrôle. C'est la **mise en service** qui déclenche
+l'amortissement, non l'acquisition : un matériel acheté en novembre et installé
+en janvier ne s'amortit pas sur novembre et décembre. La dernière annuité solde
+le plan, sinon les arrondis laisseraient quelques francs non amortis et le bien
+resterait indéfiniment au bilan pour ce reliquat.
+
+Les écritures, en SYSCOHADA révisé — les numéros viennent du relevé OHADA du
+dépôt, non d'une mémoire :
+
+| Écriture | Débit | Crédit |
+|---|---|---|
+| **Dotation** | 681x | 28x |
+| **Cession** — solde de l'amortissement | 28x | — |
+| **Cession** — valeur comptable nette | 810000 | — |
+| **Cession** — sortie du bien | — | 2x |
+| **Cession** — le prix | 485000 | 820000 |
+
+**La plus-value ne s'écrit pas** : elle apparaît d'elle-même comme différence
+entre le 82 et le 81 au compte de résultat. L'inscrire doublerait le résultat de
+cession — erreur qu'on retrouve dans beaucoup de logiciels.
+
+**La dotation de l'exercice de sortie est due jusqu'au jour de la sortie.** Le
+bien a servi ; l'omettre gonflerait la valeur nette, donc minorerait la charge
+et **majorerait la plus-value, sur laquelle l'entreprise serait imposée**.
+
+Une dotation ne se passe qu'une fois — `comptabilise_at` le garantit. La
+repasser doublerait la charge et amortirait le bien au double de sa valeur, et
+l'erreur ne se verrait qu'au bilan de l'année suivante. Une fiche dont une
+dotation est passée ne se retouche plus.
+
+**La seule convention d'usage du lot est isolée et nommée.** Le prorata temporis
+se compte en jours sur une année commerciale de 360 jours, chaque mois valant 30
+jours — usage OHADA courant. C'est le seul point qui ne vient pas d'un texte du
+dépôt : il tient dans `AmortissementService::JOURS_PAR_AN`, pour qu'un cabinet
+qui compte en mois entiers change une constante et non le service. **À
+confirmer par le propriétaire.**
+
+**Le dégressif n'est pas calculé.** Ses coefficients relèvent d'un texte que le
+dépôt ne contient pas, et les supposer donnerait un plan faux que rien ne
+signalerait — c'est exactement l'écart qui a produit un timbre de quittance à
+1,5 %, taux qui ne figure dans aucun texte.
+
+- `2026_08_14_000001_immobilisations_et_amortissements.php`
+- `Immobilisation`, `DotationAmortissement`, `AmortissementService`,
+  `ImmobilisationControleur`, trois vues
+- `tests/Feature/AmortissementTest.php` — 37 tests, dont dix par les écrans :
+  code déjà pris, mise en service antérieure à l'acquisition, valeur résiduelle
+  supérieure à la valeur d'acquisition, fiche engagée, sortie antérieure à la
+  mise en service, et la fiche d'un bien d'une autre entreprise.
+
 ### Lot 7 — La vitrine
 
 Landing page, documentation, politique, présentation de DC-Knowing et de ses
