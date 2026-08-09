@@ -7,7 +7,6 @@ use App\Modules\Admin\Modeles\Achat;
 use App\Modules\Admin\Modeles\EcritureComptable;
 use App\Modules\Admin\Modeles\CodeJournal;
 use App\Modules\Admin\Modeles\Operation;
-use App\Modules\Admin\Modeles\OrdreProduction;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -381,59 +380,29 @@ class ComptabiliteService
     // ─────────────────────────────────────────────────────────────────
     // PRODUCTION
     // ─────────────────────────────────────────────────────────────────
-
-    /**
-     * Génère les écritures comptables d'un ordre de production.
-     *
-     * Logique SYSCOHADA révisé (inventaire permanent) :
-     *   Pour chaque matière première consommée :
-     *     Débit  603200 (Variation des stocks de MP)   vs Crédit 311000 (Stock MP)
-     *   Pour le produit fini fabriqué :
-     *     Débit  351100 (Stock produits finis)          vs Crédit 731100 (Variation stocks PF)
-     */
-    public static function genererEcritureProduction(
-        OrdreProduction $ordre,
-        array $consommations,
-        float $valeurProduction
-    ): void {
-        if (empty($consommations) && $valeurProduction <= 0) {
-            return;
-        }
-
-        $entrepriseId = $ordre->pointDeVente->entreprise_id;
-        $pdvId        = $ordre->point_de_vente_id;
-        $date         = now()->toDateString();
-        $refDoc       = $ordre->code_ordre;
-        $codeJournal  = self::codeJournal($entrepriseId, 'OD', 'OD');
-
-        DB::transaction(function () use ($ordre, $consommations, $valeurProduction, $entrepriseId, $pdvId, $date, $refDoc, $codeJournal) {
-            $operation = Operation::creer(
-                $entrepriseId, $pdvId, $date, 'Production',
-                $codeJournal, $refDoc, 'Production interne — ' . ($ordre->produitFini->nom ?? '')
-            );
-
-            foreach ($consommations as $conso) {
-                $valeurMp = round($conso['quantite'] * ($conso['valeur_unitaire'] ?? $conso['produit']->prix_achat ?? 0), 2);
-                if ($valeurMp <= 0) continue;
-
-                self::ligne($operation, $entrepriseId, $pdvId, $date, $refDoc, $codeJournal,
-                    $refDoc . ' / Conso MP ' . $conso['produit']->nom, '603200', null, null, $valeurMp, 0);
-
-                self::ligne($operation, $entrepriseId, $pdvId, $date, $refDoc, $codeJournal,
-                    $refDoc . ' / Sortie Stock MP ' . $conso['produit']->nom, null, '311000', null, 0, $valeurMp);
-            }
-
-            if ($valeurProduction > 0) {
-                self::ligne($operation, $entrepriseId, $pdvId, $date, $refDoc, $codeJournal,
-                    $refDoc . ' / Entrée PF ' . $ordre->produitFini->nom, '351100', null, null, $valeurProduction, 0);
-
-                self::ligne($operation, $entrepriseId, $pdvId, $date, $refDoc, $codeJournal,
-                    $refDoc . ' / Production stockée ' . $ordre->produitFini->nom, null, '731100', null, 0, $valeurProduction);
-            }
-
-            $operation->cloturerEquilibre();
-        });
-    }
+    //
+    // **`genererEcritureProduction()` a été retirée.**
+    //
+    // Elle écrivait, pour chaque matière consommée, D 603200 / C 311000, et
+    // pour le produit fini D 351100 / C 731100. Depuis le lot 4.2, la porte
+    // unique du stock écrit déjà ces deux paires : `StockService` appelle
+    // `InventairePermanentService` à chaque mouvement. Les deux se cumulaient
+    // donc, et **le coût de production ressortait au double** — les matières
+    // deux fois en charge, le stock crédité deux fois pour une seule sortie.
+    // Sur un atelier qui produit tous les jours, le compte de stock de matières
+    // partait en négatif au bilan sans que rien ne le signale.
+    //
+    // Deux autres défauts partaient avec elle :
+    //
+    // - **les comptes étaient en dur** — `311000` et `351100` quelle que soit
+    //   la famille de l'article. Une brasserie et une boulangerie imputaient au
+    //   même compte. `ImputationService` lit désormais la chaîne article →
+    //   rayon → défaut ;
+    // - **le produit fini entrait à son propre `prix_achat`** — le prix d'achat
+    //   d'une chose qu'on ne rachète pas, presque toujours nul. La fabrication
+    //   apparaissait en perte sèche : les matières sortaient en charge, et rien
+    //   n'entrait en face. Il entre maintenant au coût de ce qui l'a fabriqué,
+    //   somme des sorties valorisées au CUMP (Coût Unitaire Moyen Pondéré).
 
     // ─────────────────────────────────────────────────────────────────
     // AVOIRS

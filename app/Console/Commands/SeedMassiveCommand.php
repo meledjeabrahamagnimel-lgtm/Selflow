@@ -22,7 +22,9 @@ use App\Modules\Admin\Modeles\BonLivraison;
 use App\Modules\Admin\Modeles\BonLivraisonDetail;
 use App\Modules\Admin\Modeles\TresorerieJournal;
 use App\Modules\Admin\Modeles\FneCredential;
+use App\Modules\Admin\Modeles\MouvementStock;
 use App\Modules\Admin\Services\ComptabiliteService;
+use App\Modules\Admin\Services\StockService;
 use App\Modules\Admin\Services\NumerotationService;
 use App\Modules\Authentification\Modeles\Utilisateur;
 use Illuminate\Console\Command;
@@ -778,26 +780,33 @@ class SeedMassiveCommand extends Command
                 'date_production' => $dateProduction,
             ]);
 
-            $consommations = [];
+            // La porte unique du stock écrit elle-même l'inventaire permanent
+            // depuis le lot 4.2 : appeler en plus une génération d'écritures
+            // de production doublerait le coût de fabrication dans les données
+            // de démonstration, et la balance de démonstration serait fausse.
+            $coutMatieres = 0.0;
+
             foreach ($ficheChoisie['ingredients'] as $ing) {
                 $qte = $ing['quantite_unitaire'] * $quantiteProduite;
                 $produitModel = Produit::find($ing['id']);
-                if ($produitModel) {
-                    $stockActuel = $produitModel->stockActuel($pdvId);
-                    if ($stockActuel >= $qte) {
-                        $produitModel->decrementStock($pdvId, $qte);
-                        $consommations[] = ['produit' => $produitModel, 'quantite' => $qte, 'valeur_unitaire' => $ing['prix_achat']];
+
+                if ($produitModel && $produitModel->stockActuel($pdvId) >= $qte) {
+                    $sortie = StockService::sortie($produitModel, (int) $pdvId, (float) $qte,
+                        MouvementStock::PRODUCTION_CONSOMMATION,
+                        ['piece' => $ordre, 'reference' => $ordre->code_ordre]);
+
+                    if ($sortie) {
+                        $coutMatieres += (float) $sortie->quantite * (float) ($sortie->cout_unitaire ?? 0);
                     }
                 }
             }
+
             $produitFiniModel = Produit::find($produitFini['id']);
             if ($produitFiniModel) {
-                $produitFiniModel->incrementStock($pdvId, $quantiteProduite);
-            }
-
-            $valeurProduction = array_sum(array_map(fn($c) => $c['quantite'] * $c['valeur_unitaire'], $consommations));
-            if (!empty($consommations) || $valeurProduction > 0) {
-                ComptabiliteService::genererEcritureProduction($ordre, $consommations, $valeurProduction ?: ($quantiteProduite * $produitFini['prix_achat']));
+                StockService::entree($produitFiniModel, (int) $pdvId, (float) $quantiteProduite,
+                    MouvementStock::PRODUCTION_ENTREE,
+                    ['piece' => $ordre, 'reference' => $ordre->code_ordre,
+                     'cout_unitaire' => $quantiteProduite > 0 ? $coutMatieres / $quantiteProduite : 0.0]);
             }
         }
     }

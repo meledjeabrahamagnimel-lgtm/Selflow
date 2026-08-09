@@ -30,6 +30,7 @@ use App\Modules\Admin\Modeles\TransfertStock;
 use App\Modules\Admin\Modeles\CodeJournal;
 use App\Modules\Admin\Modeles\EcritureComptable;
 use App\Modules\Admin\Services\ComptabiliteService;
+use App\Modules\Admin\Services\StockService;
 use App\Modules\Authentification\Modeles\Utilisateur;
 
 // Nettoyer les écritures comptables générées précédemment pour éviter les doublons lors des re-runs du seed
@@ -277,31 +278,28 @@ foreach ([['e' => $dck, 's' => $siegeDck, 'admin' => $adminDck], ['e' => $bHome,
     );
 
     if ($op3->wasRecentlyCreated) {
-        $consommationsCompta = [];
-        // Consommer les ingrédients
-        foreach ($fiche->details as $d) {
-            $besoin = $d->quantite * 20;
-            $stMat = Stock::where('produit_id', $d->ingredient_id)->where('point_de_vente_id', $siege->id)->first();
-            if ($stMat) {
-                $av = $stMat->quantite_disponible;
-                $stMat->decrement('quantite_disponible', $besoin);
-                mouvement($d->ingredient_id, $siege->id, 'Sortie', 'Production', $besoin, $av, $op3->code_ordre, $admin->id);
-            }
-            $consommationsCompta[] = [
-                'produit'         => $d->ingredient,
-                'quantite'        => $besoin,
-                'valeur_unitaire' => (float)($d->ingredient->prix_achat ?? 0),
-            ];
-        }
-        // Augmenter produit fini
-        $stPf = Stock::firstOrCreate(['produit_id' => $pf->id, 'point_de_vente_id' => $siege->id], ['quantite_disponible' => 0, 'stock_minimum' => 2]);
-        $avPf = $stPf->quantite_disponible;
-        $stPf->increment('quantite_disponible', 20);
-        mouvement($pf->id, $siege->id, 'Entree', 'Production', 20, $avPf, $op3->code_ordre, $admin->id);
+        // La porte unique du stock écrit elle-même l'inventaire permanent :
+        // pas d'appel supplémentaire à une génération d'écritures de
+        // production, qui doublerait le coût de fabrication.
+        $coutMatieres = 0.0;
 
-        // Ecriture production
-        $valeurProduitFini = 20 * (float)($pf->prix_achat ?? 0);
-        ComptabiliteService::genererEcritureProduction($op3, $consommationsCompta, $valeurProduitFini);
+        foreach ($fiche->details as $d) {
+            $sortie = StockService::sortie($d->ingredient, (int) $siege->id, (float) ($d->quantite * 20),
+                MouvementStock::PRODUCTION_CONSOMMATION,
+                ['piece' => $op3, 'reference' => $op3->code_ordre, 'utilisateur_id' => $admin->id]);
+
+            if ($sortie) {
+                $coutMatieres += (float) $sortie->quantite * (float) ($sortie->cout_unitaire ?? 0);
+            }
+        }
+
+        // Le produit fini entre au coût de ce qui l'a fabriqué, non à son
+        // propre `prix_achat` — le prix d'achat d'une chose qu'on ne rachète
+        // pas, presque toujours nul.
+        StockService::entree($pf, (int) $siege->id, 20.0,
+            MouvementStock::PRODUCTION_ENTREE,
+            ['piece' => $op3, 'reference' => $op3->code_ordre, 'utilisateur_id' => $admin->id,
+             'cout_unitaire' => $coutMatieres / 20]);
     }
 
     echo "   ✅ {$e->nom} : FT '{$pf->nom}' + OP-{$e->id}-001 (Brouillon) + OP-{$e->id}-003 (Terminé + Ecriture)\n";

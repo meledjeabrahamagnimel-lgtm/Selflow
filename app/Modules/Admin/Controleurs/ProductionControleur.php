@@ -15,8 +15,8 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\View\View;
-use App\Modules\Admin\Services\ComptabiliteService;
 use App\Modules\Admin\Regles\Appartenance;
+use App\Modules\Admin\Services\ImputationService;
 use App\Modules\Admin\Services\StockService;
 
 class ProductionControleur extends Controller
@@ -115,13 +115,16 @@ class ProductionControleur extends Controller
                 ]);
                 $produitFiniId = $nouveauProduit->id;
                 
-                // Initialiser le stock à 0 sur tous les points de vente
-                $pdvs = \App\Modules\Admin\Modeles\PointDeVente::where('entreprise_id', $entrepriseId)->get();
-                foreach ($pdvs as $pdv) {
-                    \App\Modules\Admin\Modeles\Stock::create([
-                        'point_de_vente_id' => $pdv->id,
-                        'produit_id'        => $nouveauProduit->id,
-                        'quantite'          => 0,
+                // Initialiser le stock à 0 sur tous les points de vente.
+                //
+                // La colonne s'appelle `quantite_disponible` ; `quantite`
+                // n'existe pas et n'est pas dans `$fillable`, si bien que la
+                // valeur passait à la trappe sans que rien ne le signale.
+                foreach (PointDeVente::where('entreprise_id', $entrepriseId)->get() as $pdv) {
+                    Stock::create([
+                        'point_de_vente_id'   => $pdv->id,
+                        'produit_id'          => $nouveauProduit->id,
+                        'quantite_disponible' => 0,
                     ]);
                 }
             }
@@ -353,53 +356,76 @@ class ProductionControleur extends Controller
                 ->with('erreur', 'Validation annulée en raison d\'un stock insuffisant.');
         }
 
+        // 1 bis. Le cas où la comptabilité ressortirait de travers.
+        //
+        // Chaque mouvement écrit sa paire équilibrée, ou n'écrit rien. Une
+        // fabrication dont les matières sont imputées mais dont le produit fini
+        // ne l'est pas reste donc équilibrée au bilan — et **fausse au compte
+        // de résultat** : les matières partent en charge, et rien n'entre en
+        // face. La marge de l'atelier apparaît en perte sèche, et l'écart ne se
+        // voit qu'à la révision.
+        //
+        // Le contrôle ne se déclenche que dans ce cas précis. Un atelier qui n'a
+        // rien paramétré du tout ne tient simplement pas d'inventaire permanent,
+        // et rien ne l'y oblige.
+        $matieresImputees = collect($besoins)->contains(
+            fn ($b) => ImputationService::peutTenirLInventairePermanent($b['ingredient'])
+        );
+
+        if ($matieresImputees && !ImputationService::peutTenirLInventairePermanent($ordre->produitFini)) {
+            $manque = implode(', ', ImputationService::manqueUnCompte($ordre->produitFini));
+
+            return back()->with('erreur',
+                "Les matières de cet ordre s'imputent en comptabilité, mais pas le produit fini "
+                . "« {$ordre->produitFini->nom} » : il lui manque le {$manque}. La fabrication "
+                . 'apparaîtrait en perte sèche. Renseignez les comptes sur sa fiche ou sur son '
+                . 'rayon avant de valider.');
+        }
+
         // 2. Transaction SQL atomique
-        DB::transaction(function () use ($ordre, $besoins, $fiche) {
-            // Construire le tableau des consommations avec les valeurs unitaires pour la comptabilité
-            $consommationsCompta = [];
+        DB::transaction(function () use ($ordre, $besoins) {
+            // Ce que la fabrication a réellement coûté, matière par matière.
+            // C'est le CUMP (Coût Unitaire Moyen Pondéré) de chaque sortie qui
+            // le dit — non `prix_achat`, qui est un prix de catalogue figé.
+            $coutMatieres = 0.0;
 
-            // Décrémenter les matières premières (ingrédients)
             foreach ($besoins as $b) {
-                $produit = $b['ingredient'];
-                $qty = $b['quantite'];
-
-                StockService::sortie($produit, (int) $ordre->point_de_vente_id, (float) $qty,
+                $sortie = StockService::sortie(
+                    $b['ingredient'], (int) $ordre->point_de_vente_id, (float) $b['quantite'],
                     MouvementStock::PRODUCTION_CONSOMMATION,
-                    ['piece' => $ordre, 'reference' => $ordre->code_ordre]);
+                    ['piece' => $ordre, 'reference' => $ordre->code_ordre]
+                );
 
-                // Préparer pour l'écriture comptable
-                $consommationsCompta[] = [
-                    'produit'        => $produit,
-                    'quantite'       => $qty,
-                    'valeur_unitaire' => (float)($produit->prix_achat ?? 0),
-                ];
+                if ($sortie) {
+                    $coutMatieres += (float) $sortie->quantite * (float) ($sortie->cout_unitaire ?? 0);
+                }
             }
 
-            // Incrémenter le produit fini
             $produitFini = $ordre->produitFini;
-            $qtyFini = $ordre->quantite_cible;
+            $qtyFini = (float) $ordre->quantite_cible;
+
+            // **Le produit fini entre au coût de ce qui l'a fabriqué.** Il
+            // entrait jusqu'ici à son propre `prix_achat` — le prix d'achat
+            // d'une chose qu'on ne rachète pas, presque toujours nul ou faux.
+            // La production apparaissait alors en perte sèche : les matières
+            // sortaient en charge, et rien n'entrait en face.
+            $coutUnitaire = $qtyFini > 0 ? round($coutMatieres / $qtyFini, Stock::DECIMALES_COUT) : 0.0;
 
             // « Entree » sans accent partait ici : l'ecran des mouvements
             // compare la chaine exacte, et une entree de production s'affichait
             // en rouge, precedee d'un signe moins. Le service pose la constante.
-            StockService::entree($produitFini, (int) $ordre->point_de_vente_id, (float) $qtyFini,
+            //
+            // **Aucune écriture comptable n'est appelée ici.** Depuis le lot
+            // 4.2, la porte unique du stock écrit elle-même l'inventaire
+            // permanent : `ComptabiliteService::genererEcritureProduction()`
+            // doublait chaque consommation et chaque entrée, et le coût de
+            // production ressortait au double.
+            StockService::entree($produitFini, (int) $ordre->point_de_vente_id, $qtyFini,
                 MouvementStock::PRODUCTION_ENTREE,
-                ['piece' => $ordre, 'reference' => $ordre->code_ordre]);
+                ['piece' => $ordre, 'reference' => $ordre->code_ordre,
+                 'cout_unitaire' => $coutUnitaire]);
 
-            // Mettre à jour le statut de l'ordre
-            $ordre->update([
-                'statut' => 'Terminé'
-            ]);
-
-            // Écritures comptables SYSCOHADA :
-            //   Débit 603200 / Crédit 311000  pour chaque MP consommée
-            //   Débit 351100 / Crédit 731100  pour le produit fini fabriqué
-            $valeurProduitFini = $qtyFini * (float)($produitFini->prix_achat ?? 0);
-            ComptabiliteService::genererEcritureProduction(
-                $ordre,
-                $consommationsCompta,
-                $valeurProduitFini
-            );
+            $ordre->update(['statut' => 'Terminé']);
         });
 
         return redirect()->route('admin.production.ordres.index')

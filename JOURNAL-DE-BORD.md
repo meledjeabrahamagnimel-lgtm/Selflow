@@ -894,6 +894,43 @@ réponse de Comptaflow. À passer en file d'attente.
 Devis B2B opposable, nomenclature de production, lots et péremption,
 immobilisations, emballages consignés, modèles d'importation complets.
 
+#### Lot 6.1 — La fabrication ne compte plus double — **TERMINÉ**
+
+Le lot 4.2 a fait écrire l'inventaire permanent à la porte unique du stock.
+`ProductionControleur::validerOrdre()` appelait **en plus**
+`ComptabiliteService::genererEcritureProduction()`, qui écrivait les deux mêmes
+paires. Trois conséquences, toutes silencieuses :
+
+| Défaut | Effet |
+|---|---|
+| **Double écriture** | Le coût de production ressortait au double. Les matières deux fois en charge, le compte de stock crédité deux fois pour une seule sortie physique. Sur un atelier qui produit tous les jours, le stock de matières partait en négatif au bilan |
+| **Comptes en dur** | `311000` et `351100` quelle que soit la famille. Une boulangerie et une quincaillerie imputaient au même compte, et `351100` n'existe dans aucun plan — le stock de produits finis est en 36 |
+| **Produit fini valorisé à `prix_achat`** | Le prix d'achat d'une chose qu'on ne rachète pas : presque toujours nul. Les matières partaient en charge, rien n'entrait en face, et la fabrication apparaissait en **perte sèche** |
+
+**Corrigé.** `genererEcritureProduction()` est retirée — le commentaire qui prend
+sa place dans `ComptabiliteService` dit pourquoi, pour qu'elle ne renaisse pas.
+Le produit fini entre au coût de ce qui l'a fabriqué : la somme des sorties
+valorisées au CUMP (Coût Unitaire Moyen Pondéré), divisée par la quantité
+produite. Les comptes viennent de la chaîne article → rayon → défaut.
+
+**Un garde-fou nouveau.** Chaque mouvement écrit sa paire équilibrée ou n'écrit
+rien : une fabrication dont les matières s'imputent mais dont le produit fini ne
+s'impute pas reste équilibrée au bilan et **fausse au compte de résultat**. Ce
+cas précis — et lui seul — arrête désormais la validation avec le nom du compte
+manquant. Un atelier qui n'a rien paramétré du tout fabrique sans écriture, ce
+que rien ne lui interdit.
+
+Les deux générateurs de données de démonstration — `SeedMassiveCommand` et
+`seed_mega.php` — passaient par `decrementStock()` et par des écritures directes
+dans `mouvements_stock`, hors de la porte unique. Leur bloc de production passe
+par `StockService` : la balance de démonstration cesse d'être fausse.
+
+Corrigé au passage : `ProductionControleur` initialisait les fiches de stock
+d'un produit fini créé à la volée avec une colonne `quantite` qui n'existe pas
+et n'est pas dans `$fillable` — la valeur passait à la trappe sans rien signaler.
+
+- `tests/Feature/ProductionTest.php` — 16 tests.
+
 ### Lot 7 — La vitrine
 
 Landing page, documentation, politique, présentation de DC-Knowing et de ses
