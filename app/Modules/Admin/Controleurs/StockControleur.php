@@ -300,12 +300,27 @@ class StockControleur
 
             if ($p->estPerime()) {
                 $perimes->push($p);
-            } elseif ($p->bientotPerime(30)) {
+            } elseif ($p->bientotPerime()) {
                 $proches->push($p);
             }
         }
 
-        return view('admin::stock.rebut', compact('perimes', 'proches', 'pointDeVenteId'));
+        // **Les lots, là où la vraie péremption se joue.**
+        //
+        // `produits.date_peremption` ne porte qu'une date par article : une
+        // pharmacie qui reçoit trois arrivages de paracétamol n'en enregistre
+        // qu'un, la saisie du troisième écrasant les deux premiers, et les
+        // boîtes de mars restent en rayon. Les deux listes ci-dessus restent
+        // pour les articles qui ne sont pas suivis par lot, où une date unique
+        // suffit ; celles-ci portent le suivi juste.
+        $site = $pointDeVenteId === 'tout' ? null : (int) $pointDeVenteId;
+
+        $lotsPerimes = \App\Modules\Admin\Services\LotService::perimes($entreprise->id, $site);
+        $lotsProches = \App\Modules\Admin\Services\LotService::bientotPerimes($entreprise->id, $site);
+
+        return view('admin::stock.rebut', compact(
+            'perimes', 'proches', 'lotsPerimes', 'lotsProches', 'pointDeVenteId'
+        ));
     }
 
     /**

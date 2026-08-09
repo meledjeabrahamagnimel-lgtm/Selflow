@@ -141,6 +141,18 @@ class VenteControleur
                         "❌ Stock insuffisant pour « {$produit->nom} » : disponible {$stockDisponible}, demandé {$article['quantite']}."
                     );
                 }
+
+                // **Le lot le plus proche de sa date est le premier que le FEFO
+                // propose** — c'est donc lui qui bloque, et il faut le dire
+                // avant d'écrire quoi que ce soit. `LotService` refusera de
+                // toute façon, mais par une exception : elle protège les
+                // données, elle n'explique rien à l'utilisateur.
+                if ($perime = self::lotPerimeEnTete($produit, $pointDeVenteId)) {
+                    return back()->withInput()->with('error',
+                        "❌ Le lot « {$perime->numero_lot} » de « {$produit->nom} » est périmé depuis le "
+                        . $perime->date_peremption->format('d/m/Y')
+                        . '. Mettez-le au rebut avant de servir ce qui suit.');
+                }
             }
         }
 
@@ -899,6 +911,32 @@ class VenteControleur
 
         return redirect()->route($routeRetour)
             ->with('succes', 'Facture ' . $vente->numero_facture . ' modifiée avec succès.');
+    }
+
+    /**
+     * Le lot périmé qui bloquerait la sortie, s'il y en a un.
+     *
+     * Le FEFO — *First Expired, First Out* — sert d'abord ce qui périme le plus
+     * tôt : c'est donc le premier lot de la file qui décide. Un lot périmé plus
+     * loin dans la file ne gêne pas, parce qu'on ne l'atteindra pas.
+     *
+     * **Vendre un produit périmé engage la responsabilité du commerçant**, et
+     * aucun écran ne rattrape cela après coup. La marchandise périmée quitte le
+     * stock par le rebut, qui la trace comme une perte.
+     */
+    private static function lotPerimeEnTete(Produit $produit, int $pointDeVenteId): ?\App\Modules\Admin\Modeles\Lot
+    {
+        if (!$produit->suivi_par_lot) {
+            return null;
+        }
+
+        $premier = \App\Modules\Admin\Modeles\Lot::where('produit_id', $produit->id)
+            ->where('point_de_vente_id', $pointDeVenteId)
+            ->nonVides()
+            ->fefo()
+            ->first();
+
+        return $premier && $premier->estPerime() ? $premier : null;
     }
 
     /**

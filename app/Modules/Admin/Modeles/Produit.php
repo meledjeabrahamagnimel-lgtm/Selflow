@@ -189,6 +189,11 @@ class Produit extends Model
         'photo',
         'date_arrivee',
         'date_peremption',
+        // Le suivi par lot : tous les articles ne le demandent pas. Un sac de
+        // ciment n'a pas de date, et imposer un numéro de lot à sa réception
+        // ferait perdre du temps sans rien apporter.
+        'suivi_par_lot',
+        'preavis_peremption',
         'provenance',
         'description_inventaire',
         'statut',
@@ -206,6 +211,8 @@ class Produit extends Model
             'sous_categorie_id'       => 'integer',
             'date_arrivee'            => 'date',
             'date_peremption'         => 'date',
+            'suivi_par_lot'           => 'boolean',
+            'preavis_peremption'      => 'integer',
         ];
     }
 
@@ -277,16 +284,54 @@ class Produit extends Model
         return $this->statut === 'archive';
     }
 
+    /**
+     * La date portée par la fiche article a-t-elle été dépassée ?
+     *
+     * **Cette date-là est celle de l'article, non celle d'un arrivage.** Une
+     * pharmacie qui reçoit trois lots de paracétamol n'en enregistre qu'un ici :
+     * la saisie du troisième écrase les deux premiers. Le suivi juste passe par
+     * `lots` et `LotService` ; ces deux méthodes restent pour les articles qui
+     * ne sont pas suivis par lot, où une date unique suffit.
+     *
+     * Le jour de péremption est compris : un produit au 30 se vend le 30, comme
+     * le dit la mention « à consommer jusqu'au ».
+     */
     public function estPerime(): bool
     {
-        return $this->date_peremption && $this->date_peremption->isPast();
+        return $this->date_peremption !== null && $this->date_peremption->endOfDay()->isPast();
     }
 
-    public function bientotPerime(int $joursAlerte = 30): bool
+    /**
+     * La date approche-t-elle ?
+     *
+     * **Le calcul d'origine était faux :**
+     *
+     *     $this->date_peremption->diffInDays(now()) <= $joursAlerte
+     *
+     * `diffInDays()` rend une différence **signée** — une date future donne un
+     * nombre négatif. `-200 <= 30` étant vrai, la comparaison l'était pour
+     * *toutes* les dates à venir, quelle que soit leur distance : l'écran des
+     * rebuts annonçait le catalogue entier comme proche de la péremption. Une
+     * alerte qui crie tout le temps ne se lit plus, et les vraies échéances
+     * passaient avec les autres.
+     */
+    public function bientotPerime(?int $joursAlerte = null): bool
     {
-        return $this->date_peremption
-            && !$this->estPerime()
-            && $this->date_peremption->diffInDays(now()) <= $joursAlerte;
+        if ($this->date_peremption === null || $this->estPerime()) {
+            return false;
+        }
+
+        $preavis = $joursAlerte ?? (int) ($this->preavis_peremption ?? 30);
+
+        return now()->startOfDay()->diffInDays($this->date_peremption->startOfDay(), false) <= $preavis;
+    }
+
+    /**
+     * Les arrivages de cet article, tous sites confondus.
+     */
+    public function lots(): \Illuminate\Database\Eloquent\Relations\HasMany
+    {
+        return $this->hasMany(Lot::class, 'produit_id');
     }
 
     public function entreprise(): BelongsTo

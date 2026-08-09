@@ -970,6 +970,54 @@ n'écrit aucune colonne `fne_*`.
 - `tests/Feature/DevisOpposableTest.php` — 36 tests, dont quatre sur ce que le
   client lit et deux sur le cloisonnement entre entreprises.
 
+#### Lot 6.3 — Les lots et la péremption — **TERMINÉ**
+
+`produits.date_peremption` porte **une seule date par article**. Une pharmacie
+qui reçoit trois arrivages de paracétamol — mars, juin, novembre — n'en
+enregistre qu'un : la saisie du troisième écrase les deux premiers, et les
+boîtes de mars restent en rayon sans que rien ne les signale. Le même défaut
+vaut pour un dépôt de boissons, une boulangerie, un magasin de cosmétiques.
+
+| Manque | Ce qu'il produisait |
+|---|---|
+| **Une date par article** | Le troisième arrivage écrase les deux premiers |
+| **Aucune traçabilité** | Un rappel de lot du fabricant est impossible à honorer : rien ne dit quel arrivage est parti chez quel client |
+| **Aucun ordre de sortie** | Rien n'impose de servir d'abord ce qui périme le plus tôt ; la marchandise la plus ancienne reste au fond du rayon |
+| **`bientotPerime()` était faux** | `diffInDays()` rend une différence **signée** : `-200 <= 30` est vrai, donc l'écran des rebuts annonçait **le catalogue entier** comme proche de la péremption. Une alerte qui crie tout le temps ne se lit plus |
+| **Le formulaire ne sauvait pas** | `date_arrivee` et `date_peremption` figuraient sur la fiche article et **n'étaient jamais enregistrées** : l'écran les reprenait vides à la visite suivante |
+
+**La structure.** Un lot est un arrivage : un numéro, une date, une quantité, sur
+un site. `mouvement_lots` dit quels lots un mouvement a consommés — **le
+mouvement reste un seul mouvement**, la comptabilité, le CUMP (Coût Unitaire
+Moyen Pondéré) et le journal ne changent pas. Faire des lots une seconde
+valorisation donnerait deux vérités sur la valeur du stock, qui divergeraient au
+premier arrondi, et la balance ne saurait plus laquelle croire.
+
+**FEFO, et non FIFO** — *First Expired, First Out*. Les deux règles coïncident
+souvent, jamais toujours : un arrivage récent à date courte doit partir avant un
+arrivage ancien à date longue, et le FIFO laisserait périmer le premier.
+
+**Le refus de servir du périmé.** Vendre un produit périmé engage la
+responsabilité du commerçant, et aucun écran ne rattrape cela après coup. La
+marchandise périmée quitte le stock par le rebut, le retour fournisseur, la
+contre-passation ou l'inventaire — jamais par la livraison. La vente le dit
+**avant** d'écrire quoi que ce soit.
+
+Le suivi s'active article par article : un sac de ciment n'a pas de date, et
+imposer un numéro de lot à sa réception ferait perdre du temps sans rien
+apporter. Le préavis suit l'article — trente jours conviennent à l'alimentaire ;
+un médicament se retire des rayons bien plus tôt, un cosmétique bien plus tard.
+
+Ce qui n'a pas de lot n'est pas bloqué : le stock a pu être posé avant
+l'activation du suivi. La ventilation est alors partielle, et l'écart entre le
+stock et la somme des lots dit ce qui reste à régulariser.
+
+- `2026_08_13_000001_lots_et_peremption.php`
+- `Lot`, `MouvementLot`, `LotService`
+- `tests/Feature/LotsEtPeremptionTest.php` — 35 tests, dont cinq de simulation
+  d'attaque : vente de périmé par la route, préavis démesuré tronqué en base,
+  lecture des lots d'une autre entreprise.
+
 ### Lot 7 — La vitrine
 
 Landing page, documentation, politique, présentation de DC-Knowing et de ses

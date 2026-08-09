@@ -91,6 +91,13 @@ class AchatControleur
             'articles.*.quantite'        => Quantite::physique(),
             'articles.*.prix_unitaire'   => ['required', 'numeric', 'min:0'],
             'articles.*.unite'           => ['nullable', 'string', 'max:50'],
+            // L'arrivage, pour les articles suivis par lot. Une date de
+            // péremption déjà passée à la réception se saisit : on reçoit
+            // parfois de la marchandise courte, et la refuser ici empêcherait
+            // de la constater pour la retourner.
+            'articles.*.numero_lot'       => ['nullable', 'string', 'max:100'],
+            'articles.*.date_peremption'  => ['nullable', 'date'],
+            'articles.*.date_fabrication' => ['nullable', 'date', 'before_or_equal:today'],
         ] + self::reglesChampsFne(), [
             'fournisseur_id.required'    => 'Veuillez sélectionner un fournisseur.',
             'fournisseur_nom_bapa.required' => 'Veuillez saisir le nom du vendeur (tiers non immatriculé).',
@@ -258,7 +265,17 @@ class AchatControleur
                          'fournisseur_id' => $achat->fournisseur_id,
                          // Le cout d'entree est le prix reellement paye, remise
                          // deduite — pas le prix de catalogue de la fiche.
-                         'cout_unitaire' => self::coutDEntree($article['prix_unitaire'], $article['remise_taux'] ?? 0)]);
+                         'cout_unitaire' => self::coutDEntree($article['prix_unitaire'], $article['remise_taux'] ?? 0),
+                         // L'arrivage, pour les articles suivis par lot. Sans
+                         // numero, rien n'est ecrit : le service laisse passer,
+                         // et l'ecart entre le stock et la somme des lots dit
+                         // ce qui reste a regulariser.
+                         'lot' => [
+                             'numero'           => $article['numero_lot'] ?? null,
+                             'date_peremption'  => $article['date_peremption'] ?? null,
+                             'date_fabrication' => $article['date_fabrication'] ?? null,
+                             'fournisseur_id'   => $achat->fournisseur_id,
+                         ]]);
                 }
             }
 

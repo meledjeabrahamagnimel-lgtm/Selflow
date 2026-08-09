@@ -32,6 +32,73 @@
     </div>
 @endif
 
+{{-- ══════════ Les lots ══════════
+
+     C'est ici que la péremption se joue vraiment. `produits.date_peremption`
+     ne porte qu'une date par article : une pharmacie qui reçoit trois arrivages
+     de paracétamol n'en enregistre qu'un, la saisie du troisième écrasant les
+     deux premiers, et les boîtes de mars restent en rayon sans que rien ne les
+     signale. Les deux tableaux plus bas restent pour les articles qui ne sont
+     pas suivis par lot, où une date unique suffit. --}}
+@if($lotsPerimes->isNotEmpty() || $lotsProches->isNotEmpty())
+<div class="card" style="margin-bottom:20px;">
+    <div class="card-header" style="border-bottom:1px solid var(--border); padding-bottom:12px;">
+        <h2 style="font-size:16px; font-weight:700;">
+            <i class="fas fa-layer-group"></i> Lots — suivi par arrivage
+        </h2>
+        <p style="font-size:12px; color:var(--text-3); margin-top:4px;">
+            Chaque arrivage porte sa propre date. La sortie sert d'abord ce qui périme le plus tôt.
+        </p>
+    </div>
+    <div class="table-wrap" style="padding-top:10px;">
+        <table>
+            <thead>
+                <tr>
+                    <th>Article</th>
+                    <th>Lot</th>
+                    <th>Site</th>
+                    <th>Péremption</th>
+                    <th>Reste</th>
+                    <th>État</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach($lotsPerimes as $lot)
+                    <tr style="background:#fef2f2;">
+                        <td>{{ $lot->produit?->nom }}</td>
+                        <td style="font-family:monospace;">{{ $lot->numero_lot }}</td>
+                        <td>{{ $lot->pointDeVente?->nom }}</td>
+                        <td>{{ $lot->date_peremption?->format('d/m/Y') }}</td>
+                        <td>@qte($lot->quantite) {{ $lot->produit?->unite }}</td>
+                        <td>
+                            <span style="color:var(--danger); font-weight:700;">
+                                <i class="fas fa-skull"></i>
+                                Périmé depuis {{ abs($lot->joursRestants()) }} j
+                            </span>
+                        </td>
+                    </tr>
+                @endforeach
+                @foreach($lotsProches as $lot)
+                    <tr style="background:#fffbeb;">
+                        <td>{{ $lot->produit?->nom }}</td>
+                        <td style="font-family:monospace;">{{ $lot->numero_lot }}</td>
+                        <td>{{ $lot->pointDeVente?->nom }}</td>
+                        <td>{{ $lot->date_peremption?->format('d/m/Y') }}</td>
+                        <td>@qte($lot->quantite) {{ $lot->produit?->unite }}</td>
+                        <td>
+                            <span style="color:var(--warning); font-weight:700;">
+                                <i class="fas fa-hourglass-half"></i>
+                                Dans {{ $lot->joursRestants() }} j
+                            </span>
+                        </td>
+                    </tr>
+                @endforeach
+            </tbody>
+        </table>
+    </div>
+</div>
+@endif
+
 <div style="display:grid; grid-template-columns:1fr 1fr; gap:20px;">
 
     {{-- Produits déjà périmés --}}
@@ -113,7 +180,11 @@
                     <tbody>
                         @foreach($proches as $p)
                             @php
-                                $restant = $p->date_peremption->diffInDays(now());
+                                // `diffInDays()` rend une difference signee : le
+                                // sens compte, et l'ordre des operandes aussi.
+                                // Ecrit dans l'autre sens, le compte a rebours
+                                // affichait « -200 j restants ».
+                                $restant = (int) now()->startOfDay()->diffInDays($p->date_peremption->startOfDay(), false);
                             @endphp
                             <tr>
                                 <td style="font-weight:600;">

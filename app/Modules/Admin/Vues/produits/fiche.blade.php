@@ -329,6 +329,31 @@
                 <div class="form-group">
                     <label class="form-label">Date de péremption</label>
                     <input type="date" name="date_peremption" class="form-control" value="{{ $produit->date_peremption?->format('Y-m-d') }}">
+                    <small style="color:var(--text-3); font-size:11px;">
+                        Une seule date pour l'article. Pour plusieurs arrivages, activez le suivi par lot.
+                    </small>
+                </div>
+                {{-- Le suivi par lot : la péremption appartient à l'arrivage,
+                     pas à l'article. Une pharmacie qui reçoit trois arrivages
+                     de paracétamol n'enregistrait qu'une date, la saisie du
+                     troisième écrasant les deux premiers. --}}
+                <div class="form-group">
+                    <label class="form-label">Suivi par lot</label>
+                    <select name="suivi_par_lot" class="form-control">
+                        <option value="0" {{ $produit->suivi_par_lot ? '' : 'selected' }}>Non — une seule date pour l'article</option>
+                        <option value="1" {{ $produit->suivi_par_lot ? 'selected' : '' }}>Oui — chaque arrivage porte sa date</option>
+                    </select>
+                    <small style="color:var(--text-3); font-size:11px;">
+                        La sortie sert alors d'abord ce qui périme le plus tôt, et un lot périmé ne peut plus être livré.
+                    </small>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Préavis de péremption (jours)</label>
+                    <input type="number" name="preavis_peremption" class="form-control" min="0" max="3650"
+                           value="{{ $produit->preavis_peremption ?? 30 }}">
+                    <small style="color:var(--text-3); font-size:11px;">
+                        Trente jours conviennent à l'alimentaire ; un médicament se retire des rayons bien plus tôt.
+                    </small>
                 </div>
                 <div class="form-group">
                     <label class="form-label">Compte vente</label>

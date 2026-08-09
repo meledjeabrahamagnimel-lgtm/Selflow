@@ -293,11 +293,19 @@ class ProduitControleur
             'taxes_produit'        => ['nullable', 'array'],
             'taxes_produit.*.nom'  => ['required_with:taxes_produit.*.taux', 'string', 'max:100'],
             'taxes_produit.*.taux' => ['required_with:taxes_produit.*.nom', 'numeric', 'gt:0', 'max:100'],
+            // Le suivi par lot et son préavis. La colonne est un `smallint` :
+            // sans borne, une valeur démesurée serait tronquée en base, et le
+            // préavis vaudrait autre chose que ce qui a été saisi.
+            'date_arrivee'       => ['nullable', 'date'],
+            'date_peremption'    => ['nullable', 'date'],
+            'suivi_par_lot'      => ['nullable', 'boolean'],
+            'preavis_peremption' => ['nullable', 'integer', 'min:0', 'max:3650'],
         ], [
             'taxes_produit.*.taux.gt'  => 'Le taux d\'une taxe doit être strictement supérieur à 0 %.',
             'taxes_produit.*.taux.max' => 'Le taux d\'une taxe ne peut pas dépasser 100 %.',
             'taxes_produit.*.nom.required_with' => 'Chaque taxe doit avoir un nom.',
             'remise_taux.max' => 'La remise ne peut pas dépasser 100 %.',
+            'preavis_peremption.max' => 'Un préavis de péremption se compte en jours, dix ans au plus.',
         ]);
 
         $categorieId = $request->input('categorie_id');
@@ -361,6 +369,18 @@ class ProduitControleur
             'code_tva'          => ($request->boolean('code_tva_manuel') && $request->input('code_tva') !== 'AUTRE')
                 ? $request->input('code_tva')
                 : null,
+            // **Ces deux champs étaient au formulaire et n'étaient pas
+            // enregistrés.** L'utilisateur saisissait une date de péremption,
+            // l'écran la reprenait vide à la visite suivante, et l'alerte des
+            // rebuts ne voyait jamais l'article.
+            'date_arrivee'       => $request->input('date_arrivee') ?: null,
+            'date_peremption'    => $request->input('date_peremption') ?: null,
+            // Le suivi par lot : la péremption appartient à l'arrivage, pas à
+            // l'article. Une pharmacie qui reçoit trois arrivages de
+            // paracétamol n'enregistrait qu'une date, la saisie du troisième
+            // écrasant les deux premiers.
+            'suivi_par_lot'      => $request->boolean('suivi_par_lot'),
+            'preavis_peremption' => (int) $request->input('preavis_peremption', 30),
         ]);
 
         $this->enregistrerTaxesProduit($produit, $request->input('taxes_produit', []));

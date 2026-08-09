@@ -3,6 +3,7 @@
 namespace App\Modules\Admin\Services;
 
 use App\Modules\Admin\Modeles\MouvementStock;
+use App\Modules\Admin\Modeles\Lot;
 use App\Modules\Admin\Modeles\Produit;
 use App\Modules\Admin\Modeles\Stock;
 use Illuminate\Database\Eloquent\Model;
@@ -298,11 +299,82 @@ class StockService
             // Aucun compte de classe 3 n'etait mouvemente jusqu'ici : le stock
             // existait en quantite, pas en valeur, et aucun bilan ne pouvait
             // etre etabli.
+            // **Le suivi par lot ne remplace pas le stock, il le double.** Le
+            // mouvement reste un seul mouvement — la comptabilité, le CUMP
+            // (Coût Unitaire Moyen Pondéré) et le journal ne changent pas — et
+            // porte à côté de lui le détail des arrivages qu'il a touchés.
+            //
+            // Faire des lots une seconde valorisation donnerait deux vérités
+            // sur la valeur du stock, qui divergeraient au premier arrondi, et
+            // la balance ne saurait plus laquelle croire.
+            self::ventilerParLot($mouvement, $produit, $pointDeVenteId, $quantite, $sens, $motif, $contexte);
+
             $mouvement->setRelation('produit', $produit);
             InventairePermanentService::comptabiliser($mouvement);
 
             return $mouvement;
         });
+    }
+
+    /**
+     * Rattacher le mouvement aux arrivages qu'il a touchés.
+     *
+     * Trois chemins, et chacun a sa raison :
+     *
+     * - **une contre-passation** rend au lot ce que le mouvement d'origine lui
+     *   avait pris. Sans cela, une vente annulée ferait disparaître la
+     *   traçabilité du lot vendu, et un rappel du fabricant ne retrouverait
+     *   plus le client ;
+     * - **une entrée** alimente le lot que l'appelant désigne. Sans numéro de
+     *   lot, rien n'est écrit : un stock d'ouverture, un transfert, un écart
+     *   d'inventaire n'ont pas d'arrivage à eux ;
+     * - **une sortie** prélève en FEFO — *First Expired, First Out* —, du plus
+     *   proche de sa date au plus lointain.
+     */
+    private static function ventilerParLot(
+        MouvementStock $mouvement,
+        Produit $produit,
+        int $pointDeVenteId,
+        float $quantite,
+        string $sens,
+        string $motif,
+        array $contexte
+    ): void {
+        if (!$produit->suivi_par_lot) {
+            return;
+        }
+
+        if ($motif === MouvementStock::CONTREPASSATION && !empty($contexte['contrepasse_id'])) {
+            $origine = MouvementStock::find($contexte['contrepasse_id']);
+
+            if ($origine) {
+                // Le mouvement inverse porte la même ventilation que celui
+                // qu'il défait : c'est ce qui rend la chaîne lisible depuis le
+                // lot, dans les deux sens.
+                LotService::attacher($mouvement, LotService::defaire($origine));
+            }
+
+            return;
+        }
+
+        if ($sens === MouvementStock::ENTREE) {
+            $lot = LotService::entrer(
+                $produit, $pointDeVenteId, $quantite,
+                $contexte['lot'] ?? [],
+                (float) ($mouvement->cout_unitaire ?? 0)
+            );
+
+            if ($lot) {
+                LotService::attacher($mouvement, [['lot' => $lot, 'quantite' => $quantite]]);
+            }
+
+            return;
+        }
+
+        LotService::attacher(
+            $mouvement,
+            LotService::prelever($produit, $pointDeVenteId, $quantite, $motif)
+        );
     }
 
     /**

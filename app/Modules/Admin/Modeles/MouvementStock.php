@@ -155,6 +155,20 @@ class MouvementStock extends Model
         return $this->belongsTo(Produit::class, 'produit_id');
     }
 
+    /**
+     * Les arrivages que ce mouvement a touchés.
+     *
+     * Le mouvement reste **un seul mouvement** — la comptabilité, le CUMP
+     * (Coût Unitaire Moyen Pondéré) et le journal ne changent pas. Une sortie
+     * de trente unités prise sur deux arrivages écrit donc une ligne de journal
+     * et deux lignes ici. C'est ce qui permet de répondre à un rappel du
+     * fabricant sans réécrire l'inventaire permanent.
+     */
+    public function lots(): \Illuminate\Database\Eloquent\Relations\HasMany
+    {
+        return $this->hasMany(MouvementLot::class, 'mouvement_stock_id');
+    }
+
     public function pointDeVente(): BelongsTo
     {
         return $this->belongsTo(PointDeVente::class, 'point_de_vente_id');
