@@ -20,11 +20,10 @@ use Illuminate\Support\Facades\DB;
  * chaque mois valant 30 jours : c'est la convention enseignée et pratiquée en
  * zone OHADA, et celle que retiennent les cabinets ivoiriens.
  *
- * Elle est isolée dans `JOURS_PAR_AN` et `proportionDeLAnnee()` pour une
- * raison précise : **c'est le seul point de ce lot qui relève d'un usage plutôt
- * que d'un texte que le dépôt contient.** Un cabinet qui compterait en mois
- * entiers change une constante, et non le service. Le reste — les numéros de
- * comptes, le schéma de la cession — vient du relevé OHADA du dépôt.
+ * **Le propriétaire du projet a confirmé cette convention.** Elle reste isolée
+ * dans `JOURS_PAR_AN` et `proportionDeLAnnee()` : un cabinet qui compterait en
+ * mois entiers change une constante, et non le service. Le reste — les numéros
+ * de comptes, le schéma de la cession — vient du relevé OHADA du dépôt.
  *
  * ## Le linéaire, et lui seul
  *
@@ -52,9 +51,9 @@ class AmortissementService
     /**
      * L'année commerciale : douze mois de trente jours.
      *
-     * **C'est la seule convention d'usage de ce lot.** Elle est ici, seule, et
-     * nommée, pour qu'un cabinet qui compte autrement n'ait qu'un endroit à
-     * changer.
+     * C'était la seule convention d'usage de ce lot, et **le propriétaire du
+     * projet l'a confirmée**. Elle reste ici, seule et nommée, pour qu'un
+     * cabinet qui compte autrement n'ait qu'un endroit à changer.
      */
     public const JOURS_PAR_AN = 360;
 

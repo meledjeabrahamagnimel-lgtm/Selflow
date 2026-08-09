@@ -194,6 +194,10 @@ class Produit extends Model
         // ferait perdre du temps sans rien apporter.
         'suivi_par_lot',
         'preavis_peremption',
+        // L'emballage consigné : le prix auquel l'article se prête, et le délai
+        // au-delà duquel il est réputé perdu.
+        'prix_consignation',
+        'delai_retour_jours',
         'provenance',
         'description_inventaire',
         'statut',
@@ -213,6 +217,8 @@ class Produit extends Model
             'date_peremption'         => 'date',
             'suivi_par_lot'           => 'boolean',
             'preavis_peremption'      => 'integer',
+            'prix_consignation'       => 'float',
+            'delai_retour_jours'      => 'integer',
         ];
     }
 

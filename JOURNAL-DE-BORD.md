@@ -1067,8 +1067,8 @@ dotation est passée ne se retouche plus.
 se compte en jours sur une année commerciale de 360 jours, chaque mois valant 30
 jours — usage OHADA courant. C'est le seul point qui ne vient pas d'un texte du
 dépôt : il tient dans `AmortissementService::JOURS_PAR_AN`, pour qu'un cabinet
-qui compte en mois entiers change une constante et non le service. **À
-confirmer par le propriétaire.**
+qui compte en mois entiers change une constante et non le service.
+**Confirmé par le propriétaire du projet.**
 
 **Le dégressif n'est pas calculé.** Ses coefficients relèvent d'un texte que le
 dépôt ne contient pas, et les supposer donnerait un plan faux que rien ne
@@ -1082,6 +1082,51 @@ signalerait — c'est exactement l'écart qui a produit un timbre de quittance �
   code déjà pris, mise en service antérieure à l'acquisition, valeur résiduelle
   supérieure à la valeur d'acquisition, fiche engagée, sortie antérieure à la
   mise en service, et la fiche d'un bien d'une autre entreprise.
+
+#### Lot 6.5 — Les emballages consignés — **TERMINÉ**
+
+**Rien n'existait**, et c'est le quotidien d'un dépôt de boissons, d'un
+distributeur de gaz, d'un grossiste en eau minérale — c'est-à-dire d'une part
+considérable du commerce ivoirien.
+
+| Manque | Ce qu'il produisait |
+|---|---|
+| **La consignation passait en vente, ou nulle part** | Une caisse consignée 2 000 francs gonflait le chiffre d'affaires de 2 000 francs que l'entreprise devra rendre. Ce n'est pas un produit, c'est **une dette** |
+| **Rien ne disait ce qui est dehors** | Un dépôt ne savait pas combien de casiers dorment chez ses clients, ni depuis quand, ni chez qui |
+| **Le non-retour ne se constatait pas** | La consignation gardée restait indéfiniment en dette au bilan alors qu'elle était devenue un produit |
+
+Les comptes viennent du relevé OHADA du dépôt :
+
+| Sens | Compte | Intitulé |
+|---|---|---|
+| Consigné **au client** | `419400` | Clients, dettes pour emballages et matériels consignés |
+| Consigné **par un fournisseur** | `409400` | Fournisseurs, créances pour emballages et matériels à rendre |
+| Gain à la reprise ou au non-retour | `707400` | Bonis sur reprises et cessions d'emballages |
+| Perte sur ce qu'on ne rend pas | `622400` | Malis sur emballages |
+
+**Une dette d'un côté, une créance de l'autre** : les confondre met le bilan à
+l'envers. Chez le fournisseur, tout s'inverse — ce qu'on ne rend pas devient un
+*mali*, une charge, et non un boni.
+
+Les retours partiels sont la règle : un client rend huit casiers sur dix et
+garde les deux autres. La reprise à prix réduit laisse un boni — c'est ce qui se
+pratique quand l'emballage revient abîmé. Rembourser **plus** que le prix
+consigné est refusé : l'entreprise rendrait plus qu'elle n'a reçu, et perdrait
+de l'argent sans qu'aucune ligne ne le dise.
+
+**Le service n'établit aucune facture, et c'est délibéré.** Le non-retour est
+une vente, soumise à la TVA et à la certification de la plateforme : elle passe
+par l'écran de vente ordinaire, dont la conformité est acquise et **gelée**.
+Fabriquer ici une seconde route vers la FNE remettrait cette conformité en jeu
+pour un gain nul. Le service constate le boni en comptabilité, et l'écran
+renvoie l'utilisateur vers la facture pour la part fiscale.
+
+- `2026_08_15_000001_emballages_consignes.php`
+- `Consignation`, `ConsignationService`, `ConsignationControleur`, une vue
+- `tests/Feature/ConsignationTest.php` — 35 tests, dont sept par les écrans :
+  remboursement supérieur au prix consigné tenté par la route, reprise de plus
+  que ce qui est dehors, consignation sans tiers, et la consignation d'une autre
+  entreprise.
 
 ### Lot 7 — La vitrine
 

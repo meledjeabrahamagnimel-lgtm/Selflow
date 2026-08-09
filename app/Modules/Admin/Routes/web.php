@@ -13,6 +13,7 @@ use App\Modules\Admin\Controleurs\PersonnelControleur;
 use App\Modules\Admin\Controleurs\EntrepriseControleur;
 use App\Modules\Admin\Controleurs\RapportControleur;
 use App\Modules\Admin\Controleurs\TransfertStockControleur;
+use App\Modules\Admin\Controleurs\ConsignationControleur;
 use App\Modules\Admin\Controleurs\ImmobilisationControleur;
 use App\Modules\Admin\Controleurs\ProductionControleur;
 use App\Modules\Admin\Controleurs\B2bControleur;
@@ -232,6 +233,18 @@ Route::prefix('admin')
                 Route::post('/creer',      [ProductionControleur::class, 'enregistrerOrdre'])->name('enregistrer');
                 Route::post('/{ordre}/valider', [ProductionControleur::class, 'validerOrdre'])->name('valider');
             });
+        });
+
+        // ── Emballages consignés ──
+        //
+        // La consignation reçue est une dette, non un produit : une caisse
+        // consignée 2 000 francs gonflait le chiffre d'affaires de 2 000 francs
+        // que l'entreprise devra rendre.
+        Route::prefix('consignations')->name('consignations.')->middleware('modules:stock')->group(function () {
+            Route::get('/',  [ConsignationControleur::class, 'index'])->name('index');
+            Route::post('/', [ConsignationControleur::class, 'enregistrer'])->name('enregistrer');
+            Route::post('/{consignation}/rendre',     [ConsignationControleur::class, 'rendre'])->name('rendre');
+            Route::post('/{consignation}/non-rendue', [ConsignationControleur::class, 'constaterLeNonRetour'])->name('non_retour');
         });
 
         // ── Immobilisations et amortissements ──
