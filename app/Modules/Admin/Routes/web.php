@@ -52,6 +52,9 @@ Route::prefix('admin')
             Route::post('/{vente}/envoyer',              [VenteControleur::class, 'envoyer'])->name('envoyer');
             Route::post('/{vente}/convertir-commande',   [VenteControleur::class, 'convertirEnCommande'])->name('convertir.commande');
             Route::post('/{vente}/convertir-facture',    [VenteControleur::class, 'convertirEnFacture'])->name('convertir.facture');
+            // Ce qui rend un devis opposable : son terme, et l'accord du client
+            Route::post('/{vente}/accepter',             [VenteControleur::class, 'accepterOffre'])->name('accepter');
+            Route::post('/{vente}/prolonger',            [VenteControleur::class, 'prolongerOffre'])->name('prolonger');
             Route::delete('/{vente}/supprimer',          [VenteControleur::class, 'supprimer'])->name('supprimer');
             // Bon de Livraison
             Route::get ('/{vente}/livraison/creer',       [BonLivraisonControleur::class, 'creerDepuisBC'])->name('livraison.creer');
@@ -395,6 +398,9 @@ Route::prefix('caissier')
             Route::post('/{vente}/envoyer',             [VenteControleur::class, 'envoyer'])->name('envoyer');
             Route::post('/{vente}/convertir-commande',  [VenteControleur::class, 'convertirEnCommande'])->name('convertir.commande');
             Route::post('/{vente}/convertir-facture',   [VenteControleur::class, 'convertirEnFacture'])->name('convertir.facture');
+            // Ce qui rend un devis opposable : son terme, et l'accord du client
+            Route::post('/{vente}/accepter',            [VenteControleur::class, 'accepterOffre'])->name('accepter');
+            Route::post('/{vente}/prolonger',           [VenteControleur::class, 'prolongerOffre'])->name('prolonger');
             Route::delete('/{vente}/supprimer',         [VenteControleur::class, 'supprimer'])->name('supprimer');
             // Bon de Livraison
             Route::get ('/{vente}/livraison/creer',       [BonLivraisonControleur::class, 'creerDepuisBC'])->name('livraison.creer');

@@ -278,11 +278,23 @@
             </button>
             
             @if(!isset($bl))
-                @if($vente->etape === 'Devis')
+                {{-- Ce qui rend un devis opposable : l'accord du client, daté et
+                     nommé, et un terme qu'on peut repousser explicitement. --}}
+                @if($vente->estUneOffre() && !$vente->estAccepte() && !$vente->estConverti() && !$vente->estExpire())
+                    <button class="print-btn" style="background:#1d4ed8; color:#fff; border-color:#1d4ed8;" onclick="enregistrerAcceptation()">
+                        <i class="fas fa-file-signature"></i> Le client a accepté
+                    </button>
+                @endif
+                @if($vente->estUneOffre() && !$vente->estConverti())
+                    <button class="print-btn" onclick="prolongerValidite()">
+                        <i class="fas fa-hourglass-half"></i> Prolonger la validité
+                    </button>
+                @endif
+                @if($vente->etape === 'Devis' && !$vente->estConverti())
                     <button class="print-btn" style="background:var(--warning); color:#fff; border-color:var(--warning);" onclick="executerAction('{{ route('admin.ventes.confirmer', $vente->id) }}')">
                         <i class="fas fa-check-circle"></i> Confirmer la commande
                     </button>
-                @elseif($vente->etape === 'Bon de commande')
+                @elseif($vente->etape === 'Bon de commande' && !$vente->estConverti())
                     <button class="print-btn" style="background:#10b981; color:#fff; border-color:#10b981;" onclick="executerAction('{{ route('admin.ventes.facturer', $vente->id) }}')">
                         <i class="fas fa-file-invoice-dollar"></i> Valider & Facturer
                     </button>
@@ -487,6 +499,12 @@ var DATA = {
         num: {!! json_encode($vente->numero_facture) !!},
         date: {!! json_encode(\Carbon\Carbon::parse($vente->date_vente)->isoFormat('D MMMM YYYY')) !!},
         etape: {!! json_encode($vente->etape) !!},
+        // Le terme de l'offre — devis et bons de commande seulement. Nul sur
+        // une facture, qui engage des son emission et n'expire pas.
+        date_validite: {!! json_encode($vente->date_validite ? $vente->date_validite->isoFormat('D MMMM YYYY') : null) !!},
+        date_acceptation: {!! json_encode($vente->date_acceptation ? $vente->date_acceptation->isoFormat('D MMMM YYYY') : null) !!},
+        accepte_par: {!! json_encode($vente->accepte_par) !!},
+        est_expire: {{ $vente->estExpire() ? 'true' : 'false' }},
         remise: {{ $vente->remise ?? 0 }},
         remise_taux: {{ (float) ($vente->remise_taux ?? 0) }},
         est_rne: {{ $vente->est_rne ? 'true' : 'false' }},
@@ -838,6 +856,46 @@ function executerAction(url, sansConfirmation = false) {
     }
 }
 
+/**
+ * L'acceptation du client : la date et le nom de qui a accepte de son cote.
+ * C'est ce qu'on oppose en cas de contestation ; sans cela, un devis
+ * « accepte » ne repose que sur la memoire de deux personnes.
+ */
+function enregistrerAcceptation() {
+    var qui = prompt("Qui a accepté ce devis, du côté du client ?\n(nom de la personne — laissez vide pour retenir le nom du client)");
+    if (qui === null) return;
+
+    var form = document.getElementById('action-form');
+    form.action = @json(route('admin.ventes.accepter', $vente->id));
+    ajouterChamp(form, 'accepte_par', qui);
+    form.submit();
+}
+
+/**
+ * Prolonger, c'est refaire l'offre : un geste explicite, trace, et impossible
+ * sur un document deja converti.
+ */
+function prolongerValidite() {
+    var terme = prompt("Nouvelle date de validité (AAAA-MM-JJ) :", @json(now()->addDays(\App\Modules\Admin\Modeles\Vente::VALIDITE_PAR_DEFAUT)->toDateString()));
+    if (!terme) return;
+
+    var form = document.getElementById('action-form');
+    form.action = @json(route('admin.ventes.prolonger', $vente->id));
+    ajouterChamp(form, 'date_validite', terme);
+    form.submit();
+}
+
+function ajouterChamp(form, nom, valeur) {
+    var champ = form.querySelector('[name="' + nom + '"]');
+    if (!champ) {
+        champ = document.createElement('input');
+        champ.type = 'hidden';
+        champ.name = nom;
+        form.appendChild(champ);
+    }
+    champ.value = valeur;
+}
+
 function toggleDeliveryMode() {
     isDeliveryMode = !isDeliveryMode;
     var btn = document.getElementById('delivery-toggle-btn');
@@ -930,6 +988,40 @@ function getAvoirBlock(d) {
     `;
 }
 
+/**
+ * Ce qui rend un devis opposable : son terme, et l'accord du client.
+ *
+ * Un devis sans terme engage indefiniment celui qui l'a fait — il reste
+ * presentable des mois plus tard, aux prix du jour ou il a ete etabli, et le
+ * client qui l'accepte a raison de le faire. Le terme doit donc figurer sur le
+ * document remis, non seulement dans la base.
+ *
+ * Rien ici ne touche a la certification : un devis n'est pas une piece
+ * fiscale, il n'est ni normalise, ni transmis, ni certifie.
+ */
+function getValiditeBlock(d) {
+    if (d.etape !== 'Devis' && d.etape !== 'Bon de commande') return '';
+    if (!d.date_validite) return '';
+
+    var accord = d.date_acceptation
+        ? `<br><strong>Accepte le ${d.date_acceptation}</strong>${d.accepte_par ? ` par ${d.accepte_par}` : ''}.`
+        : '';
+
+    var couleur = d.est_expire ? '#b91c1c' : '#1d4ed8';
+    var fond    = d.est_expire ? '#fef2f2' : '#eff6ff';
+    var bordure = d.est_expire ? '#fecaca' : '#dbeafe';
+
+    var terme = d.est_expire
+        ? `Offre expiree le <strong>${d.date_validite}</strong> : les prix indiques n'engagent plus.`
+        : `Offre valable jusqu'au <strong>${d.date_validite}</strong> inclus. Passe ce terme, les prix indiques ne nous engagent plus.`;
+
+    return `
+    <div style="background:${fond}; border:1px solid ${bordure}; border-left:4px solid ${couleur}; border-radius:8px; padding:10px 14px; margin-bottom:14px; font-size:11px; line-height:1.4; color:${couleur}; text-align:left;">
+        <i class="fas fa-hourglass-half" style="margin-right:4px;"></i> ${terme}${accord}
+    </div>
+    `;
+}
+
 function getDocTitle(d) {
     if (isDeliveryMode) return "BON DE LIVRAISON";
     if (d.type_facture === 'avoir') return "FACTURE D'AVOIR";
@@ -1018,7 +1110,7 @@ function model1(d) {
             </div>
         </div>
         
-        ${getAvoirBlock(d)}
+        ${getValiditeBlock(d)}${getAvoirBlock(d)}
         <table class="tbl-articles" style="border-collapse:collapse;font-size:11px;margin-bottom:16px">
             ${colgroupArticles()}
             <thead>
@@ -1152,7 +1244,7 @@ function model2(d) {
                     ${d.ref_bl ? `<span style="font-weight:600;">Livré selon BL : </span>${d.ref_bl}` : ''}
                 </div>` : ''}
             </div>
-            ${getAvoirBlock(d)}
+            ${getValiditeBlock(d)}${getAvoirBlock(d)}
             <table class="tbl-articles" style="border-collapse:collapse;font-size:11px;margin-bottom:14px">
                 ${colgroupArticles()}
                 <thead>
@@ -1283,7 +1375,7 @@ function model3(d) {
             </div>
         </div>
 
-        ${getAvoirBlock(d)}
+        ${getValiditeBlock(d)}${getAvoirBlock(d)}
         <table class="tbl-articles" style="border-collapse:collapse;font-size:11px;margin-bottom:16px">
             ${colgroupArticles()}
             <thead>
@@ -1507,7 +1599,7 @@ function modelStandard(d) {
             <div>Type de facturation : <strong>${d.client.template || '—'}</strong></div>
         </div>
         
-        ${getAvoirBlock(d)}
+        ${getValiditeBlock(d)}${getAvoirBlock(d)}
         <!-- Tableau des Articles -->
         <table class="table-m4 tbl-articles">
             ${colgroupArticlesM4()}

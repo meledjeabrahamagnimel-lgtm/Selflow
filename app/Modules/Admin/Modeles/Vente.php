@@ -18,6 +18,9 @@ class Vente extends Model
         'numero_facture',
         'numero_fne',
         'date_vente',
+        'date_validite',    // terme de l'offre — devis et bons de commande
+        'date_acceptation', // quand le client a accepté
+        'accepte_par',      // qui, de son côté, a accepté
         'mode_paiement',
         'moyen_bancaire',
         'reference_paiement',
@@ -31,6 +34,7 @@ class Vente extends Model
         'type_facture',
         'type_piece',      // 'facture' ou 'recu' — nature du document commercial
         'piece_liee_id',   // reçu <-> facture issue l'un de l'autre
+        'converti_en_id',  // la pièce née de celle-ci : devis → BC → facture
         'est_rne',         // → champ `isRne` FNE
         'numero_rne',      // → champ `rne` FNE
         'pied_de_page',    // → champ `footer` FNE
@@ -71,7 +75,9 @@ class Vente extends Model
     protected function casts(): array
     {
         return [
-            'date_vente'    => 'date',
+            'date_vente'       => 'date',
+            'date_validite'    => 'date',
+            'date_acceptation' => 'date',
             'montant_ht'    => 'decimal:2',
             'montant_tva'   => 'decimal:2',
             'montant_ttc'   => 'decimal:2',
@@ -169,6 +175,112 @@ class Vente extends Model
     public function pieceLiee(): BelongsTo
     {
         return $this->belongsTo(Vente::class, 'piece_liee_id');
+    }
+
+    // ─────────────────────────────────────────────────────────────────
+    // LE DEVIS OPPOSABLE
+    // ─────────────────────────────────────────────────────────────────
+
+    /**
+     * Les étapes qui portent une offre : elles ont un terme, elles peuvent être
+     * acceptées, et elles se convertissent. Une facture n'en est pas une —
+     * elle engage dès son émission et n'expire pas.
+     */
+    public const ETAPES_OFFRE = ['Devis', 'Bon de commande'];
+
+    /**
+     * Durée de validité par défaut d'un devis, en jours.
+     *
+     * Trente jours est l'usage commercial courant, et c'est le délai que
+     * retiennent les tribunaux quand l'offre est muette. Le formulaire permet
+     * d'en saisir un autre.
+     */
+    public const VALIDITE_PAR_DEFAUT = 30;
+
+    public function estUneOffre(): bool
+    {
+        return in_array($this->etape, self::ETAPES_OFFRE, true);
+    }
+
+    /**
+     * La pièce née de celle-ci : le bon de commande issu du devis, la facture
+     * issue du bon de commande.
+     */
+    public function convertiEn(): BelongsTo
+    {
+        return $this->belongsTo(Vente::class, 'converti_en_id');
+    }
+
+    /**
+     * Cette offre a-t-elle déjà donné une pièce ?
+     *
+     * `archived` disait qu'une conversion avait eu lieu sans dire en quoi, et
+     * rien n'empêchait la seconde : le même devis produisait deux bons de
+     * commande, donc deux livraisons et deux factures.
+     */
+    public function estConverti(): bool
+    {
+        return $this->converti_en_id !== null;
+    }
+
+    /**
+     * L'offre a-t-elle passé son terme ?
+     *
+     * Une offre sans terme n'expire pas — c'est le cas des devis établis avant
+     * ce lot, qu'on ne va pas invalider rétroactivement. Le jour du terme est
+     * compris : un devis valable jusqu'au 30 peut être accepté le 30.
+     */
+    public function estExpire(): bool
+    {
+        return $this->estUneOffre()
+            && $this->date_validite !== null
+            && $this->date_validite->endOfDay()->isPast();
+    }
+
+    /**
+     * Le client a-t-il accepté ?
+     */
+    public function estAccepte(): bool
+    {
+        return $this->date_acceptation !== null;
+    }
+
+    /**
+     * L'offre engage-t-elle encore celui qui l'a faite ?
+     *
+     * C'est la question que pose le mot « opposable » : une offre que son terme
+     * a dépassée ne lie plus personne, et une offre déjà convertie a produit
+     * son effet.
+     */
+    public function estOpposable(): bool
+    {
+        return $this->estUneOffre() && !$this->estExpire() && !$this->estConverti();
+    }
+
+    /**
+     * Une offre acceptée ou convertie se relit, elle ne se réécrit pas.
+     *
+     * C'est ce qui fait la différence entre un document opposable et une note :
+     * un devis dont les prix changent après l'accord du client ne prouve rien.
+     * La correction passe par un nouveau devis.
+     */
+    public function estFige(): bool
+    {
+        return $this->estUneOffre() && ($this->estAccepte() || $this->estConverti());
+    }
+
+    /**
+     * Ce que l'écran affiche du sort d'une offre.
+     */
+    public function etatDeLOffre(): string
+    {
+        return match (true) {
+            !$this->estUneOffre() => '',
+            $this->estConverti()  => 'Converti',
+            $this->estAccepte()   => 'Accepté',
+            $this->estExpire()    => 'Expiré',
+            default               => $this->statut === 'Envoyé' ? 'En attente' : 'Brouillon',
+        };
     }
 
     /**

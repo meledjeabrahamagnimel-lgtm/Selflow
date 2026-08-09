@@ -931,6 +931,45 @@ et n'est pas dans `$fillable` — la valeur passait à la trappe sans rien signa
 
 - `tests/Feature/ProductionTest.php` — 16 tests.
 
+#### Lot 6.2 — Le devis opposable — **TERMINÉ**
+
+Le devis existait déjà comme étape de la vente — Devis → Bon de commande →
+Facture — et ne touchait ni le stock, ni la comptabilité, ni la plateforme. Tout
+cela était juste. **Mais il n'engageait personne**, et quatre manques
+l'expliquaient :
+
+| Manque | Ce qu'il produisait |
+|---|---|
+| **Aucune date de validité** | Un devis de janvier restait présentable en décembre, aux prix de janvier. Le client qui l'accepte a raison de le faire : rien n'y dit le contraire |
+| **Aucune trace de l'acceptation** | Ni la date, ni le nom de qui a accepté. En cas de contestation, rien à opposer |
+| **La conversion se rejouait** | `archived` disait qu'elle avait eu lieu sans dire en quoi, et n'empêchait pas la seconde : **le même devis produisait deux bons de commande**, donc deux livraisons et deux factures |
+| **La pièce née héritait de la date de son aînée** | `replicate()` recopiait `date_vente` : une facture de juin issue d'un devis de janvier était **datée de janvier**, se rangeait dans la période de janvier et entrait dans la déclaration de TVA du mauvais mois |
+
+**Ce que le lot pose.** Trois colonnes — `date_validite`, `date_acceptation`,
+`accepte_par` — et une quatrième, `converti_en_id`, qui dit ce qu'une offre est
+devenue. Trente jours de validité par défaut : l'usage commercial courant, et le
+délai que retiennent les tribunaux quand l'offre est muette. Le jour du terme
+est compris.
+
+Une offre acceptée ou convertie **se relit, elle ne se réécrit pas** : c'est ce
+qui fait la différence entre un document opposable et une note. La correction
+passe par un nouveau devis, ce qui laisse les deux versions lisibles. Une offre
+convertie ne se supprime pas non plus — elle fonde la pièce qui en découle.
+
+Prolonger reste possible tant que l'offre n'a rien produit : c'est refaire
+l'offre, donc un geste explicite et tracé. Une offre expirée ne s'accepte plus —
+l'accepter après coup ferait croire à un engagement qui n'existe pas.
+
+**Le terme figure sur le document remis**, non seulement dans la base : un bloc
+de validité s'affiche sur les quatre modèles d'impression, et porte l'accord du
+client dès qu'il est enregistré. Rien de tout cela ne touche à la certification :
+un devis n'est ni normalisé, ni transmis, ni certifié, et le lot ne lit ni
+n'écrit aucune colonne `fne_*`.
+
+- `2026_08_12_000001_devis_opposable.php`
+- `tests/Feature/DevisOpposableTest.php` — 36 tests, dont quatre sur ce que le
+  client lit et deux sur le cloisonnement entre entreprises.
+
 ### Lot 7 — La vitrine
 
 Landing page, documentation, politique, présentation de DC-Knowing et de ses

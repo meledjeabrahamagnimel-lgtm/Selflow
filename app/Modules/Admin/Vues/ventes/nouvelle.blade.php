@@ -303,6 +303,20 @@
                             </button>
                         </div>
                         <small id="infoEtapeVente" style="color:var(--text-3); font-size:11px;">Mode facturation avec règlement</small>
+
+                        {{-- Le terme de l'offre. Un devis sans terme engage
+                             indéfiniment celui qui l'a fait : il reste
+                             présentable des mois plus tard, aux prix du jour où
+                             il a été établi. Une facture, elle, n'expire pas. --}}
+                        <div id="blocValidite" style="display:none; margin-top:10px;">
+                            <label class="form-label" for="dateValidite" style="font-size:12px;">Valable jusqu'au</label>
+                            <input type="date" name="date_validite" id="dateValidite" class="form-control"
+                                   min="{{ now()->toDateString() }}"
+                                   value="{{ old('date_validite', now()->addDays(\App\Modules\Admin\Modeles\Vente::VALIDITE_PAR_DEFAUT)->toDateString()) }}">
+                            <small style="color:var(--text-3); font-size:11px;">
+                                Passé ce terme, les prix indiqués ne vous engagent plus. Trente jours par défaut.
+                            </small>
+                        </div>
                         <div id="avertissementRne" style="display:none; margin-top:8px; padding:10px 12px; background:#fffbeb; border:1px solid #fcd34d; border-radius:8px; font-size:11px; color:#92400e; line-height:1.5;">
                             <i class="fas fa-triangle-exclamation"></i>
                             <strong>Normalisation RNE en attente.</strong>
@@ -611,6 +625,12 @@ function selectionnerEtapeVente(btn) {
     // communiqué les champs de mappage du reçu normalisé électronique.
     const avertissement = document.getElementById('avertissementRne');
     if (avertissement) avertissement.style.display = estRecu ? 'block' : 'none';
+
+    // Seules les offres ont un terme : une facture engage des son emission.
+    const blocValidite = document.getElementById('blocValidite');
+    if (blocValidite) {
+        blocValidite.style.display = (etape === 'Devis' || etape === 'Bon de commande') ? 'block' : 'none';
+    }
 
     if (estRecu) {
         blocPaiement.style.display = 'block';

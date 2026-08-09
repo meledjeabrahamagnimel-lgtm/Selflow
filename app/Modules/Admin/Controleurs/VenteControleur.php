@@ -87,6 +87,9 @@ class VenteControleur
             'articles.*.prix_unitaire'   => ['nullable', 'numeric', 'min:0'],
             'articles.*.tva'             => ['nullable', 'numeric', 'min:0', 'max:100'],
             'type_piece'                 => ['nullable', 'string', 'in:facture,recu'],
+            // Un terme dans le passé ne serait pas une offre, mais une offre
+            // déjà caduque au moment où on la remet au client.
+            'date_validite'              => ['nullable', 'date', 'after_or_equal:today'],
             'articles.*.code_tva'        => ['nullable', 'string', 'in:TVA,TVAB,TVAC,TVAD'],
             'articles.*.taxes'           => ['nullable', 'array'],
             'articles.*.taxes.*.nom'     => ['required_with:articles.*.taxes.*.taux', 'string', 'max:100'],
@@ -229,6 +232,10 @@ class VenteControleur
                 'client_id'               => $request->client_id ?: null,
                 'numero_facture'          => $numero,
                 'date_vente'              => now()->toDateString(),
+                // Un devis sans terme engage indéfiniment celui qui l'a fait :
+                // il reste présentable des mois plus tard, aux prix du jour où
+                // il a été établi. Une facture, elle, n'expire pas.
+                'date_validite'           => self::termeDeLOffre($request, $etape),
                 'mode_paiement'           => $modePaiementFinal,
                 'moyen_bancaire'          => $request->mode_paiement === 'Banque' ? $request->moyen_bancaire : null,
                 'reference_paiement'      => $request->mode_paiement === 'Banque' ? $request->reference_paiement : null,
@@ -616,6 +623,10 @@ class VenteControleur
             abort(403, 'Cette facture a été normalisée et ne peut plus être modifiée.');
         }
 
+        if ($vente->estFige()) {
+            abort(403, self::pourquoiFige($vente));
+        }
+
         $entreprise = Auth::user()->entreprise;
         $clients    = Client::obtenirClientsPrioritaires($entreprise->id);
         $produits   = Produit::where('entreprise_id', $entreprise->id)->orderBy('nom')->get();
@@ -642,6 +653,16 @@ class VenteControleur
             abort(403, 'Cette facture a été normalisée et ne peut plus être modifiée.');
         }
 
+        // **Une offre acceptée ou convertie se relit, elle ne se réécrit pas.**
+        // C'est ce qui fait la différence entre un document opposable et une
+        // note : un devis dont les prix changent après l'accord du client ne
+        // prouve plus rien, et la commande qui en découle facturerait autre
+        // chose que ce qui a été convenu. La correction passe par un nouveau
+        // devis, ce qui laisse les deux versions lisibles.
+        if ($vente->estFige()) {
+            abort(403, self::pourquoiFige($vente));
+        }
+
         $request->validate(array_merge([
             'client_id'      => ['nullable', 'integer', Appartenance::a('clients', 'id')],
             'mode_paiement'  => ['required', 'string'],
@@ -653,6 +674,9 @@ class VenteControleur
             'articles.*.prix_unitaire'   => ['nullable', 'numeric', 'min:0'],
             'articles.*.tva'             => ['nullable', 'numeric', 'min:0', 'max:100'],
             'type_piece'                 => ['nullable', 'string', 'in:facture,recu'],
+            // Un terme dans le passé ne serait pas une offre, mais une offre
+            // déjà caduque au moment où on la remet au client.
+            'date_validite'              => ['nullable', 'date', 'after_or_equal:today'],
             'articles.*.code_tva'        => ['nullable', 'string', 'in:TVA,TVAB,TVAC,TVAD'],
             'articles.*.taxes'           => ['nullable', 'array'],
             'articles.*.taxes.*.nom'     => ['required_with:articles.*.taxes.*.taux', 'string', 'max:100'],
@@ -877,11 +901,147 @@ class VenteControleur
             ->with('succes', 'Facture ' . $vente->numero_facture . ' modifiée avec succès.');
     }
 
+    /**
+     * Le terme de l'offre, à l'enregistrement.
+     *
+     * Une facture n'a pas de terme : elle engage dès son émission et
+     * n'expire pas. Un devis sans terme, lui, engage indéfiniment celui qui
+     * l'a fait — il reste présentable des mois plus tard, aux prix du jour où
+     * il a été établi, et le client qui l'accepte a raison de le faire.
+     */
+    private static function termeDeLOffre(Request $request, string $etape): ?string
+    {
+        if (!in_array($etape, Vente::ETAPES_OFFRE, true)) {
+            return null;
+        }
+
+        return $request->filled('date_validite')
+            ? $request->date('date_validite')->toDateString()
+            : now()->addDays(Vente::VALIDITE_PAR_DEFAUT)->toDateString();
+    }
+
+    /**
+     * Ce qui fige une offre, dit à l'utilisateur.
+     */
+    private static function pourquoiFige(Vente $offre): string
+    {
+        if ($offre->estConverti()) {
+            return 'Ce document a été converti en ' . ($offre->convertiEn?->numero_facture ?? 'une autre pièce')
+                . ' : il ne se modifie plus. Modifiez la pièce qui en est issue.';
+        }
+
+        return 'Ce document a été accepté le ' . $offre->date_acceptation->format('d/m/Y')
+            . ' : le modifier ferait dire à un accord ce qu\'il ne disait pas. '
+            . 'Établissez un nouveau devis.';
+    }
+
+    /**
+     * Ce qui interdit de convertir une offre, ou `null` si rien ne s'y oppose.
+     *
+     * Deux motifs, et le premier a produit de vraies doubles livraisons :
+     * `archived` disait qu'une conversion avait eu lieu sans dire en quoi, et
+     * rien n'empêchait la seconde. Le second est ce que le terme veut dire :
+     * une offre dépassée ne lie plus personne, et la reprendre telle quelle
+     * facturerait aux prix d'un mois révolu.
+     */
+    private static function obstacleALaConversion(Vente $offre): ?string
+    {
+        if ($offre->estConverti()) {
+            $nee = $offre->convertiEn?->numero_facture;
+
+            return 'Ce document a déjà été converti'
+                . ($nee ? " en {$nee}" : '')
+                . '. Le convertir une seconde fois créerait une commande en double.';
+        }
+
+        if ($offre->estExpire()) {
+            return 'Ce devis a expiré le ' . $offre->date_validite->format('d/m/Y')
+                . ' : ses prix ne vous engagent plus. Prolongez sa validité ou '
+                . 'établissez-en un nouveau avant de le convertir.';
+        }
+
+        return null;
+    }
+
+    /**
+     * Enregistrer l'acceptation du client.
+     *
+     * C'est ce qu'on oppose en cas de contestation : la date, et le nom de qui
+     * a accepté du côté du client. Sans cela, un devis « accepté » ne repose
+     * que sur la mémoire de deux personnes.
+     */
+    public function accepterOffre(Request $request, Vente $vente): RedirectResponse
+    {
+        abort_unless($vente->pointDeVente->entreprise_id === Auth::user()->entreprise_id, 403);
+        abort_unless($vente->estUneOffre(), 403);
+
+        $request->validate([
+            'accepte_par'      => ['nullable', 'string', 'max:190'],
+            'date_acceptation' => ['nullable', 'date', 'before_or_equal:today'],
+        ], [
+            'date_acceptation.before_or_equal' => 'Une acceptation ne se date pas dans le futur.',
+        ]);
+
+        if ($vente->estAccepte()) {
+            return back()->with('info', 'Ce document est déjà accepté.');
+        }
+
+        // Une offre expirée ne lie plus personne : l'accepter après coup
+        // ferait croire à un engagement qui n'existe pas.
+        if ($vente->estExpire()) {
+            return back()->with('erreur',
+                'Ce devis a expiré le ' . $vente->date_validite->format('d/m/Y')
+                . ' : il ne peut plus être accepté en l\'état.');
+        }
+
+        $vente->update([
+            'date_acceptation' => $request->filled('date_acceptation')
+                ? $request->date('date_acceptation')->toDateString()
+                : now()->toDateString(),
+            'accepte_par' => $request->input('accepte_par') ?: $vente->client?->nom,
+            'statut'      => 'Accepté',
+        ]);
+
+        return back()->with('succes', 'Acceptation enregistrée. Le document est désormais figé.');
+    }
+
+    /**
+     * Repousser le terme d'une offre qui n'a pas encore produit son effet.
+     *
+     * Prolonger, c'est refaire l'offre : c'est un geste explicite, tracé, et
+     * qui reste impossible sur un document déjà converti.
+     */
+    public function prolongerOffre(Request $request, Vente $vente): RedirectResponse
+    {
+        abort_unless($vente->pointDeVente->entreprise_id === Auth::user()->entreprise_id, 403);
+        abort_unless($vente->estUneOffre(), 403);
+
+        $request->validate([
+            'date_validite' => ['required', 'date', 'after_or_equal:today'],
+        ], [
+            'date_validite.after_or_equal' => 'Prolonger une offre, c\'est lui donner un terme à venir.',
+        ]);
+
+        if ($vente->estConverti()) {
+            return back()->with('erreur',
+                'Ce document a déjà été converti : son terme n\'a plus d\'objet.');
+        }
+
+        $vente->update(['date_validite' => $request->date('date_validite')->toDateString()]);
+
+        return back()->with('succes',
+            'Validité prolongée jusqu\'au ' . $vente->fresh()->date_validite->format('d/m/Y') . '.');
+    }
+
     public function confirmerCommande(Vente $vente): RedirectResponse
     {
         abort_unless($vente->pointDeVente->entreprise_id === Auth::user()->entreprise_id, 403);
         if ($vente->etape !== 'Devis') {
             return back()->with('info', 'Le document n\'est pas à l\'étape Devis.');
+        }
+
+        if ($obstacle = self::obstacleALaConversion($vente)) {
+            return back()->with('erreur', $obstacle);
         }
 
         $vente->update(['etape' => 'Bon de commande']);
@@ -1140,11 +1300,12 @@ class VenteControleur
             return back()->with('erreur', 'Ce document n\'est pas un devis.');
         }
 
-        DB::transaction(function () use ($vente) {
-            // 1. Archiver le devis d'origine
-            $vente->update(['archived' => true]);
+        if ($obstacle = self::obstacleALaConversion($vente)) {
+            return back()->with('erreur', $obstacle);
+        }
 
-            // 2. Cloner en Bon de commande
+        DB::transaction(function () use ($vente) {
+            // 1. Cloner en Bon de commande
             $entrepriseId = $vente->pointDeVente->entreprise_id;
             $nouveauNumero = \App\Modules\Admin\Services\NumerotationService::genererNumeroVente($entrepriseId, 'Bon de commande');
 
@@ -1157,14 +1318,31 @@ class VenteControleur
             $clone->numero_fne     = null;
             $clone->signature_dgi  = null;
             $clone->qr_code_data   = null;
+
+            // **La pièce naît aujourd'hui.** `replicate()` recopiait la date du
+            // devis : une commande de juin issue d'un devis de janvier était
+            // datée de janvier, se rangeait dans la période de janvier, et la
+            // facture qui en découlait entrait dans la déclaration du mauvais
+            // mois. L'acceptation du client, elle, appartient au devis : elle
+            // ne se recopie pas non plus.
+            $clone->date_vente       = now()->toDateString();
+            $clone->date_validite    = now()->addDays(Vente::VALIDITE_PAR_DEFAUT)->toDateString();
+            $clone->date_acceptation = null;
+            $clone->accepte_par      = null;
+            $clone->converti_en_id   = null;
             $clone->save();
 
-            // 3. Cloner les lignes de détail
+            // 2. Cloner les lignes de détail
             foreach ($vente->details as $detail) {
                 $newDetail = $detail->replicate();
                 $newDetail->vente_id = $clone->id;
                 $newDetail->save();
             }
+
+            // 3. Le devis d'origine dit ce qu'il est devenu. `archived` seul ne
+            //    le disait pas, et n'empêchait pas une seconde conversion : le
+            //    même devis produisait deux commandes, donc deux livraisons.
+            $vente->update(['archived' => true, 'converti_en_id' => $clone->id]);
         });
 
         return back()->with('succes', 'Le devis a été converti en bon de commande et archivé.');
@@ -1182,13 +1360,14 @@ class VenteControleur
             return back()->with('erreur', 'Ce document n\'est pas un bon de commande.');
         }
 
+        if ($obstacle = self::obstacleALaConversion($vente)) {
+            return back()->with('erreur', $obstacle);
+        }
+
         $nouvelleFactureId = null;
 
         DB::transaction(function () use ($vente, &$nouvelleFactureId) {
-            // 1. Archiver le bon de commande d'origine
-            $vente->update(['archived' => true]);
-
-            // 2. Cloner en Facture (statut Crédit par défaut, en attente de finalisation)
+            // 1. Cloner en Facture (statut Crédit par défaut, en attente de finalisation)
             $entrepriseId = $vente->pointDeVente->entreprise_id;
             $nouveauNumero = \App\Modules\Admin\Services\NumerotationService::genererNumeroVente($entrepriseId, 'Facture');
 
@@ -1201,14 +1380,30 @@ class VenteControleur
             $clone->numero_fne     = null;
             $clone->signature_dgi  = null;
             $clone->qr_code_data   = null;
+
+            // **La facture naît aujourd'hui.** `replicate()` recopiait la date
+            // du bon de commande : une facture de juin issue d'une commande de
+            // janvier était datée de janvier et entrait dans la déclaration de
+            // TVA du mauvais mois. Une facture n'a pas de terme — elle engage
+            // dès son émission —, et l'acceptation appartient à l'offre.
+            $clone->date_vente       = now()->toDateString();
+            $clone->date_validite    = null;
+            $clone->date_acceptation = null;
+            $clone->accepte_par      = null;
+            $clone->converti_en_id   = null;
             $clone->save();
 
-            // 3. Cloner les lignes
+            // 2. Cloner les lignes
             foreach ($vente->details as $detail) {
                 $newDetail = $detail->replicate();
                 $newDetail->vente_id = $clone->id;
                 $newDetail->save();
             }
+
+            // 3. La commande dit ce qu'elle est devenue, et ne se convertit
+            //    plus : deux factures pour une commande, c'est un client
+            //    facturé deux fois.
+            $vente->update(['archived' => true, 'converti_en_id' => $clone->id]);
 
             $nouvelleFactureId = $clone->id;
         });
@@ -1318,6 +1513,13 @@ class VenteControleur
         abort_unless($vente->pointDeVente->entreprise_id === Auth::user()->entreprise_id, 403);
         abort_if($vente->type_facture === 'avoir', 403, "Impossible de supprimer une facture d'avoir.");
         abort_unless($vente->archived, 403, 'Seuls les documents archivés peuvent être supprimés.');
+
+        // Une offre convertie est le premier maillon d'une chaîne : la
+        // supprimer laisse la commande, puis la facture, sans l'accord qui les
+        // fonde. C'est précisément ce qu'on oppose en cas de contestation.
+        abort_if($vente->estConverti(), 403,
+            'Ce document a été converti en ' . ($vente->convertiEn?->numero_facture ?? 'une autre pièce')
+            . " : il fonde la pièce qui en découle et ne peut pas être supprimé.");
 
         $etape = $vente->etape;
         $vente->details()->delete();
