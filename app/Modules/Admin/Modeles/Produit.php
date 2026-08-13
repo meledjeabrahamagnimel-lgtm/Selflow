@@ -2,6 +2,7 @@
 
 namespace App\Modules\Admin\Modeles;
 
+use App\Modules\Admin\Modeles\Concerns\IdentifiantOpaque;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -9,6 +10,8 @@ use Illuminate\Support\Facades\DB;
 
 class Produit extends Model
 {
+    use IdentifiantOpaque;
+
     protected $table = 'produits';
 
     /**

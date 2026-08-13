@@ -262,6 +262,7 @@ class AchatApiControleur
             'donnees' => [
                 'achat' => [
                     'id' => $achat->id,
+                    'uuid' => $achat->uuid,
                     'numero_facture' => $achat->numero_facture,
                     'date_achat' => $achat->date_achat->toDateString(),
                     'mode_paiement' => $achat->mode_paiement,

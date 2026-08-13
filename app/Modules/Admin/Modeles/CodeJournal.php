@@ -2,11 +2,14 @@
 
 namespace App\Modules\Admin\Modeles;
 
+use App\Modules\Admin\Modeles\Concerns\IdentifiantOpaque;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class CodeJournal extends Model
 {
+    use IdentifiantOpaque;
+
     protected $table = 'codes_journaux';
     protected $fillable = ['entreprise_id', 'type', 'code', 'numero_original', 'intitule', 'compte', 'source', 'archive_le', 'systeme'];
 

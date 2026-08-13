@@ -79,7 +79,7 @@
                         </td>
                         <td style="font-family:monospace; font-size:13px;">{{ $code->compte }}</td>
                         <td>
-                            <form method="POST" action="{{ route('admin.tresorerie.supprimer_code_journal', $code->id) }}" onsubmit="return confirm('Êtes-vous sûr de vouloir supprimer ce code journal ?')" style="display:inline;">
+                            <form method="POST" action="{{ route('admin.tresorerie.supprimer_code_journal', $code) }}" onsubmit="return confirm('Êtes-vous sûr de vouloir supprimer ce code journal ?')" style="display:inline;">
                                 @csrf
                                 @method('DELETE')
                                 <button type="submit" class="btn btn-danger btn-sm" style="padding: 5px 10px;">

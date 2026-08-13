@@ -106,7 +106,16 @@ return Application::configure(basePath: dirname(__DIR__))
                         'ligne'   => $e->getLine(),
                         'url'     => $request->fullUrl(),
                         'moment'  => now()->format('d/m/Y à H:i:s'),
-                        'trace'   => substr($e->getTraceAsString(), 0, 4000),
+                        // Les chemins sont ramenés à la racine du projet. La
+                        // suite des appels est désormais visible de tous : elle
+                        // n'a pas à dire sous quel compte le serveur tourne ni
+                        // où le projet est installé, seulement quel fichier a
+                        // appelé quel autre.
+                        'trace'   => substr(
+                            str_replace(base_path() . DIRECTORY_SEPARATOR, '', $e->getTraceAsString()),
+                            0,
+                            4000
+                        ),
                     ],
                 ], 500);
             }

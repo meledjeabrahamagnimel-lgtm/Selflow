@@ -214,7 +214,9 @@
 
 <script>
     function ouvrirModalNegociation(neg) {
-        document.getElementById('formProposer').action = `/admin/b2b/negociation/${neg.id}/proposer`;
+        // L'adresse porte l'identifiant opaque, non le numero de ligne :
+        // `neg.id` ne resout plus rien.
+        document.getElementById('formProposer').action = `/admin/b2b/negociation/${neg.uuid}/proposer`;
         
         // 1. Remplir les produits
         const pContainer = document.getElementById('modal-produits-container');

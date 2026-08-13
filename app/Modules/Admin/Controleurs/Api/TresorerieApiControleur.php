@@ -140,6 +140,7 @@ class TresorerieApiControleur
             'message' => 'Code journal banque créé avec succès.',
             'banque' => [
                 'id'            => $journal->id,
+                'uuid' => $journal->uuid,
                 'nom'           => $journal->intitule,
                 'numero_compte' => $journal->code . ' - ' . $journal->compte,
                 'code'          => $journal->code,

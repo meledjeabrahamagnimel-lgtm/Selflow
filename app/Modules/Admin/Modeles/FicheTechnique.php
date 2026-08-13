@@ -2,12 +2,15 @@
 
 namespace App\Modules\Admin\Modeles;
 
+use App\Modules\Admin\Modeles\Concerns\IdentifiantOpaque;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class FicheTechnique extends Model
 {
+    use IdentifiantOpaque;
+
     protected $table = 'fiches_techniques';
 
     protected $fillable = [

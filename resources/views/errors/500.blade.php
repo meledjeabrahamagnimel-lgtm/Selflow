@@ -19,10 +19,9 @@
     $detail = $detail ?? null;
     $reference = $reference ?? null;
 
-    // Le détail complet — les appels successifs — n'est déplié que pour qui
-    // peut en faire quelque chose. Un utilisateur voit ce qui s'est passé et
-    // sous quelle référence ; il n'a pas à voir l'arborescence du serveur.
-    $montrerLaTrace = config('app.debug') || (auth()->check() && auth()->user()->role === 'superadmin');
+    // **La suite des appels est visible de tous** — décision du propriétaire du
+    // projet. Elle porte l'arborescence du serveur ; les chemins sont ramenés à
+    // la racine du projet pour n'en dire que le nécessaire.
 @endphp
 <!DOCTYPE html>
 <html lang="fr">
@@ -263,13 +262,17 @@
                             </div>
                         </dl>
 
-                        @if($montrerLaTrace && !empty($detail['trace']))
-                            <pre class="trace">{{ $detail['trace'] }}</pre>
-                        @elseif(!empty($detail['trace']))
-                            <p style="margin-top:12px; font-size:12px; color:var(--text-3);">
-                                La suite des appels n'est visible que par l'administration de la
-                                plateforme : elle porte l'arborescence du serveur.
-                            </p>
+                        @if(!empty($detail['trace']))
+                            <div style="margin-top:14px; display:flex; align-items:center; justify-content:space-between; gap:10px;">
+                                <span style="font-size:12px; font-weight:600; color:var(--text-3);">
+                                    Suite des appels
+                                </span>
+                                <button type="button" class="btn" style="padding:4px 10px; font-size:12px;"
+                                        onclick="copierLaTrace()">
+                                    <i class="fas fa-copy"></i> Copier le détail
+                                </button>
+                            </div>
+                            <pre class="trace" id="trace">{{ $detail['trace'] }}</pre>
                         @endif
                     </div>
                 </details>
@@ -291,6 +294,27 @@
     </main>
 
     <script>
+        /**
+         * Copier tout le detail technique d'un coup : c'est ce qu'on colle dans
+         * un billet d'assistance, et le recopier a la main d'un ecran de caisse
+         * n'arrive jamais.
+         */
+        function copierLaTrace() {
+            const bloc = document.getElementById('trace');
+            const reference = document.getElementById('reference')?.textContent?.trim() ?? '';
+
+            if (!bloc || !navigator.clipboard) return;
+
+            const texte = 'Référence : ' + reference + '\n\n' + bloc.textContent;
+            const bouton = event.currentTarget;
+
+            navigator.clipboard.writeText(texte).then(() => {
+                const avant = bouton.innerHTML;
+                bouton.innerHTML = '<i class="fas fa-check"></i> Copié';
+                setTimeout(() => { bouton.innerHTML = avant; }, 1800);
+            });
+        }
+
         function copierLaReference() {
             const texte = document.getElementById('reference')?.textContent?.trim();
 

@@ -236,7 +236,7 @@
         <div style="display: flex; gap: 8px; align-items: center;">
             @if(isset($bl))
                 @if(!in_array($bl->statut, ['livre', 'facture']))
-                <button type="button" class="print-btn" style="background:#0369a1; color:#fff; border-color:#0369a1; font-weight:700;" onclick="executerAction('{{ request()->routeIs('caissier.*') ? route('caissier.ventes.livraison.livrer', $bl->id) : route('admin.ventes.livraison.livrer', $bl->id) }}', true)">
+                <button type="button" class="print-btn" style="background:#0369a1; color:#fff; border-color:#0369a1; font-weight:700;" onclick="executerAction('{{ request()->routeIs('caissier.*') ? route('caissier.ventes.livraison.livrer', $bl) : route('admin.ventes.livraison.livrer', $bl) }}', true)">
                     <i class="fas fa-check"></i> Marquer Livré
                 </button>
                 @endif
@@ -291,11 +291,11 @@
                     </button>
                 @endif
                 @if($vente->etape === 'Devis' && !$vente->estConverti())
-                    <button class="print-btn" style="background:var(--warning); color:#fff; border-color:var(--warning);" onclick="executerAction('{{ route('admin.ventes.confirmer', $vente->id) }}')">
+                    <button class="print-btn" style="background:var(--warning); color:#fff; border-color:var(--warning);" onclick="executerAction('{{ route('admin.ventes.confirmer', $vente) }}')">
                         <i class="fas fa-check-circle"></i> Confirmer la commande
                     </button>
                 @elseif($vente->etape === 'Bon de commande' && !$vente->estConverti())
-                    <button class="print-btn" style="background:#10b981; color:#fff; border-color:#10b981;" onclick="executerAction('{{ route('admin.ventes.facturer', $vente->id) }}')">
+                    <button class="print-btn" style="background:#10b981; color:#fff; border-color:#10b981;" onclick="executerAction('{{ route('admin.ventes.facturer', $vente) }}')">
                         <i class="fas fa-file-invoice-dollar"></i> Valider & Facturer
                     </button>
                 @endif
@@ -866,7 +866,7 @@ function enregistrerAcceptation() {
     if (qui === null) return;
 
     var form = document.getElementById('action-form');
-    form.action = @json(route('admin.ventes.accepter', $vente->id));
+    form.action = @json(route('admin.ventes.accepter', $vente));
     ajouterChamp(form, 'accepte_par', qui);
     form.submit();
 }
@@ -880,7 +880,7 @@ function prolongerValidite() {
     if (!terme) return;
 
     var form = document.getElementById('action-form');
-    form.action = @json(route('admin.ventes.prolonger', $vente->id));
+    form.action = @json(route('admin.ventes.prolonger', $vente));
     ajouterChamp(form, 'date_validite', terme);
     form.submit();
 }

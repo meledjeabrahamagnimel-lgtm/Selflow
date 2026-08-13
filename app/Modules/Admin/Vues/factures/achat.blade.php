@@ -160,11 +160,11 @@
             </button>
             
             @if($achat->etape === 'Demande de prix')
-                <button class="print-btn" style="background:var(--warning); color:#fff; border-color:var(--warning);" onclick="executerAction('{{ route('admin.achats.confirmer', $achat->id) }}')">
+                <button class="print-btn" style="background:var(--warning); color:#fff; border-color:var(--warning);" onclick="executerAction('{{ route('admin.achats.confirmer', $achat) }}')">
                     <i class="fas fa-check-circle"></i> Confirmer la commande
                 </button>
             @elseif($achat->etape === 'Bon de commande')
-                <button class="print-btn" style="background:#10b981; color:#fff; border-color:#10b981;" onclick="executerAction('{{ route('admin.achats.facturer', $achat->id) }}')">
+                <button class="print-btn" style="background:#10b981; color:#fff; border-color:#10b981;" onclick="executerAction('{{ route('admin.achats.facturer', $achat) }}')">
                     <i class="fas fa-file-invoice-dollar"></i> Valider & Facturer
                 </button>
             @endif

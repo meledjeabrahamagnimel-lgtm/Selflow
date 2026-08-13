@@ -2,12 +2,15 @@
 
 namespace App\Modules\Admin\Modeles;
 
+use App\Modules\Admin\Modeles\Concerns\IdentifiantOpaque;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Client extends Model
 {
+    use IdentifiantOpaque;
+
     protected $table = 'clients';
     protected $fillable = ['entreprise_id', 'type_facturation', 'nom', 'telephone', 'email', 'adresse', 'ncc', 'regime_imposition', 'rccm', 'compte_comptable', 'numero_tiers', 'source', 'numero_original'];
 

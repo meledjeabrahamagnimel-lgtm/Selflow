@@ -418,6 +418,7 @@ class VenteApiControleur
             'donnees' => [
                 'vente' => [
                     'id' => $vente->id,
+                    'uuid' => $vente->uuid,
                     'numero_facture' => $vente->numero_facture,
                     'date_vente' => $vente->date_vente->toDateString(),
                     'mode_paiement' => $vente->mode_paiement,

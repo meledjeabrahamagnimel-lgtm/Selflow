@@ -2,6 +2,7 @@
 
 namespace App\Modules\Admin\Modeles;
 
+use App\Modules\Admin\Modeles\Concerns\IdentifiantOpaque;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
@@ -9,6 +10,8 @@ use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 
 class Entreprise extends Model
 {
+    use IdentifiantOpaque;
+
     protected $table = 'entreprises';
 
     protected $fillable = [

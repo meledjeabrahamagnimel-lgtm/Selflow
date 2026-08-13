@@ -285,7 +285,8 @@
 
     function ouvrirModalNegociation(neg) {
         activeNegId = neg.id;
-        document.getElementById('formProposer').action = `/admin/b2b/negociation/${neg.id}/proposer`;
+        // L'adresse porte l'identifiant opaque, non le numero de ligne.
+        document.getElementById('formProposer').action = `/admin/b2b/negociation/${neg.uuid}/proposer`;
         document.getElementById('stock-feedback').style.display = 'none';
 
         // 1. Produits
@@ -389,7 +390,7 @@
     }
 
     function ouvrirModalFinalisation(neg) {
-        document.getElementById('formFinaliser').action = `/admin/b2b/negociation/${neg.id}/finaliser`;
+        document.getElementById('formFinaliser').action = `/admin/b2b/negociation/${neg.uuid}/finaliser`;
         document.getElementById('modalFinalisation').classList.add('open');
     }
 

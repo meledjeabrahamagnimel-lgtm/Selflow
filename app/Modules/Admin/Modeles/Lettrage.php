@@ -2,6 +2,7 @@
 
 namespace App\Modules\Admin\Modeles;
 
+use App\Modules\Admin\Modeles\Concerns\IdentifiantOpaque;
 use App\Modules\Authentification\Modeles\Utilisateur;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -15,6 +16,8 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  */
 class Lettrage extends Model
 {
+    use IdentifiantOpaque;
+
     protected $table = 'lettrages';
 
     protected $fillable = [

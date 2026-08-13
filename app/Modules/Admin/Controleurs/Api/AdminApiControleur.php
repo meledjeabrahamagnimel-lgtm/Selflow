@@ -52,6 +52,7 @@ class AdminApiControleur
             ->map(function ($p) {
                 return [
                     'id' => $p->id,
+                    'uuid' => $p->uuid,
                     'reference' => $p->reference,
                     'nom' => $p->nom,
                     'stock_actuel' => $p->stock_actuel,
@@ -76,6 +77,7 @@ class AdminApiControleur
             ->map(function ($v) {
                 return [
                     'id' => $v->id,
+                    'uuid' => $v->uuid,
                     'numero_facture' => $v->numero_facture,
                     'date_vente' => $v->date_vente->toDateString(),
                     'client' => $v->client ? $v->client->nom : 'Client de passage',
@@ -96,6 +98,7 @@ class AdminApiControleur
             ->map(function ($pdv) {
                 return [
                     'id' => $pdv->id,
+                    'uuid' => $pdv->uuid,
                     'nom' => $pdv->nom,
                     'statut' => $pdv->statut,
                     'ventes_jour' => $pdv->ventes_jour ?? 0,
@@ -108,6 +111,7 @@ class AdminApiControleur
             'donnees' => [
                 'entreprise' => [
                     'id' => $entreprise->id,
+                    'uuid' => $entreprise->uuid,
                     'nom' => $entreprise->nom,
                 ],
                 'point_de_vente_actif_id' => $pointDeVenteId ? intval($pointDeVenteId) : null,

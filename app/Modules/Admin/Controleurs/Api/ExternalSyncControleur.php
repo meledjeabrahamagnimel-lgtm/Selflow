@@ -179,6 +179,7 @@ class ExternalSyncControleur
             'success' => true,
             'company' => [
                 'id'                => $entreprise->id,
+                'uuid' => $entreprise->uuid,
                 'nom'               => $entreprise->nom,
                 'rccm'              => $entreprise->rccm ?? null,
                 'ncc'               => $entreprise->ncc ?? null,
@@ -212,6 +213,7 @@ class ExternalSyncControleur
             $admin = $e->utilisateurs->first();
             return [
                 'id'                   => $e->id,
+                'uuid' => $e->uuid,
                 'nom'                  => $e->nom,
                 'email'                => $e->email,
                 'telephone'            => $e->telephone,

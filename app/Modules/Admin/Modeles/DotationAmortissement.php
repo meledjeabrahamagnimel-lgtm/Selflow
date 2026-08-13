@@ -2,6 +2,7 @@
 
 namespace App\Modules\Admin\Modeles;
 
+use App\Modules\Admin\Modeles\Concerns\IdentifiantOpaque;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
@@ -18,6 +19,8 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  */
 class DotationAmortissement extends Model
 {
+    use IdentifiantOpaque;
+
     protected $table = 'dotations_amortissement';
 
     protected $fillable = [

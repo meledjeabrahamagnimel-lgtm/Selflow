@@ -2,12 +2,15 @@
 
 namespace App\Modules\Authentification\Modeles;
 
+use App\Modules\Admin\Modeles\Concerns\IdentifiantOpaque;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 
 class Utilisateur extends Authenticatable
 {
+    use IdentifiantOpaque;
+
     use Notifiable;
 
     protected $table = 'utilisateurs';

@@ -1275,7 +1275,7 @@ n'est pas arrêté.
 - `App\Providers\LimitesDeDebit`
 - `tests/Feature/LimitesDeDebitTest.php` — 15 tests.
 
-#### Lot 8.3 — L'oracle de volume — **TERMINÉ pour le 404 ; les identifiants opaques restent à faire**
+#### Lot 8.3 — L'oracle de volume, et les identifiants opaques — **TERMINÉ**
 
 **Le cloisonnement tenait.** Les soixante-cinq gardes d'appartenance faisaient
 leur travail, et aucune donnée d'autrui n'était rendue — l'audit statique n'a
@@ -1303,34 +1303,45 @@ les refus d'habilitation restent des 403, et un test le vérifie.
 Un second test empêche la dérive : il relit les contrôleurs et échoue si une
 garde d'appartenance neuve est écrite avec un 403.
 
-##### Ce qui n'a pas été fait, et pourquoi
+##### Les identifiants opaques — faits
 
-**Les identifiants restent numériques.** Le 404 supprime l'oracle, non le besoin
-d'identifiants opaques : une adresse qui porte `4213` dit encore quelque chose à
-qui la voit passer — dans un courriel transféré, une capture d'écran, un billet
-d'assistance.
+Le 404 supprimait l'oracle, non le besoin d'identifiants opaques : une adresse
+qui porte `4213` dit encore quelque chose à qui la voit passer — dans un courriel
+transféré, une capture d'écran, un billet d'assistance, l'historique d'un
+navigateur partagé.
 
-Le passage à des identifiants tirés au hasard se fait par une colonne `uuid` et
-`getRouteKeyName()`. La difficulté n'est pas là : **six modèles —
-`vente`, `achat`, `produit`, `pdv`, `personnel`, `code` — sont liés en route
-dans l'API mobile autant que sur le web**, et `getRouteKeyName()` vaut pour les
-deux. Changer la clé casserait un client que ce dépôt ne contient pas et que je
-ne peux pas éprouver.
+**Le propriétaire a tranché pour l'identité unique**, et signalé que le projet
+est encore en développement : aucune donnée réelle, donc aucune période de
+compatibilité à ménager. Le changement est donc net.
 
-Trois chemins, à trancher par le propriétaire :
+| Décision | Raison |
+|---|---|
+| **La clé primaire ne change pas** | L'entier reste ce qui porte les jointures, les index et les clés étrangères, où il est plus rapide et plus compact |
+| **`getRouteKeyName()` vaut pour le web et l'API** | Deux identités — le numéro sur le mobile, l'`uuid` sur le web — auraient rendu impossible de rapprocher un journal du serveur, un billet d'assistance et une capture d'écran. Et la moitié du problème serait restée entière pour toujours |
+| **L'identifiant n'est pas `fillable`** | Le trait le pose lui-même à la création : une requête ne peut donc pas choisir l'identifiant d'une ressource, ni le connaître avant de la créer |
+| **L'API publie l'`uuid` à côté de l'`id`** | L'application mobile construit ses adresses depuis ce que l'API rend : sans l'identifiant dans la charge utile, elle n'a rien pour désigner une ressource |
 
-1. **Lier par colonne, route par route** — `{vente:uuid}` sur le web, `{vente}`
-   sur l'API. Précis et réversible, mais il faut vérifier que la génération
-   d'URL suit le champ déclaré ;
-2. **Changer les deux à la fois**, en publiant l'`uuid` dans les réponses de
-   l'API et en mettant à jour le client mobile ;
-3. **S'en tenir au 404**, en jugeant que le résiduel ne justifie pas le risque.
+Dix-neuf modèles, dix-neuf tables. Neuf adresses construites dans les vues avec
+`$piece->id` et trois construites en JavaScript ont été reprises : elles
+généraient l'entier là où la route attend l'identifiant, et **le défaut ne se
+serait vu qu'au clic**.
 
-Le premier est le plus sûr ; il demande une vérification que je préfère faire
-avec vous plutôt que de la présumer.
+**Un défaut trouvé en chemin.** `replicate()` recopiait l'`uuid` : la contrainte
+d'unicité refusait l'enregistrement — un bon de commande ne pouvait plus naître
+d'un devis — et si elle ne l'avait pas refusé, **l'adresse du devis aurait
+désigné sa commande**, ce qui est exactement ce que l'identifiant sert à
+empêcher. L'exclusion est posée dans le trait, non dans les appelants : un
+`replicate()` écrit demain ailleurs hériterait sinon du même défaut.
 
-- `App\Modules\Admin\Regles\Cloisonnement`
-- `tests/Feature/CloisonnementTest.php` — 11 tests.
+Un test relit les vues et échoue si une adresse est construite avec un numéro de
+ligne ; un autre vérifie que chaque modèle désigné dans une adresse porte bien
+son identifiant et sa colonne.
+
+- `App\Modules\Admin\Regles\Cloisonnement`,
+  `App\Modules\Admin\Modeles\Concerns\IdentifiantOpaque`
+- `2026_08_17_000001_identifiants_opaques.php`
+- `tests/Feature/CloisonnementTest.php` — 11 tests ;
+  `tests/Feature/IdentifiantOpaqueTest.php` — 31 tests.
 
 #### Lot 8.3 bis — La page de panne — **TERMINÉ**
 
@@ -1358,11 +1369,11 @@ l'application — le bleu royal `#002B5C`, le gris-bleu `#F4F6F9`, la police
 Inter. Aucun fichier à déployer, aucune requête à faire : le jour où le serveur
 va mal est le pire moment pour dépendre d'une image qui doit se charger.
 
-**Une réserve, signalée.** La suite des appels porte l'arborescence du serveur :
-elle n'est dépliée que pour l'administration de la plateforme ou en mode
-développement. Tout le reste du détail — type, message, fichier, ligne, adresse,
-moment — est montré à tout le monde. Si vous préférez que la suite des appels
-soit visible de tous, c'est une ligne à changer dans la vue.
+**La suite des appels est visible de tous** — décision du propriétaire. Les
+chemins sont ramenés à la racine du projet : la pile dit quel fichier a appelé
+quel autre, sans dire sous quel compte le serveur tourne ni où le projet est
+installé. Un bouton copie tout le détail avec sa référence, puisque le recopier
+à la main depuis un écran de caisse n'arrive jamais.
 
 - `resources/views/errors/500.blade.php`, `App\Exceptions\Panne::reference()`
 - `tests/Feature/PageDePanneTest.php` — 12 tests.

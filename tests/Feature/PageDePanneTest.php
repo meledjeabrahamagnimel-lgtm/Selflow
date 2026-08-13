@@ -97,28 +97,26 @@ class PageDePanneTest extends TestCase
         $reponse->assertSee('data:image/svg+xml', false);
     }
 
-    // ══════════════ Ce qui n'est pas montré à n'importe qui ══════════════
+    // ══════════════ Ce que le repli contient ══════════════
 
-    public function test_la_suite_des_appels_n_est_pas_montree_a_un_visiteur(): void
+    public function test_la_suite_des_appels_est_visible_de_tous(): void
     {
-        // Elle porte l'arborescence du serveur : un chemin absolu dit le
-        // système et la structure du déploiement.
+        // Décision du propriétaire du projet : le repli montre tout, y compris
+        // la suite des appels.
         $reponse = $this->provoquerLaPanne();
 
-        $reponse->assertDontSee('<pre class="trace"', false);
-        $reponse->assertSee('n\'est visible que par l\'administration', false);
+        $reponse->assertSee('<pre class="trace"', false);
+        $reponse->assertSee('Suite des appels', false);
     }
 
-    public function test_l_administration_de_la_plateforme_voit_la_suite_des_appels(): void
+    public function test_le_detail_se_copie_d_un_bouton(): void
     {
-        $superadmin = Utilisateur::create([
-            'nom' => 'Admin', 'prenom' => 'Plateforme', 'email' => 'admin@exemple.ci',
-            'password' => bcrypt('secret-de-test'), 'role' => 'superadmin',
-        ]);
+        // C'est ce qu'on colle dans un billet d'assistance : le recopier à la
+        // main depuis un écran de caisse n'arrive jamais.
+        $reponse = $this->provoquerLaPanne();
 
-        $reponse = $this->actingAs($superadmin)->get('/_panne-de-test');
-
-        $reponse->assertSee('<pre class="trace"', false);
+        $reponse->assertSee('Copier le détail', false);
+        $reponse->assertSee('copierLaTrace', false);
     }
 
     public function test_le_chemin_du_serveur_est_ramene_au_projet(): void

@@ -20,6 +20,7 @@ class PointDeVenteApiControleur
             ->map(function ($pdv) {
                 return [
                     'id' => $pdv->id,
+                    'uuid' => $pdv->uuid,
                     'nom' => $pdv->nom,
                     'ville' => $pdv->ville,
                     'commune' => $pdv->commune,
@@ -68,6 +69,7 @@ class PointDeVenteApiControleur
             'message' => 'Point de vente créé avec succès.',
             'point_de_vente' => [
                 'id' => $pdv->id,
+                'uuid' => $pdv->uuid,
                 'nom' => $pdv->nom
             ]
         ], 201);

@@ -2,12 +2,15 @@
 
 namespace App\Modules\Admin\Modeles;
 
+use App\Modules\Admin\Modeles\Concerns\IdentifiantOpaque;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class BonLivraison extends Model
 {
+    use IdentifiantOpaque;
+
     protected $table = 'bons_livraison';
 
     protected $fillable = [

@@ -24,6 +24,7 @@ class PersonnelApiControleur
             ->map(function ($p) {
                 return [
                     'id' => $p->id,
+                    'uuid' => $p->uuid,
                     'nom' => $p->nom,
                     'prenom' => $p->prenom,
                     'email' => $p->email,
@@ -32,6 +33,7 @@ class PersonnelApiControleur
                     'statut' => $p->statut,
                     'point_de_vente' => $p->pointDeVente ? [
                         'id' => $p->pointDeVente->id,
+                        'uuid' => $p->pointDeVente->uuid,
                         'nom' => $p->pointDeVente->nom
                     ] : null
                 ];
@@ -82,6 +84,7 @@ class PersonnelApiControleur
             'message' => 'Membre du personnel créé avec succès.',
             'personnel' => [
                 'id' => $personnel->id,
+                'uuid' => $personnel->uuid,
                 'nom' => $personnel->nom,
                 'prenom' => $personnel->prenom
             ]
@@ -102,6 +105,7 @@ class PersonnelApiControleur
             'statut' => 'succes',
             'personnel' => [
                 'id' => $personnel->id,
+                'uuid' => $personnel->uuid,
                 'nom' => $personnel->nom,
                 'prenom' => $personnel->prenom,
                 'email' => $personnel->email,

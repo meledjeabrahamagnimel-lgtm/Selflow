@@ -2,12 +2,15 @@
 
 namespace App\Modules\Admin\Modeles;
 
+use App\Modules\Admin\Modeles\Concerns\IdentifiantOpaque;
 use App\Modules\Admin\Traits\JournaliseActions;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class TransfertStock extends Model
 {
+    use IdentifiantOpaque;
+
     use JournaliseActions;
 
     protected $table = 'transferts_stock';

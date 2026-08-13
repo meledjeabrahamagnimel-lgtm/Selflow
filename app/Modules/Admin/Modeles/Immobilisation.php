@@ -2,6 +2,7 @@
 
 namespace App\Modules\Admin\Modeles;
 
+use App\Modules\Admin\Modeles\Concerns\IdentifiantOpaque;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -17,6 +18,8 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  */
 class Immobilisation extends Model
 {
+    use IdentifiantOpaque;
+
     protected $table = 'immobilisations';
 
     protected $fillable = [

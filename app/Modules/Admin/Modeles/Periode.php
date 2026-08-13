@@ -2,11 +2,14 @@
 
 namespace App\Modules\Admin\Modeles;
 
+use App\Modules\Admin\Modeles\Concerns\IdentifiantOpaque;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class Periode extends Model
 {
+    use IdentifiantOpaque;
+
     protected $table = 'periodes';
 
     protected $fillable = [
