@@ -1413,7 +1413,7 @@ Format du payload et clé d'idempotence inchangés.
   total) : le déversement part en file, une entreprise non liée n'y met
   rien.
 
-#### Lot 8.4 — Un scénario de bout en bout par combinaison de modules — **AMORCÉ**
+#### Lot 8.4 — Un scénario de bout en bout par combinaison de modules — **TERMINÉ pour les combinaisons atteignables**
 
 `VerifierModulesActifs` ferme les écrans d'un module que l'entreprise n'a pas
 souscrit — mais n'était couvert par **aucun test**, dans un sens comme dans
@@ -1435,12 +1435,35 @@ Deux choses désormais vérifiées :
 
 La combinaison « Commerce » (vente + stock + achats + comptabilité
 ensemble) était déjà couverte par `CycleStockTest` et `BalanceTest` — elle
-n'est pas dupliquée ici. **Restent à écrire** : les combinaisons
-« Production » (production + stock + ventes, sans achats), « BTP/chantiers »
-si le module `chantiers` sort du référentiel, et « B2B » (b2b + ventes,
-avec négociation avant facturation).
+n'est pas dupliquée ici.
 
-- `tests/Feature/ModulesActifsTest.php` — 4 tests.
+**La combinaison « Production »** (production + stock + ventes, sans
+achats) est vérifiée de bout en bout : un atelier reçoit sa matière première
+sans passer par un achat (le module est éteint), la fabrication consomme la
+matière et pose son écriture, le produit fini entre en stock, la vente le
+sort et pose la sienne — et l'écran `achats` reste fermé pendant tout le
+cycle.
+
+**Une anomalie trouvée en écrivant le scénario B2B.** Contrairement à
+`ventes`, `achats`, `stock`, `production` et `comptabilite`, le groupe de
+routes `admin.b2b.*` ne porte **aucun** middleware `modules:b2b` : une
+entreprise dont `modules_actifs` ne contient pas `b2b` atteint quand même
+ces écrans, du moment qu'elle a `ventes` ou `achats`. Le menu fait la même
+chose — les liens B2B sont rangés sous les sections Ventes et Achats, pas
+sous un module propre. `b2b` figure pourtant dans
+`Entreprise::TOUS_LES_MODULES`, comme s'il s'agissait d'un module
+souscriptible à part. Non corrigé : c'est une décision de produit (le B2B
+est-il un module à part, ou une fonctionnalité incluse dans ventes/achats ?),
+pas un bogue technique évident. Un test verrouille le comportement actuel
+pour qu'un futur changement soit délibéré — voir section 6, sous-section
+B2B.
+
+**Hors de portée pour l'instant** : la combinaison « BTP/chantiers ». Les
+modules `chantiers` et `cycles` figurent dans `Entreprise::TOUS_LES_MODULES`
+mais **aucune route, aucun contrôleur ne les implémente** — il n'y a rien à
+scénariser tant que ces modules ne sortent pas du référentiel.
+
+- `tests/Feature/ModulesActifsTest.php` — 6 tests.
 
 ---
 
@@ -1597,6 +1620,16 @@ comptable, les codes journaux, et les soldes d'ouverture.
 Le flux va de la demande de prix à la proposition, puis crée directement une
 vente et un achat. **L'étape du devis n'existe pas** : ni pièce opposable, ni
 validité, ni acceptation, ni renégociation.
+
+- Le groupe de routes `admin.b2b.*` n'est gated par aucun `modules:b2b`,
+  contrairement à `ventes`, `achats`, `stock`, `production` et
+  `comptabilite`. Une entreprise sans `b2b` dans `modules_actifs` atteint
+  quand même ces écrans dès qu'elle a `ventes` ou `achats` — trouvé en
+  écrivant `tests/Feature/ModulesActifsTest.php` (lot 8.4). Décision à
+  prendre : `b2b` est-il un module à part entière, avec sa propre
+  souscription, ou une fonctionnalité incluse dans ventes/achats ? Le menu
+  penche aujourd'hui pour la seconde lecture — il range les liens B2B sous
+  ces deux sections plutôt que sous une section B2B propre.
 
 ---
 
