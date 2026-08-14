@@ -1,0 +1,676 @@
+================================================================================
+SELFLOW — DOCUMENT DE PASSATION
+Rédigé le 16 août 2026, à l'issue de la session ayant traité les lots 6 à 8.3
+À coller intégralement en premier message de toute nouvelle session Claude
+Code sur ce dépôt. Il remplace toute explication orale : tout ce qu'il faut
+savoir pour reprendre le travail sans reperdre de temps est ici.
+================================================================================
+
+
+SOMMAIRE
+--------
+1. Ce qu'est Selflow, en une page
+2. La règle d'or : la conformité FNE est gelée (À LIRE AVANT TOUT)
+3. L'état exact du dépôt à la fin de cette session
+4. Tout ce qui a été fait, lot par lot, avec le "pourquoi"
+5. Ce qui reste à faire, dans l'ordre
+6. LE CHANTIER PRIORITAIRE DE LA PROCHAINE SESSION : le mapping RNE
+7. Les TPE / TERNE — définition et ce qu'implique l'impression directe
+8. Comptaflow — ce qui est bloqué et pourquoi
+9. Conventions de travail à respecter dans toute nouvelle session
+10. Commandes utiles pour reprendre en 30 secondes
+
+
+================================================================================
+1. CE QU'EST SELFLOW, EN UNE PAGE
+================================================================================
+
+Selflow est une application de facturation, d'achats, de stock et de
+comptabilité pour les entreprises ivoiriennes, développée en Laravel 13 /
+PHP 8.3, architecture modulaire (app/Modules/{Admin,Authentification}).
+
+Elle a deux obligations réglementaires ivoiriennes à respecter en même temps :
+
+- **La FNE (Facture Normalisée Électronique)** : toute vente/achat doit être
+  transmise et certifiée par la plateforme de la DGI (Direction Générale des
+  Impôts) via une API. Chaque facture certifiée porte un QR code, un numéro de
+  série DGI et une signature électronique. C'est une obligation légale depuis
+  2025 (loi de finances 2025, articles 384-385 du CGI).
+- **La comptabilité SYSCOHADA révisé** (le référentiel comptable OHADA, qui
+  couvre 17 pays d'Afrique de l'Ouest et Centrale) : chaque mouvement d'argent
+  ou de marchandise doit produire une écriture comptable équilibrée (autant de
+  débit que de crédit), imputée sur le bon compte du plan comptable OHADA.
+
+Selflow est vendue par DC-Knowing, éditeur ivoirien qui possède aussi
+**Comptaflow** (application de comptabilité séparée, dépôt
+`guysergekouassi/COMPTAFLOW`, PAS accessible depuis cette session). Les deux
+applications se synchronisent : Selflow pousse ses écritures comptables vers
+Comptaflow pour les entreprises qui utilisent les deux.
+
+Le propriétaire du projet : Agnimel Meledje Abraham (adresse de contact :
+meledjeagnimel17@gmail.com). Il valide chaque décision de fond ; ne jamais
+prendre une décision de conformité fiscale ou de choix technique structurant
+sans lui poser la question.
+
+
+================================================================================
+2. LA RÈGLE D'OR : LA CONFORMITÉ FNE EST GELÉE (À LIRE AVANT TOUT)
+================================================================================
+
+Cette règle est écrite dans CLAUDE.md à la racine du dépôt et s'applique à
+TOUTE session, y compris celle-ci si elle continue.
+
+**Ne plus modifier le code, les champs ni les données de la FNE (DGI) pendant
+le reste du développement.** L'interfaçage a été validé contre le référentiel
+et contre des pièces réellement certifiées ; toute retouche remet en jeu une
+conformité fiscale acquise au prix de nombreuses corrections.
+
+Sont gelés :
+
+| Périmètre | Fichiers |
+|---|---|
+| Construction et envoi des payloads | `app/Modules/Admin/Services/FneService.php` |
+| Barème du timbre de quittance | `app/Modules/Admin/Services/TimbreQuittanceService.php` |
+| Code QR de vérification | `app/Modules/Admin/Services/QrCodeFneService.php` |
+| Alerte de stickers | `app/Modules/Admin/Services/AlerteStickersService.php` |
+| Codes TVA, taux et régimes d'exonération | `Produit::CODES_TVA`, `TAUX_TVA_DGI`, `REGIMES_EXONERATION_LEGALE` |
+| Colonnes `fne_*`, `numero_fne`, `qr_code_data`, `signature_dgi`, `normalise`, `est_rne`, `numero_rne`, `type_piece` | migrations et modèles `Vente` / `Achat` |
+| Blocs de certification des documents imprimés | `Vues/factures/*.blade.php` |
+| Tests de conformité | `tests/Feature/FnePayloadTest.php` |
+
+Trois exceptions, et trois seulement, autorisent d'y toucher :
+1. la DGI publie une nouvelle version du référentiel ;
+2. la plateforme rejette une pièce et le journal le prouve ;
+3. le propriétaire du projet le demande explicitement.
+
+**Le mapping RNE (section 6 de ce document) entre exactement dans
+l'exception 3** : le propriétaire vient de recevoir les champs RNE de la DGI
+et demande le mapping. C'est donc une intervention AUTORISÉE dans le
+périmètre gelé, mais seulement pour cette raison précise et seulement sur ce
+que les champs RNE couvrent — pas une porte ouverte pour retoucher le reste
+de FneService.
+
+
+================================================================================
+3. L'ÉTAT EXACT DU DÉPÔT À LA FIN DE CETTE SESSION
+================================================================================
+
+Dépôt GitHub : meledjeabrahamagnimel-lgtm/Selflow
+Branche de développement : claude/selflow-remises-taxes-dgi-a5je2b
+Branche stable : main (les deux sont synchronisées, dernier commit commun)
+
+Dernier commit poussé sur les deux branches : 4652a2c
+("Fusion : enregistrement des routes du hub")
+
+Suite de tests : 612 tests, 3131 assertions, TOUS VERTS.
+Commande pour vérifier : php artisan test
+Commande de vérification des variables Blade non écrites :
+php artisan verifier:variables (doit répondre "Aucune variable lue sans
+avoir été écrite.")
+
+Aucune modification non commitée. Le dépôt est propre.
+
+Fichiers de suivi à connaître :
+- JOURNAL-DE-BORD.md (racine) — le journal détaillé de TOUT le projet depuis
+  le début, lot par lot, avec les raisons de chaque décision. **Toujours le
+  lire en premier dans une nouvelle session.** 1566 lignes.
+- CLAUDE.md (racine) — la règle d'or FNE (section 2 ci-dessus).
+- CONFIGURATION FNE/Procedure_technique_integration_API.txt — le document
+  officiel DGI de la procédure d'interfaçage (26 pages), qui contient déjà
+  la définition de TERNE et les champs isRne/rne des factures. Ne contient
+  PAS encore les champs de mapping complet du RNE lui-même (voir section 6).
+- PASSERELLE-COMPTAFLOW/LISEZ-MOI.md — patch en attente côté Comptaflow, voir
+  section 8.
+
+
+================================================================================
+4. TOUT CE QUI A ÉTÉ FAIT, LOT PAR LOT, AVEC LE "POURQUOI"
+================================================================================
+
+Le détail complet et référencé est dans JOURNAL-DE-BORD.md. Voici le résumé
+qui permet de comprendre l'application sans le relire en entier.
+
+--- LOTS 0 À 5 (sessions précédentes, terminés avant celle-ci) ---
+
+Lot 0 — Fermeture des portes ouvertes : secrets en dur retirés, comparaisons
+non protégées contre le temps d'exécution (hash_equals), mots de passe de
+démonstration en clair supprimés des semeurs.
+
+Lot 1 — Référentiel en base : le classeur de paramétrage sectoriel (quels
+comptes, quels rayons, quels produits pour quel métier) chargé en base de
+données depuis un JSON, avec 276 imputations comptables corrigées suite à un
+audit contre le plan OHADA officiel.
+
+Lot 2 — Parcours de souscription : une entreprise qui s'inscrit choisit son
+secteur d'activité et reçoit automatiquement son plan comptable, ses rayons,
+son catalogue de départ.
+
+Lot 3 — Le stock suit l'événement : refonte complète de la gestion de stock.
+AVANT : douze endroits différents modifiaient le stock chacun à sa manière,
+sans verrou (deux ventes simultanées pouvaient survendre), sans journal fiable
+(les corrections effaçaient l'historique). APRÈS : StockService est la SEULE
+porte par laquelle le stock bouge, avec verrouillage (lockForUpdate), quantités
+décimales (12,5 kg de cacao ne devient plus 12), et un principe strict :
+« le journal ne s'efface pas, on écrit l'inverse » (contre-passation).
+
+Lot 4 — Les imputations comptables : ImputationService centralise la question
+« sur quel compte s'impute cet article » avec une chaîne de résolution
+article → rayon → compte par défaut, remplaçant cinq copies du même code
+dispersées dans ComptabiliteService.
+
+Lot 5 — La passerelle Comptaflow (partiellement bloquée, voir section 8) :
+quatre champs manquaient au déversement des écritures vers Comptaflow
+(compte_tiers, clé d'idempotence, point de vente, exercice comptable). Le
+correctif Selflow est fait et poussé. Le correctif côté Comptaflow existe en
+patch mais n'a jamais pu être appliqué (accès refusé par le proxy git de la
+session — ce dépôt n'est pas dans le périmètre autorisé).
+
+--- LOT 6 — LES MANQUES MÉTIER (fait dans cette session, terminé) ---
+
+6.1 — La fabrication ne compte plus double. Bug trouvé : quand un ordre de
+production était validé, DEUX systèmes écrivaient chacun leurs écritures
+comptables pour la même opération (doublait le coût de fabrication). Corrigé :
+un seul système écrit, et le produit fini entre en stock à son coût réel de
+fabrication (au CUMP — Coût Unitaire Moyen Pondéré — des matières consommées)
+et non plus à son prix d'achat catalogue (qui vaut 0 pour un produit qu'on
+fabrique soi-même).
+
+6.2 — Le devis devient opposable. AVANT : un devis n'avait ni date de
+validité, ni trace d'acceptation client, et pouvait être converti deux fois en
+bon de commande (créant deux livraisons fantômes pour la même vente). APRÈS :
+date de validité (30 jours par défaut), acceptation datée et nommée, une
+conversion ne peut plus se rejouer, la pièce née d'une conversion prend la
+date du jour (et non celle du devis d'origine, qui aurait faussé la
+déclaration de TVA du mauvais mois).
+
+6.3 — La péremption appartient à l'arrivage, pas à l'article. AVANT : une
+seule date de péremption par article, écrasée à chaque nouvelle réception.
+APRÈS : système de lots (numéro de lot, date de péremption par lot), sortie
+en FEFO (First Expired First Out — on sert d'abord ce qui périme en premier),
+refus de vendre un lot périmé. Bug de calcul trouvé et corrigé au passage :
+la formule "produit bientôt périmé" utilisait une soustraction de dates dans
+le mauvais sens, ce qui faisait que TOUT le catalogue apparaissait comme
+"bientôt périmé" en permanence.
+
+6.4 — Immobilisations et amortissements. Rien n'existait avant : aucune
+gestion des biens durables de l'entreprise (véhicules, machines, mobilier).
+Créé : fiche d'immobilisation, calcul automatique du plan d'amortissement
+linéaire (méthode confirmée par le propriétaire), écritures comptables de
+dotation aux amortissements, gestion de la cession/mise au rebut avec calcul
+de plus/moins-value.
+
+6.5 — Emballages consignés. Système de consignation (casiers de bouteilles,
+bonbonnes de gaz, palettes) avec suivi de ce qui est prêté à qui, remboursement
+à la reprise, ou facturation si non retourné dans le délai.
+
+6.6 — Modèles d'importation Excel/CSV. Système d'import en masse (produits,
+clients, fournisseurs) avec validation ligne par ligne et rapport d'erreurs
+détaillé.
+
+--- LOT 8 — STABILISATION (fait dans cette session) ---
+
+8.1 — Les habilitations ferment par défaut. AVANT : le contrôle des droits
+utilisateur (qui peut accéder à quelle page) fonctionnait par LISTE BLANCHE
+implicite avec une faille grave — toute route absente de la liste de contrôle
+passait SANS AUCUNE vérification. 88 routes sur l'ensemble de l'application
+étaient dans ce cas, dont l'écran d'import (qui crée des comptes utilisateurs
+et modifie le stock). Corrigé : le sens est inversé, toute route doit être
+explicitement classée (soit elle exige une habilitation nommée, soit elle est
+déclarée "ouverte" avec une raison écrite), sinon elle est refusée par défaut.
+Un test automatique parcourt TOUTES les routes de l'application et échoue si
+une nouvelle route n'a pas été classée — empêche la régression pour toujours.
+
+8.2 — Les limites de débit (rate limiting). AVANT : seule la page de connexion
+avait une limite de tentatives. Le reste de l'application — y compris les
+51 routes d'API utilisées par l'application mobile, et les routes de
+synchronisation externe avec Comptaflow — n'avait AUCUNE limite. Découverte
+grave : le groupe de middleware "api" de Laravel n'était même pas défini
+dans la configuration, donc littéralement aucune route d'API n'avait de
+protection. Corrigé : limites différenciées par type de porte (API générale,
+mot de passe oublié, import, appels vers la plateforme DGI, synchronisation
+Comptaflow).
+
+8.3 — L'oracle de volume, et les identifiants opaques. AVANT : les URL de
+l'application utilisaient des numéros de ligne de base de données
+(ex: /admin/ventes/facture/4213). Deux défauts : (1) les vérifications de
+propriété répondaient "403 Accès refusé" pour la facture d'un concurrent mais
+"404 Introuvable" pour une facture qui n'existe pas — la différence entre les
+deux réponses permet de COMPTER combien de factures existent sur toute la
+plateforme en balayant les numéros, ce qui est une fuite d'information
+commerciale grave pour une plateforme vendue à des entreprises concurrentes ;
+(2) même en corrigeant le code de réponse, le numéro dans l'URL reste visible
+dans un courriel transféré, une capture d'écran, un historique de navigateur.
+Corrigé en deux temps : toutes les vérifications de propriété répondent
+maintenant 404 uniformément (le "403" n'existe plus pour ce cas — voir la
+définition ci-dessous), ET tous les modèles exposés dans une URL portent
+désormais un identifiant aléatoire (UUID) à la place du numéro de ligne, à la
+fois côté web ET côté API (une seule identité pour une même ressource,
+décision explicite du propriétaire qui a confirmé qu'aucune donnée réelle
+n'existe encore en production).
+
+    DÉFINITIONS DES CODES HTTP UTILISÉS DANS CE PROJET (à partir de maintenant,
+    tout code HTTP cité doit porter sa définition entre parenthèses, consigne
+    du propriétaire) :
+    - 200 OK (la requête a réussi)
+    - 302 Found / redirection (la page demande de continuer ailleurs)
+    - 403 Forbidden (accès interdit — l'utilisateur est identifié mais n'a pas
+      le droit d'agir ici)
+    - 404 Not Found (page introuvable — rien n'existe à cette adresse, que ce
+      soit vraiment le cas ou que ce soit une pièce d'un autre qu'on ne veut
+      pas révéler)
+    - 429 Too Many Requests (trop de requêtes — la limite de débit a été
+      atteinte)
+    - 500 Internal Server Error (erreur interne du serveur — une panne)
+
+Page de panne personnalisée (fait dans cette session, hors plan initial,
+demandé directement par le propriétaire). AVANT : en cas de panne (erreur
+500), Laravel affichait sa page de débogage technique brute — illisible pour
+un caissier, et dangereuse à laisser fuiter (elle montre l'arborescence du
+serveur, les versions de bibliothèques). APRÈS : page dans la charte
+graphique de l'application (fond dessiné en CSS/SVG, aucune image à charger),
+message "Cette page est en maintenance et notre service informatique s'en
+charge. Veuillez patienter, et désolé pour le désagrément.", référence
+technique courte à donner au support (ex: SF-260816-A3F9C1, qui se recalcule
+identiquement pour deux occurrences du même bug — permet de les regrouper),
+détail technique complet dans un tiroir repliable qui s'ouvre au clic (bouton
+"copier" pour coller directement dans un ticket de support). Décision du
+propriétaire : le détail technique (y compris la pile d'appels complète) est
+VISIBLE DE TOUS, pas seulement des administrateurs.
+Fichier : resources/views/errors/500.blade.php
+Référence calculée par : app/Exceptions/Panne::reference()
+
+
+================================================================================
+5. CE QUI RESTE À FAIRE, DANS L'ORDRE
+================================================================================
+
+Dans l'ordre de priorité recommandé :
+
+1. **LE MAPPING RNE** (section 6 ci-dessous) — le propriétaire a reçu les
+   champs de la DGI et l'a demandé explicitement. C'est le chantier numéro un
+   de la prochaine session.
+
+2. **La question TPE/TERNE — impression directe des reçus** (section 7) — à
+   clarifier avec le propriétaire avant de coder quoi que ce soit, parce que
+   plusieurs interprétations techniques très différentes sont possibles.
+
+3. **Lot 8.4 — scénarios de bout en bout.** Écrire des tests qui simulent un
+   parcours complet réaliste (ex: une entreprise s'inscrit → configure son
+   catalogue → fait une vente → normalise la facture → encaisse → l'écriture
+   comptable se retrouve dans la balance) pour chaque grande combinaison de
+   modules. Pas commencé.
+
+4. **Lot 7 — la vitrine (page publique).** Le propriétaire doit fournir le
+   contenu (texte, présentation de DC-Knowing et de ses produits : Comptaflow,
+   Selflow, RHFlow, LegalFlow, Agent-AI, CGA-Connect). RIEN à inventer ici —
+   ne jamais rédiger de contenu commercial à la place du propriétaire. Écran
+   superadmin de gestion de la vitrine à construire une fois le contenu reçu.
+
+5. **Le correctif Comptaflow** (section 8) — reste bloqué tant que le dépôt
+   Comptaflow n'est pas accessible depuis une session Claude Code. Le patch
+   existe et est prêt, il attend seulement d'être appliqué.
+
+6. **Le mot de passe superadmin en clair dans l'historique Git** — signalé
+   depuis plusieurs sessions, jamais confirmé comme traité par le
+   propriétaire. À vérifier : sur tout déploiement déjà initialisé avec les
+   anciens semeurs de données (avant le lot 0), le mot de passe
+   "12345678SUPER@" doit être changé manuellement, parce qu'il reste lisible
+   dans l'historique Git même après correction du code.
+
+7. **Déplacer le déversement Comptaflow vers une file d'attente.** Actuellement
+   chaque vente déclenche un appel HTTP synchrone de 3 secondes vers
+   Comptaflow au moment de l'enregistrement (dans un hook created() de
+   modèle) — l'utilisateur attend ces 3 secondes à chaque vente. Devrait
+   passer par une file d'attente (queue) asynchrone. Documenté, pas fait.
+
+
+================================================================================
+6. LE CHANTIER PRIORITAIRE DE LA PROCHAINE SESSION : LE MAPPING RNE
+================================================================================
+
+CONTEXTE — pourquoi c'est bloqué depuis le début
+
+Le RNE (Reçu Normalisé Électronique) est le pendant de la FNE (Facture
+Normalisée Électronique) pour les reçus — un document plus simple qu'une
+facture, utilisé typiquement pour une vente au comptant sans identification
+du client (un commerce de détail classique). Comme la facture, il doit être
+certifié par la plateforme DGI et porter un QR code, un numéro de série, une
+signature électronique.
+
+DANS SELFLOW AUJOURD'HUI :
+- Un utilisateur PEUT créer un reçu (bouton "Reçu" à la vente, colonne
+  `ventes.type_piece = 'recu'`).
+- Le reçu s'enregistre, s'imprime, produit ses écritures comptables
+  normalement.
+- MAIS il n'est jamais envoyé à la DGI pour certification. Le code refuse
+  explicitement, avec ce message :
+  "La normalisation des reçus est en attente : la FNE n'a pas encore fourni
+  les champs de mappage du reçu normalisé électronique (RNE). Le reçu reste
+  enregistré et pourra être normalisé rétroactivement."
+- Emplacement exact du blocage : app/Modules/Admin/Services/FneService.php,
+  méthode normaliserFacture(), condition `if ($vente->estRecu())` qui renvoie
+  immédiatement `success: false` avec l'erreur `rne_mapping`.
+
+CE QUE LE DOCUMENT DGI ACTUEL CONTIENT DÉJÀ (dans
+"CONFIGURATION FNE/Procedure_technique_integration_API.txt", déjà dans le
+dépôt) :
+- La définition de RNE et son cadre légal (section I du document).
+- Les champs `isRne` (booléen) et `rne` (chaîne = numéro du reçu) qui
+  apparaissent DANS LE PAYLOAD DE LA FACTURE — ces deux champs servent à dire
+  « cette facture est établie en remplacement d'un reçu déjà émis sous ce
+  numéro ». Ce sont les champs `ventes.est_rne` et `ventes.numero_rne`, DÉJÀ
+  implémentés et DÉJÀ testés (voir FnePayloadTest.php). CE N'EST PAS LE SUJET
+  de la prochaine session — c'est déjà fait.
+- Ce que le document DGI actuel NE CONTIENT PAS : la structure complète du
+  payload à envoyer pour normaliser un RNE EN TANT QUE TEL (c'est-à-dire
+  l'équivalent de la structure de facture pour un reçu). C'est exactement ce
+  que le propriétaire vient de recevoir de la DGI et qu'il apportera à la
+  prochaine session.
+
+CE QU'IL FAUDRA FAIRE, ÉTAPE PAR ÉTAPE, DÈS QUE LE PROPRIÉTAIRE FOURNIT LE
+DOCUMENT/LES CHAMPS RNE DE LA DGI :
+
+1. Lire attentivement le nouveau document RNE fourni. Le comparer point par
+   point à la structure de payload de facture déjà implémentée dans
+   FneService::normaliserFacture() (regarder les méthodes privées qui
+   construisent le tableau du payload — actuellement le payload de facture
+   est construit vers la ligne 176 et suivantes, avec isRne/rne vers la
+   ligne 187-188).
+
+2. Identifier précisément :
+   - Quels champs sont communs entre facture et reçu (probablement : items,
+     montants HT/TVA/TTC, point de vente, date).
+   - Quels champs sont SPÉCIFIQUES au reçu et n'existent pas encore dans le
+     modèle Vente (regarder si une nouvelle colonne est nécessaire).
+   - Quel est l'endpoint (l'URL de l'API DGI) pour le RNE — probablement
+     différent de celui de la facture.
+   - Quelle est la structure de réponse renvoyée par la DGI pour un RNE
+     certifié — est-ce que `qr_code_data`, `signature_dgi`, `numero_fne`
+     (qui deviendra peut-être `numero_rne` côté certification, à ne pas
+     confondre avec la colonne existante `ventes.numero_rne` qui sert à un
+     usage différent, voir ci-dessus) suivent le même format que pour une
+     facture.
+
+3. Écrire une méthode dédiée, par exemple
+   `FneService::normaliserRecu(Vente $vente)`, plutôt que de complexifier
+   `normaliserFacture()` avec des branches conditionnelles partout. Respecter
+   le style déjà en place dans le fichier (commentaires qui expliquent le
+   "pourquoi", jamais le "quoi"). NE PAS toucher aux méthodes de facture
+   existantes sauf strict nécessaire.
+
+4. Retirer le blocage `if ($vente->estRecu())` dans normaliserFacture() (ou
+   le remplacer par un aiguillage vers normaliserRecu()) une fois la nouvelle
+   méthode prête et testée.
+
+5. Écrire les tests de conformité AVANT de considérer le travail terminé —
+   c'est la règle du projet depuis le début (voir FnePayloadTest.php comme
+   modèle exact à suivre : structure des tests, noms des méthodes, style des
+   commentaires qui expliquent quel écart a été trouvé et pourquoi il
+   importait). Le propriétaire a explicitement demandé "faire les tests"
+   dans sa dernière consigne — ne pas les sauter, ne pas les remettre à plus
+   tard.
+
+6. Vérifier le cas de l'avoir sur reçu (`raison_avoir`, `type_facture =
+   'avoir'`) : est-ce que le remboursement d'un reçu suit une structure RNE
+   spécifique elle aussi, ou retombe-t-il sur le mécanisme d'avoir de facture
+   déjà en place ? À vérifier dans le nouveau document DGI.
+
+7. Une fois normaliserRecu() posée et testée, vérifier l'écran d'impression
+   du reçu (app/Modules/Admin/Vues/factures/ticket.blade.php et la méthode
+   VenteControleur::imprimerTicket()) pour s'assurer que le QR code et la
+   signature DGI du reçu s'affichent correctement une fois la certification
+   obtenue — comparer avec la manière dont vente.blade.php affiche ces mêmes
+   éléments pour une facture.
+
+POINT D'ATTENTION IMPORTANT : cette intervention touche FneService.php, qui
+est un fichier GELÉ par la règle d'or (section 2). Elle est autorisée
+UNIQUEMENT parce que le propriétaire l'a explicitement demandée avec les
+nouveaux champs DGI en main (exception 3 de la règle d'or). Ne pas en profiter
+pour retoucher autre chose dans ce fichier au passage — rester strictement
+dans le périmètre du RNE.
+
+
+================================================================================
+7. LES TPE / TERNE — DÉFINITION ET CE QU'IMPLIQUE L'IMPRESSION DIRECTE
+================================================================================
+
+Le propriétaire a demandé d'expliquer "comment fonctionnent les TPE" parce
+que les reçus devront être "directement envoyés au terminal pour
+impression". Voici l'explication complète, car plusieurs notions différentes
+se cachent derrière ce sigle et il faut clarifier laquelle s'applique avant
+de coder quoi que ce soit.
+
+--- TROIS SENS POSSIBLES DE "TPE" (à distinguer absolument) ---
+
+1. **TPE = Terminal de Paiement Électronique** (le sens le plus courant en
+   français). C'est le petit boîtier qui lit les cartes bancaires (Visa,
+   Mastercard) ou fait du paiement sans contact — ce qu'on utilise pour
+   payer par carte dans un magasin. Il communique avec une banque, pas avec
+   la DGI. Si c'est CE sens-là que le propriétaire vise, le sujet est
+   l'intégration d'un lecteur de carte bancaire au moment de l'encaissement,
+   ce qui est un chantier complètement différent (protocoles bancaires,
+   partenariat avec un opérateur de paiement ivoirien) et n'a AUCUN rapport
+   avec l'impression de reçus.
+
+2. **TERNE = Terminaux d'Émission de Reçus Normalisés Électroniques**
+   (le sigle exact utilisé par la DGI, trouvé dans le document officiel
+   "CONFIGURATION FNE/Procedure_technique_integration_API.txt", ligne 13 et
+   37). C'est un dispositif AGRÉÉ PAR LA DGI qui peut émettre lui-même des
+   reçus normalisés, en dehors de l'application de facturation classique
+   (par exemple pour un marché, un taxi, un petit commerce sans ordinateur).
+   La procédure officielle liste TROIS façons d'émettre une FNE/RNE :
+   (a) le module de facturation électronique en ligne ou l'application
+   mobile de la DGI directement, (b) l'interfaçage par API — c'est ce que
+   fait Selflow aujourd'hui, (c) un TERNE physique agréé.
+   Si Selflow doit un jour piloter un TERNE physique, il faudrait
+   l'agrément DGI du dispositif et probablement un protocole matériel
+   spécifique non documenté dans le fichier actuel — à demander à la DGI
+   séparément si c'est réellement le besoin.
+
+3. **"Le terminal" au sens d'imprimante de reçu / imprimante thermique de
+   point de vente** (POS printer). C'est très probablement CE sens que vise
+   la phrase "les reçus devront être directement envoyés au terminal pour
+   impression" : au lieu que la caissière clique sur "Imprimer" et passe par
+   la boîte de dialogue d'impression du navigateur (ce qui est le
+   comportement ACTUEL de Selflow — voir
+   app/Modules/Admin/Vues/factures/ticket.blade.php et
+   VenteControleur::imprimerTicket()), le reçu devrait s'imprimer
+   automatiquement sur une imprimante de tickets de caisse (le petit rouleau
+   de papier thermique) sans intervention manuelle.
+
+--- COMMENT FONCTIONNE UNE IMPRIMANTE THERMIQUE DE POINT DE VENTE (sens 3,
+    le plus probable) ---
+
+Une imprimante de reçu de caisse ne fonctionne PAS comme une imprimante de
+bureau. Elle ne comprend pas un PDF ou une page web : elle attend une suite
+de commandes texte brutes appelées **ESC/POS** (un standard de fait, créé
+par Epson, adopté par presque tous les fabricants d'imprimantes de caisse :
+Epson, Star, Bixolon, etc.). Ces commandes disent par exemple "imprime ce
+texte en gras", "coupe le papier ici", "imprime ce code-barres".
+
+Les façons de lui envoyer ces commandes depuis une application web comme
+Selflow, de la plus simple à la plus lourde à mettre en œuvre :
+
+  a) **Impression via le navigateur (ce que fait Selflow aujourd'hui)** :
+     window.print() ouvre la boîte de dialogue système, l'utilisateur
+     choisit son imprimante et clique "Imprimer". Fonctionne avec
+     N'IMPORTE QUELLE imprimante (thermique ou non), mais demande un clic
+     manuel à chaque fois. C'est le plus simple et le plus universel.
+
+  b) **Un petit programme installé sur le poste de caisse** (souvent appelé
+     "agent d'impression" ou "print server local") qui tourne en tâche de
+     fond sur l'ordinateur ou la tablette de la caisse, écoute les demandes
+     d'impression envoyées par le navigateur (par exemple via une requête
+     réseau locale sur http://localhost:PORT), les traduit en commandes
+     ESC/POS, et les envoie à l'imprimante branchée en USB, réseau ou
+     Bluetooth. C'est la solution la PLUS COURANTE dans les logiciels de
+     caisse professionnels (ex: QZ Tray, un logiciel gratuit très employé à
+     cet effet). Avantage : impression automatique sans clic. Inconvénient :
+     il faut installer ce petit programme sur CHAQUE poste de caisse, ce qui
+     est une contrainte de déploiement à anticiper avec les commerçants
+     clients.
+
+  c) **Impression directe depuis le navigateur sans logiciel intermédiaire**,
+     via les API web modernes WebUSB ou WebSerial (permettent à une page web
+     de parler directement à un périphérique USB/série si l'utilisateur
+     autorise l'accès). Fonctionne uniquement sur Chrome/Edge (pas Firefox ni
+     Safari), et seulement si le navigateur tourne sur le même poste que
+     l'imprimante — impossible depuis un téléphone qui afficherait juste une
+     page web à distance. Solution plus moderne mais plus fragile et à
+     compatibilité limitée.
+
+  d) **Une imprimante réseau (Ethernet ou Wifi)**, qui a sa propre adresse IP
+     et accepte une connexion directe (souvent sur le port 9100) : le
+     serveur Laravel peut alors lui envoyer les commandes ESC/POS directement
+     par le réseau, sans rien installer sur le poste de caisse — mais il faut
+     que le serveur Laravel puisse atteindre cette adresse IP (viable si le
+     serveur tourne en local sur le réseau du magasin, plus délicat si
+     Selflow est hébergé dans le cloud et le magasin sur un réseau privé).
+
+--- CE QU'IL FAUT DEMANDER AU PROPRIÉTAIRE AVANT DE CODER QUOI QUE CE SOIT ---
+
+1. Confirmer LEQUEL des trois sens ci-dessus (TPE bancaire / TERNE DGI /
+   imprimante thermique) correspond au besoin réel — la phrase "envoyé
+   directement au terminal pour impression" pointe très fortement vers le
+   sens 3, mais il faut le confirmer explicitement, car les trois chantiers
+   sont totalement différents et n'ont presque rien en commun.
+2. Si c'est bien le sens 3 (imprimante thermique), demander :
+   - Quel modèle/marque d'imprimante les commerçants utilisent-ils déjà ou
+     prévoient-ils d'acheter ? (Cela détermine si ESC/POS standard suffit ou
+     s'il faut un protocole propriétaire.)
+   - Est-ce que la caisse tourne sur un ordinateur, une tablette, ou un
+     téléphone ? (Détermine si WebUSB est même envisageable.)
+   - Est-ce acceptable d'installer un petit logiciel sur chaque poste de
+     caisse (solution b, la plus robuste), ou faut-il que ça marche "juste
+     depuis le navigateur" sans rien installer (solutions a ou c, plus
+     limitées) ?
+   - Est-ce que Selflow est hébergé en ligne (cloud) ou installé
+     localement chez chaque commerçant ? (Détermine si la solution d est
+     viable.)
+
+RECOMMANDATION (à valider avec le propriétaire, pas une décision prise) : la
+solution (b), un petit agent d'impression local type QZ Tray, est
+généralement le meilleur compromis pour un logiciel de caisse professionnel :
+robuste, fonctionne avec toute imprimante ESC/POS courante, ne dépend pas du
+navigateur utilisé. C'est probablement la voie à explorer en premier, mais
+NE PAS commencer l'implémentation avant d'avoir la confirmation du
+propriétaire sur les points ci-dessus — c'est un choix d'architecture qui
+engage durablement le projet et le parc matériel des clients.
+
+
+================================================================================
+8. COMPTAFLOW — CE QUI EST BLOQUÉ ET POURQUOI
+================================================================================
+
+Comptaflow (dépôt guysergekouassi/COMPTAFLOW) N'EST PAS accessible depuis les
+sessions Claude Code sur ce projet — la tentative d'ajout du dépôt a été
+refusée par le proxy git de l'environnement ("cross-tier adds are not
+supported... requested guysergekouassi/comptaflow but session already has
+repos from owner(s) meledjeabrahamagnimel-lgtm").
+
+Le correctif côté Comptaflow existe intégralement, écrit et documenté, mais
+n'a jamais pu être poussé. Il se trouve dans :
+  PASSERELLE-COMPTAFLOW/0001-deversement-selflow.patch (le patch git)
+  PASSERELLE-COMPTAFLOW/LISEZ-MOI.md (les instructions d'application et
+  l'explication complète de chaque changement)
+
+Pour débloquer ce chantier, DEUX solutions possibles, à la main du
+propriétaire :
+1. Démarrer une nouvelle session Claude Code en indiquant Comptaflow comme
+   dépôt d'ORIGINE (source_url) dès la création de la session, plutôt que
+   d'essayer de l'ajouter en cours de route à une session Selflow.
+2. Appliquer le patch manuellement (les commandes exactes sont dans
+   LISEZ-MOI.md) sur un poste ayant accès au dépôt Comptaflow.
+
+Une fois appliqué : IMPÉRATIF de poser la variable d'environnement
+EXTERNAL_SYNC_SECRET (la même valeur des deux côtés, Selflow et Comptaflow)
+avant tout déploiement — sans elle, la synchronisation refuse désormais
+TOUT appel (comportement volontaire et correct, pas un bug).
+
+
+================================================================================
+9. CONVENTIONS DE TRAVAIL À RESPECTER DANS TOUTE NOUVELLE SESSION
+================================================================================
+
+Ce sont des consignes DONNÉES DIRECTEMENT PAR LE PROPRIÉTAIRE au fil des
+sessions précédentes. Elles s'appliquent à toute nouvelle session, même sans
+rappel :
+
+1. Toujours lire JOURNAL-DE-BORD.md en premier — il porte l'état du projet,
+   les décisions arrêtées, les anomalies déjà constatées. Une session qui
+   démarre sans lui refera des analyses déjà faites.
+
+2. Respecter la règle d'or FNE gelée (section 2) sans exception, sauf
+   demande explicite du propriétaire.
+
+3. Développer sur la branche claude/selflow-remises-taxes-dgi-a5je2b, fusionner
+   ensuite vers main. Toujours dire explicitement où on a poussé (Selflow ou
+   Comptaflow) — consigne répétée du propriétaire : "dorenavant quand tu
+   pousses dis-moi où t'as poussé ; selflow ou comptaflow".
+
+4. Tenir JOURNAL-DE-BORD.md à jour à chaque lot terminé — cela fait partie
+   du lot, pas une tâche à part.
+
+5. Chaque fois que "CUMP" apparaît dans un texte, écrire sa définition entre
+   parenthèses : "CUMP (Coût Unitaire Moyen Pondéré)". Consigne explicite et
+   permanente du propriétaire.
+
+6. **Depuis cette session : chaque fois qu'un code HTTP (404, 403, 500, 429,
+   200, etc.) apparaît dans un texte adressé au propriétaire, écrire sa
+   définition entre parenthèses.** Voir la liste section 4 (lot 8.3) pour les
+   définitions déjà utilisées dans ce projet.
+
+7. Être en permanence en mode sécurité : simuler des scénarios d'attaquant
+   pour chaque fonctionnalité livrée (voir les tests "attaque" dans
+   tests/Feature/ — AttaquesStockTest.php, AttaquesElevationTest.php,
+   HabilitationsTest.php, CloisonnementTest.php, IdentifiantOpaqueTest.php
+   comme modèles). Un point de vigilance permanent et explicitement demandé :
+   les tentatives d'intrusion dans la base de données et de vol d'accès
+   admin/superadmin.
+
+8. Écrire les tests AVANT de considérer un lot terminé, jamais après coup ni
+   sautés. Toute correction de bug doit être verrouillée par un test qui
+   aurait échoué avant la correction.
+
+9. Ne jamais inventer de contenu commercial/marketing (lot 7, la vitrine) —
+   ce contenu vient exclusivement du propriétaire.
+
+10. Faire tourner la suite de tests complète (php artisan test) et
+    verifier:variables avant de considérer tout travail terminé. Ne jamais
+    laisser de test rouge.
+
+11. Style d'écriture du code : les commentaires expliquent le POURQUOI (une
+    contrainte cachée, un bug corrigé, une décision), jamais le QUOI (ce que
+    fait le code, que les noms de variables/méthodes disent déjà). Regarder
+    n'importe quel fichier de service récent (StockService.php,
+    AmortissementService.php, ConsignationService.php) comme modèle de style
+    exact à reproduire.
+
+
+================================================================================
+10. COMMANDES UTILES POUR REPRENDRE EN 30 SECONDES
+================================================================================
+
+# Vérifier l'état du dépôt
+git status
+git log --oneline -5
+
+# Faire tourner la suite de tests complète
+php artisan test
+
+# Vérifier qu'aucune variable Blade n'est lue sans être écrite
+php artisan verifier:variables
+
+# Voir toutes les routes déclarées (utile pour vérifier le classement des
+# habilitations ou des limites de débit sur une nouvelle route)
+php artisan route:list
+
+# Migrer la base après avoir ajouté une migration
+php artisan migrate --force
+
+# Lancer un seul fichier de test pendant le développement
+php artisan test --filter=NomDuTest
+
+================================================================================
+FIN DU DOCUMENT
+================================================================================
