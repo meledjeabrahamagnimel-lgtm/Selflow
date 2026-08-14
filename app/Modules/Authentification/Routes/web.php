@@ -79,14 +79,31 @@ Route::middleware('auth')->group(function () {
 // Redirection de la racine vers connexion ou tableau de bord
 // -----------------------------------------------------------------------
 Route::get('/', function () {
-    if (auth()->check()) {
-        $role = auth()->user()->role;
-        return match ($role) {
-            'superadmin' => redirect()->route('superadmin.tableau_de_bord'),
-            'admin'      => redirect()->route('admin.tableau_de_bord'),
-            'caissier'   => redirect()->route('caissier.tableau_de_bord'),
-            default      => redirect()->route('connexion'),
-        };
+    if (! auth()->check()) {
+        return redirect()->route('connexion');
     }
-    return redirect()->route('connexion');
+
+    $role = auth()->user()->role;
+
+    return match ($role) {
+        'superadmin' => redirect()->route('superadmin.tableau_de_bord'),
+        'admin'      => redirect()->route('admin.tableau_de_bord'),
+        'caissier'   => redirect()->route('caissier.tableau_de_bord'),
+
+        // **Ne jamais renvoyer un utilisateur connecté vers `connexion`.**
+        // C'est une route réservée aux visiteurs : elle le renvoie aussitôt
+        // ici, qui le renvoie là-bas, et le navigateur s'arrête au bout de
+        // vingt allers-retours sur `ERR_TOO_MANY_REDIRECTS`.
+        //
+        // Le modèle porte cinq rôles — `estAdminSecondaire()` et
+        // `estResponsablePdv()` en plus des trois aiguillés ci-dessus — mais
+        // aucune route ne les accepte : `role:admin` et `role:admin,caissier`
+        // comparent à l'identique. Ces deux comptes n'avaient donc aucun
+        // espace où aller, et la boucle était le seul symptôme. Un message
+        // vaut mieux qu'une boucle : il dit ce qui manque au lieu de laisser
+        // croire à une panne du navigateur.
+        default      => abort(403, "Votre compte porte le rôle « {$role} », auquel aucun "
+            . "espace de travail n'est rattaché. Demandez à votre administrateur de vous "
+            . "attribuer un rôle actif."),
+    };
 })->name('accueil');
