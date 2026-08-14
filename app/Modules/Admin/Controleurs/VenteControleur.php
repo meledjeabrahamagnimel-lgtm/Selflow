@@ -268,8 +268,6 @@ class VenteControleur
                 'type_piece'              => $request->input('type_piece') === Vente::TYPE_RECU
                     ? Vente::TYPE_RECU
                     : Vente::TYPE_FACTURE,
-                'est_rne'                 => $request->boolean('est_rne'),
-                'numero_rne'              => $request->boolean('est_rne') ? trim($request->input('numero_rne')) : null,
             ]);
 
             // Taxes sur le total TTC (champ `customTaxes` de la FNE)
@@ -343,16 +341,16 @@ class VenteControleur
             // Trésorerie et Comptabilité (uniquement si validé en étape Facture)
             // Trésorerie et Comptabilité (uniquement si validé en étape Facture)
             if ($etape === 'Facture') {
-                // Appel au service FNE pour la Côte d'Ivoire
-                // Si pas de client enregistré ou client divers -> RNE (Reçu), sinon EV (Facture)
-                $estRne = empty($request->client_id) || ($request->client_id == 'divers');
-
-                // Un reçu n'est pas transmis à la FNE : la certification du reçu
-                // normalisé électronique attend les champs de mappage de la
-                // DGI. Il reste enregistré et normalisable rétroactivement.
-                if (!$vente->estRecu()) {
-                    // Normalisation FNE en arrière-plan (Section 18.5) — n'attendons pas la réponse HTTP
-                    NormaliserFactureFne::dispatch($vente, $estRne);
+                // Le reçu part par la même porte que la facture : la procédure
+                // d'interfaçage n'expose qu'un seul point d'émission. Ce qui les
+                // sépare est le format d'impression, pas l'envoi.
+                //
+                // La certification suit désormais le réglage de l'entreprise —
+                // dès l'émission, ou à la main après vérification. Une pièce
+                // certifiée ne se reprenant pas, le choix lui appartient.
+                if ($entreprise->normaliseAutomatiquement($vente)) {
+                    // En arrière-plan : n'attendons pas la réponse de la DGI.
+                    NormaliserFactureFne::dispatch($vente);
                 }
 
                 // Écritures de facturation (+ règlement immédiat le cas échéant).
@@ -818,8 +816,6 @@ class VenteControleur
                 'type_piece'        => $request->input('type_piece') === Vente::TYPE_RECU
                     ? Vente::TYPE_RECU
                     : $vente->type_piece,
-                'est_rne'           => $request->boolean('est_rne'),
-                'numero_rne'        => $request->boolean('est_rne') ? trim($request->input('numero_rne')) : null,
             ]);
 
             self::enregistrerTaxesSurTtc($vente, $request->input('taxes_ttc', []), $montantTtc);
@@ -1213,11 +1209,6 @@ class VenteControleur
                 'etape'             => 'Facture',
                 'parent_id'         => $vente->id,
                 'raison_avoir'      => $request->raison,
-                // Repris de la facture d'origine pour l'impression de l'avoir.
-                // L'API de remboursement de la FNE n'accepte que la liste des
-                // articles : ces champs ne lui sont pas transmis.
-                'est_rne'           => $vente->est_rne,
-                'numero_rne'        => $vente->numero_rne,
                 'autres_mentions'   => $vente->autres_mentions,
                 'pied_de_page'      => $vente->pied_de_page,
             ]);
@@ -1499,10 +1490,6 @@ class VenteControleur
             $clone->type_piece     = Vente::TYPE_FACTURE;
             $clone->type_facture   = 'proformat';
             $clone->piece_liee_id  = $vente->id;
-            // La facture est émise pour ce reçu : c'est exactement ce que
-            // décrivent `isRne` et `rne` dans le payload de certification.
-            $clone->est_rne        = true;
-            $clone->numero_rne     = $vente->numero_fne ?: $vente->numero_facture;
             $clone->archived       = false;
             $clone->normalise      = false;
             $clone->numero_fne     = null;
@@ -1624,8 +1611,6 @@ class VenteControleur
             'numero_facture' => $vente->numero_facture,
             'client_nom' => $vente->client ? $vente->client->nom : 'Client de passage',
             'montant_ttc' => $vente->montant_ttc,
-            'est_rne' => (bool) $vente->est_rne,
-            'numero_rne' => $vente->numero_rne,
             'autres_mentions' => $vente->autres_mentions,
             'pied_de_page' => $vente->pied_de_page,
             'details' => $vente->details->map(function($d) use ($dejaCredite) {
@@ -1770,11 +1755,6 @@ class VenteControleur
             'parent_id' => ['required', Appartenance::a('ventes', 'id')],
             'raison'    => ['required', 'string', 'max:255'],
             'items'     => ['required', 'array'],
-            // Mentions du document d'avoir (impression locale uniquement)
-            'est_rne'         => ['nullable', 'boolean'],
-            'numero_rne'      => ['nullable', 'required_if:est_rne,1', 'string', 'max:64'],
-        ], [
-            'numero_rne.required_if' => 'Veuillez saisir le numéro du reçu auquel cet avoir est rattaché.',
         ]);
 
         $parent = Vente::findOrFail($request->parent_id);
@@ -1845,13 +1825,6 @@ class VenteControleur
                 'remise'            => 0,
                 'remise_taux'       => 0,
                 'montant_ttc'       => 0,
-                // Saisi dans la modale, a defaut repris de la facture d'origine.
-                // Ces champs n'apparaissent que sur l'avoir imprime : l'API de
-                // remboursement de la FNE n'accepte que la liste des articles.
-                'est_rne'           => $request->boolean('est_rne'),
-                'numero_rne'        => $request->boolean('est_rne')
-                    ? trim((string) $request->input('numero_rne'))
-                    : $parent->numero_rne,
             ]);
 
             $totalHt = 0;

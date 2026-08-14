@@ -183,17 +183,37 @@ class FnePayloadTest extends TestCase
         $this->assertArrayNotHasKey('id', $article);
     }
 
-    public function test_le_rattachement_a_un_recu_provient_de_la_case_cochee_et_non_de_l_absence_de_client(): void
+    public function test_selflow_ne_declare_jamais_confirmer_un_recu_anterieur(): void
     {
+        // `isRne` déclare que la pièce **confirme un reçu déjà émis ailleurs**,
+        // dont `rne` porte le numéro. Selflow émet la pièce : il n'existe aucun
+        // reçu antérieur à confirmer, et le numéro d'un reçu est de toute façon
+        // attribué par la plateforme, jamais par l'émetteur. Déclarer le
+        // contraire dirait à la DGI qu'une pièce qui n'a jamais existé a été
+        // confirmée.
+        //
+        // Le reçu de Selflow n'est pas une seconde pièce : c'est la mise en page
+        // de la facture certifiée, portant le QR, le visuel FNE et la
+        // numérotation renvoyés par la plateforme.
         $this->simulerReponseFne();
 
-        $vente = $this->venteMinimale(['est_rne' => true, 'numero_rne' => '9606123E25000000001']);
-
-        FneService::normaliserFacture($vente);
+        FneService::normaliserFacture($this->venteMinimale());
 
         $payload = $this->payloadEnvoye();
-        $this->assertTrue($payload['isRne']);
-        $this->assertSame('9606123E25000000001', $payload['rne']);
+        $this->assertFalse($payload['isRne']);
+        $this->assertSame('', $payload['rne']);
+    }
+
+    public function test_un_recu_declare_lui_aussi_ne_confirmer_aucun_recu_anterieur(): void
+    {
+        // Le reçu part par la même porte que la facture, avec le même payload.
+        $this->simulerReponseFne();
+
+        FneService::normaliserFacture($this->venteMinimale(['type_piece' => \App\Modules\Admin\Modeles\Vente::TYPE_RECU]));
+
+        $payload = $this->payloadEnvoye();
+        $this->assertFalse($payload['isRne']);
+        $this->assertSame('', $payload['rne']);
     }
 
     public function test_une_vente_sans_client_n_est_pas_declaree_rattachee_a_un_recu(): void
@@ -509,17 +529,21 @@ class FnePayloadTest extends TestCase
         $this->assertSame($facture->id, $recu->fresh()->pieceLiee->id);
     }
 
-    public function test_un_recu_n_est_pas_transmis_a_la_fne(): void
+    public function test_un_recu_est_transmis_a_la_fne_comme_une_facture(): void
     {
-        Http::fake();
+        // Le reçu était refusé, faute de champs de mappage supposés manquants.
+        // La procédure d'interfaçage n'expose en réalité **aucune API propre au
+        // reçu** : seulement `/external/invoices/sign` et son remboursement. Le
+        // reçu part donc par la même porte, avec le même payload, et ne se
+        // distingue qu'à l'impression.
+        $this->simulerReponseFne();
 
-        $recu = $this->venteMinimale(['type_piece' => Vente::TYPE_RECU]);
+        $resultat = FneService::normaliserFacture(
+            $this->venteMinimale(['type_piece' => Vente::TYPE_RECU])
+        );
 
-        $resultat = FneService::normaliserFacture($recu);
-
-        $this->assertFalse($resultat['success']);
-        $this->assertArrayHasKey('rne_mapping', $resultat['errors']);
-        Http::assertNothingSent();
+        $this->assertTrue($resultat['success']);
+        $this->assertSame('sale', $this->payloadEnvoye()['invoiceType']);
     }
 
     public function test_un_taux_de_tva_hors_bareme_dgi_bloque_la_normalisation(): void

@@ -307,4 +307,48 @@ class ParcoursSouscriptionTest extends TestCase
     {
         $this->get(route('admin.souscription.index'))->assertRedirect();
     }
+
+    // ══════════════ Le référentiel absent ══════════════
+
+    public function test_sans_referentiel_la_page_dit_ce_qui_manque(): void
+    {
+        // `ReferentielSeeder` n'était appelé par aucun autre semeur : une
+        // installation neuve arrivait sur « Dans quel domaine travaillez-vous ? »
+        // avec la question, le bouton, et **rien entre les deux**. Le formulaire
+        // exige pourtant un domaine — continuer était impossible, et rien ne
+        // disait pourquoi.
+        Categorie::query()->delete();
+
+        $reponse = $this->actingAs($this->admin)->get(route('admin.souscription.index'));
+
+        $reponse->assertOk();
+        $reponse->assertSee('catalogue des domaines d\'activité n\'est pas chargé', false);
+        $reponse->assertSee('ReferentielSeeder', false);
+    }
+
+    public function test_sans_referentiel_le_bouton_continuer_disparait(): void
+    {
+        // Un bouton qui ramène sur la même page n'aide personne.
+        Categorie::query()->delete();
+
+        $this->actingAs($this->admin)
+            ->get(route('admin.souscription.index'))
+            ->assertDontSee('Continuer <i class="fas fa-arrow-right"></i>', false);
+    }
+
+    public function test_le_semeur_par_defaut_charge_le_referentiel(): void
+    {
+        // La cause première : `db:seed` ne chargeait pas le référentiel, donc
+        // une base fraîchement installée ne pouvait pas franchir l'étape 1.
+        // Le semeur complet ne se rejoue pas ici — il repose les données que ce
+        // test a déjà créées — mais son enchaînement, lui, se lit.
+        $source = file_get_contents(database_path('seeders/DatabaseSeeder.php'));
+
+        $this->assertMatchesRegularExpression(
+            '/\$this->call\(\s*ReferentielSeeder::class\s*\)/',
+            $source,
+            'Le semeur par défaut doit charger le référentiel : sans lui, une '
+            . 'installation neuve ne peut pas franchir la première étape de la souscription.'
+        );
+    }
 }

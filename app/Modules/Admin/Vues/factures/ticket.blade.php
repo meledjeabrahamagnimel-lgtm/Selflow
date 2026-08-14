@@ -148,11 +148,31 @@
     if ($logoTicket && !\Illuminate\Support\Str::startsWith($logoTicket, ['http://', 'https://'])) {
         $logoTicket = \Illuminate\Support\Facades\Storage::disk('public')->url($logoTicket);
     }
+
+    // Le visuel FNE — deuxieme des trois elements du sticker electronique, avec
+    // le code QR et le format de la numerotation. Il ne s'affiche que sur une
+    // piece reellement certifiee : l'apposer sur un brouillon en ferait une
+    // mention officielle usurpee.
+    //
+    // Celui de l'entreprise d'abord, tel qu'il a ete depose dans les
+    // parametres ; a defaut le visuel livre avec l'application.
+    $visuelFne = null;
+    if ($estNormalise) {
+        $visuelFne = $entrepriseTicket->logo_fne_path;
+        if ($visuelFne && !\Illuminate\Support\Str::startsWith($visuelFne, ['http://', 'https://'])) {
+            $visuelFne = \Illuminate\Support\Facades\Storage::disk('public')->url($visuelFne);
+        }
+        if (!$visuelFne && is_file(public_path('logo-FNE.png'))) {
+            $visuelFne = asset('logo-FNE.png');
+        }
+    }
 @endphp
 
 <div class="header">
     <div class="logo-box">
-        @if($logoTicket)
+        @if($visuelFne)
+            <img class="logo-svg" src="{{ $visuelFne }}" alt="Facture normalisée électronique" style="object-fit:contain;">
+        @elseif($logoTicket)
             <img class="logo-svg" src="{{ $logoTicket }}" alt="{{ $entrepriseTicket->nom }}" style="object-fit:contain;">
         @endif
         <div class="rne-label">
@@ -265,9 +285,6 @@
     $mentionsTicket = $vente->autres_mentions ?: $entrepriseTicket->facture_autres_mentions;
     $piedTicket     = $vente->pied_de_page ?: $entrepriseTicket->pied_de_page_facture;
 @endphp
-@if(!isset($bl) && $vente->est_rne && $vente->numero_rne)
-    <div class="footer-text bold">Rattaché au reçu n° {{ $vente->numero_rne }}</div>
-@endif
 @if($mentionsTicket)
     <div class="footer-text">{{ $mentionsTicket }}</div>
 @endif

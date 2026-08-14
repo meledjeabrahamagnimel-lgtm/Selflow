@@ -52,17 +52,12 @@ class FneService
             ];
         }
 
-        // La certification d'un reçu normalisé électronique (RNE) suppose des
-        // champs de mappage que la DGI n'a pas encore communiqués : mieux vaut
-        // le dire que d'envoyer un payload de facture pour un reçu.
-        if ($vente->estRecu()) {
-            return [
-                'success' => false,
-                'message' => 'La normalisation des reçus est en attente : la FNE n\'a pas encore fourni les champs de mappage du reçu normalisé électronique (RNE). Le reçu reste enregistré et pourra être normalisé rétroactivement.',
-                'errors'  => ['rne_mapping' => 'En attente des champs de mappage RNE'],
-            ];
-        }
-
+        // Le reçu ne bloque plus la certification. Il n'existe pas d'API propre
+        // au reçu normalisé électronique : la procédure d'interfaçage n'expose
+        // que `/external/invoices/sign` et son remboursement. Le reçu part donc
+        // par la même porte, avec le même payload, et ne se distingue qu'à
+        // l'impression — le format ticket, portant le QR, le visuel FNE et la
+        // numérotation renvoyés par la plateforme.
         $parentInvoiceId = $vente->parent?->fne_invoice_id;
         $isAvoirRefund = $vente->type_facture === 'avoir' && !empty($parentInvoiceId);
 
@@ -173,19 +168,23 @@ class FneService
             // l'entreprise, qui doit être transmis.
             $pointOfSaleValue = trim($vente->pointDeVente?->nom ?: 'Siège');
 
-            // `isRne` indique que la facture est rattachée à un reçu normalisé
-            // déjà émis. La seule source valable est la case cochée à la saisie :
-            // l'ancienne déduction « pas de client ⇒ isRne = true » envoyait un
-            // rattachement inexistant à la DGI pour toute vente au comptant.
-            $factureRattacheeAUnRecu = (bool) ($vente->est_rne ?? false);
-            $numeroRne = trim((string) ($vente->numero_rne ?? ''));
-
+            // `isRne` déclare que la pièce **confirme un reçu déjà émis
+            // ailleurs**, dont `rne` porte le numéro. Selflow émet la pièce : il
+            // n'existe aucun reçu antérieur à confirmer, et le numéro d'un reçu
+            // est de toute façon attribué par la plateforme, jamais par
+            // l'émetteur. Déclarer le contraire — en inventant un numéro — dirait
+            // à la DGI qu'une pièce qui n'a jamais existé a été confirmée.
+            //
+            // Le reçu de Selflow n'est pas une seconde pièce : c'est la **mise en
+            // page** de cette facture-ci, portant le numéro FNE, le QR et le
+            // visuel que la plateforme a renvoyés. Un seul envoi, deux formats
+            // d'impression.
             $payload = [
                 'invoiceType'         => 'sale',
                 'paymentMethod'       => self::mapperModePaiement($paymentMethod),
                 'template'            => $template,
-                'isRne'               => $factureRattacheeAUnRecu,
-                'rne'                 => $factureRattacheeAUnRecu ? $numeroRne : '',
+                'isRne'               => false,
+                'rne'                 => '',
                 'clientNcc'           => $clientNcc,
                 'clientCompanyName'   => $vente->client ? $vente->client->nom : 'Client de passage',
                 'clientPhone'         => $vente->client ? preg_replace('/[^0-9]/', '', $vente->client->telephone ?? '') : '',

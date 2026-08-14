@@ -58,6 +58,11 @@ class Entreprise extends Model
         'fne_solde_maj_at',
         // null tant que la question n'a pas ete posee (voir migration).
         'possede_compte_fne',
+        // Certifier des l'emission, ou a la main apres verification. Separes :
+        // une boutique peut vouloir verifier ses factures et laisser partir ses
+        // tickets de caisse tout seuls.
+        'normalisation_auto_factures',
+        'normalisation_auto_recus',
         'timbre_quittance',
         'bapa',
         'pied_de_page_facture',
@@ -76,7 +81,26 @@ class Entreprise extends Model
         'fne_solde_provision' => 'decimal:2',
         'fne_solde_maj_at'    => 'datetime',
         'possede_compte_fne'  => 'boolean',
+        'normalisation_auto_factures' => 'boolean',
+        'normalisation_auto_recus'    => 'boolean',
     ];
+
+    /**
+     * Cette pièce doit-elle être certifiée dès son émission ?
+     *
+     * Le réglage est distinct pour la facture et pour le reçu. Le défaut est
+     * l'automatique, qui était le seul comportement possible jusqu'ici.
+     */
+    public function normaliseAutomatiquement(\App\Modules\Admin\Modeles\Vente $vente): bool
+    {
+        $colonne = $vente->estRecu()
+            ? 'normalisation_auto_recus'
+            : 'normalisation_auto_factures';
+
+        // `null` sur une base dont la migration vient de passer : on retient le
+        // comportement d'avant, pour ne rien changer sans qu'on l'ait demandé.
+        return $this->{$colonne} ?? true;
+    }
 
     public function pointsDeVente(): HasMany
     {

@@ -254,24 +254,11 @@
                 {{-- Client & paiement --}}
                 <div style="margin-top: 18px;">
 
-                    {{-- Rattachement à un reçu normalisé déjà émis (champ `isRne` de la DGI) --}}
+                    {{-- Le rattachement à un reçu déjà émis ne se saisit plus ici.
+                         Selflow *émet* la pièce : il n'existe pas de reçu antérieur
+                         à confirmer. Le reçu est une mise en page de la facture déjà
+                         certifiée — voir `factures/ticket.blade.php`. --}}
                     @php $entrepriseCourante = Auth::user()->entreprise; @endphp
-                    <div class="form-group" style="background:var(--bg3); border:1px solid var(--border); border-radius:10px; padding:12px;">
-                        <label style="display:flex; align-items:center; gap:8px; font-size:13px; font-weight:700; cursor:pointer; margin:0;">
-                            <input type="checkbox" name="est_rne" value="1" id="estRneCheckbox"
-                                   onchange="basculerChampRne()"
-                                   style="width:16px; height:16px; cursor:pointer;">
-                            RNE
-                        </label>
-                        <small style="display:block; color:var(--text-3); font-size:11px; margin-top:4px;">
-                            À cocher si cette facture est émise en remplacement d'un reçu normalisé déjà délivré.
-                        </small>
-                        <div id="champRneContainer" style="display:none; margin-top:10px;">
-                            <label class="form-label" style="font-size:11px;">Numéro du reçu</label>
-                            <input type="text" name="numero_rne" id="numeroRneInput" class="form-control"
-                                   maxlength="64" placeholder="N° du reçu normalisé d'origine">
-                        </div>
-                    </div>
 
                     <div class="form-group">
                         <label class="form-label">Client (optionnel)</label>
@@ -1382,15 +1369,6 @@ function supprimerTaxeTtc(bouton) {
     });
 
     calculerTotaux();
-}
-
-function basculerChampRne() {
-    const coche = document.getElementById('estRneCheckbox').checked;
-    const bloc  = document.getElementById('champRneContainer');
-    const champ = document.getElementById('numeroRneInput');
-
-    bloc.style.display = coche ? 'block' : 'none';
-    if (champ) champ.required = coche;
 }
 
 

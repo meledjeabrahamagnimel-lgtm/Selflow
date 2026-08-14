@@ -563,6 +563,47 @@
                             </div>
                         </label>
 
+                        {{-- Quand certifier : dès l'émission, ou à la main.
+                             Les deux réglages sont séparés parce que les deux
+                             usages le sont — une boutique peut vouloir vérifier
+                             ses factures avant de les certifier, et laisser
+                             partir ses tickets de caisse tout seuls. --}}
+                        <label
+                            style="display:flex;align-items:flex-start;gap:12px;cursor:pointer;padding:14px;background:var(--bg3);border-radius:10px;border:1px solid var(--border);">
+                            <input type="checkbox" name="normalisation_auto_factures" value="1"
+                                {{ old('normalisation_auto_factures', $entreprise->normalisation_auto_factures ?? true) ? 'checked' : '' }}
+                                style="margin-top:3px;width:16px;height:16px;cursor:pointer;">
+                            <div>
+                                <div style="font-weight:600;font-size:13px;color:var(--text);">
+                                    Normaliser les factures automatiquement
+                                </div>
+                                <div style="font-size:12px;color:var(--text-3);margin-top:2px;">
+                                    Cochée, chaque facture part à la DGI dès son émission. Décochée,
+                                    elle reste enregistrée et vous la normalisez vous-même depuis la
+                                    liste des factures, après vérification.
+                                    <strong>Une pièce certifiée ne se reprend pas.</strong>
+                                </div>
+                            </div>
+                        </label>
+
+                        <label
+                            style="display:flex;align-items:flex-start;gap:12px;cursor:pointer;padding:14px;background:var(--bg3);border-radius:10px;border:1px solid var(--border);">
+                            <input type="checkbox" name="normalisation_auto_recus" value="1"
+                                {{ old('normalisation_auto_recus', $entreprise->normalisation_auto_recus ?? true) ? 'checked' : '' }}
+                                style="margin-top:3px;width:16px;height:16px;cursor:pointer;">
+                            <div>
+                                <div style="font-weight:600;font-size:13px;color:var(--text);">
+                                    Normaliser les reçus automatiquement
+                                </div>
+                                <div style="font-size:12px;color:var(--text-3);margin-top:2px;">
+                                    Même règle pour les reçus de caisse. Le reçu emprunte la même
+                                    porte que la facture : ce qui les distingue est le format
+                                    d'impression — le ticket porte le code QR, le visuel FNE et la
+                                    numérotation renvoyés par la plateforme.
+                                </div>
+                            </div>
+                        </label>
+
                     </div>
                 </div>
 

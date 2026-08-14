@@ -258,26 +258,11 @@
                 {{-- Client & paiement --}}
                 <div style="margin-top: 18px;">
 
-                    {{-- Rattachement a un recu normalise deja emis (champ `isRne` de la DGI) --}}
+                    {{-- Le rattachement a un recu deja emis ne se saisit plus ici :
+                         Selflow *emet* la piece, il n'existe pas de recu anterieur
+                         a confirmer. Le recu est une mise en page de la facture
+                         deja certifiee. --}}
                     @php $entrepriseCourante = Auth::user()->entreprise; @endphp
-                    <div class="form-group" style="background:var(--bg3); border:1px solid var(--border); border-radius:10px; padding:12px;">
-                        <label style="display:flex; align-items:center; gap:8px; font-size:13px; font-weight:700; cursor:pointer; margin:0;">
-                            <input type="checkbox" name="est_rne" value="1" id="estRneCheckbox"
-                                   onchange="basculerChampRne()"
-                                   {{ old('est_rne', $vente->est_rne) ? 'checked' : '' }}
-                                   style="width:16px; height:16px; cursor:pointer;">
-                            RNE
-                        </label>
-                        <small style="display:block; color:var(--text-3); font-size:11px; margin-top:4px;">
-                            A cocher si cette facture est emise en remplacement d'un recu normalise deja delivre.
-                        </small>
-                        <div id="champRneContainer" style="display:{{ old('est_rne', $vente->est_rne) ? 'block' : 'none' }}; margin-top:10px;">
-                            <label class="form-label" style="font-size:11px;">Numero du recu</label>
-                            <input type="text" name="numero_rne" id="numeroRneInput" class="form-control"
-                                   maxlength="64" value="{{ old('numero_rne', $vente->numero_rne) }}"
-                                   placeholder="N&deg; du recu normalise d'origine">
-                        </div>
-                    </div>
 
                     <div class="form-group">
                         <label class="form-label">Client (optionnel)</label>
@@ -1018,15 +1003,6 @@ function supprimerTaxeTtc(bouton) {
     });
 
     calculerTotaux();
-}
-
-function basculerChampRne() {
-    const coche = document.getElementById('estRneCheckbox').checked;
-    const bloc  = document.getElementById('champRneContainer');
-    const champ = document.getElementById('numeroRneInput');
-
-    bloc.style.display = coche ? 'block' : 'none';
-    if (champ) champ.required = coche;
 }
 
 

@@ -507,8 +507,6 @@ var DATA = {
         est_expire: {{ $vente->estExpire() ? 'true' : 'false' }},
         remise: {{ $vente->remise ?? 0 }},
         remise_taux: {{ (float) ($vente->remise_taux ?? 0) }},
-        est_rne: {{ $vente->est_rne ? 'true' : 'false' }},
-        numero_rne: {!! json_encode($vente->numero_rne) !!},
         autres_mentions: {!! json_encode($vente->autres_mentions ?: $vente->pointDeVente->entreprise->facture_autres_mentions) !!},
         pied_de_page: {!! json_encode($vente->pied_de_page ?: $vente->pointDeVente->entreprise->pied_de_page_facture) !!},
         taxes_ttc: [
@@ -769,9 +767,6 @@ function blocAutresTaxesTr(c, colonnes) {
  */
 function blocMentions(d) {
     var morceaux = [];
-    if (d.est_rne && d.numero_rne) {
-        morceaux.push(`<div style="font-weight:600;">Facture rattachee au recu normalise n&deg; ${d.numero_rne}</div>`);
-    }
     if (d.autres_mentions) {
         morceaux.push(`<div>${d.autres_mentions}</div>`);
     }
@@ -1707,7 +1702,6 @@ function modelStandard(d) {
                 COMPANY.email ? 'email : ' + COMPANY.email : ''
             ].filter(Boolean).join(', ')}
             ${d.autres_mentions ? `<div style="margin-top:6px;">${d.autres_mentions}</div>` : ''}
-            ${d.est_rne && d.numero_rne ? `<div style="margin-top:4px;font-weight:700;">Facture rattachee au recu normalise n&deg; ${d.numero_rne}</div>` : ''}
             ${d.pied_de_page ? `<div style="margin-top:6px;">${d.pied_de_page}</div>` : ''}
         </div>
         `}

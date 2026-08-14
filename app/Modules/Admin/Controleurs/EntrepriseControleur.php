@@ -124,7 +124,11 @@ class EntrepriseControleur
         }
         $data['bapa']             = $request->boolean('bapa');
 
-        $syncKeyChanged = $request->filled('comptaflow_sync_key') && ($request->comptaflow_sync_key !== $entreprise->comptaflow_sync_key);
+        // Quand certifier : des l'emission, ou a la main apres verification.
+        $data['normalisation_auto_factures'] = $request->boolean('normalisation_auto_factures');
+        $data['normalisation_auto_recus']    = $request->boolean('normalisation_auto_recus');
+
+        $syncKeyChanged =$request->filled('comptaflow_sync_key') && ($request->comptaflow_sync_key !== $entreprise->comptaflow_sync_key);
 
         // Mettre à jour le statut en fonction de la présence de la clé
         $data['comptaflow_sync_status'] = !empty($request->comptaflow_sync_key) ? 'active' : 'inactive';

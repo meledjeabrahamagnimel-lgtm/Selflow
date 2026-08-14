@@ -684,33 +684,9 @@ function telechargerDirectement(url) {
                         <input type="text" name="raison" class="form-control" required placeholder="Ex: Retour produit défectueux, remise commerciale..." style="width:100%; padding:10px; border:1px solid #cbd5e1; border-radius:8px;">
                     </div>
 
-                    <!-- Rattachement à un reçu déjà émis -->
-                    <div style="margin-bottom:20px; background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; padding:14px; text-align:left;">
-                        <label style="display:flex; align-items:center; gap:8px; font-size:13px; font-weight:700; color:#334155; cursor:pointer; margin:0;">
-                            <input type="checkbox" name="est_rne" value="1" id="avoirEstRneCheckbox"
-                                   onchange="basculerChampRneAvoir()" style="width:16px; height:16px; cursor:pointer;">
-                            RNE
-                        </label>
-                        <div style="font-size:11px; color:#64748b; margin-top:4px;">
-                            Les autres mentions et le pied de page proviennent des paramètres de l'entreprise.
-                        </div>
-                        <div id="avoirChampRne" style="display:none; margin-top:10px;">
-                            <label style="font-size:11px; font-weight:700; color:#475569; display:block; margin-bottom:4px;">Numéro du reçu</label>
-                            <input type="text" name="numero_rne" id="avoirNumeroRne" maxlength="64"
-                                   placeholder="N° du reçu normalisé d'origine"
-                                   style="width:100%; padding:8px; border:1px solid #cbd5e1; border-radius:6px; font-size:12px;">
-                        </div>
-                    </div>
-
-                    <script>
-                        function basculerChampRneAvoir() {
-                            const coche = document.getElementById('avoirEstRneCheckbox').checked;
-                            const bloc  = document.getElementById('avoirChampRne');
-                            const champ = document.getElementById('avoirNumeroRne');
-                            bloc.style.display = coche ? 'block' : 'none';
-                            if (champ) champ.required = coche;
-                        }
-                    </script>
+                    {{-- Le rattachement à un reçu déjà émis ne se saisit plus :
+                         Selflow émet la pièce, il n'existe aucun reçu antérieur à
+                         confirmer. --}}
 
                     <!-- Articles -->
                     <label style="font-weight: 700; font-size: 13px; display: block; margin-bottom: 10px; color: #334155;">Sélectionner les articles et ajuster les quantités à créditer</label>
@@ -1093,14 +1069,6 @@ function selectionnerFacturePourAvoir(id) {
             document.getElementById('avoir_facture_ref').textContent = data.numero_facture;
             document.getElementById('avoir_client_nom').textContent = data.client_nom;
 
-            // Preremplir les mentions depuis la facture d'origine
-            const caseRne = document.getElementById('avoirEstRneCheckbox');
-            if (caseRne) {
-                caseRne.checked = !!data.est_rne;
-                document.getElementById('avoirNumeroRne').value = data.numero_rne || '';
-                basculerChampRneAvoir();
-            }
-            
             const tbody = document.getElementById('avoirItemsTableBody');
             tbody.innerHTML = '';
             

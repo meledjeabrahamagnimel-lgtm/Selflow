@@ -19,6 +19,21 @@
     .sous-tete p  { font-size:14px; color:var(--text-2); margin:0; max-width:58ch; line-height:1.55; }
 
     .tuiles { display:grid; grid-template-columns:repeat(auto-fill, minmax(210px,1fr)); gap:14px; margin-bottom:24px; }
+
+    /* Le référentiel manquant : le dire, plutôt que laisser la page muette. */
+    .referentiel-absent {
+        display:flex; gap:14px; align-items:flex-start;
+        padding:18px 20px; margin-bottom:24px;
+        background:#fffbeb; border:1px solid #fde68a; border-left:4px solid #f59e0b;
+        border-radius:10px; color:#78350f;
+    }
+    .referentiel-absent i { font-size:18px; color:#b45309; margin-top:2px; }
+    .referentiel-absent strong { display:block; margin-bottom:6px; font-size:14px; }
+    .referentiel-absent p { margin:0; font-size:13px; line-height:1.6; }
+    .referentiel-absent code {
+        font-family:ui-monospace, Menlo, monospace; font-size:12.5px;
+        background:#fff; border:1px solid #fde68a; border-radius:5px; padding:2px 6px;
+    }
     .tuile { position:relative; background:#fff; border:2px solid var(--border); border-radius:12px;
              padding:18px; cursor:pointer; transition:border-color .12s, box-shadow .12s; }
     .tuile:hover { border-color:#cbd5e1; }
@@ -99,6 +114,23 @@
                ici et en changer tant que la configuration n'est pas terminée.</p>
         </div>
 
+        {{-- Le référentiel absent laissait cette page muette : la question, le
+             bouton, et rien entre les deux. L'utilisateur n'avait aucun moyen
+             de savoir que le catalogue des domaines n'était pas chargé, ni que
+             continuer était impossible — le formulaire exige un domaine que
+             rien ne proposait. --}}
+        @if($categories->isEmpty())
+            <div class="referentiel-absent">
+                <i class="fas fa-triangle-exclamation"></i>
+                <div>
+                    <strong>Le catalogue des domaines d'activité n'est pas chargé.</strong>
+                    <p>La configuration ne peut pas commencer sans lui. Demandez à votre
+                       administrateur de charger le référentiel de préparamétrage
+                       (<code>php artisan db:seed --class=ReferentielSeeder</code>),
+                       puis revenez sur cette page.</p>
+                </div>
+            </div>
+        @else
         <div class="tuiles">
             @foreach($categories as $categorie)
             <label class="tuile">
@@ -111,6 +143,7 @@
             </label>
             @endforeach
         </div>
+        @endif
 
     {{-- ══ 2. Le métier ══ --}}
     @elseif($etape === 2)
@@ -268,6 +301,9 @@
     @endif
 
     <div class="pieds">
+        {{-- Un bouton qui ne peut mener nulle part vaut mieux caché : sans
+             domaine à choisir, le formulaire revient sur lui-même. --}}
+        @unless($etape === 1 && $categories->isEmpty())
         <button type="submit" class="btn btn-primary">
             @if($etape === $derniere)
                 <i class="fas fa-check"></i> Terminer
@@ -275,6 +311,7 @@
                 Continuer <i class="fas fa-arrow-right"></i>
             @endif
         </button>
+        @endunless
 
         @if($etape > 1)
             <a href="{{ route('admin.souscription.index', ['etape' => $etape - 1]) }}" class="btn btn-outline">
