@@ -1555,7 +1555,51 @@ Elles sont documentées pour ne pas être redécouvertes.
   figé.~~ **CORRIGÉ au lot 4.2** : CUMP (Coût Unitaire Moyen Pondéré) par fiche
   de stock, alimenté par le prix réellement payé.
 
-### Passerelle Comptaflow
+### Passerelle Comptaflow — **LE CORRECTIF A ÉTÉ PERDU**
+
+Le correctif du lot 5 avait bien été appliqué côté Comptaflow, commit
+`b3bd59b` du 9 août 2026 (« Déversement Selflow : idempotence, tiers, exercice
+comparé, et un secret qui n'est plus public »).
+
+**Un `git push --force` sur `main` le 12 août l'a effacé de l'historique.**
+Le commit existe encore dans le dépôt — `git cat-file -t b3bd59b` répond —
+mais il n'est plus atteignable depuis `main` :
+`git merge-base --is-ancestor b3bd59b HEAD` échoue. `ExternalSyncController`
+est revenu à sa version d'avant, vérifié ligne à ligne :
+
+| Vérification | État au 14/08/2026 |
+|---|---|
+| `cle_selflow` (idempotence) | absent de tout `app/` |
+| `compte_tiers` | absent du contrôleur de synchronisation |
+| `exercice_debut` / `exercice_fin` | absents |
+| `n_saisie` | de nouveau `$refPiece ?: 'SELF_' . time() . '_' . $count` (ligne 486) |
+| Exercice | de nouveau celui **actif** chez Comptaflow, sans comparaison (ligne 411) |
+
+Or **Selflow envoie désormais ces cinq champs** : le `DeverserEcritureComptaflow`
+les met dans chaque payload. Comptaflow les reçoit et les ignore. Conséquences
+en l'état :
+
+- rejouer une synchronisation **duplique tout**, et la balance double ;
+- le relevé d'un client particulier reste impossible : tout retombe sur le
+  compte collectif `411000` ;
+- une pièce d'un exercice clos se range dans l'exercice courant.
+
+**À faire, côté Comptaflow :** ré-appliquer `b3bd59b` — il suffit d'un
+`git cherry-pick b3bd59b` tant que l'objet n'a pas été ramassé par le garbage
+collector, sinon le patch est toujours dans
+`PASSERELLE-COMPTAFLOW/0001-deversement-selflow.patch`. Cette session lit le
+dépôt Comptaflow mais ne peut pas y pousser.
+
+### Plan comptable de Comptaflow — non vérifiable depuis le dépôt
+
+Le plan comptable de Comptaflow ne vit pas dans le code : il s'importe par
+`public/templates/import/modele_plan_comptable.xlsx`, et son contenu réel est
+en base. Le classeur versionné n'a pas bougé depuis le 12 août, et il porte
+encore un export Sage d'« ELIKET MARKET » comme exemple. **Une mise à jour
+faite dans l'application ne laisse donc aucune trace ici** : elle est
+invisible depuis le dépôt, et je ne peux ni la confirmer ni l'infirmer.
+
+### Passerelle Comptaflow — anomalies d'origine
 
 - `deverserEcritures` prend l'exercice **actif** de Comptaflow sans jamais le
   comparer à la date de l'écriture.
