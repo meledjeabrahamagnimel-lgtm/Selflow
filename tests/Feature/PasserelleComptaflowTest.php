@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Jobs\DeverserEcritureComptaflow;
 use App\Modules\Admin\Modeles\EcritureComptable;
 use App\Modules\Admin\Modeles\Entreprise;
 use App\Modules\Admin\Modeles\Operation;
@@ -9,6 +10,7 @@ use App\Modules\Admin\Modeles\Periode;
 use App\Modules\Admin\Modeles\PointDeVente;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Queue;
 use Tests\TestCase;
 
 /**
@@ -228,5 +230,37 @@ class PasserelleComptaflowTest extends TestCase
         $this->ecrire();
 
         Http::assertNothingSent();
+    }
+
+    // ── Le déversement part en arrière-plan ────────────────────────────
+    //
+    // L'appel HTTP partait en synchrone, dans le hook `created()` du modèle :
+    // chaque écriture faisait attendre la caisse la réponse de Comptaflow.
+    // Il part désormais par un Job mis en file — la caisse n'attend plus rien.
+
+    public function test_l_ecriture_met_le_deversement_en_file_au_lieu_d_appeler_en_direct(): void
+    {
+        Queue::fake();
+
+        $ecriture = $this->ecrire();
+
+        Queue::assertPushed(DeverserEcritureComptaflow::class, function ($job) use ($ecriture) {
+            return $job->ecriture->id === $ecriture->id;
+        });
+
+        // La file étant simulée, le Job ne s'exécute pas : rien ne part
+        // encore sur le réseau à cet instant.
+        Http::assertNothingSent();
+    }
+
+    public function test_une_entreprise_non_liee_ne_met_rien_en_file(): void
+    {
+        Queue::fake();
+
+        $this->entreprise->update(['comptaflow_sync_status' => 'inactive']);
+
+        $this->ecrire();
+
+        Queue::assertNotPushed(DeverserEcritureComptaflow::class);
     }
 }
