@@ -54,6 +54,7 @@ class Habilitations
         'gestion_fne',
         'administration_interne',
         'gestion_secteurs_modules',
+        'gestion_vitrine',
     ];
 
     /**

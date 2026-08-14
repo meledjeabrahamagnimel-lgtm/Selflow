@@ -1621,15 +1621,15 @@ Le flux va de la demande de prix à la proposition, puis crée directement une
 vente et un achat. **L'étape du devis n'existe pas** : ni pièce opposable, ni
 validité, ni acceptation, ni renégociation.
 
-- Le groupe de routes `admin.b2b.*` n'est gated par aucun `modules:b2b`,
-  contrairement à `ventes`, `achats`, `stock`, `production` et
-  `comptabilite`. Une entreprise sans `b2b` dans `modules_actifs` atteint
-  quand même ces écrans dès qu'elle a `ventes` ou `achats` — trouvé en
-  écrivant `tests/Feature/ModulesActifsTest.php` (lot 8.4). Décision à
-  prendre : `b2b` est-il un module à part entière, avec sa propre
-  souscription, ou une fonctionnalité incluse dans ventes/achats ? Le menu
-  penche aujourd'hui pour la seconde lecture — il range les liens B2B sous
-  ces deux sections plutôt que sous une section B2B propre.
+- **Le B2B est une fonctionnalité incluse, non un module — tranché par le
+  propriétaire du projet.** Le groupe de routes `admin.b2b.*` ne porte donc
+  aucun `modules:b2b`, contrairement à `ventes`, `achats`, `stock`,
+  `production` et `comptabilite` : une entreprise qui a `ventes` ou `achats`
+  a le B2B avec. Ce n'est pas un oubli — le menu le disait déjà, en rangeant
+  les liens B2B sous ces deux sections plutôt que sous une section propre.
+  `b2b` figure encore dans `Entreprise::TOUS_LES_MODULES` : la valeur reste
+  acceptée pour ne pas casser les entreprises qui la portent déjà, mais elle
+  ne commande rien. Un test verrouille le comportement.
 
 ---
 

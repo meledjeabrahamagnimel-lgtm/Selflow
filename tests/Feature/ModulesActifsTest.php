@@ -276,20 +276,19 @@ class ModulesActifsTest extends TestCase
             ->assertForbidden();
     }
 
-    // ══════════════ B2B — anomalie constatée, non corrigée ══════════════
+    // ══════════════ B2B — une fonctionnalité incluse, non un module ══════════════
     //
-    // Contrairement à `ventes`, `achats`, `stock`, `production` et
-    // `comptabilite`, le groupe de routes `admin.b2b.*` ne porte aucun
-    // middleware `modules:b2b` : une entreprise dont `modules_actifs` ne
-    // contient pas `b2b` atteint quand même ces écrans, du moment qu'elle a
-    // `ventes` ou `achats` — c'est d'ailleurs ce que fait le menu, qui range
-    // les liens B2B sous les sections Ventes et Achats plutôt que sous un
-    // module propre. Ce test verrouille le comportement **actuel**, pour
-    // qu'un futur changement soit délibéré et non redécouvert par accident.
-    // Voir JOURNAL-DE-BORD.md, section « Anomalies constatées », sous-section
-    // B2B.
+    // Tranché par le propriétaire du projet : le B2B accompagne les ventes et
+    // les achats, il ne se souscrit pas à part. Le groupe `admin.b2b.*` ne
+    // porte donc aucun `modules:b2b`, et c'est délibéré — le menu le disait
+    // déjà, en rangeant ces liens sous les sections Ventes et Achats plutôt
+    // que sous une section propre.
+    //
+    // `b2b` figure encore dans `Entreprise::TOUS_LES_MODULES` : la valeur
+    // reste acceptée pour les entreprises qui la portent déjà, mais elle ne
+    // commande rien.
 
-    public function test_b2b_reste_atteignable_sans_le_module_b2b(): void
+    public function test_le_b2b_accompagne_les_ventes_sans_module_a_souscrire(): void
     {
         $entreprise = $this->creerEntreprise(['principal', 'ventes', 'comptabilite', 'produits', 'tiers', 'points_de_vente']);
         $pdv = PointDeVente::create(['entreprise_id' => $entreprise->id, 'nom' => 'Boutique', 'ville' => 'Abidjan', 'commune' => 'Cocody']);

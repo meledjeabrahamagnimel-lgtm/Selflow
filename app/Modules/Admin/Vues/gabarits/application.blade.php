@@ -574,6 +574,12 @@
                 <i class="fas fa-book-open"></i> Référentiel d'activités
             </a>
             @endif
+
+            @if(auth()->user()->aHabilitation('gestion_vitrine'))
+            <a href="{{ route('superadmin.vitrine.index') }}" class="nav-item {{ request()->routeIs('superadmin.vitrine*') ? 'active' : '' }}">
+                <i class="fas fa-window-maximize"></i> Vitrine publique
+            </a>
+            @endif
         @elseif(request()->routeIs('caissier.*'))
             <!-- ── CAISSIER SIDEBAR ── -->
             <div class="nav-section"><span>Caisse</span></div>

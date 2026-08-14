@@ -73,6 +73,17 @@ class VerifierHabilitationRoute
         'superadmin.secteurs_modules.index'       => 'gestion_secteurs_modules',
         'superadmin.secteurs_modules.sauvegarder' => 'gestion_secteurs_modules',
 
+        // La vitrine publique : ce que le monde entier lit de DC-Knowing.
+        'superadmin.vitrine.index'             => 'gestion_vitrine',
+        'superadmin.vitrine.sections.creer'    => 'gestion_vitrine',
+        'superadmin.vitrine.sections.modifier' => 'gestion_vitrine',
+        'superadmin.vitrine.sections.basculer' => 'gestion_vitrine',
+        'superadmin.vitrine.sections.supprimer'=> 'gestion_vitrine',
+        'superadmin.vitrine.cartes.creer'      => 'gestion_vitrine',
+        'superadmin.vitrine.cartes.modifier'   => 'gestion_vitrine',
+        'superadmin.vitrine.cartes.basculer'   => 'gestion_vitrine',
+        'superadmin.vitrine.cartes.supprimer'  => 'gestion_vitrine',
+
         // Le référentiel des profils métier — les familles et les articles que
         // chaque secteur reçoit à la souscription. Il se lit et ne s'écrit pas
         // depuis l'écran ; il relève tout de même du paramétrage sectoriel.

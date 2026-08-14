@@ -4,6 +4,17 @@ use App\Modules\Authentification\Controleurs\ConnexionControleur;
 use Illuminate\Support\Facades\Route;
 
 // -----------------------------------------------------------------------
+// La vitrine — page de présentation publique.
+//
+// Hors du groupe `guest` : elle s'adresse à tout le monde, y compris à un
+// utilisateur déjà connecté qui reviendrait la lire. La mettre derrière
+// `guest` l'aurait renvoyé vers son tableau de bord au lieu de la lui
+// montrer.
+// -----------------------------------------------------------------------
+Route::get('/presentation', [\App\Modules\Admin\Controleurs\VitrineControleur::class, 'accueil'])
+    ->name('vitrine');
+
+// -----------------------------------------------------------------------
 // Routes publiques (accès sans authentification)
 // -----------------------------------------------------------------------
 Route::middleware('guest')->group(function () {

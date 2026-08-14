@@ -408,6 +408,21 @@ Route::prefix('superadmin')
             Route::post('/{entreprise}/notes',                    [\App\Modules\Admin\Controleurs\SuperadminFneControleur::class, 'mettreAJourNotes'])->name('notes');
         });
 
+        // ── Vitrine publique (contenu de la page de presentation) ──
+        Route::prefix('vitrine')->name('vitrine.')->group(function () {
+            Route::get('/', [\App\Modules\Admin\Controleurs\VitrineControleur::class, 'index'])->name('index');
+
+            Route::post('/sections', [\App\Modules\Admin\Controleurs\VitrineControleur::class, 'creerSection'])->name('sections.creer');
+            Route::put('/sections/{section}', [\App\Modules\Admin\Controleurs\VitrineControleur::class, 'modifierSection'])->name('sections.modifier');
+            Route::post('/sections/{section}/basculer', [\App\Modules\Admin\Controleurs\VitrineControleur::class, 'basculerSection'])->name('sections.basculer');
+            Route::delete('/sections/{section}', [\App\Modules\Admin\Controleurs\VitrineControleur::class, 'supprimerSection'])->name('sections.supprimer');
+
+            Route::post('/sections/{section}/cartes', [\App\Modules\Admin\Controleurs\VitrineControleur::class, 'creerCarte'])->name('cartes.creer');
+            Route::post('/cartes/{carte}', [\App\Modules\Admin\Controleurs\VitrineControleur::class, 'modifierCarte'])->name('cartes.modifier');
+            Route::post('/cartes/{carte}/basculer', [\App\Modules\Admin\Controleurs\VitrineControleur::class, 'basculerCarte'])->name('cartes.basculer');
+            Route::delete('/cartes/{carte}', [\App\Modules\Admin\Controleurs\VitrineControleur::class, 'supprimerCarte'])->name('cartes.supprimer');
+        });
+
         // ── Secteurs & Modules (Configuration plateforme) ──
         Route::prefix('secteurs-modules')->name('secteurs_modules.')->group(function () {
             Route::get('/',    [\App\Modules\Admin\Controleurs\SuperadminControleur::class, 'secteursModules'])->name('index');
