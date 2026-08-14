@@ -288,7 +288,7 @@ class AdminControleur
 
         return view('admin::tableau_de_bord_general', compact(
             'entreprise', 'montantVentesJour', 'montantAchatsJour',
-            'nbVentesJour', 'totalVentesPeriode', 'nbVentesPeriode',
+            'nbVentesJour', 'totalVentesPeriode', 'totalVentesHTPeriode', 'nbVentesPeriode',
             'totalAchatsPeriode', 'margeBrutePeriode', 'tauxMargePeriode',
             'produitsEnAlerte', 'solde', 'totalEncaissements', 'totalDecaissements',
             'dernieresVentes', 'pointsDeVente', 'pointDeVenteId',
