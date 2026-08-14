@@ -128,8 +128,14 @@ class IdentifiantOpaqueTest extends TestCase
 
         $adresse = route('admin.ventes.imprimer', $vente);
 
-        $this->assertStringContainsString($vente->uuid, $adresse);
-        $this->assertStringNotContainsString('/' . $vente->id, $adresse);
+        // C'est le dernier segment qui désigne la pièce : le comparer entier
+        // plutôt que chercher « /1 » quelque part dans l'adresse, qu'un
+        // identifiant commençant par le même chiffre ferait échouer une fois
+        // sur seize.
+        $segment = basename(parse_url($adresse, PHP_URL_PATH));
+
+        $this->assertSame($vente->uuid, $segment);
+        $this->assertNotSame((string) $vente->id, $segment);
     }
 
     public function test_l_ancienne_adresse_numerique_ne_resout_plus_rien(): void
@@ -338,5 +344,80 @@ class IdentifiantOpaqueTest extends TestCase
 
         $this->assertSame([], array_values(array_unique($fautives)),
             'Ces vues construisent une adresse avec un numéro de ligne : ' . implode(', ', $fautives));
+    }
+
+    /**
+     * Une insertion brute ne passe pas par le modèle.
+     *
+     * Les semeurs écrivent en SQL direct pour aller vite — et le crochet
+     * `creating` qui pose l'identifiant ne s'exécute alors pas. La pièce naît
+     * sans adresse publique, MySQL l'accepte (une colonne unique tolère autant
+     * de `NULL` qu'on veut), et rien ne se voit **jusqu'à ce qu'un écran
+     * demande cette adresse** : le tableau de bord répondait 500 (*Internal
+     * Server Error* — erreur interne du serveur) sur la première vente semée.
+     *
+     * Le test lit la source : toute insertion brute dans une table à
+     * identifiant opaque doit poser l'`uuid` elle-même.
+     */
+    public function test_aucun_peuplement_n_insere_sans_identifiant_opaque(): void
+    {
+        $tables = [
+            'ventes', 'achats', 'entreprises', 'produits', 'bons_livraison',
+            'points_de_vente', 'b2b_negotiations', 'immobilisations',
+            'fiches_techniques', 'codes_journaux', 'clients', 'consignations',
+            'fournisseurs', 'transferts_stock', 'lettrages', 'periodes',
+            'dotations_amortissement', 'ordres_production', 'utilisateurs',
+        ];
+
+        $sources = array_merge(
+            glob(database_path('seeders/*.php')) ?: [],
+            glob(app_path('Console/Commands/*.php')) ?: []
+        );
+
+        $fautives = [];
+
+        foreach ($sources as $chemin) {
+            $src = file_get_contents($chemin);
+
+            foreach ($tables as $table) {
+                // Chaque site d'insertion est examiné à part : le tableau passé
+                // à `insert()` est construit plus haut, dans une variable, et
+                // c'est **ce tableau-là** qui doit porter l'identifiant. Chercher
+                // « uuid » n'importe où dans le fichier laisserait passer un site
+                // fautif dès qu'un autre, correct, est présent.
+                $motif = "/DB::table\(\s*'{$table}'\s*\)->insert(?:GetId)?\s*\(\s*(\\\$[a-zA-Z_][a-zA-Z_0-9]*)\s*\)/";
+
+                if (!preg_match_all($motif, $src, $trouves, PREG_OFFSET_CAPTURE)) {
+                    continue;
+                }
+
+                foreach ($trouves[1] as [$variable, $ouInsere]) {
+                    $nom = preg_quote(substr($variable, 1), '/');
+
+                    // La construction du tableau, cherchée **en remontant depuis
+                    // l'insertion** : le même nom de variable sert dans plusieurs
+                    // méthodes du même fichier, et partir du début en attraperait
+                    // une autre. C'est la dernière affectation avant l'insertion
+                    // qui décrit ce qui part en base.
+                    $avant = substr($src, 0, $ouInsere);
+
+                    if (!preg_match_all('/\$' . $nom . '(?:\[\])?\s*=\s*\[(.*?)\n\s*\];/s',
+                            $avant, $blocs, PREG_SET_ORDER)) {
+                        $fautives[] = basename($chemin) . ' → ' . $table . ' (tableau ' . $variable . ' introuvable)';
+                        continue;
+                    }
+
+                    $dernier = end($blocs);
+
+                    if (!str_contains($dernier[1], "'uuid'")) {
+                        $fautives[] = basename($chemin) . ' → ' . $table;
+                    }
+                }
+            }
+        }
+
+        $this->assertSame([], array_values(array_unique($fautives)),
+            'Ces peuplements insèrent en SQL brut sans poser l\'identifiant opaque, '
+            . 'ce qui produit des pièces sans adresse publique : ' . implode(', ', array_unique($fautives)));
     }
 }

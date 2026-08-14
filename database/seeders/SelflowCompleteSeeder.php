@@ -692,6 +692,10 @@ class SelflowCompleteSeeder extends Seeder
             $ttcTotal = $htTotal + $tvaTotal;
 
             $venteData = [
+                // Une insertion brute ne passe pas par le modèle : le crochet
+                // qui pose l'identifiant opaque ne s'exécute pas, et la pièce
+                // se retrouve sans adresse publique. Voir `IdentifiantOpaque`.
+                'uuid'              => (string) Str::uuid(),
                 'utilisateur_id'    => $user->id,
                 'point_de_vente_id' => $pdv->id,
                 'date_vente'        => $date->toDateTimeString(),
@@ -781,6 +785,7 @@ class SelflowCompleteSeeder extends Seeder
             $ttcTotal = $htTotal + $tvaTotal;
 
             $achatData = [
+                'uuid'              => (string) Str::uuid(),
                 'point_de_vente_id' => $pdv->id,
                 'utilisateur_id'    => $user->id,
                 'fournisseur_id'    => $fourn->id,
@@ -893,6 +898,7 @@ class SelflowCompleteSeeder extends Seeder
 
             // ── Fiche technique ────────────────────────────────────────────
             $ficheData = [
+                'uuid'           => (string) Str::uuid(),
                 'entreprise_id'  => $e->id,
                 'produit_fini_id'=> $produitFini->id,
                 'description'    => $description,
@@ -906,6 +912,7 @@ class SelflowCompleteSeeder extends Seeder
                 $dateOrdre = Carbon::now()->subDays(rand(1, 180));
                 $pdvOrdre  = $pdvs[array_rand($pdvs)] ?? null;
                 $ordreData = [
+                    'uuid'            => (string) Str::uuid(),
                     'entreprise_id'   => $e->id,
                     'produit_fini_id' => $produitFini->id,
                     'code_ordre'      => 'OP-' . $dateOrdre->format('Y') . '-' . str_pad($i + 1, 4, '0', STR_PAD_LEFT),
@@ -967,6 +974,7 @@ class SelflowCompleteSeeder extends Seeder
             $pdvDst  = $pdvs[1 + ($i % (count($pdvs) - 1))];
             $date    = Carbon::now()->subDays(rand(1, 90));
             $trData  = [
+                'uuid'                    => (string) Str::uuid(),
                 'produit_id'              => $produit->id,
                 'quantite'                => rand(5, 30),
                 'statut'                  => ['en_attente','approuve','rejete'][rand(0, 2)],

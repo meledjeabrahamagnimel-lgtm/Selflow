@@ -30,6 +30,7 @@ use App\Modules\Authentification\Modeles\Utilisateur;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Str;
 use Carbon\Carbon;
 
 /**
@@ -390,6 +391,9 @@ class SeedMassiveCommand extends Command
         $lignes = [];
         foreach ($journaux as [$code, $intitule, $type, $compte]) {
             $lignes[] = [
+                // Une insertion brute ne passe pas par le modèle : le crochet
+                // qui pose l'identifiant opaque ne s'exécute pas.
+                'uuid' => (string) Str::uuid(),
                 'entreprise_id' => $entrepriseId,
                 'code' => $code,
                 'intitule' => $intitule,
@@ -458,6 +462,7 @@ class SeedMassiveCommand extends Command
             $estEntreprise = $i % 3 === 0;
             $numeroTiers = '411' . str_pad((string) $i, 3, '0', STR_PAD_LEFT);
             $lignes[] = [
+                'uuid' => (string) Str::uuid(),
                 'entreprise_id' => $entrepriseId,
                 'nom' => $estEntreprise ? $this->raisonSocialeAleatoire() : $this->nomAleatoire(),
                 'telephone' => $this->telephoneAleatoire(),
@@ -483,6 +488,7 @@ class SeedMassiveCommand extends Command
         for ($i = 1; $i <= $n; $i++) {
             $numeroTiers = '401' . str_pad((string) $i, 3, '0', STR_PAD_LEFT);
             $lignes[] = [
+                'uuid' => (string) Str::uuid(),
                 'entreprise_id' => $entrepriseId,
                 'nom' => $this->raisonSocialeAleatoire(),
                 'telephone' => $this->telephoneAleatoire(),
@@ -633,6 +639,7 @@ class SeedMassiveCommand extends Command
                 $compteAchat = $this->comptesAchatDisponibles[array_rand($this->comptesAchatDisponibles)];
 
                 $produitsLignes[] = [
+                    'uuid' => (string) Str::uuid(),
                     'entreprise_id' => $entrepriseId,
                     'reference' => 'P' . ($idx + 1) . '-' . str_pad((string) $compteurGlobal, 6, '0', STR_PAD_LEFT),
                     'nom' => $nomProduit,
