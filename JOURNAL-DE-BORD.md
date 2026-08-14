@@ -1378,6 +1378,70 @@ installé. Un bouton copie tout le détail avec sa référence, puisque le recop
 - `resources/views/errors/500.blade.php`, `App\Exceptions\Panne::reference()`
 - `tests/Feature/PageDePanneTest.php` — 12 tests.
 
+#### Le tableau de bord général — variable manquante, corrigé
+
+`AdminControleur::tableauDeBordGeneral()` calculait `$totalVentesHTPeriode`
+pour en tirer la marge brute et le taux de marge, mais oubliait de la
+transmettre à la vue dans le `compact(...)` final. La carte « CA HT » de
+`/admin/general` levait donc une erreur 500 (*Internal Server Error* —
+erreur interne du serveur) dès le premier chargement, sur toute entreprise —
+et rien ne l'avait couvert : aucun test ne touchait cet écran.
+
+- `app/Modules/Admin/Controleurs/AdminControleur.php`
+- `tests/Feature/TableauDeBordGeneralTest.php` — 1 test (nouveau : l'écran
+  n'était couvert par rien avant).
+
+#### Le déversement Comptaflow — du hook synchrone à la file d'attente
+
+`EcritureComptable::booted()` appelait Comptaflow en HTTP direct dans son
+hook `created()` : chaque vente, achat ou mouvement de stock qui produit une
+écriture attendait la réponse de Comptaflow — jusqu'à 3 secondes de délai
+réseau — avant de rendre la main à l'utilisateur. Un Comptaflow lent ou
+indisponible ralentissait donc la caisse elle-même, sur toute entreprise
+liée.
+
+L'appel part désormais par `App\Jobs\DeverserEcritureComptaflow`
+(`ShouldQueue`, 3 tentatives, 10 secondes de délai entre chacune) — la
+clé d'idempotence `cle_selflow` rend le renvoi automatique sans risque de
+doublon. Le rattrapage par lot (`php artisan selflow:sync-ecritures`) reste
+le filet de sécurité pour ce qui échouerait encore après ces tentatives.
+Format du payload et clé d'idempotence inchangés.
+
+- `app/Jobs/DeverserEcritureComptaflow.php`
+- `app/Modules/Admin/Modeles/EcritureComptable.php`
+- `tests/Feature/PasserelleComptaflowTest.php` — 2 tests ajoutés (11 au
+  total) : le déversement part en file, une entreprise non liée n'y met
+  rien.
+
+#### Lot 8.4 — Un scénario de bout en bout par combinaison de modules — **AMORCÉ**
+
+`VerifierModulesActifs` ferme les écrans d'un module que l'entreprise n'a pas
+souscrit — mais n'était couvert par **aucun test**, dans un sens comme dans
+l'autre. Rien ne garantissait que le blindage marchait vraiment, ni qu'une
+entreprise à modules réduits pouvait mener un cycle complet avec ce qu'elle
+a réellement activé.
+
+Deux choses désormais vérifiées :
+
+- **le blindage** : un module absent de `modules_actifs` ferme ses écrans
+  (403 — *Forbidden*, accès interdit), un module présent les ouvre, et le
+  superadmin traverse le contrôle lui-même (c'est `role:admin`, en amont,
+  qui lui ferme `/admin/*` — pas ce middleware) ;
+- **la combinaison « Services »** — une entreprise sans module `stock` ni
+  `achats`, qui vend une prestation de type `service`. `estStockable()`
+  renvoie faux pour ce type : la vente ne crée aucun mouvement de stock,
+  quel que soit l'état du module, et pose tout de même son écriture
+  comptable puisque `comptabilite` reste actif.
+
+La combinaison « Commerce » (vente + stock + achats + comptabilité
+ensemble) était déjà couverte par `CycleStockTest` et `BalanceTest` — elle
+n'est pas dupliquée ici. **Restent à écrire** : les combinaisons
+« Production » (production + stock + ventes, sans achats), « BTP/chantiers »
+si le module `chantiers` sort du référentiel, et « B2B » (b2b + ventes,
+avec négociation avant facturation).
+
+- `tests/Feature/ModulesActifsTest.php` — 4 tests.
+
 ---
 
 ## 5 bis. La numérotation des comptes — tranché
