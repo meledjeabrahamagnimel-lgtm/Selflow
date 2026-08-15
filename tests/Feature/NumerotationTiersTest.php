@@ -17,7 +17,7 @@ use Tests\TestCase;
  * | Notion | Colonne | Exemple |
  * |---|---|---|
  * | Compte général de rattachement | `compte_comptable` | `411000` |
- * | Numéro de tiers | `numero_tiers` | `411001`, `411KONE` |
+ * | Numéro de tiers | `numero_tiers` | `410001`, `41KON1` |
  *
  * Le compte général est celui du plan comptable, et son intitulé — « Clients »
  * — ne change jamais. Le numéro de tiers désigne un client précis.
@@ -26,6 +26,13 @@ use Tests\TestCase;
  * chaque entreprise portait, comme numéro de tiers, le numéro du compte
  * collectif. Les deux notions se rejoignaient en base, et le relevé de ce
  * client remontait le solde de tous les autres.
+ *
+ * **La règle vient de Comptaflow**, qui retrouve un tiers par égalité de
+ * chaîne sur `numero_de_tiers`. Une convention différente d'un côté et de
+ * l'autre, et plus aucun tiers n'est reconnu : chaque écriture déversée
+ * retombe sur son compte collectif, sans que rien ne le signale. Le préfixe
+ * tient donc sur **deux** caractères, et le numéro fait six caractères en
+ * tout — comme `companies.tier_digits` là-bas.
  */
 class NumerotationTiersTest extends TestCase
 {
@@ -92,7 +99,7 @@ class NumerotationTiersTest extends TestCase
 
         $client = Client::where('entreprise_id', $this->entreprise->id)->firstOrFail();
 
-        $this->assertSame('411001', $client->numero_tiers);
+        $this->assertSame('410001', $client->numero_tiers);
         $this->assertSame('411000', $client->compte_comptable);
         $this->assertNotSame($client->compte_comptable, $client->numero_tiers);
     }
@@ -106,7 +113,7 @@ class NumerotationTiersTest extends TestCase
 
         $fournisseur = Fournisseur::where('entreprise_id', $this->entreprise->id)->firstOrFail();
 
-        $this->assertSame('401001', $fournisseur->numero_tiers);
+        $this->assertSame('400001', $fournisseur->numero_tiers);
         $this->assertNotSame($fournisseur->compte_comptable, $fournisseur->numero_tiers);
     }
 
@@ -116,7 +123,7 @@ class NumerotationTiersTest extends TestCase
         $this->creerClient(['nom' => 'Second client']);
 
         $this->assertSame(
-            ['411001', '411002'],
+            ['410001', '410002'],
             Client::where('entreprise_id', $this->entreprise->id)
                 ->orderBy('numero_tiers')->pluck('numero_tiers')->all()
         );
@@ -126,19 +133,19 @@ class NumerotationTiersTest extends TestCase
 
     public function test_la_convention_par_le_nom_tire_le_radical_du_nom(): void
     {
-        $this->convention(NumerotationTiersService::NOM);
+        $this->convention(NumerotationTiersService::ALPHANUMERIQUE);
 
         $this->creerClient(['nom' => 'Kouassi Koné']);
 
         $this->assertSame(
-            '411KOUASSIK',
+            '41KOU1',
             Client::where('entreprise_id', $this->entreprise->id)->value('numero_tiers')
         );
     }
 
     public function test_deux_homonymes_recoivent_des_numeros_distincts(): void
     {
-        $this->convention(NumerotationTiersService::NOM);
+        $this->convention(NumerotationTiersService::ALPHANUMERIQUE);
 
         $this->creerClient(['nom' => 'Koné']);
         $this->creerClient(['nom' => 'Koné']);
@@ -146,84 +153,160 @@ class NumerotationTiersTest extends TestCase
         $numeros = Client::where('entreprise_id', $this->entreprise->id)
             ->orderBy('id')->pluck('numero_tiers')->all();
 
-        $this->assertSame(['411KONE', '411KONE2'], $numeros);
+        $this->assertSame(['41KON1', '41KON2'], $numeros);
     }
 
     public function test_un_nom_sans_lettre_retombe_sur_la_sequence(): void
     {
         // « 123 » ne laisse aucun radical : sans ce repli, le numéro se
         // réduirait à sa racine — c'est-à-dire au compte collectif.
-        $this->convention(NumerotationTiersService::NOM);
+        $this->convention(NumerotationTiersService::ALPHANUMERIQUE);
 
         $this->creerClient(['nom' => '123']);
 
         $numero = Client::where('entreprise_id', $this->entreprise->id)->value('numero_tiers');
 
-        $this->assertSame('411001', $numero);
-        $this->assertNotSame('411', $numero);
+        $this->assertSame('410001', $numero);
+        $this->assertNotSame('41', $numero);
     }
 
     public function test_les_deux_conventions_cohabitent(): void
     {
         // Une entreprise qui change d'avis en cours de route ne doit pas voir
         // sa séquence repartir de 001 et heurter un numéro déjà pris.
-        $this->creerClient(['nom' => 'Premier client']);      // 411001
+        $this->creerClient(['nom' => 'Premier client']);      // 410001
 
-        $this->convention(NumerotationTiersService::NOM);
-        $this->creerClient(['nom' => 'Koné']);                // 411KONE
+        $this->convention(NumerotationTiersService::ALPHANUMERIQUE);
+        $this->creerClient(['nom' => 'Koné']);                // 41KON1
 
-        $this->convention(NumerotationTiersService::SEQUENCE);
-        $this->creerClient(['nom' => 'Troisième client']);    // 411002
+        $this->convention(NumerotationTiersService::NUMERIQUE);
+        $this->creerClient(['nom' => 'Troisième client']);    // 410002
 
         $this->assertSame(
-            ['411001', '411KONE', '411002'],
+            ['410001', '41KON1', '410002'],
             Client::where('entreprise_id', $this->entreprise->id)->orderBy('id')->pluck('numero_tiers')->all()
         );
     }
 
-    // ══════════════ Ce que la saisie manuelle refuse ══════════════
+    // ══════════════ Le numéro ne se saisit plus ══════════════
 
-    public function test_le_numero_saisi_ne_peut_pas_etre_le_compte_collectif(): void
+    public function test_un_numero_envoye_par_le_formulaire_est_ignore(): void
     {
-        $this->creerClient(['auto_numero_tiers' => '0', 'numero_tiers' => '411000'])
-            ->assertSessionHasErrors('numero_tiers');
+        // Le système numérote seul, comme Comptaflow. Un champ ajouté à la
+        // requête — par un formulaire forgé, ou par un ancien gabarit resté en
+        // cache — ne doit pas passer devant la convention de l'entreprise.
+        $this->creerClient(['numero_tiers' => '411000']);
 
-        $this->assertSame(0, Client::where('entreprise_id', $this->entreprise->id)->count());
+        $this->assertSame(
+            '410001',
+            Client::where('entreprise_id', $this->entreprise->id)->value('numero_tiers')
+        );
     }
 
-    public function test_le_numero_saisi_suit_la_racine_du_compte_de_rattachement(): void
+    public function test_le_numero_ne_se_modifie_pas_davantage(): void
     {
-        // Un tiers 401… rattaché au collectif clients ferait partir l'écriture
-        // sur le mauvais compte, et le grand livre deviendrait faux sans
-        // qu'aucun contrôle ne s'en émeuve.
-        $this->creerClient(['auto_numero_tiers' => '0', 'numero_tiers' => '401001'])
-            ->assertSessionHasErrors('numero_tiers');
+        // Changer le numéro d'un tiers déjà déversé le rendrait introuvable
+        // chez Comptaflow, et ses écritures futures retomberaient sur le
+        // collectif tandis que les anciennes resteraient sur l'ancien numéro.
+        $this->creerClient(['nom' => 'Kouassi Koné']);
+        $client = Client::where('entreprise_id', $this->entreprise->id)->firstOrFail();
+
+        $this->put(route('admin.clients.modifier', $client), [
+            'nom' => 'Kouassi Koné', 'type_facturation' => 'B2C',
+            'compte_comptable' => '411000', 'numero_tiers' => '419999',
+        ]);
+
+        $this->assertSame('410001', $client->fresh()->numero_tiers);
     }
 
-    public function test_un_numero_avec_des_lettres_est_accepte(): void
-    {
-        // L'ancienne expression `^411[0-9]*$` refusait 411KONE, qui est
-        // pourtant une convention répandue.
-        $this->creerClient(['auto_numero_tiers' => '0', 'numero_tiers' => '411KONE'])
-            ->assertSessionDoesntHaveErrors();
+    // ══════════════ L'import filtre, comme Comptaflow ══════════════
 
-        $this->assertSame('411KONE', Client::where('entreprise_id', $this->entreprise->id)->value('numero_tiers'));
+    private function importerClients(array $lignes)
+    {
+        $contenu = '';
+        foreach ($lignes as $ligne) {
+            $contenu .= implode(';', array_map(fn ($v) => '"' . $v . '"', $ligne)) . "\r\n";
+        }
+        $chemin = tempnam(sys_get_temp_dir(), 'tiers') . '.csv';
+        file_put_contents($chemin, $contenu);
+
+        return $this->post(route('admin.import.importer', ['type' => 'clients']), [
+            'fichier' => new \Illuminate\Http\UploadedFile($chemin, 'clients.csv', 'text/csv', null, true),
+        ]);
+    }
+
+    public function test_l_import_garde_un_numero_conforme(): void
+    {
+        $this->importerClients([
+            ['nom', 'type_facturation', 'compte_comptable', 'numero_tiers'],
+            ['Société ABC', 'B2C', '411000', '410042'],
+        ]);
+
+        $this->assertSame('410042', Client::where('nom', 'Société ABC')->value('numero_tiers'));
+    }
+
+    public function test_l_import_renumerote_un_tiers_qui_vaut_le_collectif(): void
+    {
+        // Un fichier vient de partout — d'un autre logiciel, d'un tableur
+        // retouché à la main — et rien n'y garantit la convention.
+        $this->importerClients([
+            ['nom', 'type_facturation', 'compte_comptable', 'numero_tiers'],
+            ['Société ABC', 'B2C', '411000', '411000'],
+        ]);
+
+        $this->assertSame('410001', Client::where('nom', 'Société ABC')->value('numero_tiers'));
+    }
+
+    public function test_l_import_renumerote_un_prefixe_qui_ne_correspond_pas(): void
+    {
+        // Un tiers 40… sur un client ferait partir l'écriture sur le collectif
+        // fournisseurs.
+        $this->importerClients([
+            ['nom', 'type_facturation', 'compte_comptable', 'numero_tiers'],
+            ['Société ABC', 'B2C', '411000', '400001'],
+        ]);
+
+        $this->assertSame('410001', Client::where('nom', 'Société ABC')->value('numero_tiers'));
+    }
+
+    public function test_l_import_renumerote_une_longueur_incorrecte(): void
+    {
+        // Comptaflow cherche par égalité de chaîne : « 4100010 » ne vaut pas
+        // « 410001 ».
+        $this->importerClients([
+            ['nom', 'type_facturation', 'compte_comptable', 'numero_tiers'],
+            ['Société ABC', 'B2C', '411000', '4100010'],
+        ]);
+
+        $this->assertSame('410001', Client::where('nom', 'Société ABC')->value('numero_tiers'));
+    }
+
+    public function test_l_import_ne_reprend_pas_un_numero_deja_pris(): void
+    {
+        $this->creerClient(['nom' => 'Client existant']);   // 410001
+
+        $this->importerClients([
+            ['nom', 'type_facturation', 'compte_comptable', 'numero_tiers'],
+            ['Société ABC', 'B2C', '411000', '410001'],
+        ]);
+
+        $this->assertSame('410002', Client::where('nom', 'Société ABC')->value('numero_tiers'));
     }
 
     // ══════════════ Le service, isolément ══════════════
 
     public function test_la_coherence_se_juge_sur_la_racine(): void
     {
-        $this->assertTrue(NumerotationTiersService::estCoherent('411001', '411000'));
-        $this->assertTrue(NumerotationTiersService::estCoherent('411KONE', '411000'));
-        $this->assertFalse(NumerotationTiersService::estCoherent('401001', '411000'));
+        $this->assertTrue(NumerotationTiersService::estCoherent('410001', '411000'));
+        $this->assertTrue(NumerotationTiersService::estCoherent('41KON1', '411000'));
+        $this->assertFalse(NumerotationTiersService::estCoherent('400001', '411000'));
         $this->assertFalse(NumerotationTiersService::estCoherent(null, '411000'));
     }
 
     public function test_le_service_reconnait_le_compte_collectif(): void
     {
         $this->assertTrue(NumerotationTiersService::estLeCompteCollectif('411000', '411000'));
-        $this->assertFalse(NumerotationTiersService::estLeCompteCollectif('411001', '411000'));
+        $this->assertFalse(NumerotationTiersService::estLeCompteCollectif('410001', '411000'));
     }
 
     // ══════════════ Le client de passage ══════════════
@@ -235,7 +318,7 @@ class NumerotationTiersTest extends TestCase
         // plus les ventes de comptoir des créances d'un client identifié.
         $divers = Client::divers($this->entreprise);
 
-        $this->assertSame('411DIVERS', $divers->numero_tiers);
+        $this->assertSame('410000', $divers->numero_tiers);
         $this->assertSame('411000', $divers->compte_comptable);
         $this->assertSame('Client divers', $divers->nom);
     }
@@ -244,7 +327,7 @@ class NumerotationTiersTest extends TestCase
     {
         $divers = Fournisseur::divers($this->entreprise);
 
-        $this->assertSame('401DIVERS', $divers->numero_tiers);
+        $this->assertSame('400000', $divers->numero_tiers);
         $this->assertSame('401000', $divers->compte_comptable);
     }
 
@@ -281,7 +364,7 @@ class NumerotationTiersTest extends TestCase
         $this->creerClient(['nom' => 'Kouassi Koné']);
 
         $this->assertSame(
-            '411001',
+            '410001',
             Client::where('entreprise_id', $this->entreprise->id)
                 ->where('numero_tiers', '!=', Client::NUMERO_DIVERS)->value('numero_tiers')
         );
@@ -296,13 +379,13 @@ class NumerotationTiersTest extends TestCase
         $autre = Entreprise::create(['nom' => 'Quincaillerie rivale']);
         Client::create([
             'entreprise_id' => $autre->id, 'nom' => 'Client de la rivale',
-            'compte_comptable' => '411000', 'numero_tiers' => '411001',
+            'compte_comptable' => '411000', 'numero_tiers' => '410001',
         ]);
 
         $this->creerClient();
 
         $this->assertSame(
-            '411001',
+            '410001',
             Client::where('entreprise_id', $this->entreprise->id)->value('numero_tiers')
         );
     }

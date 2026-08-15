@@ -620,9 +620,13 @@
                     </div>
 
                     <div style="font-size:12px;color:var(--text-3);margin-bottom:14px;line-height:1.6;">
-                        La forme des numéros attribués automatiquement aux clients et aux
-                        fournisseurs. Les deux conventions se pratiquent ; celle de votre cabinet
-                        comptable fait foi. Les fiches déjà créées gardent leur numéro.
+                        Le système attribue lui-même le numéro d'un client ou d'un fournisseur —
+                        il ne se saisit pas. Vous choisissez seulement sa forme.
+                        <strong>Ce réglage doit être le même que dans Comptaflow</strong>
+                        (Configuration &rsaquo; Type d'identifiant tiers) : la passerelle retrouve un
+                        tiers par son numéro exact, et deux conventions différentes feraient
+                        retomber chaque écriture sur son compte collectif.
+                        Les fiches déjà créées gardent leur numéro.
                     </div>
 
                     <div style="display:flex;flex-direction:column;gap:10px;">
@@ -630,24 +634,36 @@
                         <label
                             style="display:flex;align-items:flex-start;gap:12px;cursor:pointer;padding:14px;background:var(--bg3);border-radius:10px;border:1px solid var(--border);">
                             <input type="radio" name="numerotation_tiers" value="{{ $cle }}"
-                                {{ old('numerotation_tiers', $entreprise->numerotation_tiers ?? 'sequence') === $cle ? 'checked' : '' }}
+                                {{ old('numerotation_tiers', $entreprise->numerotation_tiers ?? \App\Modules\Admin\Services\NumerotationTiersService::NUMERIQUE) === $cle ? 'checked' : '' }}
                                 style="margin-top:3px;width:16px;height:16px;cursor:pointer;">
                             <div>
                                 <div style="font-weight:600;font-size:13px;color:var(--text);">{{ $libelle }}</div>
                                 <div style="font-size:12px;color:var(--text-3);margin-top:2px;">
-                                    @if($cle === 'sequence')
-                                        Un compteur derrière la racine du compte de rattachement :
-                                        <code>411001</code>, <code>411002</code>, <code>401001</code>.
-                                        Jamais d'homonyme, mais il faut ouvrir la fiche pour savoir de qui il s'agit.
+                                    @if($cle === \App\Modules\Admin\Services\NumerotationTiersService::NUMERIQUE)
+                                        Le préfixe du collectif, puis un compteur :
+                                        <code>410001</code>, <code>410002</code> pour les clients,
+                                        <code>400001</code> pour les fournisseurs. Jamais d'homonyme,
+                                        mais il faut ouvrir la fiche pour savoir de qui il s'agit.
                                     @else
-                                        Le nom derrière la racine : <code>411KONE</code>, <code>401KOFFI</code>.
-                                        Lisible directement en grand livre. Deux homonymes reçoivent
-                                        <code>411KONE</code> et <code>411KONE2</code>.
+                                        Le préfixe, trois lettres du nom, puis un compteur :
+                                        <code>41KON1</code>, <code>40KOF1</code>. Lisible directement
+                                        en grand livre ; deux Koné reçoivent <code>41KON1</code> et
+                                        <code>41KON2</code>.
                                     @endif
                                 </div>
                             </div>
                         </label>
                         @endforeach
+                    </div>
+
+                    <div style="margin-top:12px;font-size:12px;color:var(--text-3);line-height:1.6;">
+                        Le numéro fait {{ \App\Modules\Admin\Services\NumerotationTiersService::LONGUEUR }} caractères,
+                        préfixe compris — la même longueur que <code>tier_digits</code> dans Comptaflow.
+                        Le préfixe tient sur deux chiffres&nbsp;: <code>41</code> pour un client rattaché
+                        au <code>411000</code>, <code>40</code> pour un fournisseur rattaché au
+                        <code>401000</code>. <strong>Le numéro de tiers n'est pas le compte
+                        collectif</strong> : le premier désigne une personne, le second regroupe
+                        tout le monde.
                     </div>
                 </div>
 

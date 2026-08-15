@@ -349,15 +349,24 @@
                                 @endforeach
                             </select>
                         </div>
+                        {{-- Le numéro de tiers ne se saisit pas : le système le
+                             fabrique, selon la convention choisie dans les
+                             paramètres. Comptaflow retrouve un tiers par
+                             égalité de chaîne — une saisie libre produirait des
+                             numéros que sa recherche ne trouverait jamais, et
+                             chaque écriture de ce tiers retomberait sur son
+                             compte collectif. --}}
                         <div class="form-group" style="margin-bottom:0; grid-column: 1/-1;">
-                            <label class="form-label" style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 4px;">
-                                <span>N° tiers auxiliaire (ex: 411001)</span>
-                                <label style="font-weight:normal; display:inline-flex; align-items:center; gap:6px; font-size:11px; cursor:pointer; margin: 0;">
-                                    <input type="checkbox" name="auto_numero_tiers" id="auto_numero_client" value="1" checked onchange="toggleClientNumeroTiers()">
-                                    Générer automatiquement
-                                </label>
-                            </label>
-                            <input type="text" name="numero_tiers" id="numero_client_input" class="form-control" placeholder="Ex: 411001" disabled>
+                            <div style="display:flex;align-items:flex-start;gap:8px;padding:10px 12px;background:var(--bg3);border:1px solid var(--border);border-radius:8px;font-size:12px;color:var(--text-2);line-height:1.55;">
+                                <i class="fas fa-hashtag" style="margin-top:2px;color:var(--primary);"></i>
+                                <span>
+                                    Le <strong>numéro de tiers</strong> est attribué automatiquement
+                                    (410001), selon la convention réglée dans
+                                    <em>Paramètres &rsaquo; Numérotation des tiers</em>.
+                                    Il ne se confond pas avec le compte de rattachement choisi ci-dessus :
+                                    celui-ci regroupe tout le monde, le numéro de tiers désigne ce client-ci.
+                                </span>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -435,9 +444,15 @@
                                 @endforeach
                             </select>
                         </div>
+                        {{-- En lecture seule : changer le numéro d'un tiers déjà
+                             déversé le rendrait introuvable chez Comptaflow, et
+                             ses écritures futures retomberaient sur le collectif
+                             tandis que les anciennes resteraient sur l'ancien
+                             numéro. --}}
                         <div class="form-group" style="margin-bottom:0; grid-column: 1/-1;">
-                            <label class="form-label">N° tiers auxiliaire (ex: 411001)</label>
-                            <input type="text" name="numero_tiers" id="edit_numero_tiers" class="form-control" placeholder="Ex: 411001" required>
+                            <label class="form-label">N° tiers auxiliaire</label>
+                            <input type="text" id="edit_numero_tiers" class="form-control" disabled
+                                   title="Attribué par le système ; il ne se modifie pas.">
                         </div>
                     </div>
                 </div>
@@ -454,19 +469,6 @@
 
 @section('scripts')
 <script>
-function toggleClientNumeroTiers() {
-    const checkbox = document.getElementById('auto_numero_client');
-    const input = document.getElementById('numero_client_input');
-    if (checkbox.checked) {
-        input.disabled = true;
-        input.value = '';
-        input.required = false;
-    } else {
-        input.disabled = false;
-        input.required = true;
-        input.focus();
-    }
-}
 
 function switchVue(mode) {
     const btnLocal = document.getElementById('btn-vue-local');

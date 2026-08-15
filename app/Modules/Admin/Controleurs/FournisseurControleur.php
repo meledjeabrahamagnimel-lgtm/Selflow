@@ -12,33 +12,6 @@ use Illuminate\View\View;
 
 class FournisseurControleur
 {
-    /**
-     * Le numéro saisi à la main, une fois validé.
-     *
-     * Il doit suivre la racine du compte de rattachement, et ne jamais être ce
-     * compte collectif lui-même. Voir `NumerotationTiersService` pour ce que
-     * ces deux notions recouvrent.
-     */
-    private function numeroSaisi(Request $request, Entreprise $entreprise, string $racine, string $compteGeneral): string
-    {
-        $request->validate([
-            'numero_tiers' => array_merge(
-                NumerotationTiersService::reglesDeSaisie($racine),
-                [
-                    'not_in:' . $compteGeneral,
-                    \Illuminate\Validation\Rule::unique('fournisseurs', 'numero_tiers')->where('entreprise_id', $entreprise->id),
-                ]
-            ),
-        ], [
-            'numero_tiers.required' => 'Le numéro de tiers est obligatoire si la numérotation automatique n\'est pas cochée.',
-            'numero_tiers.regex'    => "Le numéro de tiers doit commencer par « {$racine} », la racine du compte de rattachement — par exemple {$racine}001 ou {$racine}KOFFI.",
-            'numero_tiers.not_in'   => "Le numéro de tiers ne peut pas être {$compteGeneral} : c'est le compte collectif, pas la fiche de ce fournisseur.",
-            'numero_tiers.unique'   => 'Ce numéro de tiers est déjà utilisé.',
-        ]);
-
-        return (string) $request->input('numero_tiers');
-    }
-
     public function index(Request $request): View
     {
         $entreprise   = Auth::user()->entreprise;
@@ -105,16 +78,13 @@ class FournisseurControleur
             'ncc.regex' => 'Le NCC doit comporter 8 caractères et se terminer par une lettre majuscule.',
         ]);
 
-        // **Le numéro de tiers n'est pas le compte général.** `401000` est le
-        // compte collectif « Fournisseurs » ; `401001` ou `401KOFFI` désigne
-        // *ce* fournisseur-ci. La numérotation automatique démarrait pourtant
-        // à `401000`.
-        $compteGeneral = $request->input('compte_comptable');
-        $racine        = NumerotationTiersService::racine($compteGeneral);
-
-        $numeroTiers = $request->boolean('auto_numero_tiers')
-            ? NumerotationTiersService::pourFournisseur($entreprise, $compteGeneral, (string) $request->input('nom'))
-            : $this->numeroSaisi($request, $entreprise, $racine, $compteGeneral);
+        // Le numéro ne se saisit plus à la main : le système le fabrique,
+        // selon la convention des paramètres, exactement comme Comptaflow.
+        $numeroTiers = NumerotationTiersService::pourFournisseur(
+            $entreprise,
+            (string) $request->input('compte_comptable'),
+            (string) $request->input('nom')
+        );
 
         Fournisseur::create(array_merge(
             $request->only(['nom', 'type_facturation', 'telephone', 'email', 'adresse', 'secteur', 'rccm', 'regime_imposition', 'compte_comptable']),
@@ -176,25 +146,14 @@ class FournisseurControleur
                         $q->whereNull('entreprise_id')->orWhere('entreprise_id', $entreprise->id);
                     })
                 ],
-                'numero_tiers'      => array_merge(
-                    NumerotationTiersService::reglesDeSaisie(
-                        NumerotationTiersService::racine((string) $request->input('compte_comptable'))
-                    ),
-                    [
-                        'not_in:' . $request->input('compte_comptable'),
-                        \Illuminate\Validation\Rule::unique('fournisseurs', 'numero_tiers')->ignore($fournisseur->id)->where('entreprise_id', $entreprise->id),
-                    ]
-                ),
             ], [
-                'numero_tiers.regex'  => 'Le numéro de tiers doit commencer par la racine du compte de rattachement (par exemple 401001 ou 401KOFFI pour un fournisseur rattaché au 401000).',
-                'numero_tiers.not_in' => 'Le numéro de tiers ne peut pas être le compte collectif lui-même : ce sont deux choses différentes.',
                 'ncc.required_if' => 'Le NCC est obligatoire pour un fournisseur de type B2B.',
                 'ncc.size' => 'Le NCC doit contenir exactement 8 caractères.',
                 'ncc.regex' => 'Le NCC doit comporter 8 caractères et se terminer par une lettre majuscule.',
             ]);
 
             $fournisseur->update(array_merge(
-                $request->only(['nom', 'type_facturation', 'telephone', 'email', 'adresse', 'secteur', 'rccm', 'regime_imposition', 'compte_comptable', 'numero_tiers']),
+                $request->only(['nom', 'type_facturation', 'telephone', 'email', 'adresse', 'secteur', 'rccm', 'regime_imposition', 'compte_comptable']),
                 ['ncc' => ($request->input('type_facturation') === 'B2B') ? $request->input('ncc') : null]
             ));
         }

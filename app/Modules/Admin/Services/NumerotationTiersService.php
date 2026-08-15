@@ -8,81 +8,98 @@ use App\Modules\Admin\Modeles\Fournisseur;
 use Illuminate\Support\Str;
 
 /**
- * Le numéro d'un tiers, et ce qu'il ne faut pas confondre avec lui.
+ * Le numéro d'un tiers, tel que Comptaflow le fabrique.
  *
  * ## Deux notions, deux colonnes
  *
  * | Notion | Colonne | Exemple | Rôle |
  * |---|---|---|---|
  * | **Compte général de rattachement** | `compte_comptable` | `411000` | le compte collectif du grand livre |
- * | **Numéro de tiers** | `numero_tiers` | `411001`, `411KONE` | la fiche auxiliaire de *cette* personne |
+ * | **Numéro de tiers** | `numero_tiers` | `410001`, `41KON1` | la fiche auxiliaire de *cette* personne |
  *
- * Le compte général est celui du plan comptable ; son intitulé — « Clients » —
- * ne change jamais. Le numéro de tiers désigne un client précis et n'existe
+ * Le compte général appartient au plan comptable ; son intitulé — « Clients »
+ * — ne change jamais. Le numéro de tiers désigne un client précis et n'existe
  * que dans le plan de tiers.
  *
- * **La numérotation automatique démarrait à `411000`** : le premier client
- * créé portait donc, comme numéro de tiers, le numéro du compte collectif
- * lui-même. Les deux notions se rejoignaient en base, et un relevé de ce
- * client remontait le solde de tous. La séquence part désormais de `001`, et
- * `411000` est refusé explicitement.
+ * ## La règle vient de Comptaflow, et ce n'est pas un détail
  *
- * ## Deux conventions, au choix de l'entreprise
+ * `ExternalSyncController::tiers()` retrouve un tiers **par égalité de chaîne**
+ * sur `numero_de_tiers`. Une convention différente d'un côté et de l'autre, et
+ * plus aucun tiers n'est reconnu : chaque écriture déversée retombe sur son
+ * compte collectif, sans que rien ne le signale. Cette classe reproduit donc
+ * `AdminConfigController::getNextTierNumber()` à l'identique :
  *
- * Elles se valent, et le cabinet comptable de chacun a la sienne :
+ * - **le préfixe tient sur deux caractères** — `41` pour les clients, `40`
+ *   pour les fournisseurs. Ce sont les deux premiers chiffres du compte
+ *   collectif, pas ses trois premiers ;
+ * - **le numéro fait `LONGUEUR` caractères en tout**, séquence comprise ;
+ * - en `numeric`, la base est le préfixe seul : `41` + `0001` → `410001` ;
+ * - en `alphanumeric`, la base est le préfixe suivi de **trois lettres** du
+ *   nom : `41` + `KON` + `1` → `41KON1`.
  *
- * - **`sequence`** — `411001`, `411002`. Jamais d'homonyme, illisible sans la
- *   fiche ;
- * - **`nom`** — `411KONE`, `401KOFFI`. Lisible en grand livre, c'est la
- *   convention Sage. Les homonymes reçoivent un suffixe : `411KONE2`.
+ * @see \App\Modules\Admin\Services\ComptabiliteService la seule porte d'écriture
+ *      des écritures, qui range le général et le tiers dans deux colonnes.
  */
 class NumerotationTiersService
 {
-    public const SEQUENCE = 'sequence';
-    public const NOM      = 'nom';
+    /** Le système numérote seul : préfixe + séquence. */
+    public const NUMERIQUE = 'numeric';
+
+    /** Le système dérive du nom : préfixe + trois lettres + séquence. */
+    public const ALPHANUMERIQUE = 'alphanumeric';
 
     public const CONVENTIONS = [
-        self::SEQUENCE => 'Racine + séquence (411001)',
-        self::NOM      => 'Racine + nom (411KONE)',
+        self::NUMERIQUE      => 'Numérique (410001)',
+        self::ALPHANUMERIQUE => 'Alphanumérique (41KON1)',
     ];
 
-    /** Nombre de chiffres de la séquence : 411001 → 411999. */
-    private const LARGEUR_SEQUENCE = 3;
+    /**
+     * La longueur totale d'un numéro de tiers.
+     *
+     * **Elle doit valoir celle de Comptaflow** (`companies.tier_digits`).
+     * Six, comme les comptes de Selflow — c'est la décision de numérotation
+     * arrêtée pour toute la partie locale.
+     */
+    public const LONGUEUR = 6;
+
+    /** Le nombre de lettres du nom retenues en convention alphanumérique. */
+    private const LETTRES = 3;
 
     /**
-     * La racine d'un compte général : les trois premiers chiffres.
+     * Le préfixe d'un compte collectif : ses **deux** premiers chiffres.
      *
-     * `411000` → `411`. C'est elle que porte le numéro de tiers, et c'est par
-     * elle qu'on vérifie qu'un tiers est rattaché au bon collectif.
+     * `411000` → `41`. Comptaflow prend deux caractères, pas trois ; en
+     * prendre trois produirait des numéros que sa recherche ne trouverait
+     * jamais.
      */
-    public static function racine(string $compteGeneral): string
+    public static function prefixe(string $compteGeneral): string
     {
-        return substr($compteGeneral, 0, 3);
+        return substr($compteGeneral, 0, 2);
     }
 
     /**
-     * Le numéro de tiers suivant, pour un client.
+     * Le numéro de tiers d'un client.
      */
     public static function pourClient(Entreprise $entreprise, string $compteGeneral, string $nom): string
     {
-        return self::suivant($entreprise, $compteGeneral, $nom, Client::class);
+        return self::fabriquer($entreprise, $compteGeneral, $nom, Client::class);
     }
 
     /**
-     * Le numéro de tiers suivant, pour un fournisseur.
+     * Le numéro de tiers d'un fournisseur.
      */
     public static function pourFournisseur(Entreprise $entreprise, string $compteGeneral, string $nom): string
     {
-        return self::suivant($entreprise, $compteGeneral, $nom, Fournisseur::class);
+        return self::fabriquer($entreprise, $compteGeneral, $nom, Fournisseur::class);
     }
 
     /**
      * Un numéro de tiers est-il cohérent avec son compte de rattachement ?
      *
-     * Rien n'empêchait de donner `411002` à un client et de le rattacher à
-     * `401000`. L'écriture partait alors sur le collectif fournisseurs avec un
-     * tiers client, et le grand livre devenait faux sans qu'aucun contrôle ne
-     * s'en émeuve.
+     * Rien n'empêchait de donner un tiers `41…` à un client rattaché à
+     * `401000` : l'écriture partait alors sur le collectif fournisseurs avec
+     * un tiers client, et le grand livre devenait faux sans qu'aucun contrôle
+     * ne s'en émeuve.
      */
     public static function estCoherent(?string $numeroTiers, ?string $compteGeneral): bool
     {
@@ -90,33 +107,30 @@ class NumerotationTiersService
             return false;
         }
 
-        return str_starts_with($numeroTiers, self::racine($compteGeneral));
+        return str_starts_with($numeroTiers, self::prefixe($compteGeneral));
     }
 
     /**
-     * Le numéro de tiers ne doit **jamais** être le compte général lui-même.
-     *
-     * C'est la confusion des deux notions, écrite en base : un tiers `411000`
-     * rattaché au collectif `411000` fait remonter, dans le relevé de ce
-     * client, le solde de tous les autres.
+     * Le numéro de tiers ne doit jamais être le compte collectif lui-même.
      */
     public static function estLeCompteCollectif(?string $numeroTiers, ?string $compteGeneral): bool
     {
-        return $numeroTiers !== null && $compteGeneral !== null
-            && $numeroTiers === $compteGeneral;
+        return $numeroTiers !== null && $compteGeneral !== null && $numeroTiers === $compteGeneral;
     }
 
     /**
-     * La règle de validation d'un numéro saisi à la main.
+     * Le numéro réservé au tiers « divers » d'un collectif.
      *
-     * Elle n'exige plus des chiffres seulement : `411KONE` est une convention
-     * répandue, et l'ancienne expression `^411[0-9]*$` la refusait.
-     *
-     * @return array<int, string>
+     * `410000`, `400000` : la place zéro. Elle précède la séquence, qui
+     * démarre à 1, et ne la fera donc jamais avancer — au contraire d'un
+     * numéro haut comme `419999`, qui pousserait le suivant hors de la
+     * longueur permise.
      */
-    public static function reglesDeSaisie(string $racine): array
+    public static function divers(string $compteGeneral): string
     {
-        return ['required', 'string', 'max:32', 'regex:/^' . preg_quote($racine, '/') . '[A-Z0-9]+$/'];
+        $prefixe = self::prefixe($compteGeneral);
+
+        return $prefixe . str_repeat('0', self::LONGUEUR - strlen($prefixe));
     }
 
     // ─────────────────────────────────────────────────────────────────
@@ -124,68 +138,64 @@ class NumerotationTiersService
     /**
      * @param  class-string<Client|Fournisseur>  $modele
      */
-    private static function suivant(Entreprise $entreprise, string $compteGeneral, string $nom, string $modele): string
+    private static function fabriquer(Entreprise $entreprise, string $compteGeneral, string $nom, string $modele): string
     {
-        $racine = self::racine($compteGeneral);
+        $prefixe = self::prefixe($compteGeneral);
+        $base    = $prefixe;
 
-        return $entreprise->numerotation_tiers === self::NOM
-            ? self::parLeNom($entreprise, $racine, $nom, $modele)
-            : self::parLaSequence($entreprise, $racine, $modele);
+        if ($entreprise->numerotation_tiers === self::ALPHANUMERIQUE) {
+            $lettres = self::lettresDuNom($nom);
+
+            // Un nom qui ne laisse aucune lettre — « 123 », « --- » — ne donne
+            // pas de radical. Comptaflow y met « XXX » ; on préfère retomber
+            // sur la base numérique, qui reste lisible et ne crée pas une
+            // famille de tiers tous nommés XXX.
+            if ($lettres !== '') {
+                $base = $prefixe . $lettres;
+            }
+        }
+
+        return $base . self::sequence($entreprise, $base, $modele);
     }
 
     /**
+     * Les lettres du nom retenues pour le radical.
+     *
+     * Les chiffres sont écartés : un radical numérique se confondrait avec la
+     * séquence, et ferait sauter le numéro suivant.
+     */
+    private static function lettresDuNom(string $nom): string
+    {
+        $propre = Str::of($nom)->ascii()->upper()->replaceMatches('/[^A-Z]/', '')->toString();
+
+        return substr($propre, 0, self::LETTRES);
+    }
+
+    /**
+     * La séquence qui complète la base jusqu'à la longueur voulue.
+     *
      * @param  class-string<Client|Fournisseur>  $modele
      */
-    private static function parLaSequence(Entreprise $entreprise, string $racine, string $modele): string
+    private static function sequence(Entreprise $entreprise, string $base, string $modele): string
     {
-        $existants = $modele::where('entreprise_id', $entreprise->id)
-            ->where('numero_tiers', 'like', $racine . '%')
-            ->pluck('numero_tiers');
+        $place = max(0, self::LONGUEUR - strlen($base));
+
+        if ($place === 0) {
+            return '';
+        }
 
         $plusHaut = 0;
 
-        foreach ($existants as $numero) {
-            $suffixe = substr((string) $numero, strlen($racine));
+        foreach ($modele::where('entreprise_id', $entreprise->id)
+            ->where('numero_tiers', 'like', $base . '%')
+            ->pluck('numero_tiers') as $numero) {
+            $suffixe = substr((string) $numero, strlen($base));
 
-            // Un numéro à convention « nom » — 411KONE — n'entre pas dans le
-            // calcul : les deux conventions peuvent cohabiter sur une même
-            // entreprise qui a changé d'avis en cours de route.
             if ($suffixe !== '' && ctype_digit($suffixe)) {
                 $plusHaut = max($plusHaut, (int) $suffixe);
             }
         }
 
-        // La séquence part de 001 : à zéro, le numéro de tiers vaudrait le
-        // compte collectif.
-        return $racine . str_pad((string) ($plusHaut + 1), self::LARGEUR_SEQUENCE, '0', STR_PAD_LEFT);
-    }
-
-    /**
-     * @param  class-string<Client|Fournisseur>  $modele
-     */
-    private static function parLeNom(Entreprise $entreprise, string $racine, string $nom, string $modele): string
-    {
-        $radical = Str::of($nom)->ascii()->upper()->replaceMatches('/[^A-Z0-9]/', '')->limit(8, '')->toString();
-
-        // Un nom qui ne laisse **aucune lettre** — « 123 », « --- » — ne donne
-        // pas de radical utilisable. Deux raisons de repasser à la séquence
-        // plutôt que d'accepter `411123` :
-        //
-        // - un radical vide réduirait le numéro à sa racine, c'est-à-dire au
-        //   compte collectif ;
-        // - un radical tout en chiffres se confond avec un numéro de séquence,
-        //   et ferait sauter la suite à `411124`.
-        if ($radical === '' || ctype_digit($radical)) {
-            return self::parLaSequence($entreprise, $racine, $modele);
-        }
-
-        $candidat = $racine . $radical;
-        $rang     = 1;
-
-        while ($modele::where('entreprise_id', $entreprise->id)->where('numero_tiers', $candidat)->exists()) {
-            $candidat = $racine . $radical . (++$rang);
-        }
-
-        return $candidat;
+        return str_pad((string) ($plusHaut + 1), $place, '0', STR_PAD_LEFT);
     }
 }

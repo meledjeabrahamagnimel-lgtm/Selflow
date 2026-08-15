@@ -8,6 +8,7 @@ use App\Modules\Admin\Modeles\PointDeVente;
 use App\Modules\Admin\Modeles\Produit;
 use App\Modules\Admin\Modeles\Categorie;
 use App\Modules\Admin\Modeles\SousCategorie;
+use App\Modules\Admin\Services\NumerotationTiersService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
@@ -34,15 +35,15 @@ class ImportControleur
         'clients' => [
             'headers'  => ['nom', 'type_facturation', 'telephone', 'email', 'adresse', 'ncc', 'regime_imposition', 'rccm', 'compte_comptable', 'numero_tiers'],
             'exemple'  => [
-                ['Société ABC SARL', 'B2B', '+225 27 00 00 01', 'contact@abc.ci', 'Cocody, Abidjan', '2302178R', 'RNI', 'CI-ABJ-2021-001', '411001', 'C001'],
-                ['Marie Koffi', 'B2C', '+225 07 00 00 02', 'marie@gmail.com', 'Yopougon, Abidjan', '', '', '', '411002', 'C002'],
+                ['Société ABC SARL', 'B2B', '+225 27 00 00 01', 'contact@abc.ci', 'Cocody, Abidjan', '2302178R', 'RNI', 'CI-ABJ-2021-001', '411000', '410001'],
+                ['Marie Koffi', 'B2C', '+225 07 00 00 02', 'marie@gmail.com', 'Yopougon, Abidjan', '', '', '', '411000', '410002'],
             ],
         ],
         'fournisseurs' => [
             'headers'  => ['nom', 'type_facturation', 'telephone', 'email', 'secteur', 'adresse', 'ncc', 'regime_imposition', 'rccm', 'compte_comptable', 'numero_tiers'],
             'exemple'  => [
-                ['CDCI Distribution', 'B2B', '+225 27 00 01 00', 'cdci@cdci.ci', 'Distribution', 'Zone 4, Marcory', '2169728N', 'RSI', 'CI-ABJ-2020-100', '401001', 'F001'],
-                ['Société Générale CI', 'B2G', '+225 20 00 00 00', 'sgci@sg.ci', 'Finance', 'Plateau', '', '', '', '401002', 'F002'],
+                ['CDCI Distribution', 'B2B', '+225 27 00 01 00', 'cdci@cdci.ci', 'Distribution', 'Zone 4, Marcory', '2169728N', 'RSI', 'CI-ABJ-2020-100', '401000', '400001'],
+                ['Société Générale CI', 'B2G', '+225 20 00 00 00', 'sgci@sg.ci', 'Finance', 'Plateau', '', '', '', '401000', '400002'],
             ],
         ],
         'utilisateurs' => [
@@ -426,14 +427,7 @@ class ImportControleur
             return "Ligne {$num} : NCC invalide pour le client {$nom}. Il doit contenir 8 caractères et se terminer par une lettre majuscule.";
         }
 
-        // Numéro tiers : auto si vide
-        $numeroTiers = trim($d['numero_tiers'] ?? '');
-        if (!$numeroTiers) {
-            $max = Client::where('entreprise_id', $entreprise->id)
-                ->where('numero_tiers', 'like', '411%')
-                ->max('numero_tiers');
-            $numeroTiers = $max ? str_pad((int)$max + 1, strlen($max), '0', STR_PAD_LEFT) : '411001';
-        }
+        $compteGeneral = trim($d['compte_comptable'] ?? '') ?: config('selflow.plan_comptable_defaut.client_collectif');
 
         Client::firstOrCreate(
             ['entreprise_id' => $entreprise->id, 'nom' => $nom],
@@ -445,12 +439,54 @@ class ImportControleur
                 'ncc'              => $type === 'B2B' ? $ncc : null,
                 'regime_imposition'=> trim($d['regime_imposition'] ?? ''),
                 'rccm'             => trim($d['rccm'] ?? ''),
-                'compte_comptable' => trim($d['compte_comptable'] ?? '') ?: '411000',
-                'numero_tiers'     => $numeroTiers,
+                'compte_comptable' => $compteGeneral,
+                'numero_tiers'     => $this->numeroTiersImporte(
+                    $d['numero_tiers'] ?? null, $entreprise, $compteGeneral, $nom, Client::class
+                ),
                 'source'           => 'import_csv',
             ]
         );
         return null;
+    }
+
+    /**
+     * Le numéro de tiers d'une fiche importée : filtré, puis fabriqué à défaut.
+     *
+     * **Comptaflow filtre au déversement comme à l'import**, et il a raison :
+     * un fichier vient de partout — d'un autre logiciel, d'un tableur retouché
+     * à la main — et rien n'y garantit la convention de l'entreprise. Un
+     * numéro qui ne la respecte pas ne serait plus retrouvé par la passerelle,
+     * et chaque écriture de ce tiers retomberait sur son compte collectif.
+     *
+     * Trois motifs de rejet, et dans les trois cas le système renumérote :
+     *
+     * - **le numéro est le compte collectif lui-même** — la confusion des deux
+     *   notions, écrite en base ;
+     * - **le préfixe ne correspond pas au compte de rattachement** — un tiers
+     *   `40…` sur un client ferait partir l'écriture sur le collectif
+     *   fournisseurs ;
+     * - **la longueur n'est pas la bonne** — Comptaflow cherche par égalité de
+     *   chaîne, et `4100010` ne vaut pas `410001`.
+     *
+     * @param  class-string<Client|Fournisseur>  $modele
+     */
+    private function numeroTiersImporte($fourni, $entreprise, string $compteGeneral, string $nom, string $modele): string
+    {
+        $fourni = strtoupper(preg_replace('/\s+/', '', (string) $fourni));
+
+        $recevable = $fourni !== ''
+            && !NumerotationTiersService::estLeCompteCollectif($fourni, $compteGeneral)
+            && NumerotationTiersService::estCoherent($fourni, $compteGeneral)
+            && strlen($fourni) === NumerotationTiersService::LONGUEUR
+            && !$modele::where('entreprise_id', $entreprise->id)->where('numero_tiers', $fourni)->exists();
+
+        if ($recevable) {
+            return $fourni;
+        }
+
+        return $modele === Client::class
+            ? NumerotationTiersService::pourClient($entreprise, $compteGeneral, $nom)
+            : NumerotationTiersService::pourFournisseur($entreprise, $compteGeneral, $nom);
     }
 
     // ─────────────────────────────────────────────────────────────
@@ -473,13 +509,7 @@ class ImportControleur
             return "Ligne {$num} : NCC invalide pour le fournisseur {$nom}. Il doit contenir 8 caractères et se terminer par une lettre majuscule.";
         }
 
-        $numeroTiers = trim($d['numero_tiers'] ?? '');
-        if (!$numeroTiers) {
-            $max = Fournisseur::where('entreprise_id', $entreprise->id)
-                ->where('numero_tiers', 'like', '401%')
-                ->max('numero_tiers');
-            $numeroTiers = $max ? str_pad((int)$max + 1, strlen($max), '0', STR_PAD_LEFT) : '401001';
-        }
+        $compteGeneral = trim($d['compte_comptable'] ?? '') ?: config('selflow.plan_comptable_defaut.fournisseur_collectif');
 
         Fournisseur::firstOrCreate(
             ['entreprise_id' => $entreprise->id, 'nom' => $nom],
@@ -492,8 +522,10 @@ class ImportControleur
                 'ncc'              => $type === 'B2B' ? $ncc : null,
                 'regime_imposition'=> trim($d['regime_imposition'] ?? ''),
                 'rccm'             => trim($d['rccm'] ?? ''),
-                'compte_comptable' => trim($d['compte_comptable'] ?? '') ?: '401000',
-                'numero_tiers'     => $numeroTiers,
+                'compte_comptable' => $compteGeneral,
+                'numero_tiers'     => $this->numeroTiersImporte(
+                    $d['numero_tiers'] ?? null, $entreprise, $compteGeneral, $nom, Fournisseur::class
+                ),
                 'source'           => 'import_csv',
             ]
         );

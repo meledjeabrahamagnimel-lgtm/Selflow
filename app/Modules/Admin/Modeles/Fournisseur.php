@@ -25,7 +25,7 @@ class Fournisseur extends Model
     }
 
     /** Le numéro de tiers du fournisseur occasionnel. */
-    public const NUMERO_DIVERS = '401DIVERS';
+    public const NUMERO_DIVERS = '400000';
 
     /**
      * Le fournisseur occasionnel — le pendant du client de passage.

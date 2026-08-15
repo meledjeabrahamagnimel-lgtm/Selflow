@@ -1839,26 +1839,48 @@ endroit du code écrit dans `ecritures_comptables`, précisément pour ça.
    ne distinguait plus les ventes de comptoir des créances d'un client
    identifié.
 
-**Deux conventions, au choix de l'entreprise** — décision du propriétaire :
+**La règle vient de Comptaflow, et ce n'est pas un détail de forme.**
+`ExternalSyncController::tiers()` retrouve un tiers **par égalité de chaîne**
+sur `numero_de_tiers`. Une convention différente d'un côté et de l'autre, et
+plus aucun tiers n'est reconnu : chaque écriture déversée retombe sur son
+compte collectif, sans que rien ne le signale.
+`NumerotationTiersService` reproduit donc
+`AdminConfigController::getNextTierNumber()` à l'identique :
 
-| Réglage | Ce que ça donne |
+| Élément | Règle |
 |---|---|
-| `sequence` *(défaut)* | `411001`, `411002`, `401001` — jamais d'homonyme |
-| `nom` | `411KONE`, `401KOFFI` — lisible en grand livre ; les homonymes reçoivent `411KONE2` |
+| Préfixe | **Deux** caractères — les deux premiers chiffres du collectif : `41`, `40` |
+| Longueur totale | **Six**, séquence comprise. Doit valoir `companies.tier_digits` chez Comptaflow |
+| `numeric` *(défaut)* | préfixe + séquence → `410001`, `400001` |
+| `alphanumeric` | préfixe + **trois lettres** du nom + séquence → `41KON1`, `40KOF1` |
 
 Le réglage vit sur l'entreprise, comme les comptes par défaut, et se change
-depuis les paramètres. Les deux conventions **cohabitent** : une entreprise qui
-change d'avis ne voit pas sa séquence repartir de `001` et heurter un numéro
-déjà pris. Un nom qui ne laisse aucune lettre — « 123 » — retombe sur la
-séquence, faute de quoi le radical numérique se confondrait avec un rang.
+depuis les paramètres — où l'écran rappelle qu'il doit être le même que dans
+Comptaflow. Les deux conventions **cohabitent** : une entreprise qui change
+d'avis ne voit pas sa séquence repartir de `0001` sur un numéro déjà pris. Un
+nom sans lettre — « 123 » — retombe sur la base numérique ; Comptaflow y met
+« XXX », ce qui créerait une famille de tiers tous nommés pareil.
 
-**Le client de passage** est une fiche unique par entreprise —
-`411DIVERS` rattaché à `411000` — posée à la souscription, et créée à la
-demande pour les entreprises déjà en service. `401DIVERS` en pendant pour les
-fournisseurs. Une fiche par ticket de caisse aurait fait gonfler le plan de
-tiers d'une ligne par vente de comptoir.
+**Le numéro ne se saisit plus, ni à la création ni à la modification.** Le
+système le fabrique. Changer le numéro d'un tiers déjà déversé le rendrait
+introuvable chez Comptaflow : ses écritures futures retomberaient sur le
+collectif pendant que les anciennes resteraient sur l'ancien numéro.
 
-Dix-huit épreuves dans `NumerotationTiersTest`.
+**L'import filtre, comme Comptaflow le fait au déversement.** Un fichier vient
+de partout — d'un autre logiciel, d'un tableur retouché à la main — et rien n'y
+garantit la convention. Trois motifs de rejet, et dans les trois cas le système
+renumérote : le numéro vaut le compte collectif ; son préfixe ne correspond pas
+au rattachement ; sa longueur n'est pas la bonne. Un numéro déjà pris est
+également écarté.
+
+**Le client de passage** est une fiche unique par entreprise — `410000`
+rattaché à `411000` — posée à la souscription, et créée à la demande pour les
+entreprises déjà en service. `400000` en pendant pour les fournisseurs. C'est
+la place zéro : elle précède la séquence, qui démarre à 1, et ne la fera donc
+jamais avancer — au contraire d'un numéro haut comme `419999`, qui pousserait
+le suivant hors de la longueur permise.
+
+Vingt-deux épreuves dans `NumerotationTiersTest`.
 
 ### Libellés d'écriture — l'intitulé du compte tient lieu de libellé
 

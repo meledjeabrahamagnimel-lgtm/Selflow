@@ -25,7 +25,7 @@ class Client extends Model
     }
 
     /** Le numéro de tiers du client de passage, chez toutes les entreprises. */
-    public const NUMERO_DIVERS = '411DIVERS';
+    public const NUMERO_DIVERS = '410000';
 
     /**
      * Le client de passage.

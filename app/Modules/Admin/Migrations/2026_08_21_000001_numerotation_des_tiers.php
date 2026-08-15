@@ -26,29 +26,37 @@ return new class extends Migration
     {
         if (Schema::hasTable('entreprises') && !Schema::hasColumn('entreprises', 'numerotation_tiers')) {
             Schema::table('entreprises', function (Blueprint $table) {
-                // La séquence par défaut : elle ne produit jamais d'homonyme,
-                // et une entreprise qui préfère les noms le dira dans ses
-                // paramètres.
+                // `numeric` par défaut, comme Comptaflow : c'est la valeur de
+                // `companies.tier_id_type` là-bas, et les deux applications
+                // doivent produire les mêmes numéros.
                 $table->string('numerotation_tiers', 16)
-                    ->default(NumerotationTiersService::SEQUENCE)
+                    ->default(NumerotationTiersService::NUMERIQUE)
                     ->after('normalisation_auto_recus');
             });
         }
 
-        self::reparer('clients', '411');
-        self::reparer('fournisseurs', '401');
+        self::reparer('clients', '41');
+        self::reparer('fournisseurs', '40');
     }
 
     /**
      * Sortir les tiers qui portent le numéro de leur compte collectif.
+     *
+     * La numérotation automatique démarrait à `411000` — le collectif
+     * lui-même. Le premier client de chaque entreprise porte donc en base un
+     * numéro de tiers qui vaut son compte de rattachement, et son relevé
+     * remonte le solde de tous les autres.
      */
-    private static function reparer(string $table, string $racine): void
+    private static function reparer(string $table, string $prefixe): void
     {
         if (!Schema::hasTable($table) || !Schema::hasColumn($table, 'numero_tiers')) {
             return;
         }
 
-        $collectif = $racine . '000';
+        // `411000` pour les clients, `401000` pour les fournisseurs : le
+        // collectif porte un 1 en troisième position, là où le préfixe des
+        // tiers n'en compte que deux.
+        $collectif = $prefixe . '1000';
 
         $fautifs = DB::table($table)
             ->where('numero_tiers', $collectif)
@@ -60,18 +68,18 @@ return new class extends Migration
             // tiers sans se gêner.
             $pris = DB::table($table)
                 ->where('entreprise_id', $fiche->entreprise_id)
-                ->where('numero_tiers', 'like', $racine . '%')
+                ->where('numero_tiers', 'like', $prefixe . '%')
                 ->pluck('numero_tiers')
                 ->all();
 
             $rang = 1;
 
-            while (in_array($racine . str_pad((string) $rang, 3, '0', STR_PAD_LEFT), $pris, true)) {
+            while (in_array($prefixe . str_pad((string) $rang, 4, '0', STR_PAD_LEFT), $pris, true)) {
                 $rang++;
             }
 
             DB::table($table)->where('id', $fiche->id)->update([
-                'numero_tiers' => $racine . str_pad((string) $rang, 3, '0', STR_PAD_LEFT),
+                'numero_tiers' => $prefixe . str_pad((string) $rang, 4, '0', STR_PAD_LEFT),
             ]);
         }
     }
