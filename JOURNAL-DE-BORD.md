@@ -1179,10 +1179,32 @@ deux tests verrouillent les deux situations.
   `entreprise_id` injecté dans une colonne, et stock d'ouverture posé sur
   l'article d'un concurrent.
 
-### Lot 7 — La vitrine
+### Lot 7 — La vitrine — **INFRASTRUCTURE TERMINÉE, CONTENU EN ATTENTE**
 
 Landing page, documentation, politique, présentation de DC-Knowing et de ses
 produits, écran superadmin de gestion de la vitrine.
+
+Le contenant est livré ; **le contenu ne l'est pas, et ne peut pas l'être
+d'ici.** Le texte d'une vitrine engage l'entreprise qu'elle présente : il vient
+de son propriétaire, jamais d'un exemple laissé là. Une vitrine vide affiche
+une page d'attente honnête plutôt que du faux texte qui finirait en production
+le jour où personne ne penserait à le remplacer.
+
+Ce qui existe :
+
+| Élément | Détail |
+|---|---|
+| Deux tables | `vitrine_sections` et `vitrine_cartes`, cartes en cascade |
+| Cinq gabarits | bandeau, colonnes, liste, tarifs, texte — un gabarit inconnu est refusé |
+| Page publique | `/presentation`, route `vitrine`, **hors du groupe `guest`** : un connecté la lit aussi |
+| Écran superadmin | création, modification, ordre, publication réversible, cartes avec image |
+| Publication | une section **naît hors ligne** : publier est un geste délibéré |
+| Habilitation | `gestion_vitrine`, accordée aux superadministrateurs en place par migration — le contrôle ferme par défaut, sans elle l'écran serait refusé à tout le monde le jour de sa mise en ligne |
+| Liens | `http(s)://` ou chemin interne `/…` seulement : un `javascript:` déposé là s'exécuterait chez chaque visiteur |
+| Épreuves | `tests/Feature/VitrineTest.php` — 19, dont 3 simulations d'attaque |
+
+**Ce qui reste : la saisie.** Textes, tarifs, images, mentions légales,
+présentation de DC-Knowing. Rien de tout cela ne peut être inventé ici.
 
 ### Lot 8 — Stabilisation
 
