@@ -1693,13 +1693,62 @@ Au passage : `Produit` n'avait aucune relation vers sa catégorie, et une
 colonne `categorie` — l'ancien libellé libre — masquait toute relation
 homonyme. D'où `categorieRelation()`.
 
-### Importations
+### Importations — **CORRIGÉ**
 
-Les modèles d'importation CSV ne couvrent que cinq types — points de vente,
-clients, fournisseurs, utilisateurs, produits — et leurs colonnes sont
-incomplètes au regard des champs réellement gérés. Manquent notamment les
-articles avec leur famille et leurs comptes, les stocks initiaux, le plan
-comptable, les codes journaux, et les soldes d'ouverture.
+Le constat d'origine — « cinq types seulement, colonnes incomplètes » — est
+levé. Le lot 6.6 a porté l'import à **sept modules** : points de vente,
+clients, fournisseurs, utilisateurs, produits (24 colonnes), stock
+d'ouverture, immobilisations. Les sept sont branchés à un écran.
+
+**Dernier manque, corrigé le 15/08/2026 :** la colonne `sous_categorie`
+figurait au modèle des articles et **n'était jamais lue**. Un catalogue
+arrivait rangé par famille seulement, et la sous-famille se ressaisissait
+fiche par fiche. Elle est désormais résolue par son nom.
+
+Un nom qui ne désigne rien — famille comme sous-famille — **refuse la ligne
+avec son motif** au lieu de la ranger « sans famille » en la comptant pour un
+succès. Ce silence-là faisait croire l'import complet, et l'administrateur ne
+s'en apercevait qu'à la première recherche au catalogue.
+
+La borne d'entreprise passe par la famille : `sous_categories` ne porte pas
+d'`entreprise_id`, elle ne tient à son entreprise que par sa `categorie_id`.
+Une recherche sur le seul nom aurait rattaché un article à la sous-famille
+d'un concurrent — cinq épreuves couvrent le point, dont la simulation
+d'attaque.
+
+Restent hors import, par choix : le plan comptable et les codes journaux, que
+Selflow livre par son propre référentiel, et les soldes d'ouverture
+comptables, qui appartiennent à Comptaflow.
+
+### Modèles d'import de Comptaflow — les quatre fichiers ne s'importent pas
+
+Vérifié fichier par fichier le 15/08/2026, en rejouant la logique des trois
+importeurs (`MasterPlanImport`, `MasterTiersImport`, `MasterJournalImport`,
+qui lisent par indice : `row[0]` numéro, `row[1]` intitulé, `row[2]` type).
+
+Les quatre classeurs de `public/templates/import/` **ne sont pas des
+modèles** : ce sont des exports Sage bruts d'ELIKET MARKET, tirage du
+22/01/2026, bandeau de titre et cellules fusionnées compris.
+
+| Fichier | Contient | Ce que l'import en tire |
+|---|---|---|
+| `modele_plan_comptable.xlsx` | 26 comptes | **0** — `row[0]` vaut « Détail », aucun chiffre |
+| `modele_plan_tiers.xlsx` | 2 tiers | **2 lignes inversées** — un tiers numéroté « FOURNISSEUR », intitulé « 401000 » |
+| `modele_codes_journaux.xlsx` | 1 journal | 1 ligne sans son type |
+| `modele_ecritures.xlsx` | 6 feuilles d'impression | rien — **aucune route ne l'importe** |
+
+S'y ajoutent deux défauts de code : `plan_tiers.compte_general` est `NOT NULL`
+et l'importeur ne le renseigne pas (violation d'intégrité même avec un bon
+fichier) ; et `AdminConfigController:520` construit `MasterPlanImport` sans le
+chemin du fichier, donc `detectDelimiter()` retombe toujours sur `;`.
+
+Et le dépôt **publie la comptabilité réelle d'un client**.
+
+**Les quatre classeurs refaits sont dans
+`PASSERELLE-COMPTAFLOW/modeles-import/`** — une feuille, une en-tête,
+l'ordre que les importeurs lisent, exemples SYSCOHADA neutres. Vérifiés :
+7 comptes, 4 tiers, 5 journaux retenus, seule l'en-tête écartée. La marche à
+suivre est en section 7 de `CONSIGNES-POUR-COMPTAFLOW.md`.
 
 ### B2B
 

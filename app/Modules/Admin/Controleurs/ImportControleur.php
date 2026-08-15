@@ -640,13 +640,54 @@ class ImportControleur
 
         if ($prixVente <= 0) return "Ligne {$num} : prix_vente doit être > 0.";
 
-        // Résoudre catégorie par nom
+        // **La famille et la sous-famille, par leur nom.**
+        //
+        // La colonne `sous_categorie` figurait au modèle et n'était jamais
+        // lue : l'`import` la traversait sans rien en faire. Un catalogue de
+        // deux mille références arrivait rangé par famille seulement, et la
+        // sous-famille se ressaisissait fiche par fiche — c'est-à-dire jamais.
+        //
+        // Un nom qui ne désigne rien est **signalé, non ignoré** : la ligne
+        // est refusée avec son motif, comme le fait déjà le stock d'ouverture
+        // devant une référence inconnue. Ranger l'article « sans famille » et
+        // compter la ligne pour un succès ferait croire l'import complet.
         $categorieId = null;
-        if (!empty($d['categorie'])) {
-            $cat = Categorie::where('entreprise_id', $entreprise->id)
-                ->whereRaw('LOWER(nom) = ?', [strtolower($d['categorie'])])
-                ->first();
-            $categorieId = $cat?->id;
+        $nomCategorie = trim($d['categorie'] ?? '');
+
+        if ($nomCategorie !== '') {
+            $categorieId = Categorie::where('entreprise_id', $entreprise->id)
+                ->whereRaw('LOWER(nom) = ?', [mb_strtolower($nomCategorie)])
+                ->value('id');
+
+            if (!$categorieId) {
+                return "Ligne {$num} : aucune famille ne s'appelle « {$nomCategorie} ». "
+                    . 'Créez-la d\'abord, ou laissez la colonne vide.';
+            }
+        }
+
+        // La sous-famille appartient à une famille, et la famille à une
+        // entreprise. Sans cette borne, deux entreprises qui nomment toutes
+        // deux leur sous-famille « Céréales » se partageraient la même ligne :
+        // le catalogue de l'une renseignerait celui de l'autre.
+        $sousCategorieId = null;
+        $nomSousCategorie = trim($d['sous_categorie'] ?? '');
+
+        if ($nomSousCategorie !== '') {
+            $sousCategorieId = SousCategorie::whereRaw('LOWER(nom) = ?', [mb_strtolower($nomSousCategorie)])
+                ->when(
+                    $categorieId,
+                    fn ($q) => $q->where('categorie_id', $categorieId),
+                    fn ($q) => $q->whereIn(
+                        'categorie_id',
+                        Categorie::where('entreprise_id', $entreprise->id)->select('id')
+                    )
+                )
+                ->value('id');
+
+            if (!$sousCategorieId) {
+                return "Ligne {$num} : aucune sous-famille ne s'appelle « {$nomSousCategorie} »"
+                    . ($nomCategorie !== '' ? " dans la famille « {$nomCategorie} »" : '') . '.';
+            }
         }
 
         // Référence : auto si vide
@@ -661,6 +702,7 @@ class ImportControleur
                 'nom'          => $nom,
                 'type'         => $type,
                 'categorie_id' => $categorieId,
+                'sous_categorie_id' => $sousCategorieId,
                 'unite'        => trim($d['unite'] ?? '') ?: 'pièce',
                 'prix_achat'   => $prixAchat,
                 'prix_vente'   => $prixVente,

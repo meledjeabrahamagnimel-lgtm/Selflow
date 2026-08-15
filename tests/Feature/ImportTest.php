@@ -584,6 +584,96 @@ class ImportTest extends TestCase
             ->assertNotFound();
     }
 
+    // ══════════════ La famille et la sous-famille ══════════════
+
+    public function test_la_sous_famille_du_fichier_arrive_sur_la_fiche(): void
+    {
+        // La colonne figurait au modèle et n'était **jamais lue**. Un catalogue
+        // arrivait rangé par famille seulement, et la sous-famille se
+        // ressaisissait fiche par fiche — c'est-à-dire jamais.
+        $famille = Categorie::where('entreprise_id', $this->entreprise->id)
+            ->where('nom', 'Fournitures')->firstOrFail();
+
+        $sousFamille = \App\Modules\Admin\Modeles\SousCategorie::create([
+            'categorie_id' => $famille->id, 'nom' => 'Papeterie',
+        ]);
+
+        $reponse = $this->importer('produits', [
+            ['nom', 'type', 'categorie', 'sous_categorie', 'prix_achat', 'prix_vente', 'taux_tva', 'reference'],
+            ['Stylo bille bleu', 'marchandise', 'Fournitures', 'Papeterie', '150', '250', '18', 'STYL-001'],
+        ]);
+
+        $this->assertSame(1, $reponse->json('importes'));
+
+        $produit = Produit::where('reference', 'STYL-001')->firstOrFail();
+
+        $this->assertSame($famille->id, $produit->categorie_id);
+        $this->assertSame($sousFamille->id, $produit->sous_categorie_id);
+    }
+
+    public function test_une_sous_famille_inconnue_refuse_la_ligne_au_lieu_de_l_ignorer(): void
+    {
+        // Ranger l'article « sans sous-famille » et compter la ligne pour un
+        // succès ferait croire l'import complet : l'administrateur ne saurait
+        // qu'à la première recherche au catalogue.
+        $reponse = $this->importer('produits', [
+            ['nom', 'type', 'categorie', 'sous_categorie', 'prix_achat', 'prix_vente', 'taux_tva', 'reference'],
+            ['Stylo bille bleu', 'marchandise', 'Fournitures', 'Bureautique', '150', '250', '18', 'STYL-002'],
+        ]);
+
+        $this->assertSame(0, $reponse->json('importes'));
+        $this->assertStringContainsString('Bureautique', $reponse->json('erreurs.0'));
+        $this->assertSame(0, Produit::where('reference', 'STYL-002')->count());
+    }
+
+    public function test_une_famille_inconnue_refuse_la_ligne(): void
+    {
+        $reponse = $this->importer('produits', [
+            ['nom', 'type', 'categorie', 'prix_achat', 'prix_vente', 'taux_tva', 'reference'],
+            ['Ciment 50 kg', 'marchandise', 'Matériaux', '4000', '5000', '18', 'CIM-001'],
+        ]);
+
+        $this->assertSame(0, $reponse->json('importes'));
+        $this->assertStringContainsString('Matériaux', $reponse->json('erreurs.0'));
+    }
+
+    public function test_une_colonne_de_famille_vide_reste_acceptee(): void
+    {
+        // Tout le monde ne range pas son catalogue. L'exigence porte sur ce qui
+        // est écrit, pas sur le fait d'écrire.
+        $reponse = $this->importer('produits', [
+            ['nom', 'type', 'categorie', 'sous_categorie', 'prix_achat', 'prix_vente', 'taux_tva', 'reference'],
+            ['Ciment 50 kg', 'marchandise', '', '', '4000', '5000', '18', 'CIM-002'],
+        ]);
+
+        $this->assertSame(1, $reponse->json('importes'));
+        $this->assertNull(Produit::where('reference', 'CIM-002')->firstOrFail()->sous_categorie_id);
+    }
+
+    public function test_la_sous_famille_d_une_autre_entreprise_reste_hors_de_portee(): void
+    {
+        // **Simulation d'attaque.** `sous_categories` ne porte pas
+        // d'`entreprise_id` : elle ne tient à son entreprise que par sa
+        // famille. Une recherche sur le seul nom aurait rattaché l'article à la
+        // sous-famille d'un concurrent — et fait remonter le catalogue de
+        // l'autre dans les listes déroulantes.
+        $autre = Entreprise::create(['nom' => 'Quincaillerie rivale']);
+        $familleRivale = Categorie::create([
+            'entreprise_id' => $autre->id, 'nom' => 'Secrets maison', 'prefixe' => 'SEC',
+        ]);
+        $sousFamilleRivale = \App\Modules\Admin\Modeles\SousCategorie::create([
+            'categorie_id' => $familleRivale->id, 'nom' => 'Formules',
+        ]);
+
+        $reponse = $this->importer('produits', [
+            ['nom', 'type', 'sous_categorie', 'prix_achat', 'prix_vente', 'taux_tva', 'reference'],
+            ['Article espion', 'marchandise', 'Formules', '100', '200', '18', 'ESP-001'],
+        ]);
+
+        $this->assertSame(0, $reponse->json('importes'));
+        $this->assertSame(0, Produit::where('sous_categorie_id', $sousFamilleRivale->id)->count());
+    }
+
     // ══════════════ Cloisonnement ══════════════
 
     public function test_l_import_rattache_toujours_a_l_entreprise_de_l_appelant(): void
