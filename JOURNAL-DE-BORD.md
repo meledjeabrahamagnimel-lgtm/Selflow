@@ -1805,6 +1805,61 @@ Restent hors import, par choix : le plan comptable et les codes journaux, que
 Selflow livre par son propre référentiel, et les soldes d'ouverture
 comptables, qui appartiennent à Comptaflow.
 
+### Numéro de tiers et compte général — **CORRIGÉ**
+
+Relevé par le propriétaire du projet le 15/08/2026. **Ce sont deux choses
+différentes**, et il ne faut pas les confondre :
+
+| Notion | Colonne | Exemple |
+|---|---|---|
+| Compte général de rattachement | `compte_comptable` | `411000`, `401000` |
+| Numéro de tiers | `numero_tiers` | `411001`, `411KONE` |
+
+La distinction existait déjà en base, et l'écriture les range dans deux
+colonnes séparées — `compte_debit` / `compte_credit` pour le général,
+`compte_tiers` pour le tiers, jamais l'un à la place de l'autre. Un seul
+endroit du code écrit dans `ecritures_comptables`, précisément pour ça.
+
+**Cinq défauts autour, tous corrigés :**
+
+1. **La numérotation automatique démarrait à `411000`** — le compte collectif
+   lui-même. Le premier client de chaque entreprise portait donc, comme numéro
+   de tiers, le numéro du collectif : son relevé remontait le solde de tous les
+   autres. La séquence part de `001`, et la migration renumérote les fiches
+   déjà fautives sur la première place libre ;
+2. **le numéro n'acceptait que des chiffres** (`^411[0-9]*$`). `411KONE` est
+   une convention répandue, elle était refusée ;
+3. **aucune cohérence n'était vérifiée** : rien n'empêchait de donner `411002`
+   à un client et de le rattacher à `401000`. L'écriture partait alors sur le
+   collectif fournisseurs avec un tiers client ;
+4. **rien n'interdisait de saisir le collectif lui-même** comme numéro de
+   tiers ;
+5. **la vente de passage ne portait aucun tiers.** Sans client nommé,
+   `compte_tiers` restait vide et tout retombait sur `411000` : le grand livre
+   ne distinguait plus les ventes de comptoir des créances d'un client
+   identifié.
+
+**Deux conventions, au choix de l'entreprise** — décision du propriétaire :
+
+| Réglage | Ce que ça donne |
+|---|---|
+| `sequence` *(défaut)* | `411001`, `411002`, `401001` — jamais d'homonyme |
+| `nom` | `411KONE`, `401KOFFI` — lisible en grand livre ; les homonymes reçoivent `411KONE2` |
+
+Le réglage vit sur l'entreprise, comme les comptes par défaut, et se change
+depuis les paramètres. Les deux conventions **cohabitent** : une entreprise qui
+change d'avis ne voit pas sa séquence repartir de `001` et heurter un numéro
+déjà pris. Un nom qui ne laisse aucune lettre — « 123 » — retombe sur la
+séquence, faute de quoi le radical numérique se confondrait avec un rang.
+
+**Le client de passage** est une fiche unique par entreprise —
+`411DIVERS` rattaché à `411000` — posée à la souscription, et créée à la
+demande pour les entreprises déjà en service. `401DIVERS` en pendant pour les
+fournisseurs. Une fiche par ticket de caisse aurait fait gonfler le plan de
+tiers d'une ligne par vente de comptoir.
+
+Dix-huit épreuves dans `NumerotationTiersTest`.
+
 ### Libellés d'écriture — l'intitulé du compte tient lieu de libellé
 
 Relevé par le propriétaire du projet le 15/08/2026, et vérifié dans le code.

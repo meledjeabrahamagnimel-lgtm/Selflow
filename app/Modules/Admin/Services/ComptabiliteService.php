@@ -4,8 +4,11 @@ namespace App\Modules\Admin\Services;
 
 use App\Modules\Admin\Modeles\Vente;
 use App\Modules\Admin\Modeles\Achat;
+use App\Modules\Admin\Modeles\Client;
 use App\Modules\Admin\Modeles\EcritureComptable;
 use App\Modules\Admin\Modeles\CodeJournal;
+use App\Modules\Admin\Modeles\Entreprise;
+use App\Modules\Admin\Modeles\Fournisseur;
 use App\Modules\Admin\Modeles\Operation;
 use Illuminate\Support\Facades\DB;
 
@@ -136,7 +139,7 @@ class ComptabiliteService
 
             // ── Vente à crédit (totale ou partielle) : passage obligatoire par le 411 ──
             $compteClientGeneral = $vente->client?->compte_comptable ?? config('selflow.plan_comptable_defaut.client_collectif');
-            $compteClientTiers = $vente->client?->numero_tiers;
+            $compteClientTiers = self::tiersClient($vente->client, $entrepriseId);
 
             $opFacture = Operation::creer(
                 $entrepriseId, $pdvId, $date, 'FactureVente',
@@ -195,7 +198,7 @@ class ComptabiliteService
         [$compteFinancier, $codeJournal] = self::compteEtJournalFinancier($entrepriseId, $modePaiement);
 
         $compteClientGeneral = $vente->client?->compte_comptable ?? config('selflow.plan_comptable_defaut.client_collectif');
-        $compteClientTiers = $vente->client?->numero_tiers;
+        $compteClientTiers = self::tiersClient($vente->client, $entrepriseId);
 
         [$libelleProduits, $descriptionProduits] = self::libelleEtDescriptionProduits($vente->loadMissing('details.produit')->details);
         $refPaiement = $referencePaiement ?? $vente->reference_paiement;
@@ -293,7 +296,7 @@ class ComptabiliteService
 
             // ── Achat à crédit (total ou partiel) : passage obligatoire par le 401 ──
             $compteFournisseurGeneral = $achat->fournisseur?->compte_comptable ?? config('selflow.plan_comptable_defaut.fournisseur_collectif');
-            $compteFournisseurTiers = $achat->fournisseur?->numero_tiers;
+            $compteFournisseurTiers = self::tiersFournisseur($achat->fournisseur, $entrepriseId);
 
             $opFacture = Operation::creer(
                 $entrepriseId, $pdvId, $date, 'FactureAchat',
@@ -348,7 +351,7 @@ class ComptabiliteService
         [$compteFinancier, $codeJournal] = self::compteEtJournalFinancier($entrepriseId, $modePaiement);
 
         $compteFournisseurGeneral = $achat->fournisseur?->compte_comptable ?? config('selflow.plan_comptable_defaut.fournisseur_collectif');
-        $compteFournisseurTiers = $achat->fournisseur?->numero_tiers;
+        $compteFournisseurTiers = self::tiersFournisseur($achat->fournisseur, $entrepriseId);
 
         [$libelleProduits, $descriptionProduits] = self::libelleEtDescriptionProduits($achat->loadMissing('details.produit')->details);
         $refPaiement = $referencePaiement ?? $achat->reference_paiement;
@@ -421,7 +424,7 @@ class ComptabiliteService
         $codeJournal = self::codeJournal($entrepriseId, 'Vente', 'VTE');
 
         $compteClientGeneral = $avoir->client?->compte_comptable ?? config('selflow.plan_comptable_defaut.client_collectif');
-        $compteClientTiers = $avoir->client?->numero_tiers;
+        $compteClientTiers = self::tiersClient($avoir->client, $entrepriseId);
 
         $ventilation = self::ventilationVente($avoir);
 
@@ -467,7 +470,7 @@ class ComptabiliteService
         $codeJournal = self::codeJournal($entrepriseId, 'Achat', 'ACH');
 
         $compteFournisseurGeneral = $avoir->fournisseur?->compte_comptable ?? config('selflow.plan_comptable_defaut.fournisseur_collectif');
-        $compteFournisseurTiers = $avoir->fournisseur?->numero_tiers;
+        $compteFournisseurTiers = self::tiersFournisseur($avoir->fournisseur, $entrepriseId);
 
         $ventilation = self::ventilationAchat($avoir);
 
@@ -529,6 +532,42 @@ class ComptabiliteService
     // ─────────────────────────────────────────────────────────────────
     // HELPERS INTERNES
     // ─────────────────────────────────────────────────────────────────
+
+    /**
+     * Le compte de tiers d'un client, ou celui du client de passage.
+     *
+     * **Une vente sans client nommé laissait `compte_tiers` vide.** Tout se
+     * rangeait sur le collectif `411000`, et le grand livre ne distinguait
+     * plus les ventes de comptoir des créances d'un client identifié.
+     *
+     * Le tiers retourné n'est jamais le compte collectif : ce sont deux
+     * notions différentes, et les confondre fait remonter, dans le relevé d'un
+     * client, le solde de tous les autres.
+     */
+    private static function tiersClient(?Client $client, int $entrepriseId): ?string
+    {
+        if ($client?->numero_tiers) {
+            return $client->numero_tiers;
+        }
+
+        $entreprise = Entreprise::find($entrepriseId);
+
+        return $entreprise ? Client::divers($entreprise)->numero_tiers : null;
+    }
+
+    /**
+     * Le compte de tiers d'un fournisseur, ou celui du fournisseur occasionnel.
+     */
+    private static function tiersFournisseur(?Fournisseur $fournisseur, int $entrepriseId): ?string
+    {
+        if ($fournisseur?->numero_tiers) {
+            return $fournisseur->numero_tiers;
+        }
+
+        $entreprise = Entreprise::find($entrepriseId);
+
+        return $entreprise ? Fournisseur::divers($entreprise)->numero_tiers : null;
+    }
 
     private const TABLE_SYSCOHADA_VENTE = [
         '701' => 'Vente de marchandises',

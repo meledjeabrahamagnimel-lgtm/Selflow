@@ -3,6 +3,8 @@
 namespace App\Modules\Admin\Controleurs;
 
 use App\Modules\Admin\Modeles\Client;
+use App\Modules\Admin\Modeles\Entreprise;
+use App\Modules\Admin\Services\NumerotationTiersService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -10,6 +12,34 @@ use Illuminate\View\View;
 
 class ClientControleur
 {
+    /**
+     * Le numéro saisi à la main, une fois validé.
+     *
+     * Deux contrôles que rien n'exerçait : il doit suivre la racine du compte
+     * de rattachement — un tiers `411002` rattaché au `401000` faisait partir
+     * l'écriture sur le collectif fournisseurs — et il ne doit pas être ce
+     * compte collectif lui-même.
+     */
+    private function numeroSaisi(Request $request, Entreprise $entreprise, string $racine, string $compteGeneral): string
+    {
+        $request->validate([
+            'numero_tiers' => array_merge(
+                NumerotationTiersService::reglesDeSaisie($racine),
+                [
+                    'not_in:' . $compteGeneral,
+                    \Illuminate\Validation\Rule::unique('clients', 'numero_tiers')->where('entreprise_id', $entreprise->id),
+                ]
+            ),
+        ], [
+            'numero_tiers.required' => 'Le numéro de tiers est obligatoire si la numérotation automatique n\'est pas cochée.',
+            'numero_tiers.regex'    => "Le numéro de tiers doit commencer par « {$racine} », la racine du compte de rattachement — par exemple {$racine}001 ou {$racine}KONE.",
+            'numero_tiers.not_in'   => "Le numéro de tiers ne peut pas être {$compteGeneral} : c'est le compte collectif, pas la fiche de ce client.",
+            'numero_tiers.unique'   => 'Ce numéro de tiers est déjà utilisé.',
+        ]);
+
+        return (string) $request->input('numero_tiers');
+    }
+
     public function index(Request $request): View
     {
         $entreprise = Auth::user()->entreprise;
@@ -74,35 +104,18 @@ class ClientControleur
             'ncc.regex' => 'Le NCC doit comporter 8 caractères et se terminer par une lettre majuscule.',
         ]);
 
-        $autoNumero = $request->boolean('auto_numero_tiers');
-        $numeroTiers = null;
+        // **Le numéro de tiers n'est pas le compte général.** `411000` est le
+        // compte collectif « Clients » du plan comptable ; `411001` ou
+        // `411KONE` désigne *ce* client-ci. La numérotation automatique
+        // démarrait pourtant à `411000` : le premier client de chaque
+        // entreprise portait le collectif comme numéro de tiers, et son relevé
+        // remontait le solde de tous les autres.
+        $compteGeneral = $request->input('compte_comptable');
+        $racine        = NumerotationTiersService::racine($compteGeneral);
 
-        if ($autoNumero) {
-            $max = Client::where('entreprise_id', $entreprise->id)
-                ->where('numero_tiers', 'like', '411%')
-                ->orderByRaw('CAST(numero_tiers AS UNSIGNED) DESC')
-                ->value('numero_tiers');
-            
-            if ($max && is_numeric($max)) {
-                $numeroTiers = (string) ((int) $max + 1);
-            } else {
-                $numeroTiers = '411000';
-            }
-        } else {
-            $request->validate([
-                'numero_tiers' => [
-                    'required',
-                    'string',
-                    'regex:/^411[0-9]*$/',
-                    \Illuminate\Validation\Rule::unique('clients', 'numero_tiers')->where('entreprise_id', $entreprise->id)
-                ],
-            ], [
-                'numero_tiers.required' => 'Le numéro de tiers est obligatoire si la numérotation automatique n\'est pas cochée.',
-                'numero_tiers.regex' => 'Le numéro de tiers doit commencer par 411 et ne contenir que des chiffres.',
-                'numero_tiers.unique' => 'Ce numéro de tiers est déjà utilisé.',
-            ]);
-            $numeroTiers = $request->input('numero_tiers');
-        }
+        $numeroTiers = $request->boolean('auto_numero_tiers')
+            ? NumerotationTiersService::pourClient($entreprise, $compteGeneral, (string) $request->input('nom'))
+            : $this->numeroSaisi($request, $entreprise, $racine, $compteGeneral);
 
         Client::create(array_merge(
             $request->only(['nom', 'type_facturation', 'telephone', 'email', 'adresse', 'ncc', 'rccm', 'regime_imposition', 'compte_comptable']),
@@ -164,13 +177,22 @@ class ClientControleur
                         $q->whereNull('entreprise_id')->orWhere('entreprise_id', $entreprise->id);
                     })
                 ],
-                'numero_tiers'      => [
-                    'required',
-                    'string',
-                    'regex:/^411[0-9]*$/',
-                    \Illuminate\Validation\Rule::unique('clients', 'numero_tiers')->ignore($client->id)->where('entreprise_id', $entreprise->id)
-                ],
+                // Le numéro suit la racine du compte de rattachement, et n'est
+                // jamais le compte collectif lui-même. Les lettres sont
+                // admises : `411KONE` est une convention répandue, que
+                // l'ancienne expression `^411[0-9]*$` refusait.
+                'numero_tiers'      => array_merge(
+                    NumerotationTiersService::reglesDeSaisie(
+                        NumerotationTiersService::racine((string) $request->input('compte_comptable'))
+                    ),
+                    [
+                        'not_in:' . $request->input('compte_comptable'),
+                        \Illuminate\Validation\Rule::unique('clients', 'numero_tiers')->ignore($client->id)->where('entreprise_id', $entreprise->id),
+                    ]
+                ),
             ], [
+                'numero_tiers.regex'  => 'Le numéro de tiers doit commencer par la racine du compte de rattachement (par exemple 411001 ou 411KONE pour un client rattaché au 411000).',
+                'numero_tiers.not_in' => 'Le numéro de tiers ne peut pas être le compte collectif lui-même : ce sont deux choses différentes.',
                 'ncc.required_if' => 'Le NCC est obligatoire pour un client de type B2B.',
                 'ncc.size' => 'Le NCC doit contenir exactement 8 caractères.',
                 'ncc.regex' => 'Le NCC doit comporter 8 caractères et se terminer par une lettre majuscule.',

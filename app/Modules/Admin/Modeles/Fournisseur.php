@@ -24,6 +24,28 @@ class Fournisseur extends Model
         return $this->hasMany(Achat::class, 'fournisseur_id');
     }
 
+    /** Le numéro de tiers du fournisseur occasionnel. */
+    public const NUMERO_DIVERS = '401DIVERS';
+
+    /**
+     * Le fournisseur occasionnel — le pendant du client de passage.
+     *
+     * Un achat au comptoir, sans fiche fournisseur, laissait `compte_tiers`
+     * vide et tout retombait sur le collectif `401000`.
+     */
+    public static function divers(Entreprise $entreprise): self
+    {
+        return self::firstOrCreate(
+            ['entreprise_id' => $entreprise->id, 'numero_tiers' => self::NUMERO_DIVERS],
+            [
+                'nom'              => 'Fournisseur divers',
+                'type_facturation' => 'B2C',
+                'compte_comptable' => config('selflow.plan_comptable_defaut.fournisseur_collectif'),
+                'source'           => 'systeme',
+            ]
+        );
+    }
+
     public static function obtenirFournisseursPrioritaires($entrepriseId)
     {
         $hasComptaflow = self::where('entreprise_id', $entrepriseId)->where('source', 'comptaflow')->exists();

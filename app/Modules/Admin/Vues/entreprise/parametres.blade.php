@@ -607,6 +607,50 @@
                     </div>
                 </div>
 
+                {{-- ── Numérotation des tiers ──
+
+                     Le numéro de tiers n'est pas le compte général. 411000 est
+                     le compte collectif « Clients » du plan comptable ; 411001
+                     ou 411KONE désigne un client précis. Les confondre fait
+                     remonter, dans le relevé d'un client, le solde de tous. --}}
+                <div class="card" style="padding:24px;">
+                    <div
+                        style="font-size:12px;font-weight:700;color:var(--text-2);text-transform:uppercase;letter-spacing:.5px;margin-bottom:16px;display:flex;align-items:center;gap:8px;">
+                        <i class="fas fa-hashtag" style="color:var(--primary);"></i> Numérotation des tiers
+                    </div>
+
+                    <div style="font-size:12px;color:var(--text-3);margin-bottom:14px;line-height:1.6;">
+                        La forme des numéros attribués automatiquement aux clients et aux
+                        fournisseurs. Les deux conventions se pratiquent ; celle de votre cabinet
+                        comptable fait foi. Les fiches déjà créées gardent leur numéro.
+                    </div>
+
+                    <div style="display:flex;flex-direction:column;gap:10px;">
+                        @foreach(\App\Modules\Admin\Services\NumerotationTiersService::CONVENTIONS as $cle => $libelle)
+                        <label
+                            style="display:flex;align-items:flex-start;gap:12px;cursor:pointer;padding:14px;background:var(--bg3);border-radius:10px;border:1px solid var(--border);">
+                            <input type="radio" name="numerotation_tiers" value="{{ $cle }}"
+                                {{ old('numerotation_tiers', $entreprise->numerotation_tiers ?? 'sequence') === $cle ? 'checked' : '' }}
+                                style="margin-top:3px;width:16px;height:16px;cursor:pointer;">
+                            <div>
+                                <div style="font-weight:600;font-size:13px;color:var(--text);">{{ $libelle }}</div>
+                                <div style="font-size:12px;color:var(--text-3);margin-top:2px;">
+                                    @if($cle === 'sequence')
+                                        Un compteur derrière la racine du compte de rattachement :
+                                        <code>411001</code>, <code>411002</code>, <code>401001</code>.
+                                        Jamais d'homonyme, mais il faut ouvrir la fiche pour savoir de qui il s'agit.
+                                    @else
+                                        Le nom derrière la racine : <code>411KONE</code>, <code>401KOFFI</code>.
+                                        Lisible directement en grand livre. Deux homonymes reçoivent
+                                        <code>411KONE</code> et <code>411KONE2</code>.
+                                    @endif
+                                </div>
+                            </div>
+                        </label>
+                        @endforeach
+                    </div>
+                </div>
+
                 {{-- ── Impression des factures ── --}}
                 <div class="card" style="padding:24px;">
                     <div

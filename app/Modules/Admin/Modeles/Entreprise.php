@@ -63,6 +63,9 @@ class Entreprise extends Model
         // tickets de caisse tout seuls.
         'normalisation_auto_factures',
         'normalisation_auto_recus',
+        // La forme des numeros de tiers : 411001 ou 411KONE. Chaque cabinet
+        // comptable a la sienne.
+        'numerotation_tiers',
         'timbre_quittance',
         'bapa',
         'pied_de_page_facture',

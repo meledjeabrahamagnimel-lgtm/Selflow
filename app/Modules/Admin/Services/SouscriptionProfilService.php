@@ -96,6 +96,15 @@ class SouscriptionProfilService
 
             $bilan['modules'] = self::ouvrirLesModules($entreprise);
 
+            // Le client de passage et le fournisseur occasionnel.
+            //
+            // Une vente de comptoir n'a pas de client nommé, et son écriture
+            // tombait sur le seul collectif `411000` : le grand livre ne
+            // distinguait plus les ventes de comptoir des créances d'un client
+            // identifié. Une fiche unique par entreprise suffit à les séparer.
+            \App\Modules\Admin\Modeles\Client::divers($entreprise);
+            \App\Modules\Admin\Modeles\Fournisseur::divers($entreprise);
+
             return $bilan;
         });
     }

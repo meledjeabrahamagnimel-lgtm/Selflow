@@ -95,6 +95,9 @@ class EntrepriseControleur
             // des espaces multiples qui font dépasser la limite pour rien.
             'pied_de_page_facture'   => ['nullable', 'string', 'max:248'],
             'facture_autres_mentions'=> ['nullable', 'string', 'max:248'],
+            // La forme des numeros de tiers. Une valeur inconnue laisserait le
+            // service sans instruction devant la prochaine fiche creee.
+            'numerotation_tiers'     => ['nullable', 'string', 'in:' . implode(',', array_keys(\App\Modules\Admin\Services\NumerotationTiersService::CONVENTIONS))],
         ], [
             'pied_de_page_facture.max'    => 'Le pied de page ne peut pas dépasser 248 caractères.',
             'facture_autres_mentions.max' => 'Les autres mentions ne peuvent pas dépasser 248 caractères.',
@@ -127,6 +130,13 @@ class EntrepriseControleur
         // Quand certifier : des l'emission, ou a la main apres verification.
         $data['normalisation_auto_factures'] = $request->boolean('normalisation_auto_factures');
         $data['normalisation_auto_recus']    = $request->boolean('normalisation_auto_recus');
+
+        // La convention de numerotation des tiers. Absente du formulaire, elle
+        // ne change pas : les fiches deja creees gardent leur numero, et rien
+        // ne justifie de basculer la suivante sans qu'on l'ait demande.
+        if ($request->filled('numerotation_tiers')) {
+            $data['numerotation_tiers'] = $request->input('numerotation_tiers');
+        }
 
         $syncKeyChanged =$request->filled('comptaflow_sync_key') && ($request->comptaflow_sync_key !== $entreprise->comptaflow_sync_key);
 
