@@ -87,6 +87,8 @@ Elles ne se rediscutent pas sans raison neuve.
 | Choix hors référentiel | Un champ **« Autre »** à saisie libre partout où l'utilisateur choisit dans une liste fermée |
 | Sigle CUMP | Toujours écrit **CUMP (Coût Unitaire Moyen Pondéré)**, définition entre parenthèses, à chaque occurrence — code, commentaires, journal, échanges |
 | Secrets | Aucun mot de passe ni clé dans le code versionné. Ils viennent de l'environnement, ou sont tirés au hasard et affichés une seule fois |
+| Impression du reçu | **Par le navigateur** (`window.print()`, format 80 mm) pendant les tests, boîte de dialogue comprise, pour voir le rendu. **À retirer sur ordre du propriétaire**, pas avant |
+| TERNE | **Pas de terminal fiscal.** Selflow passe par l'API de la DGI, qui renvoie les trois éléments du sticker. L'imprimante de caisse est un périphérique ordinaire |
 
 ---
 
@@ -1584,20 +1586,60 @@ en l'état :
   compte collectif `411000` ;
 - une pièce d'un exercice clos se range dans l'exercice courant.
 
-**À faire, côté Comptaflow :** ré-appliquer `b3bd59b` — il suffit d'un
-`git cherry-pick b3bd59b` tant que l'objet n'a pas été ramassé par le garbage
-collector, sinon le patch est toujours dans
-`PASSERELLE-COMPTAFLOW/0001-deversement-selflow.patch`. Cette session lit le
-dépôt Comptaflow mais ne peut pas y pousser.
+**Le correctif a été refait — 15/08/2026.** `git cherry-pick b3bd59b` échoue
+sur un poste de travail ordinaire (`fatal: bad revision`) : l'objet n'a jamais
+été récupéré localement. Il a donc été reporté sur `a5da35d`, conflit résolu,
+et livré sous deux formes dans `PASSERELLE-COMPTAFLOW/` :
 
-### Plan comptable de Comptaflow — non vérifiable depuis le dépôt
+| Fichier | Rôle |
+|---|---|
+| `0002-deversement-selflow-sur-a5da35d.patch` | le correctif, vérifié : `git apply --check` passe sur `a5da35d` |
+| `CONSIGNES-POUR-COMPTAFLOW.md` | le dossier complet, autoportant : contexte, raison de chaque changement, application, vérification au `curl`, plan comptable |
 
-Le plan comptable de Comptaflow ne vit pas dans le code : il s'importe par
-`public/templates/import/modele_plan_comptable.xlsx`, et son contenu réel est
-en base. Le classeur versionné n'a pas bougé depuis le 12 août, et il porte
-encore un export Sage d'« ELIKET MARKET » comme exemple. **Une mise à jour
-faite dans l'application ne laisse donc aucune trace ici** : elle est
-invisible depuis le dépôt, et je ne peux ni la confirmer ni l'infirmer.
+Le conflit portait sur la résolution du compte : `main` avait retouché le bloc
+en ligne là où le correctif le déplace dans `compteGeneral()` / `tiers()`.
+**La version du correctif l'emporte** — sa logique remplace l'ancienne, elle
+ne s'y ajoute pas.
+
+Ces deux fichiers se donnent tels quels à une session Comptaflow, qui n'a
+besoin de rien d'autre. Cette session-ci lit le dépôt Comptaflow mais ne peut
+pas y pousser : `add_repo` refuse les ajouts entre propriétaires différents.
+
+**À faire en même temps que l'application :** poser `EXTERNAL_SYNC_SECRET`
+dans les deux `.env`, même valeur. Sans elle la synchronisation refuse tout —
+c'est le comportement voulu, mais il faut le savoir avant de conclure à une
+régression. Et considérer `selflow-comptaflow-secret-2026` comme compromis :
+il est dans l'historique public.
+
+### Plan comptable de Comptaflow — le référentiel existe bien
+
+Correction du constat précédent, qui portait sur le mauvais chemin.
+
+Comptaflow **possède** son référentiel SYSCOHADA : `config/syscohada_complet.php`,
+**1 259 comptes**, chargeable par entreprise depuis l'écran de configuration
+(`AdminConfigController::loadSyscohadaPlan`), en trois formats — SYSCOHADA
+(2-4), **COMPTES SAGE (6)**, DC-KNOWING (8). La table `plan_comptables` est
+`company_id`, donc chaque entreprise en a sa copie et la modifie sans gêner
+les autres.
+
+Le chargement est **à la demande, jamais automatique** : une entreprise neuve
+part d'un plan vide tant que personne n'a cliqué.
+
+**Selflow émet des numéros à 6 chiffres** (`411000`, `701000`, `443100`,
+`521000`…). Le format à charger est donc **« COMPTES SAGE (6) »** : c'est le
+seul des trois où les comptes de Selflow tombent sur des comptes existants du
+référentiel. En 2-4, `701000` ne correspond à rien — le déversement le crée à
+la volée avec le libellé de l'écriture pour intitulé, et le plan se remplit de
+comptes bâtards à côté des vrais.
+
+Le classeur `modele_plan_comptable.xlsx` est un **modèle d'import** pour un
+plan déjà existant venu d'ailleurs, pas la source du référentiel. Son contenu
+d'exemple (« ELIKET MARKET ») ne dit rien de l'état réel des plans en base.
+
+**Bug repéré au passage, hors passerelle :** `routes/web.php:510` route
+`POST /load-syscohada` vers `loadSyscohadaPlan`, **déclarée `private`** →
+500 (Internal Server Error — erreur interne du serveur). Les trois routes
+`-4`, `-6`, `-8` passent par des méthodes publiques et fonctionnent.
 
 ### Passerelle Comptaflow — anomalies d'origine
 
