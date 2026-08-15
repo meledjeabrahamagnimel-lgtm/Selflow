@@ -1627,7 +1627,28 @@ Ces deux fichiers se donnent tels quels à une session Comptaflow, qui n'a
 besoin de rien d'autre. Cette session-ci lit le dépôt Comptaflow mais ne peut
 pas y pousser : `add_repo` refuse les ajouts entre propriétaires différents.
 
-**À faire en même temps que l'application :** poser `EXTERNAL_SYNC_SECRET`
+**Le correctif est poussé — vérifié le 15/08/2026.** Il vit sur la branche
+`claude/passerelle-selflow-deversement` du dépôt Comptaflow, commit `0407335`.
+**`main` est resté sur `a5da35d` : la fusion n'est pas faite.**
+
+Contrôlé sur la branche, pas supposé : `cle_selflow`, `compte_tiers`,
+`exercice_debut`, `hash_equals`, `desaccordDExercice()` et `compteGeneral()`
+sont là ; `n_saisie` prend la clé ; la migration d'idempotence est présente.
+Il ne reste aucune valeur de secret en dur — les douze appelants lisent la
+même clé de configuration, sans repli, et les seules occurrences des anciennes
+chaînes sont les commentaires qui expliquent leur retrait.
+
+Un second commit y ajoute deux choses que je n'avais pas vues :
+
+- **un septième point d'entrée restait ouvert.** `syncStatus` lisait
+  `config('app.external_sync_secret', 'selflow-local-secret')` — une **autre**
+  clé, absente de `config/app.php`, et une **autre** valeur de repli en clair.
+  C'était donc toujours la chaîne publique qui faisait foi, quoi qu'on mette
+  au `.env`, pendant que les six autres étaient refermés ;
+- la route morte `POST /load-syscohada` vers une méthode `private` est
+  supprimée, et aucune vue ne la référençait.
+
+**À faire en même temps que la fusion :** poser `EXTERNAL_SYNC_SECRET`
 dans les deux `.env`, même valeur. Sans elle la synchronisation refuse tout —
 c'est le comportement voulu, mais il faut le savoir avant de conclure à une
 régression. Et considérer `selflow-comptaflow-secret-2026` comme compromis :
