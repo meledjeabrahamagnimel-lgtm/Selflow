@@ -155,6 +155,9 @@
         .attente i { font-size: 30px; color: var(--text-3); margin-bottom: 16px; }
         .attente h1 { font-size: 22px; font-weight: 800; color: var(--primary); margin-bottom: 10px; }
         .attente p { font-size: 14.5px; color: var(--text-2); }
+        .attente .actions {
+            display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; margin-top: 22px;
+        }
 
         @media (max-width: 700px) {
             .bandeau h1 { font-size: 32px; }
@@ -254,7 +257,18 @@
         <i class="fas fa-pen-ruler"></i>
         <h1>Cette page est en préparation</h1>
         <p>Le contenu de la présentation n'a pas encore été publié.
-           En attendant, vous pouvez vous connecter à votre espace.</p>
+           En attendant, vous pouvez rejoindre votre espace.</p>
+        {{-- Cette page est devenue la porte d'entrée : sans ces deux liens,
+             un visiteur qui arrive avant la publication n'a nulle part où
+             aller. --}}
+        <div class="actions">
+            <a href="{{ route('connexion') }}" class="btn btn-principal">
+                <i class="fas fa-arrow-right-to-bracket"></i> Se connecter
+            </a>
+            <a href="{{ route('inscription') }}" class="btn">
+                <i class="fas fa-user-plus"></i> Créer un compte
+            </a>
+        </div>
     </div>
 @endforelse
 

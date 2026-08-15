@@ -1203,8 +1203,50 @@ Ce qui existe :
 | Liens | `http(s)://` ou chemin interne `/…` seulement : un `javascript:` déposé là s'exécuterait chez chaque visiteur |
 | Épreuves | `tests/Feature/VitrineTest.php` — 19, dont 3 simulations d'attaque |
 
+**La vitrine est branchée — 15/08/2026.** Elle existait à `/presentation`,
+mais **rien n'y menait** : la racine conduisait le visiteur droit au
+formulaire de connexion, et il fallait connaître l'adresse pour lire la
+présentation — le contraire d'une vitrine. `/` la sert désormais à qui n'est
+pas connecté ; `/presentation` reste valable.
+
+L'état d'attente porte les deux liens qui manquaient — se connecter, créer un
+compte. Sans eux, un visiteur arrivé avant la publication n'avait nulle part
+où aller.
+
 **Ce qui reste : la saisie.** Textes, tarifs, images, mentions légales,
 présentation de DC-Knowing. Rien de tout cela ne peut être inventé ici.
+
+### Les accès délégués — **TRANCHÉ ET LIVRÉ**
+
+`admin_secondaire` et `responsable_pdv` n'étaient rattachés à aucun espace :
+`role:admin` compare à l'identique, et la racine les renvoyait dans la boucle
+de redirection. La question restait ouverte de savoir s'il fallait les garder.
+
+**Décision du propriétaire du projet, 15/08/2026 :** ce sont des **accès
+délégués**. « C'est comme si je veux déléguer mon travail, donc je crée un
+accès pour une autre personne pour avoir accès à mon espace. » Le même espace
+que le propriétaire, avec les habilitations qu'il accorde.
+
+Deux corrections, et la seconde est la plus importante :
+
+- **`role:admin` accepte désormais les rôles délégués.** Le middleware dit
+  dans quel espace on travaille ; `habilitation`, qui s'exécute juste après et
+  ferme par défaut, dit ce qu'on y fait. La racine les conduit au tableau de
+  bord d'administration ;
+- **`aHabilitation()` rendait `true` pour tout à `admin_secondaire`**, au même
+  titre que le propriétaire. Déléguer revenait donc à **céder l'entreprise
+  entière** : le compte créé « pour aider aux ventes » atteignait la
+  comptabilité, les paramètres fiscaux, et l'écran qui distribue les droits —
+  d'où il pouvait s'en accorder d'autres, ou en retirer au propriétaire. Seuls
+  le superadministrateur et le propriétaire ont tout.
+
+**Conséquence à connaître :** un compte délégué sans habilitation ne voit
+rien, et reçoit un 403 (Forbidden — accès interdit) explicite. C'est le sens
+d'un contrôle qui ferme par défaut ; les droits se cochent depuis l'onglet des
+habilitations, écran du personnel. Les comptes `admin_secondaire` existants
+perdent leur accès total : il faut leur accorder ce qu'ils doivent avoir.
+
+Neuf épreuves dans `AiguillageRacineTest`.
 
 ### Lot 8 — Stabilisation
 

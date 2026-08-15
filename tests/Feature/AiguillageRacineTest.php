@@ -20,9 +20,14 @@ use Tests\TestCase;
  *
  * Le modèle porte pourtant cinq rôles : `admin_secondaire` et
  * `responsable_pdv` existent, avec leurs méthodes sur `Utilisateur`, mais
- * aucune route ne les accepte — `role:admin` et `role:admin,caissier`
- * comparent à l'identique. Ces deux comptes n'ont donc **aucun espace de
- * travail**, ce que la boucle cachait et qu'un message dit désormais.
+ * aucune route ne les acceptait — `role:admin` compare à l'identique. Ces
+ * deux comptes n'avaient donc aucun espace de travail, ce que la boucle
+ * cachait.
+ *
+ * **Ce sont des accès délégués**, tranché par le propriétaire du projet : un
+ * administrateur qui veut confier son travail ouvre un accès à *son* espace,
+ * et choisit ce que la personne y voit. Ils rejoignent donc le tableau de
+ * bord d'administration, et ce sont les habilitations qui décident ensuite.
  */
 class AiguillageRacineTest extends TestCase
 {
@@ -89,17 +94,33 @@ class AiguillageRacineTest extends TestCase
             ->assertRedirect(route('superadmin.tableau_de_bord'));
     }
 
-    public function test_le_visiteur_est_conduit_a_la_connexion(): void
+    // ══════════════ Le visiteur : la vitrine, pas le formulaire ══════════════
+
+    public function test_le_visiteur_arrive_sur_la_vitrine(): void
     {
-        $this->get('/')->assertRedirect(route('connexion'));
+        // La présentation existait, à `/presentation`, mais **rien n'y
+        // menait** : il fallait connaître l'adresse pour la lire, ce qui est
+        // le contraire d'une vitrine. La racine y conduit désormais.
+        $this->get('/')
+            ->assertOk()
+            ->assertSee('DC-Knowing', false);
     }
 
-    // ══════════════ Les rôles sans espace : un message, pas une boucle ══════════════
+    public function test_la_vitrine_d_accueil_mene_a_la_connexion(): void
+    {
+        // Elle est devenue la porte d'entrée : sans ce lien, un visiteur venu
+        // travailler n'a nulle part où aller.
+        $this->get('/')
+            ->assertOk()
+            ->assertSee(route('connexion'), false);
+    }
+
+    // ══════════════ Les accès délégués ══════════════
 
     /**
      * @return array<string, array{0: string}>
      */
-    public static function rolesSansEspace(): array
+    public static function rolesDelegues(): array
     {
         return [
             'administrateur secondaire' => ['admin_secondaire'],
@@ -107,18 +128,70 @@ class AiguillageRacineTest extends TestCase
         ];
     }
 
-    #[\PHPUnit\Framework\Attributes\DataProvider('rolesSansEspace')]
-    public function test_un_role_sans_espace_recoit_un_message_et_non_une_boucle(string $role): void
+    #[\PHPUnit\Framework\Attributes\DataProvider('rolesDelegues')]
+    public function test_un_acces_delegue_rejoint_l_espace_d_administration(string $role): void
     {
-        // Le point du test : la réponse ne doit **pas** être une redirection
-        // vers `connexion`, qui rejetterait l'utilisateur ici même.
-        $reponse = $this->actingAs($this->compte($role))->get('/');
-
-        $reponse->assertForbidden();
-        $reponse->assertSee($role, false);
+        $this->actingAs($this->compte($role))
+            ->get('/')
+            ->assertRedirect(route('admin.tableau_de_bord'));
     }
 
-    #[\PHPUnit\Framework\Attributes\DataProvider('rolesSansEspace')]
+    #[\PHPUnit\Framework\Attributes\DataProvider('rolesDelegues')]
+    public function test_un_acces_delegue_franchit_le_controle_de_role(string $role): void
+    {
+        // `role:admin` comparait à l'identique et refusait ces comptes avant
+        // même que les habilitations soient consultées. Il les accepte
+        // désormais ; c'est l'habilitation qui décide ensuite.
+        $compte = $this->compte($role);
+        $compte->update(['habilitations' => ['tableau_de_bord_personnel']]);
+
+        $this->actingAs($compte)
+            ->get(route('admin.tableau_de_bord'))
+            ->assertOk();
+    }
+
+    #[\PHPUnit\Framework\Attributes\DataProvider('rolesDelegues')]
+    public function test_un_acces_delegue_sans_habilitation_ne_voit_rien(string $role): void
+    {
+        // Le contrôle ferme par défaut : ouvrir l'espace n'ouvre pas les
+        // écrans. Tant que l'administrateur n'a rien coché, il n'y a rien à
+        // voir — et c'est ce qui fait la différence entre déléguer une tâche
+        // et céder l'entreprise.
+        $this->actingAs($this->compte($role))
+            ->get(route('admin.tableau_de_bord'))
+            ->assertForbidden();
+    }
+
+    public function test_un_acces_delegue_ne_distribue_pas_les_droits(string $role = 'admin_secondaire'): void
+    {
+        // **`admin_secondaire` recevait `true` pour toute habilitation**, au
+        // même titre que le propriétaire. Le compte créé « pour aider aux
+        // ventes » atteignait donc la comptabilité, les paramètres fiscaux, et
+        // l'écran qui distribue les droits — d'où il pouvait s'en accorder
+        // d'autres, ou en retirer au propriétaire. Déléguer revenait à céder
+        // l'entreprise entière.
+        $compte = $this->compte($role);
+        $compte->update(['habilitations' => ['tableau_de_bord_personnel']]);
+
+        $this->assertFalse($compte->aHabilitation('gestion_habilitations'));
+        $this->assertFalse($compte->aHabilitation('gestion_comptabilite'));
+        $this->assertTrue($compte->aHabilitation('tableau_de_bord_personnel'));
+
+        $this->actingAs($compte)
+            ->get(route('admin.personnel.index', ['tab' => 'habilitations']))
+            ->assertForbidden();
+    }
+
+    public function test_le_proprietaire_garde_toutes_les_habilitations(): void
+    {
+        // Le resserrement ne doit pas atteindre celui qui distribue les droits.
+        $admin = $this->compte('admin');
+
+        $this->assertTrue($admin->aHabilitation('gestion_habilitations'));
+        $this->assertTrue($admin->aHabilitation('gestion_comptabilite'));
+    }
+
+    #[\PHPUnit\Framework\Attributes\DataProvider('rolesDelegues')]
     public function test_la_racine_ne_renvoie_jamais_un_connecte_vers_la_connexion(string $role): void
     {
         // La boucle tenait à cette seule redirection : `connexion` est

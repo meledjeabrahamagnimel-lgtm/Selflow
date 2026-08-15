@@ -87,11 +87,43 @@ class Utilisateur extends Authenticatable
     }
 
     /**
+     * Les accès délégués : le même espace, mais pas les mêmes droits.
+     *
+     * Un administrateur qui veut confier son travail ne crée pas un second
+     * propriétaire — il ouvre un accès à **son** espace, et choisit ce que la
+     * personne y voit. Ces rôles franchissent donc `role:admin`, et ce sont
+     * les habilitations qui tranchent ensuite, écran par écran.
+     */
+    public const ROLES_DELEGUES = ['admin_secondaire', 'responsable_pdv'];
+
+    /**
+     * Cet utilisateur travaille-t-il dans l'espace d'administration ?
+     *
+     * Le propriétaire et ses délégués, oui. La différence entre eux ne se joue
+     * pas ici mais dans `aHabilitation()`.
+     */
+    public function partageLEspaceAdmin(): bool
+    {
+        return $this->estAdmin() || in_array($this->role, self::ROLES_DELEGUES, true);
+    }
+
+    /**
      * Vérifier si l'utilisateur a l'habilitation pour une page spécifique.
+     *
+     * **`admin_secondaire` recevait `true` pour tout**, au même titre que le
+     * propriétaire. Déléguer revenait donc à céder l'entreprise entière : le
+     * compte créé « pour aider aux ventes » atteignait la comptabilité, les
+     * paramètres fiscaux, et l'écran qui distribue les droits — d'où il
+     * pouvait s'en accorder d'autres, ou en retirer au propriétaire.
+     *
+     * Seuls le superadministrateur et le propriétaire ont tout. Un délégué a
+     * ce qu'on lui a donné, et rien de plus. Un compte sans habilitation ne
+     * voit donc rien tant que son administrateur n'a pas coché : c'est le sens
+     * d'un contrôle qui ferme par défaut.
      */
     public function aHabilitation(string $page): bool
     {
-        if ($this->estSuperAdmin() || $this->estAdmin() || $this->estAdminSecondaire()) {
+        if ($this->estSuperAdmin() || $this->estAdmin()) {
             return true;
         }
 

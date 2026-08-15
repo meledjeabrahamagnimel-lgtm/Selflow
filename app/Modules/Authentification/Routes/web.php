@@ -90,31 +90,42 @@ Route::middleware('auth')->group(function () {
 // Redirection de la racine vers connexion ou tableau de bord
 // -----------------------------------------------------------------------
 Route::get('/', function () {
+    // **La porte d'entrée est la vitrine, pas le formulaire de connexion.**
+    //
+    // Un visiteur qui tape l'adresse tombait directement sur la page de
+    // connexion : la présentation existait, à `/presentation`, mais rien n'y
+    // menait — il fallait connaître l'adresse pour la lire, ce qui est le
+    // contraire d'une vitrine.
     if (! auth()->check()) {
-        return redirect()->route('connexion');
+        return app(\App\Modules\Admin\Controleurs\VitrineControleur::class)->accueil();
     }
 
-    $role = auth()->user()->role;
+    $utilisateur = auth()->user();
+    $role        = $utilisateur->role;
 
-    return match ($role) {
-        'superadmin' => redirect()->route('superadmin.tableau_de_bord'),
-        'admin'      => redirect()->route('admin.tableau_de_bord'),
-        'caissier'   => redirect()->route('caissier.tableau_de_bord'),
+    if ($utilisateur->estSuperAdmin()) {
+        return redirect()->route('superadmin.tableau_de_bord');
+    }
 
-        // **Ne jamais renvoyer un utilisateur connecté vers `connexion`.**
-        // C'est une route réservée aux visiteurs : elle le renvoie aussitôt
-        // ici, qui le renvoie là-bas, et le navigateur s'arrête au bout de
-        // vingt allers-retours sur `ERR_TOO_MANY_REDIRECTS`.
-        //
-        // Le modèle porte cinq rôles — `estAdminSecondaire()` et
-        // `estResponsablePdv()` en plus des trois aiguillés ci-dessus — mais
-        // aucune route ne les accepte : `role:admin` et `role:admin,caissier`
-        // comparent à l'identique. Ces deux comptes n'avaient donc aucun
-        // espace où aller, et la boucle était le seul symptôme. Un message
-        // vaut mieux qu'une boucle : il dit ce qui manque au lieu de laisser
-        // croire à une panne du navigateur.
-        default      => abort(403, "Votre compte porte le rôle « {$role} », auquel aucun "
-            . "espace de travail n'est rattaché. Demandez à votre administrateur de vous "
-            . "attribuer un rôle actif."),
-    };
+    // Le propriétaire **et ses délégués** : le même espace. Un accès délégué
+    // est un accès à l'espace de celui qui l'a créé — ce sont les
+    // habilitations qui décident ensuite de ce qu'on y voit.
+    //
+    // Ces comptes n'étaient rattachés à rien : `role:admin` comparait à
+    // l'identique, et la racine les renvoyait vers `connexion`, page réservée
+    // aux visiteurs, qui les renvoyait ici. Le navigateur s'arrêtait au bout
+    // de vingt allers-retours sur `ERR_TOO_MANY_REDIRECTS`.
+    if ($utilisateur->partageLEspaceAdmin()) {
+        return redirect()->route('admin.tableau_de_bord');
+    }
+
+    if ($utilisateur->estCaissier()) {
+        return redirect()->route('caissier.tableau_de_bord');
+    }
+
+    // **Ne jamais renvoyer un utilisateur connecté vers `connexion`.** Un
+    // message vaut mieux qu'une boucle : il dit ce qui manque au lieu de
+    // laisser croire à une panne du navigateur.
+    abort(403, "Votre compte porte le rôle « {$role} », auquel aucun espace de travail "
+        . "n'est rattaché. Demandez à votre administrateur de vous attribuer un rôle actif.");
 })->name('accueil');
