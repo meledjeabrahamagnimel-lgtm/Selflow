@@ -209,6 +209,31 @@ class Entreprise extends Model
             && in_array($module, $this->modulesAutorises(), true);
     }
 
+    /**
+     * Ce que tout le monde reçoit, quel que soit le métier.
+     *
+     * Cette liste vivait **en double** — dans `SouscriptionControleur` pour
+     * afficher les cases à cocher, et dans `SouscriptionProfilService` pour
+     * écrire `modules_actifs`. Les deux copies avaient dérivé : `points_de_vente`
+     * manquait aux deux, et la section disparaissait de la barre latérale
+     * sitôt la souscription enregistrée, sans que rien ne l'explique. Une seule
+     * liste, désormais.
+     */
+    public const MODULES_SOCLE = [
+        'principal', 'points_de_vente', 'ventes', 'achats',
+        'tiers', 'produits', 'rapports', 'comptabilite',
+    ];
+
+    /**
+     * Ceux qu'on ne décoche pas.
+     *
+     * `principal` porte le socle. `points_de_vente` porte les sites, **le
+     * personnel et les habilitations** : le décocher retirerait à
+     * l'administrateur l'écran où il gère ses propres utilisateurs et leurs
+     * droits. Personne ne fait ce choix en connaissance de cause.
+     */
+    public const MODULES_STRUCTURELS = ['principal', 'points_de_vente'];
+
     public const TOUS_LES_MODULES = [
         'principal', 'ventes', 'achats', 'stock', 'production', 'chantiers',
         'cycles', 'comptabilite', 'points_de_vente', 'produits', 'tiers',

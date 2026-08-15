@@ -280,7 +280,7 @@ class SouscriptionProfilService
         }
         $actifs = is_array($actifs) ? $actifs : [];
 
-        $demandes = ['principal', 'ventes', 'achats', 'tiers', 'produits', 'rapports', 'comptabilite'];
+        $demandes = Entreprise::MODULES_SOCLE;
 
         foreach ($entreprise->profils as $profil) {
             $demandes = array_merge($demandes, $profil->modulesOuverts());

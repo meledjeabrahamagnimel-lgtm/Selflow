@@ -158,6 +158,113 @@ class ParcoursSouscriptionTest extends TestCase
         $this->assertTrue($entreprise->moduleEstActif('ventes'));
     }
 
+    // ══════════════ Les points de vente, qui disparaissaient ══════════════
+
+    public function test_l_etape_des_modules_propose_les_points_de_vente(): void
+    {
+        // **La liste de base l'oubliait**, et elle vivait en double : une copie
+        // dans le contrôleur pour afficher les cases, une autre dans le service
+        // pour écrire `modules_actifs`. Les deux avaient dérivé de la même
+        // façon, et la section disparaissait de la barre latérale sitôt la
+        // souscription enregistrée, sans que rien ne l'explique.
+        $this->actingAs($this->admin);
+        $this->post(route('admin.souscription.enregistrer', 1), ['categorie_id' => $this->commerce()->id]);
+        $this->post(route('admin.souscription.enregistrer', 2), ['profils' => ['boutique_quartier']]);
+
+        // On vise la case elle-même, pas le texte : « Points de vente » figure
+        // aussi dans la barre latérale, qui affiche tout tant que
+        // `modules_actifs` est vide. L'épreuve passerait sans rien prouver.
+        $this->get(route('admin.souscription.index', ['etape' => 3]))
+            ->assertOk()
+            ->assertSee('name="modules[]" value="points_de_vente"', false);
+    }
+
+    public function test_les_points_de_vente_survivent_a_la_souscription(): void
+    {
+        $this->actingAs($this->admin);
+        $this->post(route('admin.souscription.enregistrer', 1), ['categorie_id' => $this->commerce()->id]);
+        $this->post(route('admin.souscription.enregistrer', 2), ['profils' => ['boutique_quartier']]);
+        $this->post(route('admin.souscription.enregistrer', 3), ['modules' => ['principal', 'ventes']]);
+        $this->post(route('admin.souscription.enregistrer', 4), ['familles' => ['VIV']]);
+
+        $this->assertTrue($this->entreprise->fresh()->moduleEstActif('points_de_vente'));
+    }
+
+    public function test_les_points_de_vente_ne_se_decochent_pas(): void
+    {
+        // Ils ne portent pas que les sites : **le personnel et les
+        // habilitations vivent derrière**. Les retirer priverait
+        // l'administrateur de l'écran où il gère ses propres utilisateurs et
+        // leurs droits — personne ne fait ce choix en connaissance de cause.
+        //
+        // La case est désactivée à l'écran, et une case désactivée n'est pas
+        // transmise : le rattrapage se fait donc côté serveur, où un formulaire
+        // forgé le rencontre aussi.
+        $this->actingAs($this->admin);
+        $this->post(route('admin.souscription.enregistrer', 1), ['categorie_id' => $this->commerce()->id]);
+        $this->post(route('admin.souscription.enregistrer', 2), ['profils' => ['boutique_quartier']]);
+        $this->post(route('admin.souscription.enregistrer', 3), ['modules' => ['ventes']]);
+        $this->post(route('admin.souscription.enregistrer', 4), ['familles' => ['VIV']]);
+
+        $entreprise = $this->entreprise->fresh();
+
+        $this->assertTrue($entreprise->moduleEstActif('points_de_vente'));
+        $this->assertTrue($entreprise->moduleEstActif('principal'));
+    }
+
+    public function test_la_barre_laterale_garde_les_points_de_vente_apres_la_souscription(): void
+    {
+        // L'épreuve du symptôme, et non de sa cause : c'est l'entrée de menu
+        // que l'utilisateur a vue disparaître.
+        $this->admin->update(['habilitations' => ['gestion_pdv', 'tableau_de_bord']]);
+
+        $this->actingAs($this->admin);
+        $this->post(route('admin.souscription.enregistrer', 1), ['categorie_id' => $this->commerce()->id]);
+        $this->post(route('admin.souscription.enregistrer', 2), ['profils' => ['boutique_quartier']]);
+        $this->post(route('admin.souscription.enregistrer', 3), ['modules' => ['principal', 'ventes']]);
+        $this->post(route('admin.souscription.enregistrer', 4), ['familles' => ['VIV']]);
+
+        $this->get(route('admin.pdv.index'))
+            ->assertOk()
+            ->assertSee('<div class="nav-section"><span>Points de vente</span></div>', false);
+    }
+
+    public function test_un_superadmin_peut_toujours_fermer_les_points_de_vente(): void
+    {
+        // Structurel ne veut pas dire hors de contrôle : les droits restent au
+        // superadmin, et un module non autorisé ne s'ouvre pas parce que le
+        // parcours le juge indispensable.
+        $this->entreprise->update(['modules_autorises' => ['principal', 'ventes', 'produits', 'tiers']]);
+
+        $this->actingAs($this->admin);
+        $this->post(route('admin.souscription.enregistrer', 1), ['categorie_id' => $this->commerce()->id]);
+        $this->post(route('admin.souscription.enregistrer', 2), ['profils' => ['boutique_quartier']]);
+        $this->post(route('admin.souscription.enregistrer', 3), ['modules' => ['principal', 'ventes']]);
+        $this->post(route('admin.souscription.enregistrer', 4), ['familles' => ['VIV']]);
+
+        $this->assertFalse($this->entreprise->fresh()->moduleEstActif('points_de_vente'));
+    }
+
+    public function test_la_liste_de_base_ne_vit_plus_en_double(): void
+    {
+        // C'est la duplication qui a produit l'anomalie : deux copies de la
+        // même liste, dérivant chacune de son côté. Une seule, désormais, et
+        // cette épreuve refuse qu'on en recrée une.
+        foreach ([
+            'app/Modules/Admin/Controleurs/SouscriptionControleur.php',
+            'app/Modules/Admin/Services/SouscriptionProfilService.php',
+        ] as $fichier) {
+            $source = file_get_contents(base_path($fichier));
+
+            $this->assertStringContainsString('Entreprise::MODULES_SOCLE', $source,
+                "{$fichier} devrait lire la liste de base sur le modèle.");
+            $this->assertDoesNotMatchRegularExpression(
+                "/\[\s*'principal'\s*,\s*'ventes'/", $source,
+                "{$fichier} recopie la liste de base au lieu de la lire."
+            );
+        }
+    }
+
     public function test_les_prix_saisis_sont_enregistres_et_le_parcours_se_termine(): void
     {
         $this->actingAs($this->admin);

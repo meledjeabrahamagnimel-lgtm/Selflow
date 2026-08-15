@@ -1742,6 +1742,40 @@ Restent hors import, par choix : le plan comptable et les codes journaux, que
 Selflow livre par son propre référentiel, et les soldes d'ouverture
 comptables, qui appartiennent à Comptaflow.
 
+### Souscription — les points de vente disparaissaient — **CORRIGÉ**
+
+Signalé le 15/08/2026 : la section « Points de vente » de la barre latérale
+s'évanouissait au cours du paramétrage, sans message.
+
+La liste des modules livrés à tout le monde vivait **en double** —
+`SouscriptionControleur::modulesProposes()` pour afficher les cases à cocher,
+`SouscriptionProfilService::ouvrirLesModules()` pour écrire `modules_actifs`.
+Les deux copies avaient dérivé de la même façon : `points_de_vente` manquait
+aux deux. Tant que `modules_actifs` restait vide, la barre latérale affichait
+tout par défaut ; l'étape 4 l'écrivait enfin, et la section disparaissait.
+
+Aucune route ne porte `modules:points_de_vente` — les écrans restaient
+joignables, seul le menu s'était fermé. C'est ce qui a rendu la panne muette.
+
+Trois corrections :
+
+- **une seule liste**, `Entreprise::MODULES_SOCLE`, lue aux deux endroits ;
+  une épreuve refuse qu'on en recrée une copie ;
+- **`Entreprise::MODULES_STRUCTURELS`** — `principal` et `points_de_vente` ne
+  se décochent pas. Ce dernier ne porte pas que les sites : **le personnel et
+  les habilitations vivent derrière lui**, et le retirer priverait
+  l'administrateur de l'écran où il gère ses propres utilisateurs et leurs
+  droits. Personne ne fait ce choix en connaissance de cause ;
+- une case désactivée **n'est pas transmise** par le navigateur : le rattrapage
+  se fait côté serveur, où un formulaire forgé le rencontre aussi.
+
+Structurel ne veut pas dire hors de contrôle : **un superadmin qui ferme le
+module le garde fermé.** Le parcours ne peut pas ouvrir ce que les droits
+refusent — une épreuve le vérifie.
+
+Six épreuves dans `ParcoursSouscriptionTest`. Trois d'entre elles échouent si
+l'on retire la correction ; c'est vérifié, pas supposé.
+
 ### Modèles d'import de Comptaflow — les quatre fichiers ne s'importent pas
 
 Vérifié fichier par fichier le 15/08/2026, en rejouant la logique des trois

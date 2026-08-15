@@ -126,8 +126,12 @@ class SouscriptionControleur
 
         // Un module qui n'est pas autorisé ne peut pas s'activer, même envoyé
         // par un formulaire : les droits appartiennent au superadmin.
+        //
+        // Les modules structurels rejoignent le choix quoi qu'il arrive. Leurs
+        // cases sont désactivées à l'écran, et une case désactivée **n'est pas
+        // transmise** : sans ce rattrapage, valider l'étape les retirerait.
         $retenus = array_values(array_intersect(
-            $donnees['modules'] ?? [],
+            array_unique(array_merge($donnees['modules'] ?? [], Entreprise::MODULES_STRUCTURELS)),
             $entreprise->modulesAutorises()
         ));
 
@@ -156,7 +160,7 @@ class SouscriptionControleur
             $entreprise->update([
                 'modules_actifs' => array_values(array_intersect(
                     $bilan['modules'],
-                    array_merge($choix['modules'], ['principal'])
+                    array_merge($choix['modules'], Entreprise::MODULES_STRUCTURELS)
                 )),
             ]);
         }
@@ -362,7 +366,7 @@ class SouscriptionControleur
      */
     private function modulesProposes(array $codesProfils): array
     {
-        $modules = ['principal', 'ventes', 'achats', 'tiers', 'produits', 'rapports', 'comptabilite'];
+        $modules = Entreprise::MODULES_SOCLE;
 
         foreach (Profil::whereIn('code', $codesProfils)->get() as $profil) {
             $modules = array_merge($modules, $profil->modulesOuverts());

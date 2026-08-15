@@ -189,21 +189,36 @@
                l'usage — vous pourrez les rouvrir à tout moment depuis vos paramètres.</p>
         </div>
 
+        @php
+            // Ce qu'on ne décoche pas, et pourquoi. `points_de_vente` ne porte
+            // pas que les sites : le personnel et les habilitations vivent
+            // derrière lui. Le retirer priverait l'administrateur de l'écran
+            // où il gère ses propres utilisateurs et leurs droits.
+            $structurels = \App\Modules\Admin\Modeles\Entreprise::MODULES_STRUCTURELS;
+            $raisons = [
+                'principal'       => "Le socle de l'application — il reste toujours ouvert.",
+                'points_de_vente' => 'Vos sites, votre personnel et leurs droits — il reste toujours ouvert.',
+            ];
+        @endphp
+
         <div class="liste">
             @foreach($modulesProposes as $module)
+            @php $estStructurel = in_array($module, $structurels, true); @endphp
             <label class="ligne">
                 <input type="checkbox" name="modules[]" value="{{ $module }}"
-                       {{ in_array($module, $choix['modules'] ?? $modulesProposes, true) ? 'checked' : '' }}
-                       {{ $module === 'principal' ? 'disabled' : '' }}>
+                       {{ $estStructurel || in_array($module, $choix['modules'] ?? $modulesProposes, true) ? 'checked' : '' }}
+                       {{ $estStructurel ? 'disabled' : '' }}>
                 <div>
                     <div class="nom">{{ ucfirst(str_replace('_', ' ', $module)) }}</div>
-                    @if($module === 'principal')
-                        <div class="sous">Le socle de l'application — il reste toujours ouvert.</div>
-                    @endif
+                    @isset($raisons[$module])
+                        <div class="sous">{{ $raisons[$module] }}</div>
+                    @endisset
                 </div>
             </label>
-            @if($module === 'principal')
-                <input type="hidden" name="modules[]" value="principal">
+            {{-- Une case désactivée n'est pas transmise : sans ce relais, valider
+                 l'étape retirerait le module qu'on vient de dire indéracinable. --}}
+            @if($estStructurel)
+                <input type="hidden" name="modules[]" value="{{ $module }}">
             @endif
             @endforeach
         </div>
