@@ -1805,6 +1805,49 @@ Restent hors import, par choix : le plan comptable et les codes journaux, que
 Selflow livre par son propre référentiel, et les soldes d'ouverture
 comptables, qui appartiennent à Comptaflow.
 
+### Libellés d'écriture — l'intitulé du compte tient lieu de libellé
+
+Relevé par le propriétaire du projet le 15/08/2026, et vérifié dans le code.
+
+**Ce sont deux choses différentes.** L'intitulé du compte appartient au plan
+comptable : 701000 s'appelle « Ventes de marchandises », et cela ne change
+jamais. Le libellé de l'écriture dit ce qui s'est passé — quelle pièce, avec
+qui. Selflow met aujourd'hui le premier à la place du second.
+
+Pour une facture FA-0042 de ciment et fer à béton, vendue à ABC SARL :
+
+| Ligne | Ce qui s'écrit | Verdict |
+|---|---|---|
+| En-tête de l'opération | `Vente de marchandises` | **intitulé du compte**, déduit de la racine 701 |
+| Client 411000 | `FA-0042 / Facturation Vente` | le tiers manque |
+| Produit 701000, ≤ 3 articles | `FA-0042 / Ciment, Fer à béton` | correct |
+| Produit 701000, > 3 articles | `FA-0042 / Vente de marchandises…` | **intitulé du compte** |
+| TVA 443100 | `FA-0042 / TVA Collectée Vente` | correct |
+| Règlement | `Rglt/FA-0042/Vente Ciment, Fer à béton` | le tiers manque |
+
+Deux fois sur six, c'est l'intitulé du compte qui sert de libellé, et **le nom
+du tiers n'apparaît jamais**. Or `grand_livre.blade.php:21` affiche déjà
+« 701000 — Ventes de marchandises » en tête de colonne : le répéter dans
+chaque ligne n'apprend rien et occupe la place de ce qui manque.
+
+Le mécanisme n'est pas mauvais partout : la référence de pièce est là, les
+articles remontent quand ils tiennent, et au-delà de trois la liste complète
+part dans la colonne `description` que la vue déplie au clic — un libellé de
+cinq cents caractères serait illisible. C'est déjà mieux que le texte fixe
+d'origine, « Vente — Facture X » répété à l'identique partout.
+
+**Deux manques, donc, et non un seul :**
+
+1. l'intitulé du compte sert de libellé d'opération, et le tiers est absent ;
+2. rien n'est paramétrable — l'assemblage est écrit dans
+   `ComptabiliteService`.
+
+Le correctif proposé traite les deux : une table `modeles_libelles` portée par
+`entreprise_id`, six gabarits, des jetons `{piece}` `{tiers}` `{produits}`
+`{point_de_vente}` `{date}`, et **`{piece} — {tiers}` par défaut**. Les
+écritures déjà passées ne sont jamais réécrites : un libellé est ce qu'il
+était au jour de la pièce.
+
 ### Souscription — les points de vente disparaissaient — **CORRIGÉ**
 
 Signalé le 15/08/2026 : la section « Points de vente » de la barre latérale
