@@ -1213,8 +1213,38 @@ L'état d'attente porte les deux liens qui manquaient — se connecter, créer u
 compte. Sans eux, un visiteur arrivé avant la publication n'avait nulle part
 où aller.
 
-**Ce qui reste : la saisie.** Textes, tarifs, images, mentions légales,
-présentation de DC-Knowing. Rien de tout cela ne peut être inventé ici.
+**La vraie page d'accueil — 15/08/2026.** La première version savait afficher
+des cartes en colonnes ; ce n'était pas une page de présentation. Elle a été
+refaite :
+
+| Élément | Détail |
+|---|---|
+| Neuf dispositions | bandeau, colonnes, liste, **produits**, **équipe**, **chiffres**, **média**, tarifs, texte |
+| Entrée au défilement | `IntersectionObserver`, une observation par élément, décalage progressif entre les cartes |
+| Mouvement réduit | `prefers-reduced-motion` respecté en CSS **et** en JavaScript — tout s'affiche d'emblée |
+| La facture qui part à la DGI | entièrement dessinée en CSS : ondes, flottement, piste de transmission, code QR, pastille « Normalisée ». Aucune image à charger |
+| Médias | une image ou une vidéo par section, fichier déposé (20 Mo) ou adresse. La vidéo est `muted`, sans quoi le navigateur refuse la lecture automatique |
+| Fonds | clair, blanc, sombre — c'est l'alternance qui découpe la page à l'œil |
+| Menu | ancres vers les sections, repliable sous 700 px, se referme derrière soi |
+| Responsive | trois paliers ; les grilles passent de 4 à 2 à 1 colonne |
+
+**Le semeur `VitrineSeeder` pose la charpente et les textes dictés par le
+propriétaire** : les six applications — Selflow, Comptaflow, RHFlow, LegalFlow,
+Agent-AI, CGA-Connect —, la fiche du développeur, celle du cabinet, et les
+deux entrées documentation et politique. Il passe par `firstOrCreate` sur
+chaque clé : le relancer après une saisie n'efface rien, ce qui permet de le
+laisser dans `DatabaseSeeder`.
+
+**Ce qui reste vide, et pourquoi.** Photos, vidéos, noms des autres membres :
+aucun n'a été donné. Et trois descriptions se réduisent à leur domaine —
+RHFlow, LegalFlow, Agent-AI — parce que c'est tout ce que leur nom permet
+d'affirmer. **Elles sont à relire.**
+
+La présentation de DC-Knowing ne porte que ce que le propriétaire a dit :
+cabinet comptable, et M. Keyman Constant directeur général. Une recherche
+publique ne trouve la maison que dans la liste 2023 des Centres de Gestion
+Agréés de la DGI, sous un autre nom de responsable — rien qui permette
+d'écrire son histoire sans l'inventer.
 
 ### Les accès délégués — **TRANCHÉ ET LIVRÉ**
 

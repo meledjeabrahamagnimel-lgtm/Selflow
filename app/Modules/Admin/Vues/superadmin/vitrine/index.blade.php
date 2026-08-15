@@ -217,24 +217,44 @@
 
                     <div class="duo">
                         <div class="champ">
-                            <label>Libellé du lien</label>
-                            <input type="text" name="lien_libelle" maxlength="64">
-                        </div>
-                        <div class="champ">
-                            <label>Adresse du lien</label>
-                            <input type="text" name="lien_url" maxlength="255" placeholder="https://… ou /inscription">
-                        </div>
-                    </div>
-
-                    <div class="duo">
-                        <div class="champ">
-                            <label>Illustration</label>
-                            <input type="file" name="image" accept="image/*">
+                            <label>Rôle</label>
+                            <input type="text" name="role" maxlength="64" placeholder="Comptabilité, Développeur…">
+                            <div class="aide">Ce que la carte est, en un mot. En étiquette sur un produit,
+                                en fonction sous un nom dans la disposition « Équipe ».</div>
                         </div>
                         <div class="champ">
                             <label>Ordre</label>
                             <input type="number" name="ordre" min="0" max="999" placeholder="à la suite">
                         </div>
+                    </div>
+
+                    <div class="duo">
+                        <div class="champ">
+                            <label>Libellé du lien</label>
+                            <input type="text" name="lien_libelle" maxlength="64">
+                        </div>
+                        <div class="champ">
+                            <label>Adresse du lien</label>
+                            <input type="text" name="lien_url" maxlength="255" placeholder="https://…, /inscription ou #produits">
+                        </div>
+                    </div>
+
+                    <div class="duo">
+                        <div class="champ">
+                            <label>Libellé du second lien</label>
+                            <input type="text" name="lien_secondaire_libelle" maxlength="64" placeholder="Documentation">
+                        </div>
+                        <div class="champ">
+                            <label>Adresse du second lien</label>
+                            <input type="text" name="lien_secondaire_url" maxlength="255">
+                        </div>
+                    </div>
+
+                    <div class="champ">
+                        <label>Illustration ou portrait</label>
+                        <input type="file" name="image" accept="image/*">
+                        <div class="aide">Sans photo, la disposition « Équipe » affiche les initiales
+                            dans un rond plutôt qu'une case grise.</div>
                     </div>
 
                     <button type="submit" class="btn btn-primary btn-sm">
@@ -248,7 +268,7 @@
                 <summary><i class="fas fa-pen"></i> Modifier cette section</summary>
 
                 <form method="POST" action="{{ route('superadmin.vitrine.sections.modifier', $section) }}"
-                      style="margin-top:10px;">
+                      enctype="multipart/form-data" style="margin-top:10px;">
                     @csrf @method('PUT')
                     <div class="duo">
                         <div class="champ">
@@ -280,6 +300,67 @@
                         <div class="champ">
                             <label>Ordre *</label>
                             <input type="number" name="ordre" required min="0" max="999" value="{{ $section->ordre }}">
+                        </div>
+                    </div>
+
+                    <div class="duo">
+                        <div class="champ">
+                            <label>Fond</label>
+                            <select name="fond">
+                                @foreach($fonds as $code => $libelle)
+                                    <option value="{{ $code }}" {{ $section->fondSur() === $code ? 'selected' : '' }}>
+                                        {{ $libelle }}
+                                    </option>
+                                @endforeach
+                            </select>
+                            <div class="aide">C'est l'alternance des fonds qui découpe la page à l'œil
+                                quand on la parcourt.</div>
+                        </div>
+                        <div class="champ">
+                            <label>Type de média</label>
+                            <select name="media_type">
+                                <option value="">Aucun</option>
+                                @foreach($medias as $code => $libelle)
+                                    <option value="{{ $code }}" {{ $section->media_type === $code ? 'selected' : '' }}>
+                                        {{ $libelle }}
+                                    </option>
+                                @endforeach
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="duo">
+                        <div class="champ">
+                            <label>Déposer le média</label>
+                            <input type="file" name="media" accept="image/*,video/mp4,video/webm">
+                            <div class="aide">Image ou vidéo, 20 Mo au plus. Au-delà, hébergez la vidéo
+                                ailleurs et collez son adresse ci-contre.
+                                @if($section->media_path)<br><strong>Un fichier est déjà déposé.</strong>@endif
+                            </div>
+                        </div>
+                        <div class="champ">
+                            <label>…ou son adresse</label>
+                            <input type="text" name="media_url" maxlength="255" value="{{ $section->media_url }}"
+                                   placeholder="https://…">
+                            <div class="aide">Le fichier déposé l'emporte sur l'adresse.</div>
+                        </div>
+                    </div>
+
+                    <div class="champ">
+                        <label>Légende du média</label>
+                        <input type="text" name="media_legende" maxlength="255" value="{{ $section->media_legende }}">
+                    </div>
+
+                    <div class="duo">
+                        <div class="champ">
+                            <label>Libellé du bouton</label>
+                            <input type="text" name="action_libelle" maxlength="64" value="{{ $section->action_libelle }}"
+                                   placeholder="Créer un compte">
+                        </div>
+                        <div class="champ">
+                            <label>Adresse du bouton</label>
+                            <input type="text" name="action_url" maxlength="255" value="{{ $section->action_url }}"
+                                   placeholder="/inscription ou #produits">
                         </div>
                     </div>
 

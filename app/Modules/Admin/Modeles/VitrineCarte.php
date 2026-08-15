@@ -20,10 +20,32 @@ class VitrineCarte extends Model
     protected $table = 'vitrine_cartes';
 
     protected $fillable = [
-        'section_id', 'titre', 'texte', 'icone', 'image_path',
-        'lien_libelle', 'lien_url', 'valeur', 'mention',
+        'section_id', 'titre', 'texte', 'role', 'icone', 'image_path',
+        'lien_libelle', 'lien_url', 'lien_secondaire_libelle', 'lien_secondaire_url',
+        'valeur', 'mention',
         'ordre', 'publiee',
     ];
+
+    /**
+     * Les initiales, quand la photo manque encore.
+     *
+     * Un portrait vide est une case grise ; deux lettres tenues dans un rond
+     * font une carte qui se regarde en attendant l'image.
+     */
+    public function initiales(): string
+    {
+        $mots = preg_split('/\s+/', trim((string) $this->titre)) ?: [];
+        $mots = array_values(array_filter($mots));
+
+        if ($mots === []) {
+            return '?';
+        }
+
+        $premiere = mb_substr($mots[0], 0, 1);
+        $seconde  = count($mots) > 1 ? mb_substr($mots[count($mots) - 1], 0, 1) : '';
+
+        return mb_strtoupper($premiere . $seconde);
+    }
 
     protected function casts(): array
     {

@@ -22,6 +22,12 @@ class DatabaseSeeder extends Seeder
         // changé sans dupliquer ce qui existe.
         $this->call(ReferentielSeeder::class);
 
+        // La charpente de la page d'accueil. Elle ne réécrit jamais ce qui
+        // existe — chaque bloc passe par `firstOrCreate` sur sa clé —, si bien
+        // que relancer le semeur après une saisie n'efface pas le travail du
+        // superadministrateur.
+        $this->call(VitrineSeeder::class);
+
         $this->call(DonneesInitialesSeeder::class);
     }
 }

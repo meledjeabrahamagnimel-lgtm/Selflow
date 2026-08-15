@@ -48,21 +48,15 @@ class VitrineControleur
         return view('admin::superadmin.vitrine.index', [
             'sections' => $sections,
             'gabarits' => VitrineSection::GABARITS,
+            'fonds'    => VitrineSection::FONDS,
+            'medias'   => VitrineSection::MEDIAS,
         ]);
     }
 
     public function creerSection(Request $request): RedirectResponse
     {
-        $champs = $request->validate([
-            'cle'        => ['required', 'string', 'max:64', 'regex:/^[a-z0-9\-]+$/', 'unique:vitrine_sections,cle'],
-            'titre'      => ['required', 'string', 'max:255'],
-            'sous_titre' => ['nullable', 'string', 'max:255'],
-            'texte'      => ['nullable', 'string', 'max:5000'],
-            'gabarit'    => ['required', 'string', 'in:' . implode(',', array_keys(VitrineSection::GABARITS))],
-            'ordre'      => ['nullable', 'integer', 'min:0', 'max:999'],
-        ], [
-            'cle.regex'  => 'La clé ne prend que des minuscules, des chiffres et des tirets : elle sert d\'ancre dans l\'adresse.',
-            'cle.unique' => 'Une section porte déjà cette clé.',
+        $champs = $this->validerSection($request, [
+            'cle' => ['required', 'string', 'max:64', 'regex:/^[a-z0-9\-]+$/', 'unique:vitrine_sections,cle'],
         ]);
 
         $champs['ordre']   = $champs['ordre'] ?? (VitrineSection::max('ordre') + 10);
@@ -75,17 +69,58 @@ class VitrineControleur
 
     public function modifierSection(Request $request, VitrineSection $section): RedirectResponse
     {
-        $champs = $request->validate([
-            'titre'      => ['required', 'string', 'max:255'],
-            'sous_titre' => ['nullable', 'string', 'max:255'],
-            'texte'      => ['nullable', 'string', 'max:5000'],
-            'gabarit'    => ['required', 'string', 'in:' . implode(',', array_keys(VitrineSection::GABARITS))],
-            'ordre'      => ['required', 'integer', 'min:0', 'max:999'],
-        ]);
+        $champs = $this->validerSection($request);
+
+        if ($request->hasFile('media')) {
+            // L'ancien fichier n'a plus d'usage : le laisser remplirait le
+            // disque d'illustrations que plus rien n'affiche.
+            if ($section->media_path && Storage::disk('public')->exists($section->media_path)) {
+                Storage::disk('public')->delete($section->media_path);
+            }
+            $champs['media_path'] = $request->file('media')->store('vitrine', 'public');
+        }
 
         $section->update($champs);
 
         return back()->with('succes', 'Section mise à jour.');
+    }
+
+    /**
+     * Ce qu'une section accepte.
+     *
+     * @param  array<string, array<int, mixed>>  $enPlus
+     * @return array<string, mixed>
+     */
+    private function validerSection(Request $request, array $enPlus = []): array
+    {
+        return $request->validate($enPlus + [
+            'titre'      => ['required', 'string', 'max:255'],
+            'sous_titre' => ['nullable', 'string', 'max:255'],
+            'texte'      => ['nullable', 'string', 'max:5000'],
+            'gabarit'    => ['required', 'string', 'in:' . implode(',', array_keys(VitrineSection::GABARITS))],
+            'fond'       => ['nullable', 'string', 'in:' . implode(',', array_keys(VitrineSection::FONDS))],
+            'ordre'      => ['nullable', 'integer', 'min:0', 'max:999'],
+
+            // L'illustration : un fichier déposé, ou une adresse. Une vidéo de
+            // démonstration pèse trop pour le disque d'une application de
+            // gestion — on accepte donc les deux.
+            'media_type'    => ['nullable', 'string', 'in:' . implode(',', array_keys(VitrineSection::MEDIAS))],
+            'media_url'     => ['nullable', 'string', 'max:255', 'regex:#^(https?://|/)#i'],
+            'media_legende' => ['nullable', 'string', 'max:255'],
+            'media'         => ['nullable', 'file', 'mimes:png,jpg,jpeg,webp,svg,mp4,webm', 'max:20480'],
+
+            'action_libelle' => ['nullable', 'string', 'max:64'],
+            // Même règle que pour les cartes : un `javascript:` déposé ici
+            // s'exécuterait chez chaque visiteur de la page publique.
+            'action_url'     => ['nullable', 'string', 'max:255', 'regex:#^(https?://|/|\#)#i'],
+        ], [
+            'cle.regex'       => 'La clé ne prend que des minuscules, des chiffres et des tirets : elle sert d\'ancre dans l\'adresse.',
+            'cle.unique'      => 'Une section porte déjà cette clé.',
+            'media_url.regex' => 'L\'adresse du média doit être un lien http(s) ou un chemin interne.',
+            'action_url.regex'=> 'Le lien du bouton doit être une adresse http(s), un chemin interne, ou une ancre (#produits).',
+            'media.mimes'     => 'Le média doit être une image (png, jpg, webp, svg) ou une vidéo (mp4, webm).',
+            'media.max'       => 'Le fichier ne peut pas dépasser 20 Mo. Au-delà, hébergez la vidéo ailleurs et collez son adresse.',
+        ]);
     }
 
     /**
@@ -175,12 +210,16 @@ class VitrineControleur
         return $request->validate([
             'titre'        => ['required', 'string', 'max:255'],
             'texte'        => ['nullable', 'string', 'max:2000'],
+            // Ce que la carte est, en un mot : « Comptabilité », « Développeur ».
+            'role'         => ['nullable', 'string', 'max:64'],
             'icone'        => ['nullable', 'string', 'max:64'],
             'lien_libelle' => ['nullable', 'string', 'max:64'],
-            // Une adresse http(s), ou un chemin interne commençant par `/`.
+            // Une adresse http(s), un chemin interne, ou une ancre de la page.
             // Rien d'autre : un `javascript:` déposé ici s'exécuterait chez
             // chaque visiteur de la page publique.
-            'lien_url'     => ['nullable', 'string', 'max:255', 'regex:#^(https?://|/)#i'],
+            'lien_url'     => ['nullable', 'string', 'max:255', 'regex:#^(https?://|/|\#)#i'],
+            'lien_secondaire_libelle' => ['nullable', 'string', 'max:64'],
+            'lien_secondaire_url'     => ['nullable', 'string', 'max:255', 'regex:#^(https?://|/|\#)#i'],
             'valeur'       => ['nullable', 'string', 'max:64'],
             'mention'      => ['nullable', 'string', 'max:255'],
             'ordre'        => ['nullable', 'integer', 'min:0', 'max:999'],

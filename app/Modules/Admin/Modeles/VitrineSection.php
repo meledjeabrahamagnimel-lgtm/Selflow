@@ -22,11 +22,46 @@ class VitrineSection extends Model
     protected $fillable = [
         'cle', 'titre', 'sous_titre', 'texte',
         'gabarit', 'ordre', 'publiee',
+        'media_type', 'media_path', 'media_url', 'media_legende',
+        'fond', 'action_libelle', 'action_url',
     ];
 
     protected function casts(): array
     {
         return ['publiee' => 'boolean', 'ordre' => 'integer'];
+    }
+
+    /** Les fonds, qui découpent la page à l'œil quand on la parcourt. */
+    public const FONDS = [
+        'clair'  => 'Clair — le fond ordinaire',
+        'blanc'  => 'Blanc — pour détacher une section de ses voisines',
+        'sombre' => 'Sombre — bleu profond, texte clair',
+    ];
+
+    /** Ce qu'une section peut porter comme illustration. */
+    public const MEDIAS = [
+        'image' => 'Une image',
+        'video' => 'Une vidéo',
+    ];
+
+    /**
+     * L'adresse de l'illustration, fichier déposé ou lien.
+     *
+     * Une vidéo pèse trop pour le disque d'une application de gestion : on
+     * accepte donc les deux, et le fichier l'emporte quand il existe.
+     */
+    public function mediaUrl(): ?string
+    {
+        if ($this->media_path) {
+            return \Illuminate\Support\Facades\Storage::disk('public')->url($this->media_path);
+        }
+
+        return $this->media_url ?: null;
+    }
+
+    public function fondSur(): string
+    {
+        return array_key_exists($this->fond, self::FONDS) ? $this->fond : 'clair';
     }
 
     /**
@@ -39,9 +74,13 @@ class VitrineSection extends Model
      * @var array<string, string>
      */
     public const GABARITS = [
-        'bandeau'  => 'Bandeau d\'ouverture — un grand titre et un appel à l\'action',
+        'bandeau'  => 'Bandeau d\'ouverture — un grand titre, un appel à l\'action, la facture qui part à la DGI',
         'colonnes' => 'Colonnes — les cartes côte à côte, en grille',
         'liste'    => 'Liste — les cartes les unes sous les autres',
+        'produits' => 'Produits — une carte par application, avec son rôle et ses liens',
+        'equipe'   => 'Équipe — un portrait par personne, avec sa fonction',
+        'chiffres' => 'Chiffres — quelques valeurs mises en avant, sans texte long',
+        'media'    => 'Média — une image ou une vidéo en grand, avec le texte à côté',
         'tarifs'   => 'Tarifs — une carte par offre, avec son prix',
         'texte'    => 'Texte seul — aucune carte, seulement le texte de la section',
     ];
