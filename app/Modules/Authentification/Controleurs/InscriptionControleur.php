@@ -12,6 +12,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\Rule;
 use Illuminate\View\View;
+use App\Modules\Admin\Services\AccesFneService;
 use App\Modules\Admin\Services\TrousseauEntrepriseService;
 
 class InscriptionControleur
@@ -27,9 +28,16 @@ class InscriptionControleur
     /** Traiter la soumission du formulaire d'inscription. */
     public function inscrire(Request $request): RedirectResponse
     {
+        // Deux étapes seulement bloquent la création : l'entreprise a besoin
+        // d'un nom, et il lui faut un responsable qui puisse se connecter.
+        // Tout le reste se renseigne aussi bien une fois dans l'application —
+        // un formulaire de vingt champs se remplit mal, ou pas. Rien n'est
+        // oublié pour autant : `estInscriptionComplete()` le signale, et le
+        // garde `inscription.complete` retient ventes et achats tant que la
+        // situation fiscale manque.
         $request->validate([
             'nom_entreprise'      => ['required', 'string', 'max:150'],
-            'regime_imposition'   => ['required', 'string', 'in:TEE,RNE,RSI,RNI'],
+            'regime_imposition'   => ['nullable', 'string', 'in:TEE,RNE,RSI,RNI'],
             'nom'                 => ['required', 'string', 'max:100'],
             'prenom'              => ['required', 'string', 'max:100'],
             'email'               => ['required', 'string', 'email', 'max:191', 'unique:utilisateurs,email'],
@@ -41,6 +49,22 @@ class InscriptionControleur
             'rccm'                => ['nullable', 'string', 'max:100'],
             'compte_contribuable' => ['nullable', 'string', 'max:100'],
             'forme_juridique'     => ['nullable', 'string', 'max:60'],
+            'centre_impots'       => ['nullable', 'string', 'max:100'],
+            'ncc'                 => ['nullable', 'string', 'size:8', 'regex:/^[A-Z0-9]{7}[A-Z]$/'],
+
+            // ── L'étape « facture normalisée » ──
+            //
+            // L'entreprise déclare si elle a déjà un compte FNE. Si oui, son
+            // NCC et le mot de passe de son espace suffisent : tout le reste
+            // est déjà chez la DGI, et le lui faire ressaisir ne ferait
+            // qu'introduire des écarts. Si non, on relève ce qu'il faut pour
+            // lui en ouvrir un.
+            //
+            // Le mot de passe est chiffré au repos et n'est jamais rendu à
+            // l'écran. Voir AccesFneService.
+            'possede_compte_fne'  => ['nullable', 'in:0,1'],
+            'fne_ncc'             => ['nullable', 'string', 'size:8', 'regex:/^[A-Z0-9]{7}[A-Z]$/'],
+            'fne_mot_de_passe'    => ['nullable', 'string', 'max:255'],
             // Le domaine se choisit dans le référentiel, pas au clavier : une
             // valeur libre ne correspondrait à aucune catégorie, et l'étape 1
             // de la souscription ne saurait pas la retrouver.
@@ -50,8 +74,11 @@ class InscriptionControleur
             'telephone_gerant'    => ['nullable', 'string', 'max:30'],
         ], [
             'nom_entreprise.required'    => 'Le nom de votre entreprise est obligatoire.',
-            'regime_imposition.required' => 'Le régime d\'imposition est obligatoire.',
             'regime_imposition.in'       => 'Régime invalide. Choisissez TEE, RNE, RSI ou RNI.',
+            'fne_ncc.size'               => 'Le NCC doit comporter exactement 8 caractères.',
+            'fne_ncc.regex'              => 'Le NCC doit être composé de 7 chiffres ou lettres suivis d\'une lettre.',
+            'ncc.size'                   => 'Le NCC doit comporter exactement 8 caractères.',
+            'ncc.regex'                  => 'Le NCC doit être composé de 7 chiffres ou lettres suivis d\'une lettre.',
             'nom.required'               => 'Votre nom est obligatoire.',
             'prenom.required'            => 'Votre prénom est obligatoire.',
             'email.required'             => 'L\'adresse email est obligatoire.',
@@ -75,7 +102,16 @@ class InscriptionControleur
                 'compte_contribuable' => trim($request->compte_contribuable ?? ''),
                 'forme_juridique'     => trim($request->forme_juridique ?? ''),
                 'regime_imposition'   => $request->regime_imposition,
+                'ncc'                 => $request->filled('fne_ncc')
+                    ? strtoupper(trim($request->fne_ncc))
+                    : ($request->filled('ncc') ? strtoupper(trim($request->ncc)) : null),
+                'centre_impots'       => trim($request->centre_impots ?? ''),
                 'secteur_activite'    => $request->secteurs_activite ?? [],
+                // Trois états : la question peut n'avoir pas encore été posée,
+                // l'étape étant facultative.
+                'possede_compte_fne'  => $request->filled('possede_compte_fne')
+                    ? $request->input('possede_compte_fne') === '1'
+                    : null,
                 'gerant_nom'          => trim($request->nom),
                 'gerant_prenom'       => trim($request->prenom),
                 'gerant_fonction'     => trim($request->fonction_gerant ?? ''),
@@ -90,6 +126,11 @@ class InscriptionControleur
             // travailler des le premier jour ; ce qui ne lui sert pas, elle
             // l'archivera.
             TrousseauEntrepriseService::doter($entreprise);
+
+            // L'acces a l'espace FNE, si l'entreprise en a deja un. Chiffre au
+            // repos, jamais rendu a l'ecran, efface une fois le parametrage
+            // releve : c'est un acces a un service de l'Etat, pas un reglage.
+            AccesFneService::enregistrer($entreprise, $request->fne_ncc, $request->fne_mot_de_passe);
 
             // 2. Créer l'utilisateur admin principal
             $utilisateur = Utilisateur::create([

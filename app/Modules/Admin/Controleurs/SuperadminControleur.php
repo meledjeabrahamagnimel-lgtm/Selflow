@@ -126,20 +126,48 @@ class SuperadminControleur
             'gerant_nom'              => ['nullable', 'string', 'max:100'],
             'gerant_prenom'           => ['nullable', 'string', 'max:150'],
             'gerant_fonction'         => ['nullable', 'string', 'max:150'],
-            'email'                   => ['nullable', 'email', 'max:150'],
+
+            // ── Le responsable, et son mot de passe ──
+            //
+            // Cet écran créait une entreprise **et personne pour s'y
+            // connecter** : aucun `Utilisateur` n'était enregistré, et le
+            // formulaire ne demandait pas même un mot de passe. Toute
+            // entreprise créée par le superadministrateur était donc
+            // inutilisable, sans que rien ne le signale — il fallait ensuite
+            // lui fabriquer un compte à la main.
+            'email'                   => ['required', 'email', 'max:150', 'unique:utilisateurs,email'],
+            'gerant_password'         => ['required', 'string', 'min:8', 'confirmed'],
+
             'telephone'               => ['nullable', 'string', 'max:30'],
             'adresse'                 => ['nullable', 'string', 'max:255'],
             'rccm'                    => ['nullable', 'string', 'max:100'],
             'ncc'                     => ['nullable', 'string', 'size:8', 'regex:/^[A-Z0-9]{7}[A-Z]$/'],
             'compte_contribuable'     => ['nullable', 'string', 'max:100'],
+            'centre_impots'           => ['nullable', 'string', 'max:100'],
             'regime_imposition'       => ['nullable', 'string', 'max:80'],
             'quota_points_de_vente'   => ['required', 'integer', 'min:1'],
             'plan_abonnement'         => ['required', 'string'],
-            'secteur_activite'        => ['required', 'array'],
-            'secteur_activite.*'      => ['required', 'string', Rule::in(Categorie::domaines())],
-            'modules_actifs'          => ['required', 'array'],
+
+            // Le domaine et la situation fiscale sont des étapes facultatives,
+            // ici comme à l'inscription : elles se complètent aussi bien une
+            // fois dans l'application. Voir EtapesCreation.
+            'secteur_activite'        => ['nullable', 'array'],
+            'secteur_activite.*'      => ['string', Rule::in(Categorie::domaines())],
+            'modules_actifs'          => ['nullable', 'array'],
+
+            // ── L'accès à l'espace FNE, si l'entreprise en a déjà un ──
+            'possede_compte_fne'      => ['nullable', 'in:0,1'],
+            'fne_ncc'                 => ['nullable', 'string', 'size:8', 'regex:/^[A-Z0-9]{7}[A-Z]$/'],
+            'fne_mot_de_passe'        => ['nullable', 'string', 'max:255'],
+
             // Champs COMPTAFLOW conditionnels
             'comptaflow_password'     => [$request->boolean('creer_compte_comptaflow') ? 'required' : 'nullable', 'string', 'min:8', 'confirmed'],
+        ], [
+            'email.required'           => "L'adresse du responsable est obligatoire : c'est avec elle qu'il se connectera.",
+            'email.unique'             => 'Cette adresse est déjà utilisée par un autre compte.',
+            'gerant_password.required' => "Sans mot de passe, le responsable ne pourra pas entrer dans son espace.",
+            'gerant_password.min'      => 'Le mot de passe doit contenir au moins 8 caractères.',
+            'gerant_password.confirmed'=> 'La confirmation du mot de passe ne correspond pas.',
         ]);
 
         // Tous les modules sont activés par défaut — l'admin peut en désactiver dans les paramètres
@@ -160,11 +188,17 @@ class SuperadminControleur
             'rccm'                   => $request->rccm,
             'ncc'                    => $request->ncc,
             'compte_contribuable'    => $request->compte_contribuable,
+            'centre_impots'          => $request->centre_impots,
             'regime_imposition'      => $request->regime_imposition,
             'quota_points_de_vente'  => $request->quota_points_de_vente,
             'plan_abonnement'        => $request->plan_abonnement,
-            'secteur_activite'       => $request->secteur_activite,
+            'secteur_activite'       => $request->secteur_activite ?? [],
             'modules_actifs'         => $modules,
+            // Trois états : la question peut n'avoir pas encore été posée,
+            // l'étape étant facultative.
+            'possede_compte_fne'     => $request->filled('possede_compte_fne')
+                ? $request->input('possede_compte_fne') === '1'
+                : null,
         ]);
 
         // Sans plan comptable ni journal, la premiere vente s'impute sur des
@@ -172,6 +206,32 @@ class SuperadminControleur
         // travailler des le premier jour ; ce qui ne lui sert pas, elle
         // l'archivera.
         TrousseauEntrepriseService::doter($entreprise);
+
+        // ── Le responsable, sans qui l'entreprise n'est atteignable par
+        //    personne ──
+        //
+        // Cet écran ne créait aucun compte : l'entreprise naissait sans
+        // administrateur, et il fallait ensuite lui en fabriquer un à la
+        // main. `doit_changer_password` est posé parce que le mot de passe
+        // vient d'un tiers — le superadministrateur — et non de son
+        // propriétaire : il doit être remplacé à la première connexion.
+        Utilisateur::create([
+            'entreprise_id'         => $entreprise->id,
+            'nom'                   => $request->gerant_nom ?: 'Responsable',
+            'prenom'                => $request->gerant_prenom ?: '',
+            'email'                 => $request->email,
+            'password'              => \Illuminate\Support\Facades\Hash::make($request->gerant_password),
+            'role'                  => 'admin',
+            'fonction'              => $request->gerant_fonction ?: 'Gérant',
+            'statut'                => 'actif',
+            'doit_changer_password' => true,
+        ]);
+
+        // L'acces a l'espace FNE, si l'entreprise en a deja un : chiffre au
+        // repos, jamais rendu a l'ecran, efface une fois le parametrage releve.
+        \App\Modules\Admin\Services\AccesFneService::enregistrer(
+            $entreprise, $request->fne_ncc, $request->fne_mot_de_passe
+        );
 
         // Création automatique du Siège comme point de vente par défaut
         PointDeVente::create([
@@ -230,7 +290,10 @@ class SuperadminControleur
             }
         }
 
-        return redirect()->route('superadmin.entreprises')->with('succes', 'Entreprise et son point de vente "Siège" créés avec succès.' . $messageSupplement);
+        return redirect()->route('superadmin.entreprises')->with('succes',
+            'Entreprise créée, avec son point de vente « Siège » et le compte de son responsable ('
+            . $entreprise->email . '). Il devra changer son mot de passe à la première connexion.'
+            . $messageSupplement);
     }
 
     /**

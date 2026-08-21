@@ -70,13 +70,42 @@
                     
                     <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
                         <div class="form-group">
-                            <label class="form-label">E-mail de contact</label>
-                            <input type="email" name="email" class="form-control" placeholder="Ex: contact@entreprise.ci" value="{{ old('email') }}">
+                            <label class="form-label">E-mail du responsable <span style="color:var(--danger)">*</span></label>
+                            <input type="email" name="email" class="form-control" required
+                                placeholder="Ex: contact@entreprise.ci" value="{{ old('email') }}">
+                            <small style="font-size:11px;color:var(--text-3);">C'est avec cette adresse qu'il se connectera.</small>
+                            @error('email') <small style="color:var(--danger);display:block;">{{ $message }}</small> @enderror
                         </div>
                         <div class="form-group">
                             <label class="form-label">Téléphone</label>
                             <input type="text" name="telephone" class="form-control" placeholder="Ex: +225 07 00 00 00" value="{{ old('telephone') }}">
                         </div>
+                    </div>
+
+                    {{-- Le mot de passe du responsable.
+
+                         Il manquait. Cet écran créait une entreprise **et
+                         personne pour s'y connecter** : aucun compte n'était
+                         enregistré, et il fallait ensuite en fabriquer un à la
+                         main. --}}
+                    <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
+                        <div class="form-group">
+                            <label class="form-label">Mot de passe du responsable <span style="color:var(--danger)">*</span></label>
+                            <input type="password" name="gerant_password" class="form-control" required
+                                minlength="8" placeholder="Min. 8 caractères" autocomplete="new-password">
+                            @error('gerant_password') <small style="color:var(--danger);display:block;">{{ $message }}</small> @enderror
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Confirmation <span style="color:var(--danger)">*</span></label>
+                            <input type="password" name="gerant_password_confirmation" class="form-control" required
+                                minlength="8" placeholder="Répéter le mot de passe" autocomplete="new-password">
+                        </div>
+                    </div>
+
+                    <div style="font-size:11.5px;color:#92400E;background:#FFFBEB;border:1px solid #FCD34D;border-radius:8px;padding:10px 12px;line-height:1.6;margin-bottom:16px;">
+                        <i class="fas fa-key"></i>
+                        Ce mot de passe vient de vous, non de son propriétaire :
+                        le responsable devra <strong>le changer à sa première connexion</strong>.
                     </div>
 
                     <div class="form-group">
@@ -127,13 +156,28 @@
         {{-- Configuration du Secteur & Modules --}}
         <div style="display:flex; flex-direction:column; gap:20px;">
             <div class="card" style="padding: 24px;">
+                {{-- La facture normalisée : la même question qu'à
+                     l'inscription, dans le même bloc. Les deux écrans créent
+                     une entreprise ; ils ne peuvent pas demander des choses
+                     différentes. --}}
+                <div style="font-size:12px;font-weight:700;color:var(--text-2);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px;display:flex;align-items:center;gap:8px;">
+                    <i class="fas fa-file-invoice" style="color:var(--primary);"></i> La facture normalisée
+                    <span style="font-size:10px;font-weight:600;text-transform:none;letter-spacing:0;color:var(--text-3);">— facultatif</span>
+                </div>
+
+                <div style="margin-bottom:24px;">
+                    @include('admin::partiels.compte-fne', ['prefixeId' => 'sa'])
+                </div>
+
                 <div style="font-size:12px;font-weight:700;color:var(--text-2);text-transform:uppercase;letter-spacing:.5px;margin-bottom:16px;display:flex;align-items:center;gap:8px;">
                     <i class="fas fa-gears" style="color:var(--primary);"></i> Secteur & Modules Actifs
                 </div>
                 
                 <div class="form-group" style="margin-bottom:20px;">
-                    <label class="form-label">Secteurs d'activité <span style="color:var(--danger)">*</span></label>
-                    <p style="font-size:11px;color:var(--text-3);margin-bottom:10px;">Sélectionnez tous les secteurs qui correspondent à l'activité de l'entreprise. Tous les modules sont activés par défaut — l'admin peut les désactiver dans ses paramètres.</p>
+                    <label class="form-label">Secteurs d'activité
+                        <span style="font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.04em;color:var(--text-3);background:var(--bg3);border-radius:4px;padding:1px 6px;margin-left:4px;">Facultatif</span>
+                    </label>
+                    <p style="font-size:11px;color:var(--text-3);margin-bottom:10px;">Le domaine décide des modules ouverts et du catalogue proposé. Il se choisit aussi bien plus tard, au parcours de configuration : ne bloquez pas la création pour lui.</p>
                     <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-top:8px;">
                         @php
                             // Le référentiel fait foi : mêmes douze domaines
