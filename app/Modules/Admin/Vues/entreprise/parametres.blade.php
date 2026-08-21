@@ -8,7 +8,25 @@
             <h1><i class="fas fa-building"></i> Paramètres de l'entreprise</h1>
             <p>Informations légales, fiscales et logos qui apparaissent sur vos factures</p>
         </div>
+
+        {{-- Le parcours de configuration n'était accessible qu'une fois, au
+             démarrage. Une entreprise qui ajoute un métier, ouvre un rayon ou
+             veut rouvrir un module n'avait plus aucun chemin pour y revenir.
+             Il se reprend ici, à l'étape qu'on veut : rien n'y est écrasé, et
+             ce qui a déjà été coché revient coché. --}}
+        <a href="{{ route('admin.souscription.index') }}" class="btn btn-outline"
+            style="display:inline-flex;align-items:center;gap:8px;white-space:nowrap;">
+            <i class="fas fa-sliders"></i>
+            Configuration
+        </a>
     </div>
+
+    <p style="font-size:12px;color:var(--text-3);margin:-8px 0 20px;">
+        <i class="fas fa-circle-info"></i>
+        <strong>Configuration</strong> rouvre le parcours de démarrage — domaine, métiers,
+        modules, rayons et prix. Vous pouvez le reprendre à n'importe quelle étape :
+        rien de ce que vous avez déjà coché n'est perdu.
+    </p>
 
     @if(session('succes'))
         <div class="alert alert-success"

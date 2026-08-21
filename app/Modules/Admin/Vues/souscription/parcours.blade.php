@@ -334,6 +334,16 @@
             </a>
         @endif
 
+        {{-- Celui qui revient d'un parcours déjà terminé n'est pas venu le
+             refaire en entier : il complète un point et repart. Sans cette
+             sortie, il devrait traverser les cinq étapes pour retrouver ses
+             paramètres. --}}
+        @if($entreprise->souscription_terminee_le)
+            <a href="{{ route('admin.entreprise.parametres') }}" class="btn btn-outline">
+                <i class="fas fa-xmark"></i> Quitter
+            </a>
+        @endif
+
         <span class="vide" style="margin-left:auto; font-size:12.5px;">
             Étape {{ $etape }} sur {{ $derniere }} — vous pouvez quitter et reprendre.
         </span>

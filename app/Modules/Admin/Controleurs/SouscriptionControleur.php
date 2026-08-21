@@ -308,13 +308,58 @@ class SouscriptionControleur
     }
 
     /**
-     * Les choix faits jusqu'ici, conservés en session.
+     * Les choix faits jusqu'ici.
+     *
+     * La session porte le parcours en cours ; la base porte ce que
+     * l'entreprise a réellement retenu. **Les deux comptent.**
+     *
+     * Le parcours ne lisait que la session. Tant qu'on le suivait d'une
+     * traite, cela suffisait — mais y revenir plus tard, depuis les
+     * paramètres, une fois la session expirée ou après une reconnexion,
+     * affichait **tout décoché** : le domaine à rechoisir, les métiers
+     * oubliés, les modules apparemment fermés. L'utilisateur venu compléter
+     * son paramétrage se serait retrouvé à le refaire, avec le risque de
+     * valider une étape en ayant perdu ce qu'il avait coché.
+     *
+     * La session prime, parce qu'elle est ce que l'utilisateur vient de
+     * choisir ; la base la complète partout où elle se tait.
      *
      * @return array<string, mixed>
      */
     private function choix(Entreprise $entreprise): array
     {
-        return session("souscription.{$entreprise->id}", []);
+        return array_merge(
+            $this->choixDejaRetenus($entreprise),
+            session("souscription.{$entreprise->id}", [])
+        );
+    }
+
+    /**
+     * Ce que l'entreprise a déjà souscrit, relu en base.
+     *
+     * @return array<string, mixed>
+     */
+    private function choixDejaRetenus(Entreprise $entreprise): array
+    {
+        $profils = $entreprise->profils()->get();
+
+        if ($profils->isEmpty()) {
+            return [];
+        }
+
+        $choix = ['profils' => $profils->pluck('code')->all()];
+
+        // Le domaine n'est pas stocké : il se relit du premier métier souscrit,
+        // puisque c'est lui qui l'a fait apparaître à l'étape 2.
+        if ($categorieId = $profils->first()->categorie_id) {
+            $choix['categorie_id'] = $categorieId;
+        }
+
+        if (!empty($entreprise->modules_actifs)) {
+            $choix['modules'] = $entreprise->modules_actifs;
+        }
+
+        return $choix;
     }
 
     private function memoriser(Entreprise $entreprise, array $valeurs): void

@@ -443,6 +443,128 @@ class ParcoursSouscriptionTest extends TestCase
             ->assertDontSee('Continuer <i class="fas fa-arrow-right"></i>', false);
     }
 
+    // ── La reprise depuis les paramètres ─────────────────────────────
+
+    /**
+     * Faire suivre le parcours en entier, puis effacer la session — ce que
+     * fait toute reconnexion.
+     */
+    private function parcoursTermineEtSessionPerdue(): void
+    {
+        $this->actingAs($this->admin);
+        $this->post(route('admin.souscription.enregistrer', 1), ['categorie_id' => $this->commerce()->id]);
+        $this->post(route('admin.souscription.enregistrer', 2), ['profils' => ['boutique_quartier']]);
+        $this->post(route('admin.souscription.enregistrer', 3), ['modules' => ['principal', 'ventes', 'stock']]);
+        $this->post(route('admin.souscription.enregistrer', 4), ['familles' => ['VIV']]);
+        $this->post(route('admin.souscription.enregistrer', 5), []);
+
+        $this->flushSession();
+        $this->actingAs($this->admin->fresh());
+    }
+
+    public function test_les_parametres_ouvrent_le_parcours_de_configuration(): void
+    {
+        // Le parcours n'etait atteignable qu'au demarrage : une entreprise qui
+        // ajoute un metier ou veut rouvrir un module n'avait plus de chemin.
+        $this->parcoursTermineEtSessionPerdue();
+
+        $this->get(route('admin.entreprise.parametres'))
+            ->assertOk()
+            ->assertSee(route('admin.souscription.index'), false);
+    }
+
+    /**
+     * La case portant cette valeur est-elle cochée ?
+     *
+     * Le gabarit rend l'attribut sur la ligne suivante ; une recherche de
+     * chaîne littérale ne le verrait pas.
+     */
+    private function estCochee(string $corps, string $valeur): bool
+    {
+        return (bool) preg_match(
+            '/value="' . preg_quote($valeur, '/') . '"\s+checked/',
+            $corps
+        );
+    }
+
+    public function test_la_reprise_retrouve_le_domaine_deja_choisi(): void
+    {
+        // Le parcours ne lisait que la session. Une fois celle-ci perdue,
+        // l'etape 1 revenait vierge et l'utilisateur devait rechoisir son
+        // domaine -- au risque d'en designer un autre.
+        $this->parcoursTermineEtSessionPerdue();
+
+        $corps = $this->get(route('admin.souscription.index', ['etape' => 1]))
+            ->assertOk()->getContent();
+
+        $this->assertTrue($this->estCochee($corps, (string) $this->commerce()->id),
+            'Le domaine déjà choisi doit revenir coché.');
+    }
+
+    public function test_la_reprise_retrouve_les_metiers_deja_souscrits(): void
+    {
+        $this->parcoursTermineEtSessionPerdue();
+
+        $corps = $this->get(route('admin.souscription.index', ['etape' => 2]))
+            ->assertOk()->getContent();
+
+        $this->assertTrue($this->estCochee($corps, 'boutique_quartier'),
+            'Le métier déjà souscrit doit revenir coché.');
+    }
+
+    public function test_la_reprise_ne_rouvre_pas_un_module_ferme(): void
+    {
+        // Le pire cas : les modules revenaient tous coches, et valider
+        // l'etape rouvrait ce que l'utilisateur avait volontairement ferme.
+        $this->parcoursTermineEtSessionPerdue();
+
+        $this->assertFalse($this->entreprise->fresh()->moduleEstActif('comptabilite'));
+
+        $corps = $this->get(route('admin.souscription.index', ['etape' => 3]))
+            ->assertOk()->getContent();
+
+        $this->assertTrue($this->estCochee($corps, 'ventes'),
+            'Un module ouvert doit revenir coché.');
+        $this->assertFalse($this->estCochee($corps, 'comptabilite'),
+            'Un module fermé ne doit pas se rouvrir tout seul.');
+    }
+
+    public function test_la_reprise_ne_double_ni_les_rayons_ni_les_articles(): void
+    {
+        $this->parcoursTermineEtSessionPerdue();
+
+        $rayons   = \App\Modules\Admin\Modeles\Categorie::where('entreprise_id', $this->entreprise->id)->count();
+        $articles = Produit::where('entreprise_id', $this->entreprise->id)->count();
+
+        // Repasser l'etape qui souscrit reellement.
+        $this->post(route('admin.souscription.enregistrer', 4), ['familles' => ['VIV']]);
+
+        $this->assertSame($rayons, \App\Modules\Admin\Modeles\Categorie::where('entreprise_id', $this->entreprise->id)->count());
+        $this->assertSame($articles, Produit::where('entreprise_id', $this->entreprise->id)->count());
+    }
+
+    public function test_un_parcours_termine_offre_une_sortie(): void
+    {
+        // Sans elle, celui qui vient completer un point devrait traverser les
+        // cinq etapes pour retrouver ses parametres.
+        $this->parcoursTermineEtSessionPerdue();
+
+        $this->get(route('admin.souscription.index', ['etape' => 2]))
+            ->assertOk()
+            ->assertSee('Quitter');
+    }
+
+    public function test_un_parcours_en_cours_n_offre_pas_de_sortie(): void
+    {
+        // Tant que la configuration n'est pas achevee, la seule issue est de
+        // la poursuivre : proposer une sortie laisserait une entreprise a
+        // demi configuree, sans catalogue ni comptes.
+        $this->actingAs($this->admin)
+            ->get(route('admin.souscription.index'))
+            ->assertOk()
+            ->assertDontSee('Quitter');
+    }
+
     public function test_le_semeur_par_defaut_charge_le_referentiel(): void
     {
         // La cause première : `db:seed` ne chargeait pas le référentiel, donc
