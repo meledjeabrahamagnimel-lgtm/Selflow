@@ -1561,6 +1561,135 @@ scénariser tant que ces modules ne sortent pas du référentiel.
 
 - `tests/Feature/ModulesActifsTest.php` — 6 tests.
 
+### Lot 9 — Ce que le propriétaire a relevé — **TERMINÉ**
+
+Quatre points signalés dans un même message, le 21 août. Aucun n'était couvert
+par une épreuve : c'est pour cela qu'ils vivaient là depuis le début.
+
+#### Lot 9.1 — Les écritures de vente — **TERMINÉ**
+
+Le propriétaire écrit : « les écritures sont mal passées, prenons le cas d'une
+écriture de vente avec TVA, normalement on doit avoir 3 lignes — 706/701 crédit,
+4432 TVA crédit, 4478 timbre quittance crédit, 411 débit, et si c'est réglé
+directement on fait le règlement. Ou bien je me trompe ? »
+
+**Il ne se trompait pas, et le défaut était plus large que ce qu'il décrivait.**
+
+| Défaut | Ce qu'il produisait |
+|---|---|
+| **La vente comptant ne passait pas par le 411** | Une seule opération « caisse contre produits ». Le compte du client ne bougeait jamais sur ses achats comptant, **le numéro de tiers n'était transmis à Comptaflow sur aucune de ces ventes** — l'écriture y retombait sur le seul compte collectif — et le journal des ventes, celui qui justifie le chiffre d'affaires en cas de contrôle, ne les contenait pas |
+| **Le droit de timbre n'entrait dans aucune écriture** | Le client le payait, `net_a_payer` le comptait, la facture l'imprimait, la plateforme le certifiait — mais **la caisse était débitée de moins que ce qui y était réellement entré**, et la dette envers l'État n'apparaissait nulle part |
+| **Toute la TVA collectée partait en 4431** | SYSCOHADA distingue la marchandise (4431), la prestation de services (4432) et les travaux (4433). Pour un garage qui vend des pièces et facture de la main-d'œuvre, la déclaration était fausse |
+
+La facturation passe désormais **toujours** par le compte client, pour le net à
+payer — TTC fiscal, taxes parafiscales et timbre compris — et le règlement fait
+l'objet d'une opération distincte. La TVA se ventile ligne à ligne d'après la
+racine du compte de produit ; l'écart d'arrondi est reporté sur le compte le
+plus chargé, parce que **c'est le montant de la pièce qui fait foi** — c'est lui
+que la plateforme certifie.
+
+**Quatre comptes manquaient au plan des entreprises**, dont le `447000` que le
+service imputait déjà sans qu'il figure nulle part : la balance affichait un
+numéro sans intitulé. Ils entrent au référentiel (38 comptes communs au lieu de
+34) et une migration les pose aux entreprises existantes.
+
+Le timbre reste lu depuis `TimbreQuittanceService`, qui n'est pas touché : le
+barème de l'article 873 est gelé.
+
+- `ComptabiliteService::genererEcrituresVente()`, `compteTvaCollectee()`, `accorderTva()`
+- `2026_08_23_000001_comptes_de_taxes_collectees.php`
+- `tests/Feature/EcrituresVenteTest.php` — 14 tests, dont **six échouent contre
+  l'ancien code**, exactement sur les trois défauts.
+
+#### Lot 9.2 — Le domaine d'activité — **TERMINÉ**
+
+« Mets à jour la page `/inscription` car elle affiche l'ancien choix de saisie. »
+
+**Trois listes écrites en dur cohabitaient**, et aucune ne correspondait aux
+douze catégories du référentiel :
+
+| Écran | Ce qu'il proposait |
+|---|---|
+| `/inscription` | dix valeurs — Commercial, Industriel, Agro-industrie, Finance… |
+| Paramètres de l'entreprise | douze autres — Agricole, Artisanat, BTP / Construction… |
+| Superadministrateur (création, modification, validation) | les mêmes douze |
+| **Souscription, étape 1** | **les vraies** — Commerce, E-commerce, Production… |
+
+Une entreprise cochait donc « Commercial » à l'inscription pour choisir
+« Commerce » à l'écran suivant. Et l'écran « secteurs ↔ modules » du
+superadministrateur rangeait sa configuration sous des clés qu'aucune entreprise
+ne portait : **elle ne servait jamais**.
+
+Les cinq écrans et les validations lisent désormais `Categorie::domaines()`. La
+sortie libre « Autre » reste offerte — le référentiel couvre douze domaines, il
+n'en couvrira jamais treize.
+
+- `Referentiel\Categorie::domaines()`, `Categorie::AUTRE`
+- `tests/Feature/DomainesActiviteTest.php` — 7 tests.
+
+#### Lot 9.3 — Le bouton « Configuration » — **TERMINÉ**
+
+« Ajoute un bouton *configuration* dans les paramètres pour pouvoir revenir au
+niveau de la configuration, compléter son domaine et autre, **sans changer ce
+qui a été coché**. »
+
+Le bouton seul aurait été pire que rien. **Le parcours ne lisait que la
+session** : y revenir après une reconnexion — donc toujours — affichait tout
+décoché. Le domaine à rechoisir, les métiers oubliés, et surtout **les modules
+tous cochés**, si bien que valider l'étape 3 rouvrait ce que l'utilisateur avait
+volontairement fermé.
+
+Les choix se relisent en base — métiers souscrits, domaine du premier d'entre
+eux, modules actifs — et la session ne fait que les compléter pendant le
+parcours. Souscrire deux fois ne double ni les rayons ni les articles : le
+service l'écartait déjà.
+
+- `SouscriptionControleur::choix()`, `choixDejaRetenus()`
+- Bouton « Configuration » dans les paramètres, bouton « Quitter » dans le parcours
+- `tests/Feature/ParcoursSouscriptionTest.php` — 8 tests de plus, dont trois
+  échouent contre l'ancien code.
+
+#### Lot 9.4 — Le sens de la passerelle — **CÔTÉ SELFLOW TERMINÉ**
+
+« Selflow ne fait que déverser ses données dans Comptaflow et non construire sur
+Comptaflow. Chaque entreprise Selflow avec ses données se déverse dans Comptaflow
+comme une importation ; Comptaflow ne fait que recevoir si la liaison existe.
+Selflow doit avoir par défaut ses comptes, ses codes journaux et les tiers
+divers. »
+
+**Le code faisait exactement l'inverse.** `synchroniserDepuisComptaflow()`
+appelait Comptaflow, **recevait** son plan comptable, ses codes journaux et ses
+tiers, les recopiait dans Selflow — puis **supprimait** toute ligne Selflow
+marquée `source = comptaflow` absente de la réponse. Une entreprise dont le
+comptable n'avait pas encore rempli son plan **se retrouvait dépouillée du
+sien**, sans que rien ne le lui dise.
+
+Ce que le propriétaire demande par ailleurs est déjà vrai : le trousseau donne à
+chaque entreprise, dès sa création, ses 38 comptes, ses 10 journaux et ses deux
+tiers de passage — `410000` client divers, `400000` fournisseur divers — sans
+rien demander à personne.
+
+La méthode est retirée. `DeversementReferentielService` envoie le référentiel
+**sous les colonnes exactes des modèles d'import de Comptaflow**, pour que le
+déversement emprunte la logique d'import déjà écrite plutôt qu'une seconde voie
+à maintenir. Ce que ces colonnes ne portent pas — téléphone, adresse, NCC —
+voyage à côté, sans contrôle, puisque rien de comptable n'en dépend.
+
+Ne partent pas : les comptes et journaux **archivés**, qui réapparaîtraient dans
+les listes de Comptaflow sans que personne sache pourquoi ; et les tiers **sans
+numéro**, qui s'y rangeraient sous une chaîne vide.
+
+**Ce qui reste chez Comptaflow**, hors de portée depuis ce dépôt : écrire
+`POST /api/external/referentiel/deverser`, qui crée le plan comptable, les codes
+journaux et les tiers **à partir de ceux de Selflow quand Comptaflow est vide**,
+et qui n'écrase ni ne supprime rien quand il ne l'est pas. La consigne complète —
+charge utile, ordre de traitement, contrôle du secret, amorçage — est dans
+`PASSERELLE-COMPTAFLOW/RECEVOIR-LE-REFERENTIEL.md`. En attendant, le déversement
+échoue proprement et le dit à l'utilisateur.
+
+- `DeversementReferentielService`
+- `tests/Feature/DeversementReferentielTest.php` — 13 tests.
+
 ---
 
 ## 5 bis. La numérotation des comptes — tranché
@@ -2100,6 +2229,7 @@ ensemble.
 | Édition | Date | Pages | Chiffres arrêtés |
 |---|---|---|---|
 | 1<sup>re</sup> | 21/08/2026 | 7 | 711 épreuves / 3 331 vérifications, 262 classes PHP, 317 routes, 94 migrations, 171 révisions, révision `6bb1b16` |
+| 2<sup>e</sup> | 21/08/2026 | 7 | le lot 9 : 752 épreuves / 3 441 vérifications, 264 classes, 95 migrations, 176 révisions, révision `5113e9d`. La passerelle n'est plus décrite comme bidirectionnelle — elle ne l'était pas |
 
 Fabriqué par `etat.py`, dans le répertoire de travail de la session, non
 versionné — comme `plan.py`, c'est le PDF qui fait foi.
