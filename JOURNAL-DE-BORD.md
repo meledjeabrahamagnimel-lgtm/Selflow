@@ -2375,6 +2375,7 @@ n'est qu'un outil.
 | 1<sup>re</sup> | 15/08/2026 | 8 | l'état initial, TERNE, l'imprimante, la comptabilité |
 | 2<sup>e</sup> | 15/08/2026 | 10 | la passerelle fusionnée, les modèles d'import, les libellés (section 7) |
 | 3<sup>e</sup> | 16/08/2026 | 14 | la numérotation des tiers (section 8), la page d'accueil (section 9), le filtrage à l'import, `tier_digits` à vérifier chez Comptaflow |
+| 4<sup>e</sup> | 21/08/2026 | 16 | les lots 9 et 10 au tableau, les écritures de vente (section 10), la création d'un compte (section 11), le point d'entrée à écrire chez Comptaflow porté en tête des points bloquants, trois décisions arrêtées de plus |
 
 ### L'état de l'application en PDF
 
