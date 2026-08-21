@@ -70,9 +70,22 @@ class ComptabiliteService
 
     /**
      * Point d'entrée unique pour la facturation d'une vente.
-     * Décide automatiquement s'il s'agit d'une vente comptant (aucune ligne
-     * 411) ou d'une vente à crédit / partiellement réglée (411 pour le
-     * solde non couvert immédiatement).
+     *
+     * **Toute vente passe par le compte client**, qu'elle soit réglée au
+     * comptant ou à crédit. Deux faits distincts se sont produits — une
+     * créance est née, puis elle a été éteinte — et les confondre en une
+     * seule opération « caisse contre produits » coûte trois choses :
+     *
+     * - le compte du client ne bouge jamais sur ses achats comptant, donc son
+     *   relevé ne dit pas ce qu'il a acheté, seulement ce qu'il doit encore ;
+     * - le tiers n'est transmis à Comptaflow sur aucune vente comptant, et
+     *   l'écriture y retombe sur le seul compte collectif ;
+     * - le journal des ventes ne contient pas les ventes comptant, alors que
+     *   c'est lui qui justifie le chiffre d'affaires en cas de contrôle.
+     *
+     * L'écriture de facturation porte donc, au débit, le **net à payer** —
+     * TTC fiscal, taxes parafiscales et droit de timbre compris — et le
+     * règlement, s'il y en a un, fait l'objet d'une seconde opération.
      */
     public static function genererEcrituresVente(
         Vente $vente,
@@ -86,58 +99,27 @@ class ComptabiliteService
         $pdvId = $vente->point_de_vente_id;
         $date = $date ?? ($vente->date_vente ? $vente->date_vente->toDateString() : now()->toDateString());
         $refDoc = $vente->numero_facture;
-        // Les taxes parafiscales collectees pour l'Etat s'ajoutent au TTC
-        // fiscal : c'est ce total qui entre en caisse.
+
+        // Ce que le client règle réellement : le TTC fiscal, augmente des
+        // taxes parafiscales collectees pour l'Etat et du droit de timbre de
+        // quittance. `montant_ttc` reste le TTC au sens fiscal — c'est lui qui
+        // sert au payload FNE, et il ne doit pas etre confondu avec la somme
+        // encaissee.
         $autresTaxes = (float) ($vente->montant_autres_taxes ?? 0);
-        $ttc = (float) $vente->montant_ttc + $autresTaxes;
-        $montantPaye = max(0, min($montantPaye, $ttc));
+        $timbre      = round((float) $vente->timbre_quittance, 2);
+        $netAPayer   = (float) $vente->montant_ttc + $autresTaxes + $timbre;
+        $montantPaye = max(0, min($montantPaye, $netAPayer));
 
         $codeJournalVente = self::codeJournal($entrepriseId, 'Vente', 'VTE');
-        [$compteFinancier, $codeJournalFinancier] = self::compteEtJournalFinancier($entrepriseId, $modePaiement);
 
         $ventilation = self::ventilationVente($vente);
         $libelleGeneral = self::libelleGeneralVente($ventilation);
 
         DB::transaction(function () use (
-            $vente, $entrepriseId, $pdvId, $date, $refDoc, $ttc, $montantPaye,
-            $codeJournalVente, $compteFinancier, $codeJournalFinancier,
-            $ventilation, $libelleGeneral, $modePaiement, $autresTaxes
+            $vente, $entrepriseId, $pdvId, $date, $refDoc, $netAPayer, $montantPaye,
+            $codeJournalVente, $ventilation, $libelleGeneral, $modePaiement,
+            $autresTaxes, $timbre, $moyenBancaire, $referencePaiement
         ) {
-            $estPaiementIntegralImmediat = $montantPaye >= $ttc && $ttc > 0;
-
-            if ($estPaiementIntegralImmediat) {
-                // ── Vente comptant : UNE SEULE opération, aucune ligne 411 ──
-                // NB : le journal Caisse/Banque n'est utilisé QUE pour la ligne
-                // financière ; les lignes Produit(s)/TVA portent le journal Vente.
-                $operation = Operation::creer(
-                    $entrepriseId, $pdvId, $date, 'VenteComptant',
-                    $codeJournalFinancier, $refDoc, $libelleGeneral . ' (comptant)'
-                );
-
-                self::ligne($operation, $entrepriseId, $pdvId, $date, $refDoc, $codeJournalFinancier,
-                    $refDoc . ' / Vente comptant', $compteFinancier, null, null, $ttc, 0);
-
-                foreach ($ventilation['comptes'] as $compte => $detailCompte) {
-                    [$libelleDetail, $description] = self::libelleEtDescriptionDetailCompte(
-                        $compte, $detailCompte['produits'], self::TABLE_SYSCOHADA_VENTE, 'Vente suivant détail'
-                    );
-                    self::ligne($operation, $entrepriseId, $pdvId, $date, $refDoc, $codeJournalVente,
-                        $refDoc . ' / ' . $libelleDetail, null, $compte, null, 0, $detailCompte['montant'], $description);
-                }
-                if ($ventilation['tva'] > 0) {
-                    self::ligne($operation, $entrepriseId, $pdvId, $date, $refDoc, $codeJournalVente,
-                        $refDoc . ' / TVA Collectée Vente', null, config('selflow.plan_comptable_defaut.tva_collectee'), null, 0, $ventilation['tva']);
-                }
-                if ($autresTaxes > 0) {
-                    self::ligne($operation, $entrepriseId, $pdvId, $date, $refDoc, $codeJournalVente,
-                        $refDoc . ' / Taxes collectées pour l\'État', null, config('selflow.plan_comptable_defaut.taxes_collectees'), null, 0, $autresTaxes);
-                }
-
-                $operation->cloturerEquilibre();
-                return;
-            }
-
-            // ── Vente à crédit (totale ou partielle) : passage obligatoire par le 411 ──
             $compteClientGeneral = $vente->client?->compte_comptable ?? config('selflow.plan_comptable_defaut.client_collectif');
             $compteClientTiers = self::tiersClient($vente->client, $entrepriseId);
 
@@ -147,7 +129,7 @@ class ComptabiliteService
             );
 
             self::ligne($opFacture, $entrepriseId, $pdvId, $date, $refDoc, $codeJournalVente,
-                $refDoc . ' / Facturation Vente', $compteClientGeneral, null, $compteClientTiers, $ttc, 0);
+                $refDoc . ' / Facturation Vente', $compteClientGeneral, null, $compteClientTiers, $netAPayer, 0);
 
             foreach ($ventilation['comptes'] as $compte => $detailCompte) {
                 [$libelleDetail, $description] = self::libelleEtDescriptionDetailCompte(
@@ -156,19 +138,30 @@ class ComptabiliteService
                 self::ligne($opFacture, $entrepriseId, $pdvId, $date, $refDoc, $codeJournalVente,
                     $refDoc . ' / ' . $libelleDetail, null, $compte, null, 0, $detailCompte['montant'], $description);
             }
-            if ($ventilation['tva'] > 0) {
+
+            foreach ($ventilation['tva'] as $compteTva => $montantTva) {
                 self::ligne($opFacture, $entrepriseId, $pdvId, $date, $refDoc, $codeJournalVente,
-                    $refDoc . ' / TVA Collectée Vente', null, config('selflow.plan_comptable_defaut.tva_collectee'), null, 0, $ventilation['tva']);
+                    $refDoc . ' / TVA Collectée Vente', null, $compteTva, null, 0, $montantTva);
             }
+
             if ($autresTaxes > 0) {
                 self::ligne($opFacture, $entrepriseId, $pdvId, $date, $refDoc, $codeJournalVente,
                     $refDoc . ' / Taxes collectées pour l\'État', null, config('selflow.plan_comptable_defaut.taxes_collectees'), null, 0, $autresTaxes);
             }
+
+            if ($timbre > 0) {
+                self::ligne($opFacture, $entrepriseId, $pdvId, $date, $refDoc, $codeJournalVente,
+                    $refDoc . ' / Droit de timbre de quittance', null, config('selflow.plan_comptable_defaut.timbre_quittance'), null, 0, $timbre);
+            }
+
             $opFacture->cloturerEquilibre();
 
-            // ── Règlement partiel encaissé immédiatement (solde restant à crédit) ──
+            // ── Le règlement, s'il y en a un : opération distincte ──
             if ($montantPaye > 0) {
-                self::genererEcritureReglementVente($vente, $montantPaye, $modePaiement, $date, null, null, 'Acompte à la facturation');
+                self::genererEcritureReglementVente(
+                    $vente, $montantPaye, $modePaiement, $date, $moyenBancaire, $referencePaiement,
+                    $montantPaye >= $netAPayer ? 'Règlement à la facturation' : 'Acompte à la facturation'
+                );
             }
         });
     }
@@ -448,9 +441,9 @@ class ComptabiliteService
                     $refDoc . ' / ' . $libelleDetail, $compte, null, null, $detailCompte['montant'], 0, $description);
             }
 
-            if ($ventilation['tva'] > 0) {
+            foreach ($ventilation['tva'] as $compteTva => $montantTva) {
                 self::ligne($operation, $entrepriseId, $pdvId, $date, $refDoc, $codeJournal,
-                    $refDoc . ' / Annulation TVA Collectée', config('selflow.plan_comptable_defaut.tva_collectee'), null, null, $ventilation['tva'], 0);
+                    $refDoc . ' / Annulation TVA Collectée', $compteTva, null, null, $montantTva, 0);
             }
 
             $operation->cloturerEquilibre();
@@ -665,10 +658,30 @@ class ComptabiliteService
     }
 
     /**
+     * Le compte de TVA collectée qui correspond à un compte de produit.
+     *
+     * SYSCOHADA range la TVA facturée selon ce qui a été vendu : la
+     * marchandise et le produit fini en 4431, la prestation de services en
+     * 4432, les travaux en 4433. La déclaration reprend cette distinction ;
+     * tout verser en 4431 la rendait fausse pour une entreprise mixte — un
+     * garage qui vend des pièces et facture de la main-d'œuvre, par exemple.
+     */
+    private static function compteTvaCollectee(string $compteProduit): string
+    {
+        return match (substr($compteProduit, 0, 3)) {
+            '705'   => config('selflow.plan_comptable_defaut.tva_collectee_travaux'),
+            '706'   => config('selflow.plan_comptable_defaut.tva_collectee_services'),
+            default => config('selflow.plan_comptable_defaut.tva_collectee'),
+        };
+    }
+
+    /**
      * Ventile les lignes d'une vente par compte de produit, avec application
-     * de la remise globale au prorata, calcule la TVA totale, et conserve la
-     * liste des produits par compte (nécessaire pour les libellés intelligents).
-     * @return array{comptes: array<string, array{montant: float, produits: array<string>}>, tva: float}
+     * de la remise globale au prorata, ventile la TVA par compte de collecte,
+     * et conserve la liste des produits par compte (nécessaire pour les
+     * libellés intelligents).
+     *
+     * @return array{comptes: array<string, array{montant: float, produits: array<string>}>, tva: array<string, float>}
      */
     private static function ventilationVente(Vente $vente): array
     {
@@ -681,6 +694,7 @@ class ComptabiliteService
             : 0;
 
         $comptes = [];
+        $tva = [];
         foreach ($vente->details as $detail) {
             // La remise de ligne s'applique avant la remise globale : c'est
             // l'ordre retenu à la saisie et celui du récapitulatif de la FNE.
@@ -689,12 +703,13 @@ class ComptabiliteService
             if ($pourcentageRemise > 0) {
                 $ht = $ht - ($ht * $pourcentageRemise);
             }
+            // Chaine article -> rayon -> defaut : le rayon manquait, et
+            // un article cree apres la souscription tombait sur le
+            // compte generique 701000. La balance d'un magasin qui a
+            // reparti ses rayons n'avait alors qu'une ligne de ventes.
+            $compte = ImputationService::compteVente($detail->produit);
+
             if ($ht > 0) {
-                // Chaine article -> rayon -> defaut : le rayon manquait, et
-                // un article cree apres la souscription tombait sur le
-                // compte generique 701000. La balance d'un magasin qui a
-                // reparti ses rayons n'avait alors qu'une ligne de ventes.
-                $compte = ImputationService::compteVente($detail->produit);
                 if (!isset($comptes[$compte])) {
                     $comptes[$compte] = ['montant' => 0, 'produits' => []];
                 }
@@ -702,9 +717,55 @@ class ComptabiliteService
                 $nom = $detail->libelle_virtuel ?? $detail->produit?->nom;
                 if ($nom) $comptes[$compte]['produits'][] = $nom;
             }
+
+            $tvaLigne = (float) ($detail->montant_tva ?? 0);
+            if ($tvaLigne > 0) {
+                $compteTva = self::compteTvaCollectee($compte);
+                $tva[$compteTva] = ($tva[$compteTva] ?? 0) + $tvaLigne;
+            }
         }
 
-        return ['comptes' => $comptes, 'tva' => (float) ($vente->montant_tva ?? 0)];
+        return ['comptes' => $comptes, 'tva' => self::accorderTva($tva, (float) ($vente->montant_tva ?? 0))];
+    }
+
+    /**
+     * Fait coïncider la TVA ventilée ligne à ligne avec le total porté par la
+     * pièce.
+     *
+     * `montant_tva` est ce que la facture annonce et ce que le payload FNE
+     * transmet : c'est lui qui fait foi. La somme des lignes peut s'en écarter
+     * de quelques centimes — arrondis, remise globale répartie au prorata — et
+     * un écart de deux francs suffit à déséquilibrer l'opération, donc à faire
+     * échouer sa clôture. L'écart est reporté sur le compte le plus chargé,
+     * là où il est proportionnellement le plus faible.
+     *
+     * @param  array<string, float>  $ventilee
+     * @return array<string, float>
+     */
+    private static function accorderTva(array $ventilee, float $total): array
+    {
+        $total = round($total, 2);
+
+        if ($total <= 0) {
+            return [];
+        }
+
+        if ($ventilee === []) {
+            // Aucune ligne ne porte de TVA alors que la pièce en annonce :
+            // le total part au compte des ventes, à défaut de savoir mieux.
+            return [config('selflow.plan_comptable_defaut.tva_collectee') => $total];
+        }
+
+        $ventilee = array_map(fn ($m) => round($m, 2), $ventilee);
+        $ecart = round($total - array_sum($ventilee), 2);
+
+        if (abs($ecart) >= 0.01) {
+            arsort($ventilee);
+            $principal = array_key_first($ventilee);
+            $ventilee[$principal] = round($ventilee[$principal] + $ecart, 2);
+        }
+
+        return array_filter($ventilee, fn ($m) => $m > 0);
     }
 
     /**

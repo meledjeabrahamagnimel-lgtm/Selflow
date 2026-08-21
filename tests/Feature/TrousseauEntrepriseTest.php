@@ -34,11 +34,15 @@ class TrousseauEntrepriseTest extends TestCase
     {
         $bilan = TrousseauEntrepriseService::doter($this->entreprise);
 
-        $this->assertSame(34, $bilan['comptes']);
+        $this->assertSame(38, $bilan['comptes']);
         $this->assertSame(10, $bilan['journaux']);
 
-        // Les comptes que toute écriture de vente au comptant touche.
-        foreach (['411000', '401000', '443100', '445200', '571000', '521000', '701000', '601000'] as $numero) {
+        // Les comptes que toute écriture de vente au comptant touche. Les
+        // quatre derniers manquaient : le service imputait déjà les taxes
+        // parafiscales au `447000` sans que ce compte figure au plan, et la
+        // balance affichait un numéro sans intitulé.
+        foreach (['411000', '401000', '443100', '443200', '443300', '445200',
+                  '447000', '447800', '571000', '521000', '701000', '601000'] as $numero) {
             $this->assertTrue(
                 PlanComptable::where('entreprise_id', $this->entreprise->id)->where('numero', $numero)->exists(),
                 "Le compte {$numero} manque au trousseau."
