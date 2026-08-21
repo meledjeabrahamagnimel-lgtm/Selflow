@@ -1744,6 +1744,115 @@ droit de poser la colonne**.
 - `tests/Feature/ConfigurationFneTest.php` — 9 tests, dont deux échouent contre
   l'ancien code.
 
+### Lot 10 — Le plan complet du propriétaire — **TERMINÉ**
+
+Le message du 21 août avait été envoyé inachevé ; sa version complète ajoute
+quatre points, tous vérifiés dans le code avant correction.
+
+#### Lot 10.1 — Le bouton « créer un avoir » — **TERMINÉ**
+
+Signalé tel quel :
+
+```
+:8003/admin/ventes/facture-details/169  →  404 (Not Found)
+factures?type=avoir:1  Uncaught SyntaxError: Unexpected token '<',
+"<!DOCTYPE "... is not valid JSON
+```
+
+**Le bouton ne fonctionnait pas du tout**, ni pour les ventes ni pour les
+achats. La recherche de factures rendait l'identifiant **numérique**, l'écran le
+remettait dans une adresse qui attend un `uuid` depuis le lot 8.3, et la requête
+tombait sur un 404 — que le script, lisant la réponse en JSON, recevait sous
+forme de page HTML.
+
+La recherche et le détail rendent désormais l'identifiant public, et le
+formulaire d'avoir l'attend. Au passage, cela cesse de publier dans une page
+l'identifiant séquentiel que le lot 8.3 avait précisément retiré des adresses.
+
+- `VenteControleur::rechercherFactures()`, `detailsFacturePourAvoir()`, `creerAvoirNouveau()`
+- `AchatControleur` — le même code y vivait
+- `tests/Feature/IdentifiantOpaqueTest.php` — 5 tests de plus, dont trois
+  échouent contre l'ancien code.
+
+#### Lot 10.2 — La page d'accueil, visible chez l'un et pas chez l'autre — **TERMINÉ**
+
+Le propriétaire ouvrait `127.0.0.1:8003` et voyait « Cette page est en
+préparation » ; un collaborateur, à la même adresse, voyait la page complète.
+
+**Le contenu n'arrivait que par `VitrineSeeder`**, appelé depuis `db:seed` — que
+personne ne relance sur une base en service, puisqu'il repose des données de
+démonstration par-dessus les vraies. Les installations antérieures à l'écriture
+de la vitrine restaient donc vides, sans qu'aucune erreur ne soit levée.
+
+`migrate`, lui, se lance sur une base en service : c'est fait pour ça. Le
+contenu suit désormais le même chemin que le schéma, et n'écrase rien — le
+semeur crée par clé, et une vitrine déjà remplie n'est pas retouchée. Si aucune
+section n'est publiée, le superadministrateur connecté voit désormais pourquoi
+et où aller.
+
+- `2026_08_23_000002_poser_le_contenu_de_la_vitrine.php`
+
+#### Lot 10.3 — La création d'un compte, des deux côtés — **TERMINÉ**
+
+« Au niveau du superadmin, lors de la création d'une entreprise et de son
+gérant, on a oublié de mettre le mot de passe du gérant. »
+
+**C'était pire que cela.** L'écran créait une entreprise **et personne pour s'y
+connecter** : aucun `Utilisateur` n'était enregistré, et le formulaire ne
+demandait pas même un mot de passe. Toute entreprise créée par cette voie était
+inutilisable, sans qu'aucune erreur ne le signale — il fallait s'en apercevoir,
+puis lui fabriquer un compte à la main.
+
+Le compte est désormais créé avec l'entreprise. `doit_changer_password` est posé :
+le mot de passe vient d'un tiers, non de son propriétaire.
+
+**Les deux écrans exigeaient par ailleurs des choses différentes** pour créer la
+même chose — le domaine était obligatoire chez le superadministrateur et
+facultatif à l'inscription. Les étapes vivent maintenant dans
+`EtapesCreation`, et les deux écrans les suivent.
+
+| Étape | Bloque la création ? |
+|---|---|
+| L'entreprise — nom, forme, régime | **oui** |
+| Le responsable — identité, mot de passe | **oui** |
+| La facture normalisée | non |
+| Le domaine d'activité | non |
+
+Le formulaire d'inscription faisait vingt champs d'un seul tenant : on le
+remplit mal, ou pas. Il se parcourt pas à pas, avec un bouton « Suivant ». Ce
+qui n'est pas rempli ne se perd pas pour autant : `estInscriptionComplete()` le
+signale dans les paramètres, et le garde `inscription.complete` retient ventes
+et achats tant que la situation fiscale manque.
+
+#### Lot 10.4 — Le compte FNE à la création — **TERMINÉ**
+
+« Pour tous les formulaires lors de la création, fais un bouton à cocher pour
+demander s'il a un compte FNE ; si oui, faire afficher deux champs qui demandent
+le NCC et le mot de passe FNE ; si non, on va demander les informations fiscales
+de l'entreprise. »
+
+Une seule question décide de la suite, et le même bloc sert aux deux écrans
+(`admin::partiels.compte-fne`) :
+
+- **elle a un compte** — son NCC et le mot de passe de son espace suffisent.
+  Tout le reste est déjà chez la DGI ; le lui faire ressaisir n'introduirait que
+  des écarts entre les deux ;
+- **elle n'en a pas** — on relève ce que la DGI exige pour lui en ouvrir un.
+
+**Le mot de passe est traité comme une clé d'API**, parce que c'en est une :
+c'est un accès à un service de l'État, pas un réglage. Il rejoint
+`fne_credentials`, chiffré au repos par `APP_KEY` ; **aucun écran ne le rend**,
+pas même au superadministrateur — seulement la date à laquelle il a été fourni ;
+et `AccesFneService::oublier()` l'efface une fois le paramétrage relevé.
+
+L'entreprise ne configure toujours rien : elle fournit une information.
+
+- `2026_08_23_000003_acces_fne_de_l_entreprise.php`, `AccesFneService`
+- `app/Modules/Admin/Regles/EtapesCreation.php`
+- `app/Modules/Admin/Vues/partiels/compte-fne.blade.php`
+- `tests/Feature/CreationDeCompteTest.php` — 14 tests, dont cinq échouent contre
+  l'ancien code.
+
 ---
 
 ## 5 bis. La numérotation des comptes — tranché
@@ -2284,6 +2393,7 @@ ensemble.
 |---|---|---|---|
 | 1<sup>re</sup> | 21/08/2026 | 7 | 711 épreuves / 3 331 vérifications, 262 classes PHP, 317 routes, 94 migrations, 171 révisions, révision `6bb1b16` |
 | 2<sup>e</sup> | 21/08/2026 | 7 | le lot 9 : 752 épreuves / 3 441 vérifications, 264 classes, 95 migrations, 176 révisions, révision `5113e9d`. La passerelle n'est plus décrite comme bidirectionnelle — elle ne l'était pas |
+| 3<sup>e</sup> | 21/08/2026 | 7 | le lot 10 : 779 épreuves / 3 514 vérifications, 268 classes, 97 migrations, 180 révisions, révision `af62a53`. La création d'un compte entre au tableau des domaines |
 
 Fabriqué par `etat.py`, dans le répertoire de travail de la session, non
 versionné — comme `plan.py`, c'est le PDF qui fait foi.
