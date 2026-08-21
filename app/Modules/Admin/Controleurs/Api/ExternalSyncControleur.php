@@ -85,7 +85,11 @@ class ExternalSyncControleur
                 'regime_imposition'      => $request->regime_imposition,
                 'quota_points_de_vente'  => 5,
                 'plan_abonnement'        => 'Pro',
-                'secteur_activite'       => ['Commercial'],
+                // Comptaflow ne connaît pas le domaine d'activité : le poser au
+                // hasard le figerait sur une valeur fausse que personne ne
+                // penserait à corriger. « Autre » dit ce qu'il en est, et
+                // l'entreprise choisit son vrai domaine à la souscription.
+                'secteur_activite'       => [\App\Modules\Admin\Modeles\Referentiel\Categorie::AUTRE],
                 'modules_actifs'         => ['principal', 'ventes', 'achats', 'stock', 'tiers', 'produits', 'rapports', 'b2b', 'fne'],
                 'comptaflow_company_id'  => $request->comptaflow_company_id,
                 'comptaflow_sync_key'    => $request->comptaflow_sync_key,

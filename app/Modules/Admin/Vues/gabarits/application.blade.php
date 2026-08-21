@@ -469,7 +469,7 @@
         if (empty($modulesActifs)) {
             $modulesActifs = ['principal', 'ventes', 'achats', 'stock', 'production', 'comptabilite', 'points_de_vente', 'produits', 'tiers', 'rapports', 'b2b', 'fne'];
         }
-        $secteurActivite = $entreprise?->secteur_activite ?? ['Commercial'];
+        $secteurActivite = $entreprise?->secteur_activite ?? [];
         if (is_string($secteurActivite)) {
             $secteurActivite = [$secteurActivite];
         }

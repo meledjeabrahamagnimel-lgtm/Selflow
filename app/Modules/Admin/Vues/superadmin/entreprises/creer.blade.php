@@ -136,30 +136,19 @@
                     <p style="font-size:11px;color:var(--text-3);margin-bottom:10px;">Sélectionnez tous les secteurs qui correspondent à l'activité de l'entreprise. Tous les modules sont activés par défaut — l'admin peut les désactiver dans ses paramètres.</p>
                     <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-top:8px;">
                         @php
-                            $secteursDispo = [
-                                'Commercial'              => 'fas fa-store',
-                                'Industriel'              => 'fas fa-industry',
-                                'Services'                => 'fas fa-concierge-bell',
-                                'Agricole'                => 'fas fa-seedling',
-                                'Artisanat'               => 'fas fa-hammer',
-                                'BTP / Construction'      => 'fas fa-hard-hat',
-                                'Restauration / Hôtellerie' => 'fas fa-utensils',
-                                'Santé'                   => 'fas fa-stethoscope',
-                                'Transport / Logistique'  => 'fas fa-truck',
-                                'Technologies / Numérique' => 'fas fa-laptop-code',
-                                'Éducation / Formation'   => 'fas fa-graduation-cap',
-                                'Autre'                   => 'fas fa-ellipsis-h',
-                            ];
-                            $secteursOld = old('secteur_activite', ['Commercial']);
+                            // Le référentiel fait foi : mêmes douze domaines
+                            // qu'à l'inscription, aux paramètres et à la
+                            // première étape de la souscription.
+                            $secteursDispo = \App\Modules\Admin\Modeles\Referentiel\Categorie::domaines();
+                            $secteursOld = old('secteur_activite', []);
                         @endphp
-                        @foreach($secteursDispo as $valeur => $icone)
+                        @foreach($secteursDispo as $valeur)
                         <label style="display:flex;align-items:center;gap:8px;padding:9px 12px;background:var(--bg3);border-radius:8px;cursor:pointer;font-size:12.5px;border:1px solid var(--border);transition:all .15s;"
                             onmouseover="this.style.borderColor='var(--primary)';this.style.background='#EBF2FC'"
                             onmouseout="this.style.borderColor='var(--border)';this.style.background='var(--bg3)'">
                             <input type="checkbox" name="secteur_activite[]" value="{{ $valeur }}"
                                 {{ in_array($valeur, $secteursOld) ? 'checked' : '' }}
                                 style="width:15px;height:15px;cursor:pointer;accent-color:var(--primary);">
-                            <i class="{{ $icone }}" style="color:var(--primary);width:14px;text-align:center;font-size:11px;"></i>
                             <span>{{ $valeur }}</span>
                         </label>
                         @endforeach

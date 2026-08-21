@@ -718,7 +718,11 @@
                     <p style="font-size:12px;color:var(--text-3);margin-bottom:14px;">Sélectionnez tous les secteurs qui
                         correspondent à votre activité principale.</p>
                     @php
-                        $secteursDispo = ['Commercial', 'Industriel', 'Services', 'Agricole', 'Artisanat', 'BTP / Construction', 'Restauration / Hôtellerie', 'Santé', 'Transport / Logistique', 'Technologies / Numérique', 'Éducation / Formation', 'Autre'];
+                        // Le référentiel fait foi : c'est la même liste qu'à
+                        // l'inscription et qu'à la première étape de la
+                        // souscription. Douze valeurs écrites en dur vivaient
+                        // ici, différentes des dix de l'inscription.
+                        $secteursDispo = \App\Modules\Admin\Modeles\Referentiel\Categorie::domaines();
                         $secteursActifs = $entreprise->secteur_activite ?? [];
                     @endphp
                     <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">

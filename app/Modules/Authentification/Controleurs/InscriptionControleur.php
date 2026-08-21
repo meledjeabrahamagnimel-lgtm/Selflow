@@ -3,12 +3,14 @@
 namespace App\Modules\Authentification\Controleurs;
 
 use App\Modules\Admin\Modeles\Entreprise;
+use App\Modules\Admin\Modeles\Referentiel\Categorie;
 use App\Modules\Authentification\Modeles\Utilisateur;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Validation\Rule;
 use Illuminate\View\View;
 use App\Modules\Admin\Services\TrousseauEntrepriseService;
 
@@ -17,7 +19,9 @@ class InscriptionControleur
     /** Afficher le formulaire d'inscription. */
     public function afficher(): View
     {
-        return view('authentification::inscription');
+        return view('authentification::inscription', [
+            'domaines' => Categorie::domaines(),
+        ]);
     }
 
     /** Traiter la soumission du formulaire d'inscription. */
@@ -37,8 +41,11 @@ class InscriptionControleur
             'rccm'                => ['nullable', 'string', 'max:100'],
             'compte_contribuable' => ['nullable', 'string', 'max:100'],
             'forme_juridique'     => ['nullable', 'string', 'max:60'],
+            // Le domaine se choisit dans le référentiel, pas au clavier : une
+            // valeur libre ne correspondrait à aucune catégorie, et l'étape 1
+            // de la souscription ne saurait pas la retrouver.
             'secteurs_activite'   => ['nullable', 'array'],
-            'secteurs_activite.*' => ['nullable', 'string', 'max:60'],
+            'secteurs_activite.*' => ['nullable', 'string', Rule::in(Categorie::domaines())],
             'fonction_gerant'     => ['nullable', 'string', 'max:100'],
             'telephone_gerant'    => ['nullable', 'string', 'max:30'],
         ], [

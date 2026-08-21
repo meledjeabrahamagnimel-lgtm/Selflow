@@ -233,27 +233,20 @@
 
                 {{-- Secteurs d'activité --}}
                 <div class="section-label" style="margin-top:16px;"><i class="ti ti-category"></i> Secteurs d'activité <small style="font-size:10px;font-weight:400;text-transform:none;letter-spacing:0;margin-left:4px;">(cochez tous ceux qui s'appliquent)</small></div>
+                {{-- Les douze domaines du référentiel, et rien d'autre : c'est ce
+                     même vocabulaire que la première étape de la souscription
+                     propose. Dix valeurs écrites en dur vivaient ici, qui n'en
+                     recoupaient aucune — l'entreprise cochait « Commercial »
+                     pour choisir « Commerce » à l'écran suivant. --}}
                 <div class="secteurs-grille">
                     @php
-                        $secteurs = [
-                            'Commercial'     => 'ti-shopping-cart',
-                            'Industriel'     => 'ti-building-factory-2',
-                            'Services'       => 'ti-briefcase',
-                            'Agro-industrie' => 'ti-plant',
-                            'Technologie'    => 'ti-cpu',
-                            'Finance'        => 'ti-coin',
-                            'BTP'            => 'ti-crane',
-                            'Santé'          => 'ti-heart-plus',
-                            'Éducation'      => 'ti-school',
-                            'Transport'      => 'ti-truck',
-                        ];
                         $oldSecteurs = old('secteurs_activite', []);
                     @endphp
-                    @foreach($secteurs as $nom => $icone)
+                    @foreach($domaines as $nom)
                         <label class="secteur-case">
                             <input type="checkbox" name="secteurs_activite[]" value="{{ $nom }}"
                                 {{ in_array($nom, $oldSecteurs) ? 'checked' : '' }}>
-                            <i class="ti {{ $icone }}" style="font-size:14px;color:#002B5C;flex-shrink:0;"></i>
+                            <i class="ti ti-point-filled" style="font-size:14px;color:#002B5C;flex-shrink:0;"></i>
                             <span>{{ $nom }}</span>
                         </label>
                     @endforeach

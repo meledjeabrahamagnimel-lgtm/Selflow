@@ -4,6 +4,7 @@ namespace App\Modules\Admin\Controleurs;
 
 use App\Modules\Admin\Modeles\Entreprise;
 use App\Modules\Admin\Modeles\PointDeVente;
+use App\Modules\Admin\Modeles\Referentiel\Categorie;
 use App\Modules\Authentification\Modeles\Utilisateur;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -12,6 +13,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
+use Illuminate\Validation\Rule;
 use App\Modules\Admin\Services\TrousseauEntrepriseService;
 
 class SuperadminControleur
@@ -134,7 +136,7 @@ class SuperadminControleur
             'quota_points_de_vente'   => ['required', 'integer', 'min:1'],
             'plan_abonnement'         => ['required', 'string'],
             'secteur_activite'        => ['required', 'array'],
-            'secteur_activite.*'      => ['required', 'string', 'in:Commercial,Industriel,Services,Agricole,Artisanat,BTP / Construction,Restauration / Hôtellerie,Santé,Transport / Logistique,Technologies / Numérique,Éducation / Formation,Autre'],
+            'secteur_activite.*'      => ['required', 'string', Rule::in(Categorie::domaines())],
             'modules_actifs'          => ['required', 'array'],
             // Champs COMPTAFLOW conditionnels
             'comptaflow_password'     => [$request->boolean('creer_compte_comptaflow') ? 'required' : 'nullable', 'string', 'min:8', 'confirmed'],
@@ -252,7 +254,7 @@ class SuperadminControleur
             'quota_points_de_vente'   => ['required', 'integer', 'min:1'],
             'plan_abonnement'         => ['required', 'string'],
             'secteur_activite'        => ['required', 'array'],
-            'secteur_activite.*'      => ['required', 'string', 'in:Commercial,Industriel,Services,Agricole,Artisanat,BTP / Construction,Restauration / Hôtellerie,Santé,Transport / Logistique,Technologies / Numérique,Éducation / Formation,Autre'],
+            'secteur_activite.*'      => ['required', 'string', Rule::in(Categorie::domaines())],
             'modules_actifs'          => ['required', 'array'],
         ]);
 
@@ -485,23 +487,42 @@ class SuperadminControleur
         ];
     }
 
-    /** Définition des 12 secteurs d'activité */
+    /**
+     * Les domaines d'activité, tels que le référentiel les nomme.
+     *
+     * L'écran « secteurs ↔ modules » range sa configuration **par nom de
+     * domaine**. Douze noms écrits en dur vivaient ici, qui n'étaient ceux
+     * d'aucune catégorie du référentiel : la configuration se classait donc
+     * sous des clés — « Commercial », « Agricole » — qu'aucune entreprise ne
+     * portait, et elle ne servait jamais.
+     *
+     * L'apparence reste locale : un domaine que la table ci-dessous ne connaît
+     * pas reçoit une pastille neutre plutôt que rien.
+     */
     public static function tousLesSecteurs(): array
     {
-        return [
-            'Commercial'         => ['icone' => 'fa-tag',           'couleur' => '#3b82f6'],
-            'Industriel'         => ['icone' => 'fa-industry',      'couleur' => '#6366f1'],
-            'Services'           => ['icone' => 'fa-handshake',     'couleur' => '#10b981'],
-            'Agricole'           => ['icone' => 'fa-seedling',      'couleur' => '#84cc16'],
-            'Artisanat'          => ['icone' => 'fa-hammer',        'couleur' => '#f59e0b'],
-            'BTP / Construction' => ['icone' => 'fa-helmet-safety', 'couleur' => '#f97316'],
-            'Restauration / Hôtellerie' => ['icone' => 'fa-utensils', 'couleur' => '#ef4444'],
-            'Santé'              => ['icone' => 'fa-stethoscope',   'couleur' => '#ec4899'],
-            'Transport / Logistique'    => ['icone' => 'fa-truck',  'couleur' => '#8b5cf6'],
-            'Technologies / Numérique'  => ['icone' => 'fa-microchip', 'couleur' => '#06b6d4'],
-            'Éducation / Formation'     => ['icone' => 'fa-graduation-cap', 'couleur' => '#0ea5e9'],
-            'Autre'              => ['icone' => 'fa-circle-dot',    'couleur' => '#94a3b8'],
+        $apparences = [
+            'Commerce'              => ['icone' => 'fa-tag',             'couleur' => '#3b82f6'],
+            'E-commerce'            => ['icone' => 'fa-cart-shopping',   'couleur' => '#6366f1'],
+            'Production'            => ['icone' => 'fa-industry',        'couleur' => '#8b5cf6'],
+            'Agriculture-Élevage'   => ['icone' => 'fa-seedling',        'couleur' => '#84cc16'],
+            'Services'              => ['icone' => 'fa-handshake',       'couleur' => '#10b981'],
+            'Restauration'          => ['icone' => 'fa-utensils',        'couleur' => '#ef4444'],
+            'BTP-Travaux'           => ['icone' => 'fa-helmet-safety',   'couleur' => '#f97316'],
+            'Location'              => ['icone' => 'fa-key',             'couleur' => '#f59e0b'],
+            'Éducation'             => ['icone' => 'fa-graduation-cap',  'couleur' => '#0ea5e9'],
+            'Professions libérales' => ['icone' => 'fa-briefcase',       'couleur' => '#14b8a6'],
+            'Santé'                 => ['icone' => 'fa-stethoscope',     'couleur' => '#ec4899'],
+            'ONG-Associations'      => ['icone' => 'fa-hand-holding-heart', 'couleur' => '#a855f7'],
         ];
+
+        $secteurs = [];
+        foreach (\App\Modules\Admin\Modeles\Referentiel\Categorie::domaines() as $nom) {
+            $secteurs[$nom] = $apparences[$nom]
+                ?? ['icone' => 'fa-circle-dot', 'couleur' => '#94a3b8'];
+        }
+
+        return $secteurs;
     }
 
     /** Chemin du fichier de config JSON */
