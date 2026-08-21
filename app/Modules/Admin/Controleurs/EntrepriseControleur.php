@@ -165,11 +165,16 @@ class EntrepriseControleur
         $this->journaliser('modification_parametres', 'Entreprise', $entreprise->id, $ancien, $data);
 
         // ── Liaison a posteriori si la clé a changé et est remplie ──
+        //
+        // La liaison ouverte, le référentiel de l'entreprise part vers
+        // Comptaflow. Le sens compte : Selflow déverse, Comptaflow reçoit.
+        // L'appel tirait auparavant le plan comptable de Comptaflow et
+        // effaçait celui de l'entreprise.
         $messageSync = '';
         if ($syncKeyChanged) {
-            $syncResult = \App\Modules\Admin\Services\ComptabiliteService::synchroniserDepuisComptaflow($entreprise);
+            $syncResult = \App\Modules\Admin\Services\DeversementReferentielService::deverser($entreprise);
             if ($syncResult['success']) {
-                $messageSync = ' Liaison COMPTAFLOW établie avec succès ! Plan comptable, codes journaux et tiers synchronisés.';
+                $messageSync = ' Liaison COMPTAFLOW établie. ' . $syncResult['message'];
             } else {
                 $entreprise->update(['comptaflow_sync_status' => 'failed']);
                 $messageSync = ' ⚠️ Échec de la liaison COMPTAFLOW : ' . $syncResult['message'];
@@ -293,13 +298,18 @@ class EntrepriseControleur
     }
 
     /**
-     * Effectue une synchronisation réelle depuis COMPTAFLOW.
+     * Déverse le référentiel de l'entreprise dans COMPTAFLOW.
+     *
+     * L'écran parlait de « synchronisation », et l'appel tirait effectivement
+     * les données de Comptaflow pour écraser celles de Selflow. Le sens est
+     * rétabli : l'entreprise verse son plan comptable, ses journaux et ses
+     * tiers chez son comptable, comme elle y verserait un fichier d'import.
      */
     public function synchroniserComptaflow(Request $request): \Illuminate\Http\JsonResponse
     {
         $entreprise = Auth::user()->entreprise;
-        $result = \App\Modules\Admin\Services\ComptabiliteService::synchroniserDepuisComptaflow($entreprise);
-        
+        $result = \App\Modules\Admin\Services\DeversementReferentielService::deverser($entreprise);
+
         if ($result['success']) {
             return response()->json([
                 'success' => true,
