@@ -2083,3 +2083,23 @@ n'est qu'un outil.
 | 1<sup>re</sup> | 15/08/2026 | 8 | l'état initial, TERNE, l'imprimante, la comptabilité |
 | 2<sup>e</sup> | 15/08/2026 | 10 | la passerelle fusionnée, les modèles d'import, les libellés (section 7) |
 | 3<sup>e</sup> | 16/08/2026 | 14 | la numérotation des tiers (section 8), la page d'accueil (section 9), le filtrage à l'import, `tier_digits` à vérifier chez Comptaflow |
+
+### L'état de l'application en PDF
+
+`Etat-de-Selflow.pdf`, à la racine, répond à une autre question que le plan de
+travail. Le plan regarde **devant** — ce qui reste à faire, dans quel ordre,
+et chez qui. L'état regarde **ce qui est** : ce que l'application sait faire
+aujourd'hui domaine par domaine, la conformité fiscale acquise, la passerelle,
+les portes qui ont été fermées, les épreuves qui gardent l'ensemble, et les
+trois choses qui séparent encore le projet d'une exploitation réelle.
+
+Il se donne à lire par quelqu'un qui ne connaît pas le dépôt — un associé, un
+cabinet, un client. Les deux documents ne se remplacent pas : ils se lisent
+ensemble.
+
+| Édition | Date | Pages | Chiffres arrêtés |
+|---|---|---|---|
+| 1<sup>re</sup> | 21/08/2026 | 7 | 711 épreuves / 3 331 vérifications, 262 classes PHP, 317 routes, 94 migrations, 171 révisions, révision `6bb1b16` |
+
+Fabriqué par `etat.py`, dans le répertoire de travail de la session, non
+versionné — comme `plan.py`, c'est le PDF qui fait foi.
