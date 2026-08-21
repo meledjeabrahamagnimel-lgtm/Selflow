@@ -264,7 +264,9 @@ class CycleStockTest extends TestCase
         $detail = $vente->details->first();
 
         return $this->post(route('admin.ventes.avoir.creer_nouveau'), [
-            'parent_id' => $vente->id,
+            // L'identifiant public : c'est celui que l'écran reçoit de la
+            // recherche et renvoie au formulaire.
+            'parent_id' => $vente->uuid,
             'raison'    => 'Retour partiel',
             'items'     => [
                 $detail->id => [

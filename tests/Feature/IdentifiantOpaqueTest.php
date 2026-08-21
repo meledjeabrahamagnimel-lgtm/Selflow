@@ -83,6 +83,70 @@ class IdentifiantOpaqueTest extends TestCase
         ], $champs));
     }
 
+    // ══════════════ Ce que les écrans renvoient ══════════════
+
+    /**
+     * Le chemin complet du bouton « créer un avoir », de bout en bout.
+     *
+     * La recherche rendait l'identifiant **numérique**, l'écran le remettait
+     * dans une adresse qui attend un `uuid`, et la requête tombait sur un
+     * 404 (Not Found — introuvable). Le script lisant la réponse en JSON
+     * recevait alors la page d'erreur en HTML :
+     *
+     *     GET /admin/ventes/facture-details/169 → 404
+     *     SyntaxError: Unexpected token '<', "<!DOCTYPE "... is not valid JSON
+     *
+     * Le bouton ne fonctionnait donc pas du tout — ni pour les ventes, ni pour
+     * les achats, où le même code vivait.
+     */
+    public function test_la_recherche_de_factures_rend_l_identifiant_public(): void
+    {
+        $vente = $this->uneVente(['numero_facture' => 'VTE-2026-0042']);
+
+        $reponse = $this->getJson(route('admin.ventes.factures.rechercher', ['q' => 'VTE-2026-0042']))
+            ->assertOk();
+
+        $trouvee = collect($reponse->json())->firstWhere('id', $vente->uuid);
+
+        $this->assertNotNull($trouvee, "La recherche doit rendre l'identifiant public de la pièce.");
+        $this->assertNotContains($vente->id, collect($reponse->json())->pluck('id')->all(),
+            "L'identifiant de base ne se publie pas : c'est lui qui disait le volume.");
+    }
+
+    public function test_l_identifiant_rendu_par_la_recherche_ouvre_bien_le_detail(): void
+    {
+        // Le test qui aurait attrapé la panne : ce que la recherche donne doit
+        // être ce que l'adresse suivante accepte.
+        $vente = $this->uneVente(['numero_facture' => 'VTE-2026-0043']);
+
+        $resultats = $this->getJson(route('admin.ventes.factures.rechercher', ['q' => 'VTE-2026-0043']))
+            ->assertOk()->json();
+
+        $this->assertNotEmpty($resultats);
+
+        $this->getJson(route('admin.ventes.factures.details', $resultats[0]['id']))
+            ->assertOk()
+            ->assertJsonPath('id', $vente->uuid);
+    }
+
+    public function test_le_detail_d_une_facture_ne_publie_pas_l_identifiant_de_base(): void
+    {
+        $vente = $this->uneVente();
+
+        $this->getJson(route('admin.ventes.factures.details', $vente))
+            ->assertOk()
+            ->assertJsonPath('id', $vente->uuid);
+    }
+
+    public function test_l_identifiant_numerique_ne_designe_plus_rien(): void
+    {
+        // L'adresse exacte du signalement.
+        $vente = $this->uneVente();
+
+        $this->get('/admin/ventes/facture-details/' . $vente->id)
+            ->assertNotFound();
+    }
+
     // ══════════════ L'identifiant existe et ne se devine pas ══════════════
 
     public function test_toute_piece_recoit_un_identifiant_a_sa_creation(): void

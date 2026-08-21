@@ -791,7 +791,11 @@ class AchatControleur
         $factures = $query->latest()->limit(10)->get()->map(function($f) {
             $fournNom = $f->fournisseur ? $f->fournisseur->nom : 'Fournisseur inconnu';
             return [
-                'id' => $f->id,
+                // L'identifiant public, celui que les adresses portent. Le
+                // numérique partait ici et revenait dans une adresse qui
+                // attend un uuid : 404 (Not Found — introuvable), puis une
+                // page HTML lue comme du JSON.
+                'id' => $f->uuid,
                 'text' => "{$f->numero_facture} - {$fournNom} (" . number_format($f->montant_ttc, 0, ',', ' ') . " XOF)"
             ];
         });
@@ -805,7 +809,7 @@ class AchatControleur
         $achat->load(['details.produit', 'fournisseur']);
 
         return response()->json([
-            'id' => $achat->id,
+            'id' => $achat->uuid,
             'numero_facture' => $achat->numero_facture,
             'fournisseur_nom' => $achat->fournisseur ? $achat->fournisseur->nom : 'Fournisseur inconnu',
             'montant_ttc' => $achat->montant_ttc,
@@ -828,12 +832,14 @@ class AchatControleur
     public function creerAvoirNouveau(Request $request): RedirectResponse
     {
         $request->validate([
-            'parent_id' => ['required', Appartenance::a('achats', 'id')],
+            // La pièce d'origine est désignée par son identifiant public,
+            // celui que l'écran a reçu. Le numérique n'est plus publié.
+            'parent_id' => ['required', 'uuid', Appartenance::a('achats', 'uuid')],
             'raison'    => ['required', 'string', 'max:255'],
             'items'     => ['required', 'array'],
         ]);
 
-        $parent = Achat::findOrFail($request->parent_id);
+        $parent = Achat::where('uuid', $request->parent_id)->firstOrFail();
         $this->autoriserAcces($parent);
         abort_if($parent->type_facture === 'avoir', 400, "Impossible de générer un avoir sur un avoir.");
 

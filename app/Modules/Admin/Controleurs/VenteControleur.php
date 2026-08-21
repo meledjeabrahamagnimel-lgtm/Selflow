@@ -1589,7 +1589,13 @@ class VenteControleur
         $factures = $query->latest()->limit(10)->get()->map(function($f) {
             $clientNom = $f->client ? $f->client->nom : 'Client de passage';
             return [
-                'id' => $f->id,
+                // L'identifiant public, celui que les adresses portent depuis
+                // que les URL ne montrent plus les identifiants de base. Le
+                // numérique était renvoyé ici, et l'écran le remettait ensuite
+                // dans une adresse qui attend un uuid : la requête tombait sur
+                // un 404 (Not Found — introuvable), et le script, qui lisait la
+                // réponse en JSON, recevait la page d'erreur en HTML.
+                'id'   => $f->uuid,
                 'text' => "{$f->numero_facture} - {$clientNom} (" . number_format($f->montant_ttc, 0, ',', ' ') . " XOF)"
             ];
         });
@@ -1607,7 +1613,10 @@ class VenteControleur
         $dejaCredite = self::quantitesDejaCreditees($vente);
 
         return response()->json([
-            'id' => $vente->id,
+            // L'identifiant public : c'est lui que le formulaire d'avoir
+            // renvoie ensuite comme pièce d'origine. Rendre le numérique le
+            // publiait dans une page, et le formulaire le refusait.
+            'id' => $vente->uuid,
             'numero_facture' => $vente->numero_facture,
             'client_nom' => $vente->client ? $vente->client->nom : 'Client de passage',
             'montant_ttc' => $vente->montant_ttc,
@@ -1752,12 +1761,15 @@ class VenteControleur
     public function creerAvoirNouveau(Request $request): RedirectResponse
     {
         $request->validate([
-            'parent_id' => ['required', Appartenance::a('ventes', 'id')],
+            // La pièce d'origine est désignée par son identifiant public, celui
+            // que l'écran a reçu et que les adresses portent. Le numérique était
+            // attendu ici : il n'est plus publié nulle part.
+            'parent_id' => ['required', 'uuid', Appartenance::a('ventes', 'uuid')],
             'raison'    => ['required', 'string', 'max:255'],
             'items'     => ['required', 'array'],
         ]);
 
-        $parent = Vente::findOrFail($request->parent_id);
+        $parent = Vente::where('uuid', $request->parent_id)->firstOrFail();
         abort_unless($parent->pointDeVente->entreprise_id === Auth::user()->entreprise_id, 404);
         abort_if($parent->type_facture === 'avoir', 400, "Impossible de générer un avoir sur une facture d'avoir.");
 
