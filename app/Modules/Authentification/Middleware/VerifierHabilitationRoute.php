@@ -62,6 +62,7 @@ class VerifierHabilitationRoute
         'superadmin.fne.voir_cle'       => 'gestion_fne',
         'superadmin.fne.supprimer_cle'  => 'gestion_fne',
         'superadmin.fne.notes'          => 'gestion_fne',
+        'superadmin.fne.timbre'         => 'gestion_fne',
 
         'superadmin.admins.index'         => 'administration_interne',
         'superadmin.admins.creer'         => 'administration_interne',

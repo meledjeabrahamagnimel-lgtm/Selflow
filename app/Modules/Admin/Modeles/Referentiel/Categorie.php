@@ -58,4 +58,29 @@ class Categorie extends Model
 
         return $noms;
     }
+
+    /**
+     * Les domaines qu'un formulaire doit accepter d'une entreprise donnée.
+     *
+     * Le référentiel, **plus ce que l'entreprise porte déjà**. Sans ce second
+     * terme, deux situations bloquaient l'écran des paramètres tout entier :
+     *
+     * - une entreprise enregistrée sous l'ancien vocabulaire — « Commercial »,
+     *   « Agro-industrie » — ne pouvait plus enregistrer **aucune**
+     *   modification, même sans toucher à son domaine : la valeur déjà en base
+     *   revenait dans le formulaire et se faisait refuser ;
+     * - sur une base dont le référentiel n'est pas chargé, la liste se réduit
+     *   à « Autre » et tout le reste devient invalide.
+     *
+     * Rien ne se perd, et rien de neuf ne se glisse : une valeur hors
+     * référentiel n'est acceptée que si l'entreprise la portait déjà.
+     *
+     * @return array<int, string>
+     */
+    public static function domainesAcceptesPour(?\App\Modules\Admin\Modeles\Entreprise $entreprise): array
+    {
+        $deja = is_array($entreprise?->secteur_activite) ? $entreprise->secteur_activite : [];
+
+        return array_values(array_unique(array_merge(static::domaines(), $deja)));
+    }
 }

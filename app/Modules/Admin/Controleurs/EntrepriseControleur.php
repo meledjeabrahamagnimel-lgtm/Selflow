@@ -78,8 +78,14 @@ class EntrepriseControleur
             'regime_imposition'      => ['nullable', 'string', 'in:TEE,RNE,RSI,RNI'],
             'centre_impots'          => ['nullable', 'string', 'max:100'],
             'compte_contribuable'    => ['nullable', 'string', 'max:100'],
+            // Le domaine se choisit dans le référentiel, comme à l'inscription
+            // et à la première étape de la souscription. L'écran proposait déjà
+            // cette liste ; la validation, elle, acceptait encore n'importe
+            // quelle chaîne de soixante caractères.
             'secteurs_activite'      => ['nullable', 'array'],
-            'secteurs_activite.*'    => ['nullable', 'string', 'max:60'],
+            'secteurs_activite.*'    => ['nullable', 'string', \Illuminate\Validation\Rule::in(
+                \App\Modules\Admin\Modeles\Referentiel\Categorie::domainesAcceptesPour($entreprise)
+            )],
             // Champs DGI
             'idu'                    => ['nullable', 'string', 'max:50'],
             'reference_cadastrale'   => ['nullable', 'string', 'max:100'],
@@ -118,8 +124,14 @@ class EntrepriseControleur
         $data['secteur_activite'] = $request->secteurs_activite ?? [];
 
 
-        // Checkboxes (non transmises si non cochées)
-        $data['timbre_quittance'] = $request->boolean('timbre_quittance');
+        // `timbre_quittance` n'est plus lu ici, et ne doit pas l'être : c'est
+        // un réglage de la plateforme FNE, et la configuration de la
+        // plateforme appartient au superadministrateur, comme les clés.
+        //
+        // Ce n'était pas une case informative. Elle décide si le droit de
+        // timbre est réclamé au client — donc du net à payer imprimé sur la
+        // facture et du montant débité en caisse. La cocher à tort faisait
+        // payer au client un droit que la DGI ne retenait pas.
 
         // Trois etats : la question peut n'avoir pas encore ete posee.
         if ($request->filled('possede_compte_fne')) {

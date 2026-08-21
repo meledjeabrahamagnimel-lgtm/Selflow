@@ -138,6 +138,69 @@ class Entreprise extends Model
     /**
      * Vérifie si toutes les informations requises pour l'inscription complète sont présentes.
      */
+    /**
+     * Les informations que la plateforme FNE exige de l'entreprise.
+     *
+     * **C'est tout ce que l'entreprise a à fournir.** Les clés d'API et la
+     * configuration de la plateforme relèvent du superadministrateur seul ;
+     * l'entreprise, elle, déclare si elle a déjà un compte et reporte les
+     * informations de son espace — ou rassemble celles qu'il faut pour
+     * l'ouvrir.
+     *
+     * La liste vit ici, et non dans une vue, parce que **deux écrans la
+     * lisent** : les paramètres de l'entreprise, qui la font remplir, et le
+     * tableau FNE du superadministrateur, qui doit voir d'un coup d'œil à qui
+     * il manque quoi avant de configurer une clé. Écrite deux fois, elle aurait
+     * divergé au premier champ ajouté.
+     *
+     * @return array<int, array{champ: string, valeur: ?string, note: string}>
+     */
+    public function informationsFne(): array
+    {
+        return [
+            ['champ' => 'Raison sociale',
+             'valeur' => $this->nom !== '[PENDING_ONBOARDING]' ? $this->nom : null,
+             'note' => 'Transmise comme « établissement » à chaque certification.'],
+            ['champ' => 'NCC — Numéro de Compte Contribuable',
+             'valeur' => $this->ncc,
+             'note' => 'Identifie l\'entreprise auprès de la plateforme. Sans lui, rien n\'est certifié.'],
+            ['champ' => 'Régime d\'imposition',
+             'valeur' => $this->regime_imposition,
+             'note' => 'Détermine le code de TVA appliqué aux articles exonérés (TVAC ou TVAD).'],
+            ['champ' => 'RCCM',
+             'valeur' => $this->rccm,
+             'note' => 'Registre du Commerce et du Crédit Mobilier, exigé à l\'inscription.'],
+            ['champ' => 'Centre des impôts',
+             'valeur' => $this->centre_impots,
+             'note' => 'Celui dont dépend l\'entreprise ; figure sur vos documents fiscaux.'],
+            ['champ' => 'Adresse de l\'établissement',
+             'valeur' => $this->adresse,
+             'note' => 'Adresse physique du siège, telle que déclarée à la DGI.'],
+            ['champ' => 'Téléphone',
+             'valeur' => $this->telephone,
+             'note' => 'Contact de l\'entreprise.'],
+            ['champ' => 'Adresse e-mail',
+             'valeur' => $this->email,
+             'note' => 'Reçoit les notifications de la plateforme à chaque facture émise.'],
+            ['champ' => 'Gérant : nom, prénom et fonction',
+             'valeur' => trim(($this->gerant_nom ?? '') . ' ' . ($this->gerant_prenom ?? '')) ?: null,
+             'note' => 'Représentant légal déclaré.'],
+            ['champ' => 'Points de vente',
+             'valeur' => $this->pointsDeVente()->count() > 0
+                 ? $this->pointsDeVente()->count() . ' déclaré(s)'
+                 : null,
+             'note' => 'Leur nom doit être identique des deux côtés : la FNE refuse une facture dont le point de vente lui est inconnu.'],
+        ];
+    }
+
+    /** Combien de ces informations manquent encore. */
+    public function informationsFneManquantes(): int
+    {
+        return collect($this->informationsFne())
+            ->filter(fn ($i) => blank($i['valeur']))
+            ->count();
+    }
+
     public function estInscriptionComplete(): bool
     {
         // Nom ne doit pas être temporaire

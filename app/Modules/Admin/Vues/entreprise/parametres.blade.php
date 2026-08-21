@@ -332,32 +332,11 @@
                 @php
                     $aCompteFne = $entreprise->possede_compte_fne;
 
-                    // Informations que la plateforme exige, et qui doivent
-                    // concorder avec celles de l'espace FNE : ce sont elles que
-                    // le payload de certification transporte.
-                    $infosFne = [
-                        ['champ' => 'Raison sociale', 'valeur' => $entreprise->nom !== '[PENDING_ONBOARDING]' ? $entreprise->nom : null,
-                         'note'  => 'Transmise comme « établissement » à chaque certification.'],
-                        ['champ' => 'NCC — Numéro de Compte Contribuable', 'valeur' => $entreprise->ncc,
-                         'note'  => 'Identifie l\'entreprise auprès de la plateforme. Sans lui, rien n\'est certifié.'],
-                        ['champ' => 'Régime d\'imposition', 'valeur' => $entreprise->regime_imposition,
-                         'note'  => 'Détermine le code de TVA appliqué aux articles exonérés (TVAC ou TVAD).'],
-                        ['champ' => 'RCCM', 'valeur' => $entreprise->rccm,
-                         'note'  => 'Registre du Commerce et du Crédit Mobilier, exigé à l\'inscription.'],
-                        ['champ' => 'Centre des impôts', 'valeur' => $entreprise->centre_impots,
-                         'note'  => 'Celui dont dépend l\'entreprise ; figure sur vos documents fiscaux.'],
-                        ['champ' => 'Adresse de l\'établissement', 'valeur' => $entreprise->adresse,
-                         'note'  => 'Adresse physique du siège, telle que déclarée à la DGI.'],
-                        ['champ' => 'Téléphone', 'valeur' => $entreprise->telephone,
-                         'note'  => 'Contact de l\'entreprise.'],
-                        ['champ' => 'Adresse e-mail', 'valeur' => $entreprise->email,
-                         'note'  => 'Reçoit les notifications de la plateforme à chaque facture émise.'],
-                        ['champ' => 'Gérant : nom, prénom et fonction', 'valeur' => trim(($entreprise->gerant_nom ?? '') . ' ' . ($entreprise->gerant_prenom ?? '')) ?: null,
-                         'note'  => 'Représentant légal déclaré.'],
-                        ['champ' => 'Points de vente', 'valeur' => $entreprise->pointsDeVente()->count() > 0 ? $entreprise->pointsDeVente()->count() . ' déclaré(s)' : null,
-                         'note'  => 'Leur nom doit être identique des deux côtés : la FNE refuse une facture dont le point de vente lui est inconnu.'],
-                    ];
-                    $manquants = collect($infosFne)->filter(fn ($i) => blank($i['valeur']))->count();
+                    // La liste vit sur le modèle : le tableau FNE du
+                    // superadministrateur la lit aussi, pour voir à qui il
+                    // manque quoi avant de configurer une clé.
+                    $infosFne = $entreprise->informationsFne();
+                    $manquants = $entreprise->informationsFneManquantes();
                 @endphp
 
                 <div class="card" style="padding:24px;">
@@ -549,23 +528,40 @@
 
                     <div style="display:flex;flex-direction:column;gap:14px;">
 
-                        <label
-                            style="display:flex;align-items:flex-start;gap:12px;cursor:pointer;padding:14px;background:var(--bg3);border-radius:10px;border:1px solid var(--border);">
-                            <input type="checkbox" name="timbre_quittance" value="1" {{ old('timbre_quittance', $entreprise->timbre_quittance) ? 'checked' : '' }}
-                                style="margin-top:3px;width:16px;height:16px;cursor:pointer;">
+                        {{-- Le timbre de quittance ne se règle plus ici.
+                             Deux raisons. C'est un réglage de la plateforme FNE,
+                             et la configuration de la plateforme appartient au
+                             superadministrateur, comme les clés. Et surtout,
+                             cette case n'a jamais été informative : elle décide
+                             si le droit de timbre est réclamé au client, donc
+                             du net à payer imprimé sur la facture et du montant
+                             débité en caisse. La cocher à tort faisait payer au
+                             client un droit que la DGI ne retenait pas. --}}
+                        <div
+                            style="display:flex;align-items:flex-start;gap:12px;padding:14px;background:var(--bg3);border-radius:10px;border:1px solid var(--border);">
+                            <i class="fas {{ $entreprise->timbre_quittance ? 'fa-circle-check' : 'fa-circle-minus' }}"
+                                style="margin-top:3px;font-size:16px;color:{{ $entreprise->timbre_quittance ? 'var(--success)' : 'var(--text-3)' }};"></i>
                             <div>
                                 <div style="font-weight:600;font-size:13px;color:var(--text);">
-                                    Timbre de quittance
+                                    Timbre de quittance —
+                                    <span style="color:{{ $entreprise->timbre_quittance ? 'var(--success)' : 'var(--text-3)' }};">{{ $entreprise->timbre_quittance ? 'appliqué' : 'non appliqué' }}</span>
                                     <span
-                                        style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:#1d4ed8;background:#dbeafe;border-radius:4px;padding:1px 6px;margin-left:6px;">Informatif</span>
+                                        style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:#92400e;background:#fef3c7;border-radius:4px;padding:1px 6px;margin-left:6px;">Réglé par Selflow</span>
                                 </div>
-                                <div style="font-size:12px;color:var(--text-3);margin-top:2px;">
-                                    Rappel de l'option cochée sur votre espace FNE. Le timbre est
-                                    calculé et appliqué par la DGI seule, à la normalisation :
-                                    cocher ou décocher ici ne change aucun montant.
+                                <div style="font-size:12px;color:var(--text-3);margin-top:2px;line-height:1.6;">
+                                    Ce droit est établi au barème de l'article 873 du CGI et
+                                    <strong>réclamé au client sur les règlements en espèces</strong> :
+                                    il entre dans le net à payer de la facture et dans l'écriture de
+                                    caisse. Il reflète l'option cochée sur votre espace FNE, que
+                                    l'API ne communique pas — c'est donc votre administrateur
+                                    Selflow qui la reporte, en même temps qu'il configure votre clé.
+                                    <br>
+                                    Si l'état affiché ne correspond pas à celui de votre espace FNE,
+                                    signalez-le : une facture annoncerait un timbre que la
+                                    plateforme ne retiendra pas, ou l'inverse.
                                 </div>
                             </div>
-                        </label>
+                        </div>
 
                         <label
                             style="display:flex;align-items:flex-start;gap:12px;cursor:pointer;padding:14px;background:var(--bg3);border-radius:10px;border:1px solid var(--border);">

@@ -406,6 +406,9 @@ Route::prefix('superadmin')
             Route::post('/{entreprise}/voir-cle',                 [\App\Modules\Admin\Controleurs\SuperadminFneControleur::class, 'voirCle'])->name('voir_cle');
             Route::delete('/{entreprise}/cle',                    [\App\Modules\Admin\Controleurs\SuperadminFneControleur::class, 'supprimerCle'])->name('supprimer_cle');
             Route::post('/{entreprise}/notes',                    [\App\Modules\Admin\Controleurs\SuperadminFneControleur::class, 'mettreAJourNotes'])->name('notes');
+            // Le timbre de quittance est un réglage de la plateforme, non un
+            // choix de l'entreprise : il se reporte ici, avec les clés.
+            Route::post('/{entreprise}/timbre',                   [\App\Modules\Admin\Controleurs\SuperadminFneControleur::class, 'basculerTimbre'])->name('timbre');
         });
 
         // ── Vitrine publique (contenu de la page de presentation) ──

@@ -1690,6 +1690,60 @@ charge utile, ordre de traitement, contrôle du secret, amorçage — est dans
 - `DeversementReferentielService`
 - `tests/Feature/DeversementReferentielTest.php` — 13 tests.
 
+#### Lot 9.5 — Qui configure la FNE — **TERMINÉ**
+
+Le propriétaire tranche : « **seul le superadmin gère les clés API, seul le
+superadmin gère tout ce qui concerne la configuration de la FNE**, et non les
+entreprises ; les entreprises offrent uniquement certaines informations. »
+
+L'essentiel était déjà en place — l'entreprise ne voit jamais sa clé, seulement
+un statut — mais **un réglage échappait à la règle**, et pas le moins cher.
+
+**Le timbre de quittance.** Il vivait dans les paramètres de l'entreprise, sous
+une étiquette « Informatif » qui promettait que « cocher ou décocher ici ne
+change aucun montant ». C'était faux, et de plus en plus faux :
+
+- `TimbreQuittanceService::estApplicable()` lit cette colonne pour décider si le
+  droit est dû ;
+- `net_a_payer` l'ajoute au TTC, et c'est ce total que la facture imprime ;
+- depuis le lot 9.1, il commande aussi le débit du compte client et le crédit du
+  `447800`.
+
+Coché à tort, il faisait **payer au client un droit que la plateforme ne
+retenait pas** ; décoché à tort, l'entreprise le payait de sa poche. Et la case
+était à la portée de n'importe quel administrateur d'entreprise.
+
+Le réglage rejoint le tableau FNE du superadministrateur, avec les clés.
+L'entreprise continue de **voir** son état — le retirer sans rien dire serait
+pire : elle doit pouvoir constater un désaccord avec son espace FNE et le
+signaler — mais ne peut plus le poser.
+
+**Ce que l'entreprise fournit, le superadministrateur le voit.** Le tableau FNE
+gagne deux colonnes : l'entreprise a-t-elle déclaré un compte FNE, et combien
+d'informations lui manquent encore pour en ouvrir un. Sans elles, il fallait
+ouvrir les paramètres de chaque entreprise une par une. La liste des dix
+informations exigées vit désormais sur le modèle, `Entreprise::informationsFne()`,
+parce que **deux écrans la lisent** — écrite deux fois, elle aurait divergé au
+premier champ ajouté.
+
+**Un manque du lot 9.2, refermé au passage.** La validation des secteurs dans
+les paramètres de l'entreprise acceptait encore n'importe quelle chaîne de
+soixante caractères, alors que l'écran proposait déjà le référentiel. Elle
+accepte maintenant `Categorie::domainesAcceptesPour($entreprise)` — le
+référentiel **plus ce que l'entreprise porte déjà** : sans ce second terme, une
+entreprise enregistrée sous l'ancien vocabulaire n'aurait plus pu enregistrer
+aucune modification, même sans toucher à son domaine.
+
+Rien de ce qui est gelé n'est touché : le barème de l'article 873 reste dans
+`TimbreQuittanceService`, et le payload ne change pas. Seul change **qui a le
+droit de poser la colonne**.
+
+- `SuperadminFneControleur::basculerTimbre()`, route `superadmin.fne.timbre`
+- `Entreprise::informationsFne()`, `informationsFneManquantes()`
+- `Categorie::domainesAcceptesPour()`
+- `tests/Feature/ConfigurationFneTest.php` — 9 tests, dont deux échouent contre
+  l'ancien code.
+
 ---
 
 ## 5 bis. La numérotation des comptes — tranché
