@@ -300,15 +300,32 @@ class Produit extends Model
 
     public function getPhotoUrlAttribute(): string
     {
-        if ($this->photo) {
-            if (str_starts_with($this->photo, 'http://') || str_starts_with($this->photo, 'https://')) {
-                return $this->photo;
-            }
-            if (\Illuminate\Support\Facades\Storage::disk('public')->exists($this->photo)) {
-                return asset('storage/' . $this->photo);
-            }
+        return $this->photoReelle() ?? asset('images/placeholder-produit.png');
+    }
+
+    /**
+     * L'adresse de la photo **réelle** de l'article, ou `null` s'il n'en a pas.
+     *
+     * `photo_url` rend toujours quelque chose — l'image d'attente au besoin —
+     * et c'est ce qu'il faut pour une vignette : une case vide serait pire.
+     * Mais la carte de l'écran de vente affiche l'image **en arrière-plan** :
+     * y poser l'image d'attente couvrirait toutes les cartes d'un même
+     * placeholder gris, ce qui n'apprendrait rien et brouillerait le texte.
+     * L'appelant doit donc pouvoir distinguer les deux cas.
+     */
+    public function photoReelle(): ?string
+    {
+        if (!$this->photo) {
+            return null;
         }
-        return asset('images/placeholder-produit.png');
+
+        if (str_starts_with($this->photo, 'http://') || str_starts_with($this->photo, 'https://')) {
+            return $this->photo;
+        }
+
+        return \Illuminate\Support\Facades\Storage::disk('public')->exists($this->photo)
+            ? asset('storage/' . $this->photo)
+            : null;
     }
 
     // ─── Helpers Phase 1 ─────────────────────────────────────────────────────

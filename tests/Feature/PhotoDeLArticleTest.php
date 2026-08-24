@@ -1,0 +1,212 @@
+<?php
+
+namespace Tests\Feature;
+
+use App\Modules\Admin\Modeles\Client;
+use App\Modules\Admin\Modeles\Entreprise;
+use App\Modules\Admin\Modeles\PointDeVente;
+use App\Modules\Admin\Modeles\Produit;
+use App\Modules\Authentification\Modeles\Utilisateur;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Storage;
+use Tests\TestCase;
+
+/**
+ * La photo de l'article se pose en arrière-plan de sa carte.
+ *
+ * Sur un écran de caisse, on reconnaît un article à son image avant de lire son
+ * nom. La photo existait déjà sur la fiche, et l'écran de vente ne l'utilisait
+ * nulle part : les cartes se ressemblaient toutes.
+ *
+ * Deux points demandent de l'attention, et ce sont eux que ces épreuves
+ * gardent :
+ *
+ *  1. **l'image d'attente n'est pas une photo.** `photo_url` rend toujours
+ *     quelque chose — c'est ce qu'il faut pour une vignette. En arrière-plan,
+ *     ce serait un même placeholder gris sous toutes les cartes, qui
+ *     n'apprendrait rien et brouillerait le texte ;
+ *  2. **le chemin de la photo entre dans un attribut `style`.** Une apostrophe
+ *     y refermerait l'attribut.
+ */
+class PhotoDeLArticleTest extends TestCase
+{
+    use RefreshDatabase;
+
+    private Entreprise $entreprise;
+    private Utilisateur $admin;
+    private PointDeVente $site;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        Storage::fake('public');
+
+        // La situation fiscale est renseignée : sans elle, le garde
+        // `inscription.complete` renvoie l'écran de vente vers la
+        // configuration, et la page ne se rend jamais.
+        $this->entreprise = Entreprise::create([
+            'nom'               => 'Quincaillerie du Plateau',
+            'regime_imposition' => 'RNI',
+            'adresse'           => 'Plateau, Abidjan',
+            'rccm'              => 'CI-ABJ-2026-B-00042',
+            'ncc'               => '2601234A',
+            'gerant_fonction'   => 'Gérant',
+            'secteur_activite'  => ['Commerce'],
+            'modules_actifs'    => ['principal', 'ventes', 'achats', 'stock', 'produits', 'tiers'],
+        ]);
+
+        $this->site = PointDeVente::create([
+            'entreprise_id' => $this->entreprise->id,
+            'nom' => 'Boutique', 'ville' => 'Abidjan', 'commune' => 'Plateau',
+        ]);
+
+        $this->admin = Utilisateur::create([
+            'nom' => 'Kouadio', 'prenom' => 'Lewis', 'email' => 'lewis@quincaillerie.ci',
+            'password' => bcrypt('secret-de-test'), 'role' => 'admin',
+            'entreprise_id' => $this->entreprise->id,
+            'point_de_vente_id' => $this->site->id,
+        ]);
+
+        Client::create(['entreprise_id' => $this->entreprise->id, 'nom' => 'Konan Yao']);
+
+        $this->actingAs($this->admin)->withSession(['point_de_vente_actif_id' => $this->site->id]);
+    }
+
+    // ── La source : photoReelle() ────────────────────────────────────
+
+    public function test_un_article_sans_photo_n_en_a_pas(): void
+    {
+        $this->assertNull($this->article('Ciment 50 kg')->photoReelle());
+    }
+
+    /**
+     * Le fichier a pu être supprimé du disque sans que la colonne soit vidée.
+     * Rendre son adresse afficherait une image cassée sur la carte.
+     */
+    public function test_un_fichier_absent_du_disque_ne_compte_pas_comme_photo(): void
+    {
+        $article = $this->article('Fer à béton', ['photo' => 'produits/disparu.jpg']);
+
+        $this->assertNull($article->photoReelle());
+    }
+
+    public function test_un_fichier_present_rend_son_adresse(): void
+    {
+        Storage::disk('public')->put('produits/ciment.jpg', 'contenu');
+        $article = $this->article('Ciment 50 kg', ['photo' => 'produits/ciment.jpg']);
+
+        $this->assertStringContainsString('produits/ciment.jpg', (string) $article->photoReelle());
+    }
+
+    public function test_une_adresse_distante_est_rendue_telle_quelle(): void
+    {
+        $article = $this->article('Tôle', ['photo' => 'https://exemple.ci/tole.jpg']);
+
+        $this->assertSame('https://exemple.ci/tole.jpg', $article->photoReelle());
+    }
+
+    /**
+     * `photo_url` garde son rôle : une vignette a besoin d'une image, toujours.
+     */
+    public function test_photo_url_rend_toujours_l_image_d_attente_en_repli(): void
+    {
+        $this->assertStringContainsString(
+            'placeholder-produit.png',
+            $this->article('Ciment 50 kg')->photo_url
+        );
+    }
+
+    // ── L'écran de vente ─────────────────────────────────────────────
+
+    public function test_la_carte_d_un_article_photographie_porte_son_image_en_fond(): void
+    {
+        Storage::disk('public')->put('produits/ciment.jpg', 'contenu');
+        $this->article('Ciment 50 kg', ['photo' => 'produits/ciment.jpg']);
+
+        $html = $this->get(route('admin.ventes.nouvelle'))->assertOk()->getContent();
+
+        // La classe se pose en fin de liste : `avec-photo"` ne peut venir que
+        // de la carte, jamais de la feuille de style, qui l'écrit suivie de
+        // `::before` ou de `:hover`.
+        $this->assertStringContainsString('avec-photo"', $html);
+        $this->assertStringContainsString('style="--fond-produit: url(', $html);
+        $this->assertStringContainsString('produits/ciment.jpg', $html);
+    }
+
+    /**
+     * Le placeholder en arrière-plan couvrirait toutes les cartes d'un même
+     * gris. Un article sans photo garde donc la carte d'avant.
+     */
+    public function test_la_carte_d_un_article_sans_photo_reste_sans_fond(): void
+    {
+        $this->article('Ciment 50 kg');
+
+        $html = $this->get(route('admin.ventes.nouvelle'))->assertOk()->getContent();
+
+        // La feuille de style porte toujours la règle `.avec-photo` : c'est la
+        // **carte** qui ne doit pas la recevoir, et l'attribut de fond qui ne
+        // doit pas être écrit.
+        $this->assertStringNotContainsString('avec-photo"', $html);
+        $this->assertStringNotContainsString('style="--fond-produit', $html);
+        $this->assertStringNotContainsString('placeholder-produit.png', $html);
+    }
+
+    public function test_l_ecran_de_modification_pose_le_meme_fond(): void
+    {
+        Storage::disk('public')->put('produits/ciment.jpg', 'contenu');
+        $this->article('Ciment 50 kg', ['photo' => 'produits/ciment.jpg']);
+
+        $vente = \App\Modules\Admin\Modeles\Vente::create([
+            'point_de_vente_id' => $this->site->id,
+            'numero_facture'    => 'FV-0001',
+            'date_vente'        => now()->toDateString(),
+            'mode_paiement'     => 'Espèces',
+            'montant_ht'        => 0, 'montant_tva' => 0, 'montant_ttc' => 0,
+            'etape'             => 'Devis', 'statut' => 'En attente',
+        ]);
+
+        $html = $this->get(route('admin.ventes.modifier', $vente))->assertOk()->getContent();
+
+        // La classe se pose en fin de liste : `avec-photo"` ne peut venir que
+        // de la carte, jamais de la feuille de style, qui l'écrit suivie de
+        // `::before` ou de `:hover`.
+        $this->assertStringContainsString('avec-photo"', $html);
+        $this->assertStringContainsString('produits/ciment.jpg', $html);
+    }
+
+    /**
+     * Simulation d'attaque : le chemin de la photo entre dans un attribut
+     * `style`, entre apostrophes. Une apostrophe dans le nom du fichier
+     * refermerait l'attribut et laisserait écrire du HTML dans la page —
+     * une porte ouverte à qui peut téléverser une image.
+     */
+    public function test_une_apostrophe_dans_le_chemin_ne_sort_pas_de_l_attribut(): void
+    {
+        $chemin = "produits/x'onerror=alert(1).jpg";
+        Storage::disk('public')->put($chemin, 'contenu');
+        $this->article('Article piégé', ['photo' => $chemin]);
+
+        $html = $this->get(route('admin.ventes.nouvelle'))->assertOk()->getContent();
+
+        // L'apostrophe est rendue en entité : elle ne referme rien.
+        $this->assertStringNotContainsString("x'onerror", $html);
+        $this->assertStringContainsString('&#039;onerror', $html);
+    }
+
+    // ─────────────────────────────────────────────────────────────────
+
+    private function article(string $nom, array $attributs = []): Produit
+    {
+        return Produit::create(array_merge([
+            'entreprise_id' => $this->entreprise->id,
+            'reference'     => 'REF-' . uniqid(),
+            'nom'           => $nom,
+            'type'          => 'marchandise',
+            'unite'         => 'unité',
+            'prix_achat'    => 5000,
+            'prix_vente'    => 6500,
+            'taux_tva'      => 18,
+        ], $attributs));
+    }
+}

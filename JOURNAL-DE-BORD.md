@@ -2105,6 +2105,40 @@ le seul axe que l'application renseigne réellement — le lieu où la pièce a 
 - `tests/Feature/AnalytiqueParSiteTest.php` — 12 tests, dont un de
   cloisonnement et un de simulation d'attaque (caissier sans habilitation).
 
+#### Lot 12.4 — La photo de l'article en fond de carte — **TERMINÉ**
+
+Demandé par le propriétaire le 24/08. Sur un écran de caisse, on reconnaît un
+article à son image avant de lire son nom. La photo existait déjà sur la fiche,
+et **l'écran de vente ne l'utilisait nulle part** : les cartes se ressemblaient
+toutes.
+
+| Décision | Raison |
+|---|---|
+| **L'image d'attente n'est pas une photo** | `photo_url` rend toujours quelque chose — c'est ce qu'il faut pour une vignette. En arrière-plan, ce serait le même placeholder gris sous toutes les cartes : cela n'apprendrait rien et brouillerait le texte. `photoReelle()` rend `null` quand il n'y a pas de fichier |
+| **Un fichier absent du disque ne compte pas** | La colonne peut survivre à la suppression du fichier. Rendre son adresse afficherait une image cassée |
+| **Le voile est pris sur le fond de la carte** | `var(--bg3)`, non une couleur écrite en dur : le texte reste lisible quel que soit le thème. Le dégradé s'épaissit vers le bas, où sont le nom, le prix et le stock ; le haut de la photo reste dégagé, c'est là qu'on reconnaît l'article |
+| **L'image s'éclaircit au survol** | 45 % au repos, 62 % au survol : la carte visée se distingue sans que la grille devienne illisible |
+
+**Simulation d'attaque.** Le chemin de la photo entre dans un attribut `style`,
+entre apostrophes : `style="--fond-produit: url('…')"`. Une apostrophe dans le
+nom du fichier refermerait l'attribut et laisserait écrire du HTML dans la page
+— une porte ouverte à qui peut téléverser une image. Blade échappe l'apostrophe
+en `&#039;` ; **une épreuve le vérifie** plutôt que de le supposer.
+
+- `Produit::photoReelle()`, `ventes/nouvelle.blade.php`, `ventes/modifier.blade.php`
+- `tests/Feature/PhotoDeLArticleTest.php` — 9 tests, dont trois échouent contre
+  l'ancien code.
+
+#### Lot 12.5 — La passation Comptaflow, prête à ouvrir — **TERMINÉ**
+
+`PASSERELLE-COMPTAFLOW/COMMENCER-ICI.md` : une page d'entrée pour une session
+qui reçoit le dossier **sans aucun autre contexte**. Elle porte le principe de
+la passerelle, les quatre travaux par ordre d'urgence, ce qu'il ne faut pas
+faire, et le rôle de chaque fichier du dossier.
+
+Les six documents précédents disaient chacun une partie ; aucun ne disait par
+où commencer.
+
 ---
 
 ## 5 bis. La numérotation des comptes — tranché

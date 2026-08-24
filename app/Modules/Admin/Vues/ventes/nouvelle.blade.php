@@ -13,7 +13,32 @@
         border-radius: 10px; padding: 14px; cursor: pointer;
         transition: all .15s; text-align: center;
         user-select: none;
+        /* La photo de l'article se pose derriere la carte : il faut donc un
+           reperage local, et de quoi couper ce qui deborde des angles. */
+        position: relative; overflow: hidden; isolation: isolate;
     }
+    /* La photo elle-meme. Elle n'est posee que sur les articles qui en ont une
+       vraiment : l'image d'attente couvrirait toutes les autres cartes d'un
+       meme gris, ce qui n'apprendrait rien et brouillerait le texte. */
+    .produit-card.avec-photo::before {
+        content: ''; position: absolute; inset: 0; z-index: 0;
+        background-image: var(--fond-produit);
+        background-size: cover; background-position: center;
+        opacity: .45; transition: opacity .15s;
+    }
+    /* Le voile. Il est pris sur le fond de la carte, non ecrit en dur : le
+       texte reste lisible en theme clair comme en theme sombre. Il s'epaissit
+       vers le bas, ou se trouvent le nom, le prix et le stock ; le haut de la
+       photo reste degage, c'est la qu'on reconnait l'article. */
+    .produit-card.avec-photo::after {
+        content: ''; position: absolute; inset: 0; z-index: 1;
+        background: linear-gradient(to bottom,
+                    rgba(0,0,0,0) 0%, var(--bg3) 62%, var(--bg3) 100%);
+        opacity: .88; pointer-events: none;
+    }
+    .produit-card.avec-photo:hover::before { opacity: .62; }
+    /* Sans cela, le texte passerait sous le voile. */
+    .produit-card > * { position: relative; z-index: 2; }
     .produit-card:hover { border-color: var(--primary); background: rgba(99,102,241,.08); transform: translateY(-2px); }
     .produit-card.out-of-stock { opacity: .65; border-color: rgba(239,68,68,.3); }
     .produit-card.out-of-stock:hover { border-color: var(--warning); background: rgba(245,158,11,.08); }
@@ -163,7 +188,9 @@
                 <div class="produit-grid" id="grilleProduits">
                     @foreach($produits as $produit)
                     @php $suitLeStock = $produit->estStockable(); @endphp
-                    <div class="produit-card {{ $suitLeStock && $produit->stock_actuel <= 0 ? 'out-of-stock' : '' }}"
+                    @php $photo = $produit->photoReelle(); @endphp
+                    <div class="produit-card {{ $suitLeStock && $produit->stock_actuel <= 0 ? 'out-of-stock' : '' }} {{ $photo ? 'avec-photo' : '' }}"
+                         @if($photo) style="--fond-produit: url('{{ $photo }}');" @endif
                          data-id="{{ $produit->id }}"
                          data-nom="{{ $produit->nom }}"
                          data-prix="{{ $produit->prix_vente }}"
