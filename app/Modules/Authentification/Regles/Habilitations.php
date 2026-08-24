@@ -172,6 +172,15 @@ class Habilitations
         'admin.comptabilite.delettrer'        => 'comptabilite_creances',
         // Une écriture manuelle écrit directement au grand livre.
         'admin.comptabilite.ecriture_manuelle' => 'comptabilite_globale',
+        // Les gabarits de libellé décident de ce que **toutes** les écritures
+        // futures porteront au journal : c'est un réglage de comptabilité, pas
+        // un écran de consultation.
+        'admin.comptabilite.libelles'             => 'comptabilite_globale',
+        'admin.comptabilite.libelles.enregistrer' => 'comptabilite_globale',
+        'admin.comptabilite.libelles.apercu'      => 'comptabilite_globale',
+        // La ventilation analytique compare les sites entre eux : elle montre
+        // le résultat de l'entreprise entière, site par site.
+        'admin.comptabilite.analytique' => 'comptabilite_globale',
 
         // ── Immobilisations ──
         // Le parc et son amortissement portent l'actif du bilan et une charge

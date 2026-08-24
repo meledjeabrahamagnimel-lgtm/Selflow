@@ -473,6 +473,11 @@
         if (is_string($secteurActivite)) {
             $secteurActivite = [$secteurActivite];
         }
+        // Le résultat par site n'a de sens qu'à partir de deux sites. Le
+        // compte est fait une fois ici plutôt qu'à chaque lien du menu.
+        $nombreDeSites = $entreprise
+            ? \App\Modules\Admin\Modeles\PointDeVente::where('entreprise_id', $entreprise->id)->count()
+            : 0;
     @endphp
 
     @if($nomPdvAffichage)
@@ -744,6 +749,17 @@
             </a>
             <a href="{{ route('admin.comptabilite.lettrage') }}" class="nav-item {{ request()->routeIs('admin.comptabilite.lettrage') ? 'active' : '' }}">
                 <i class="fas fa-link"></i> Lettrage
+            </a>
+            {{-- La ventilation analytique n'a de sens qu'à plusieurs sites :
+                 comparer un magasin à lui-même n'apprend rien, et le lien
+                 encombrerait le menu d'un commerce qui n'en a qu'un. --}}
+            @if(($nombreDeSites ?? 0) > 1)
+            <a href="{{ route('admin.comptabilite.analytique') }}" class="nav-item {{ request()->routeIs('admin.comptabilite.analytique') ? 'active' : '' }}">
+                <i class="fas fa-store"></i> Résultat par site
+            </a>
+            @endif
+            <a href="{{ route('admin.comptabilite.libelles') }}" class="nav-item {{ request()->routeIs('admin.comptabilite.libelles') ? 'active' : '' }}">
+                <i class="fas fa-pen-nib"></i> Libellés d'écriture
             </a>
             @endif
             @endif

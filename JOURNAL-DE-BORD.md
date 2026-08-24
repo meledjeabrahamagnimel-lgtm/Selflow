@@ -90,6 +90,9 @@ Elles ne se rediscutent pas sans raison neuve.
 | Impression du reçu | **Par le navigateur** (`window.print()`, format 80 mm) pendant les tests, boîte de dialogue comprise, pour voir le rendu. **À retirer sur ordre du propriétaire**, pas avant |
 | TERNE | **Pas de terminal fiscal.** Selflow passe par l'API de la DGI, qui renvoie les trois éléments du sticker. L'imprimante de caisse est un périphérique ordinaire |
 | Achats et DGI | **Le BAPA est le seul achat transmis à la plateforme**, et il ne collecte aucune TVA — ce que le payload d'achat traduit déjà, et qui reste **gelé**. Les autres achats ne sont enregistrés **que pour la comptabilité** : c'est la finalité visée, et elle confirme le sens du lot 11.3 — 24/08/2026, propriétaire du projet |
+| Taxes supportées à l'achat | **La colonne est retirée**, pas ouverte. À l'achat, une taxe supportée est une charge dont le compte dépend de sa nature ; le deviner reviendrait à en choisir un au hasard — 24/08/2026, propriétaire du projet |
+| Libellés d'écriture | **Paramétrables par entreprise**, deux gabarits par type d'opération. Les défauts reproduisent l'ancien texte au caractère près, et **les écritures passées ne sont jamais réécrites** — 24/08/2026 |
+| Ventilation analytique | **Un seul axe : le point de vente**, celui que l'application renseigne réellement. Aucune clé de répartition : une charge de siège reste au site où elle a été saisie, et l'écran le dit — 24/08/2026 |
 
 ---
 
@@ -2007,6 +2010,101 @@ d'accord avec elle, non l'inverse.
 - `tests/Feature/CreationDeCompteTest.php` — 6 tests de plus, dont trois
   échouent contre l'ancien code.
 
+### Lot 12 — Ce qui dormait — **TERMINÉ**
+
+Trois chantiers, tous autorisés le 24 août : la colonne à trancher, et les deux
+chantiers proposés que le propriétaire a débloqués d'un coup.
+
+#### Lot 12.1 — Les taxes supportées à l'achat — **RETIRÉ**
+
+`achats.montant_autres_taxes` était déclarée en `fillable` et en `casts`, et
+**rien ne l'écrivait ni ne la lisait** : ni formulaire, ni `ventilationAchat()`,
+ni `montant_ttc`. Le propriétaire a tranché : elle est retirée.
+
+La symétrie avec la vente ne tenait pas. À la vente, une taxe additionnelle est
+collectée pour le compte de l'État — une **dette**, créditée au `447000`, et
+reversée. À l'achat, une taxe supportée est une **charge**, et le compte dépend
+de sa nature : droit d'enregistrement, taxe non récupérable, redevance. Il n'y a
+pas de compte unique à deviner, et en choisir un au hasard dans la classe 6
+aurait été pire que l'omission.
+
+`ventes.montant_autres_taxes` **n'est pas touchée**.
+
+**Trouvé en chemin, non corrigé :** les tables `achat_taxes` et
+`achat_detail_taxes` existent, les relations sont déclarées sur `Achat` et
+`AchatDetail`, et **aucun écran ne les alimente non plus**. C'est la même
+plomberie dormante, posée par symétrie avec la vente. Les retirer suppose de
+supprimer deux tables — geste plus lourd qu'une colonne jamais remplie, et que
+le propriétaire n'a pas demandé. À décider.
+
+- `2026_08_24_000002_retirer_autres_taxes_de_l_achat.php`
+- `tests/Feature/EcrituresAchatTest.php` — 3 tests de plus (17 au total).
+
+#### Lot 12.2 — Les libellés d'écriture — **TERMINÉ**
+
+**Le libellé était l'intitulé du compte.** L'opération d'une facture de vente
+portait « Vente de marchandises » — le nom SYSCOHADA du compte mouvementé. Or
+le compte porte déjà ce nom : le répéter dépense la **seule colonne de texte
+libre du journal**. Un grand livre du `701` dont chaque ligne redit l'en-tête de
+la page n'apprend rien à qui le relit ; ce qu'on veut y trouver, c'est quelle
+pièce, quel client, quels articles, quel site.
+
+Chaque entreprise pose ses gabarits, deux par type d'opération — celui de
+l'opération, celui de ses lignes — pour les six types que `ComptabiliteService`
+écrit depuis une pièce commerciale. Neuf jetons : `{piece}`, `{tiers}`,
+`{produits}`, `{point_de_vente}`, `{date}`, `{nature}`, `{journal}`,
+`{reference}`, `{role}`.
+
+| Décision | Raison |
+|---|---|
+| **Les défauts reproduisent l'ancien texte au caractère près** | Une entreprise qui ne touche à rien ne doit voir aucun changement dans son journal. Les épreuves comparent aux chaînes exactes d'avant |
+| **Les écritures passées ne sont pas réécrites** | Un journal se lit tel qu'il a été tenu ; le regraver effacerait ce que le comptable a relu |
+| **Un jeton vide emporte son séparateur** | `Rglt/{piece}/{reference}/Vente {produits}` sur un règlement sans référence donnerait `Rglt/FV-1//Vente…`. Le premier séparateur d'une suite est conservé **avec ses espaces** : c'est ce qui laisse `Rglt/FV-1/Vente` collé et `FV-1 / Facturation` espacé |
+| **Un gabarit qui ne produit rien retombe sur le défaut** | Une écriture sans libellé rendrait le journal illisible |
+| **Vider les deux champs supprime la ligne** | Enregistrer deux chaînes vides empêcherait une évolution future du défaut de rattraper cette entreprise |
+| **`{role}` ne rend rien sur l'opération** | Seule une ligne porte un rôle. L'aperçu promettrait un texte que l'écriture ne produira jamais |
+| **`$contexte` prime sur le gabarit au règlement** | « Acompte à la facturation » dit que le règlement ne solde pas la pièce — aucun jeton ne saurait le produire |
+
+**Un défaut trouvé en écrivant les épreuves.** Le règlement construisait ses
+jetons avec `$base + ['reference' => $ref]`. L'union de tableaux **garde la
+valeur de gauche** sur une clé déjà présente, et `reference` y valait `null` :
+le numéro de chèque n'atteignait jamais le libellé. `array_merge` a remplacé le
+`+`. Le défaut ne se voyait qu'à la lecture du journal, sur les seuls règlements
+par chèque ou virement.
+
+- `2026_08_24_000003_modeles_de_libelle.php`, `ModeleLibelle`,
+  `LibelleEcritureService`, `ModeleLibelleControleur`, une vue
+- `tests/Feature/LibellesEcritureTest.php` — 22 tests, dont deux simulations
+  d'attaque : type d'opération inventé, `entreprise_id` injecté.
+
+#### Lot 12.3 — Le résultat par site — **TERMINÉ**
+
+**La donnée était là depuis toujours, et personne ne la lisait.**
+`point_de_vente_id` est porté par chaque écriture — la vente, l'achat, le
+règlement, le mouvement de stock, la dotation d'amortissement, la consignation,
+et jusqu'à l'écriture manuelle. Il partait vers Comptaflow, qui l'ignore ; la
+balance et le grand livre savaient s'y restreindre. Mais **aucun écran ne
+mettait les sites côte à côte**, ce qui est la seule question qui compte quand
+on en tient plusieurs : lequel gagne de l'argent, lequel en perd.
+
+| Décision | Raison |
+|---|---|
+| **Classes 6 et 7 seulement** | Le résultat ne se lit pas sur le bilan. Une ligne de trésorerie, de tiers ou de TVA n'y a pas sa place |
+| **Les deux sens sont pris** | Un produit vit au crédit, une charge au débit — mais l'avoir et la contre-passation écrivent dans l'autre sens. Ne retenir que la colonne naturelle ferait apparaître un avoir comme une charge, et gonflerait les deux totaux d'un même montant |
+| **Aucune clé de répartition** | Une charge de siège reste au site où elle a été saisie. La clé n'existe nulle part dans l'application, et l'inventer donnerait un résultat faux que rien ne signalerait. **L'écran le dit**, et une épreuve vérifie qu'il le dit |
+| **Les écritures sans site sont montrées** | Les taire ferait que la somme des sites ne vaudrait pas le résultat de l'entreprise, sans que rien ne l'explique. Elles figurent sous « Sans site », et un bandeau les compte |
+| **Le lien n'apparaît qu'à partir de deux sites** | Comparer un magasin à lui-même n'apprend rien |
+| **Le comptage des écritures est une requête à part** | Une ligne qui porte une charge au débit et un produit au crédit serait comptée deux fois par les deux passes d'agrégation, et le total annoncé dépasserait le journal |
+
+Ce n'est **pas** une comptabilité analytique complète : pas de sections, pas de
+clés, pas de charges indirectes réparties au prorata. C'est la ventilation par
+le seul axe que l'application renseigne réellement — le lieu où la pièce a été
+établie. Prétendre davantage supposerait des clés que personne n'a données.
+
+- `AnalytiqueService`, `ComptabiliteControleur::analytique()`, une vue
+- `tests/Feature/AnalytiqueParSiteTest.php` — 12 tests, dont un de
+  cloisonnement et un de simulation d'attaque (caissier sans habilitation).
+
 ---
 
 ## 5 bis. La numérotation des comptes — tranché
@@ -2056,23 +2154,21 @@ verrouillent les trois situations.
 
 Elles sont documentées pour ne pas être redécouvertes.
 
-### Taxes supportées à l'achat — **À TRANCHER**
+### ~~Taxes supportées à l'achat~~ — **TRANCHÉ ET RETIRÉ au lot 12.1**
 
-`Achat` déclare une colonne `montant_autres_taxes`, en `fillable` et en `casts`,
-qu'**aucun écran n'alimente et qu'aucune écriture ne lit**. Le formulaire
-d'achat ne la propose pas, `ventilationAchat()` l'ignore, et `montant_ttc` ne la
-comporte pas.
+Le propriétaire a choisi le retrait, le 24/08/2026. Voir le lot 12.1.
 
-Sur la vente, la colonne homonyme porte les taxes parafiscales collectées pour
-l'État — une dette, créditée au `447000`. **À l'achat, la symétrie ne tient
-pas** : une taxe supportée n'est pas une dette mais une charge, et le compte à
-retenir dépend de sa nature — droit d'enregistrement, taxe non récupérable,
-redevance. Le deviner reviendrait à choisir un compte au hasard dans la classe
-6, ce qui est pire que l'omettre.
+### Taxes personnalisées à l'achat — **À TRANCHER**
 
-Deux issues, au choix du propriétaire : ouvrir la saisie et poser le compte de
-charge dans la configuration, ou retirer la colonne du modèle pour qu'elle cesse
-de promettre ce qu'elle ne fait pas.
+Les tables `achat_taxes` et `achat_detail_taxes` existent, les relations sont
+déclarées sur `Achat` et `AchatDetail`, et **aucun écran ne les alimente**.
+C'est la même plomberie dormante que la colonne retirée au lot 12.1, posée par
+symétrie avec la vente — où elle sert, elle, à la fois aux écritures et au
+payload FNE.
+
+Les retirer suppose de supprimer deux tables, geste plus lourd qu'une colonne
+jamais remplie, et que le propriétaire n'a pas demandé. Deux issues, comme pour
+la colonne : ouvrir la saisie, ou supprimer les tables.
 
 ### Stock
 
@@ -2376,9 +2472,16 @@ le suivant hors de la longueur permise.
 
 Vingt-deux épreuves dans `NumerotationTiersTest`.
 
-### Libellés d'écriture — l'intitulé du compte tient lieu de libellé
+### Libellés d'écriture — l'intitulé du compte tient lieu de libellé — **CORRIGÉ au lot 12.2**
 
 Relevé par le propriétaire du projet le 15/08/2026, et vérifié dans le code.
+**Livré le 24/08/2026** — voir le lot 12.2. Le constat ci-dessous est conservé :
+c'est lui qui dit pourquoi le chantier existait.
+
+Une seule chose diffère de ce qui était proposé ici : **le défaut n'est pas
+`{piece} — {tiers}` mais l'ancien texte, à l'identique.** Changer le libellé de
+toutes les entreprises d'office aurait modifié leur journal sans qu'elles
+l'aient demandé ; le nouveau gabarit est proposé à l'écran, il ne s'impose pas.
 
 **Ce sont deux choses différentes.** L'intitulé du compte appartient au plan
 comptable : 701000 s'appelle « Ventes de marchandises », et cela ne change

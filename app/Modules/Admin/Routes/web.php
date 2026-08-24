@@ -149,6 +149,16 @@ Route::prefix('admin')
             // livre dit pourquoi.
             Route::get('/grand-livre', [\App\Modules\Admin\Controleurs\ComptabiliteControleur::class, 'grandLivre'])->name('grand_livre');
 
+            // Le resultat site par site : l'axe analytique que l'application
+            // renseigne reellement.
+            Route::get('/analytique', [\App\Modules\Admin\Controleurs\ComptabiliteControleur::class, 'analytique'])->name('analytique');
+
+            // Les libelles d'ecriture : ce que le journal dit d'une operation,
+            // au lieu de repeter l'intitule du compte mouvemente.
+            Route::get('/libelles',  [\App\Modules\Admin\Controleurs\ModeleLibelleControleur::class, 'index'])->name('libelles');
+            Route::put('/libelles',  [\App\Modules\Admin\Controleurs\ModeleLibelleControleur::class, 'enregistrer'])->name('libelles.enregistrer');
+            Route::post('/libelles/apercu', [\App\Modules\Admin\Controleurs\ModeleLibelleControleur::class, 'apercu'])->name('libelles.apercu');
+
             // Lettrage : rapprocher une facture du reglement qui la solde.
             Route::get('/lettrage',  [\App\Modules\Admin\Controleurs\ComptabiliteControleur::class, 'lettrage'])->name('lettrage');
             Route::post('/lettrage', [\App\Modules\Admin\Controleurs\ComptabiliteControleur::class, 'lettrer'])->name('lettrer');

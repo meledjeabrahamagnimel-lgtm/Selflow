@@ -648,6 +648,35 @@ class ComptabiliteControleur
     }
 
     /**
+     * Le résultat, site par site.
+     *
+     * Chaque écriture porte son `point_de_vente_id` depuis toujours — la
+     * vente, l'achat, le règlement, le mouvement de stock, la dotation, la
+     * consignation, l'écriture manuelle. L'information partait vers Comptaflow,
+     * qui l'ignore, et **aucun écran de Selflow ne s'en servait** : la balance
+     * et le grand livre savent se restreindre à un site, mais rien ne les
+     * mettait côte à côte. Or c'est la seule question qui compte quand on en
+     * tient plusieurs — lequel gagne de l'argent, lequel en perd.
+     */
+    public function analytique(Request $request): View
+    {
+        $entreprise = Auth::user()->entreprise;
+
+        [$debut, $fin] = FiltrePeriodeService::intervalle($request);
+
+        $ventilation = \App\Modules\Admin\Services\AnalytiqueService::parSite(
+            $entreprise->id,
+            $debut?->toDateString(),
+            $fin?->toDateString()
+        );
+
+        return view('admin::comptabilite.analytique', [
+            'ventilation'    => $ventilation,
+            'libellePeriode' => FiltrePeriodeService::libelle($request),
+        ]);
+    }
+
+    /**
      * L'écran de lettrage d'un compte.
      */
     public function lettrage(Request $request): View
