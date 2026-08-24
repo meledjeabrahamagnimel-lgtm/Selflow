@@ -26,7 +26,15 @@ class Achat extends Model
         'montant_ht',
         'montant_tva',
         'montant_ttc',
-        'montant_autres_taxes', // taxes parafiscales collectées, hors TVA
+        // `montant_autres_taxes` a été retiré — décision du propriétaire, 24/08/2026.
+        // La colonne existait ici depuis la vente, par symétrie. Mais la symétrie
+        // ne tient pas : à la vente, une taxe additionnelle est **collectée pour
+        // l'État**, donc une dette au 447000 ; à l'achat, une taxe supportée est
+        // une **charge**, et son compte dépend de sa nature — droit
+        // d'enregistrement, taxe non récupérable, redevance. Aucun écran ne
+        // l'alimentait, aucune écriture ne la lisait : elle promettait ce qu'elle
+        // ne faisait pas. Le jour où le besoin se présentera, il faudra d'abord
+        // savoir quel compte de charge retenir, et le poser dans la configuration.
         'remise',          // montant de la remise globale, en francs
         'remise_taux',     // taux de la remise globale, en % → champ `discount` FNE
         'est_rne',         // → champ `isRne` FNE
@@ -75,7 +83,6 @@ class Achat extends Model
             'montant_ht'  => 'decimal:2',
             'montant_tva' => 'decimal:2',
             'montant_ttc' => 'decimal:2',
-            'montant_autres_taxes' => 'decimal:2',
             'remise'      => 'decimal:2',
             'remise_taux' => 'decimal:2',
             'est_rne'     => 'boolean',

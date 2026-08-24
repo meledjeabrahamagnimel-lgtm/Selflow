@@ -302,6 +302,62 @@ class EcrituresAchatTest extends TestCase
         $this->assertEqualsWithDelta(1800, $this->debitDu('445200'), 0.01);
     }
 
+    // ── Les taxes supportées à l'achat : la colonne est retirée ──────
+
+    /**
+     * `achats.montant_autres_taxes` n'existe plus — décision du propriétaire,
+     * 24/08/2026. Elle était déclarée en `fillable` et en `casts`, et rien ne
+     * l'écrivait ni ne la lisait : une colonne qui annonce un montant que rien
+     * ne calcule finit par être crue.
+     */
+    public function test_l_achat_ne_porte_plus_de_colonne_autres_taxes(): void
+    {
+        $this->assertFalse(
+            \Illuminate\Support\Facades\Schema::hasColumn('achats', 'montant_autres_taxes'),
+            "La colonne a été retirée de la table des achats."
+        );
+
+        $this->assertNotContains('montant_autres_taxes', (new Achat)->getFillable());
+    }
+
+    /**
+     * La vente, elle, la garde : elle y porte les taxes parafiscales
+     * **collectées pour l'État**, créditées au 447000 et reversées. C'est une
+     * dette, pas une charge — et le retrait de l'achat ne doit pas l'emporter
+     * avec lui.
+     */
+    public function test_la_vente_garde_sa_colonne_autres_taxes(): void
+    {
+        $this->assertTrue(
+            \Illuminate\Support\Facades\Schema::hasColumn('ventes', 'montant_autres_taxes')
+        );
+
+        $this->assertContains(
+            'montant_autres_taxes',
+            (new \App\Modules\Admin\Modeles\Vente)->getFillable()
+        );
+    }
+
+    /**
+     * Le retrait ne doit rien changer aux écritures : elles ne la lisaient pas.
+     */
+    public function test_les_ecritures_d_achat_sont_inchangees_par_le_retrait(): void
+    {
+        $achat = $this->achat(
+            [['produit' => $this->ciment, 'quantite' => 10, 'prix' => 5000, 'tva' => 9000]]
+        );
+
+        ComptabiliteService::genererEcrituresAchat($achat, 59000, 'Espèces');
+
+        $this->assertEqualsWithDelta(50000, $this->debitDu('601000'), 0.01);
+        $this->assertEqualsWithDelta(9000, $this->debitDu('445200'), 0.01);
+        $this->assertEqualsWithDelta(
+            59000,
+            (float) EcritureComptable::where('compte_credit', '401000')->sum('credit'),
+            0.01
+        );
+    }
+
     // ─────────────────────────────────────────────────────────────────
 
     /**
