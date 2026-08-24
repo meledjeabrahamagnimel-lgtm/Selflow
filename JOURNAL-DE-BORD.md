@@ -1563,6 +1563,170 @@ scénariser tant que ces modules ne sortent pas du référentiel.
 
 ---
 
+### Lot 9 — Les relevés du portail FNE — **TERMINÉ (import), RAPPROCHEMENT EN ATTENTE**
+
+Le portail de la DGI porte, par entreprise, des informations qu'aucune API ne
+rend : l'adresse déclarée, la commune, le quartier, le solde d'alerte des
+stickers, l'activation du timbre de quittance et du bordereau d'achat agricole,
+et la liste des points de facturation ouverts. Elles se relèvent à l'écran. Le
+relevé arrive sous forme de **deux fichiers par entreprise**, nommés
+`<login>_<date>.json` (la fiche) et `<login>_<date>.xlsx` (les points de
+facturation). Le login est le NCC.
+
+| Élément | Détail |
+|---|---|
+| Migration | `2026_08_23_000001_portail_fne_scraping` — trois tables |
+| `portail_fne_imports` | un fichier lu, une ligne : nom, date, empreinte SHA-256, contenu brut, statut |
+| `portail_fne_fiches` | le JSON interprété, quatorze champs, plus un fourre-tout `champs_inconnus` |
+| `portail_fne_points_facturation` | une ligne par point : nom, outil, terminal, statut, établissement, dates DGI |
+| Service | `ImportPortailFneService` — `importerDossier()`, `importerFichier()` |
+| Commande | `php artisan portail-fne:importer [--dossier=] [--fichier=]` |
+| Dossier | `config('selflow.portail_fne.dossier_import')`, variable `PORTAIL_FNE_DOSSIER_IMPORT` |
+| Tests | `tests/Feature/ImportPortailFneTest.php` — 7 tests |
+
+**Ce que l'import ne fait pas, et c'est le point important.** Il n'écrit rien
+dans `entreprises`. Trois des champs relevés — `timbre_quittance`, `bapa`,
+`sticker_solde_alerte` — commandent le comportement fiscal de l'application :
+les recopier automatiquement ferait changer une facture parce qu'un fichier a
+été déposé dans un dossier, sans que personne ne l'ait décidé, et sur la foi
+d'un relevé dont rien ne garantit la fraîcheur.
+`PortailFneFiche::ecartsAvecEntreprise()` montre les différences ; **les
+appliquer reste à faire, et doit se voir avant de s'appliquer.**
+
+Trois décisions de lecture, prises contre des façons de faire plus simples :
+
+- **le nom du fichier fait foi pour le rattachement.** Un fichier hors
+  nomenclature est refusé et signalé plutôt que rattaché au hasard : ranger le
+  relevé fiscal d'un client chez un autre ne se répare pas ;
+- **l'empreinte du contenu tient lieu de marque de traitement**, pas le
+  déplacement du fichier. Le dossier d'origine reste intact et la commande se
+  relance sans précaution ;
+- **la lecture du tableur suit les en-têtes, jamais les positions.** Le portail
+  peut réordonner ses colonnes ; un import qui compte les colonnes rangerait
+  alors un statut dans un identifiant d'établissement.
+
+**Le ramassage est planifié**, dans `routes/console.php` :
+`portail-fne:importer` toutes les heures, sans chevauchement, sortie dans
+`storage/logs/portail-fne.log`. Toutes les heures et non toutes les minutes :
+un relevé se produit au mieux une fois par jour. Le passage est sans effet
+quand rien n'a changé, l'empreinte reconnaissant un fichier déjà lu — il n'y a
+donc rien à préparer avant le premier passage, et rien à déplacer après.
+
+Le scraper, lui, reste extérieur à Selflow : l'application ne va chercher les
+relevés nulle part, elle lit un dossier. Ce qui dépose les fichiers dans ce
+dossier — un script lancé à la main, une tâche planifiée, un dossier
+synchronisé — ne la regarde pas.
+
+Le premier relevé réel (`1864699A`, DC-KNOWING CGA, 21/08/2026) est en base. Le
+rapprochement montre déjà sept écarts, dont le timbre de quittance et le
+bordereau d'achat actifs au portail et inactifs dans Selflow, et un solde
+d'alerte de 5 000 stickers contre 5. **À arbitrer avec le propriétaire** : c'est
+Selflow qui a tort, ou c'est le portail qui porte une valeur par défaut.
+
+---
+
+### Lot 10 — Du rejet de la DGI au relèvement du portail — **POSÉ, MIGRATION À APPLIQUER**
+
+Le lot 9 rangeait des relevés que rien ne consultait. Celui-ci relie les deux
+bouts : une pièce refusée par la plateforme déclenche un relèvement, et le
+relevé qui arrive sert à expliquer le refus.
+
+**Le point de départ était un trou.** `FneService::messageRejet()` assemblait
+déjà un message précis — champ fautif, valeur envoyée, raison de la DGI — et ce
+message finissait dans un `Log::warning` (`NormaliserFactureFne.php:107`). Un
+rejet survenu la nuit ne laissait, au matin, qu'une ligne dans un fichier que
+personne ne relit. **On ne diagnostique pas ce qu'on n'a pas gardé.**
+
+| Élément | Détail |
+|---|---|
+| Migration | `2026_08_24_000001_fne_rejets_et_demandes_releve` — deux tables |
+| `fne_rejets` | une pièce refusée : pièce, login, message, champs mis en cause, statut, diagnostic |
+| `portail_fne_demandes` | la file des relevés attendus : login, motif, statut, import qui l'a servie |
+| Service | `DiagnosticFneService::diagnostiquer()` — lit, compare, n'écrit rien |
+| Commandes | `portail-fne:demandes [--json]`, `fne:diagnostiquer-rejets [--rejet=] [--tous]` |
+| Planification | `fne:diagnostiquer-rejets` à la 10e minute, juste après le ramassage |
+| Tests | `tests/Feature/DiagnosticRejetFneTest.php` — 10 tests |
+
+**Ce que le rapprochement produit.** À la place de la piste générique écrite en
+dur dans `pisteDeCorrection()` :
+
+> « Le nom du point de vente doit être déclaré à l'identique sur votre espace FNE. »
+
+il rend un constat :
+
+> « Vous avez envoyé « FACTURATION SIEGE ». Le portail, relevé le 21/08/2026,
+> déclare « FACTURATION SIÈGE ». Le plus proche est « FACTURATION SIÈGE ». »
+
+**Rien ne se corrige tout seul, et c'est le point du lot.** Le service lit et
+compare ; il n'écrit ni dans la pièce, ni dans l'entreprise, ni dans le
+paramétrage. Trois raisons, dont la première est bloquante :
+
+1. la règle d'or l'interdit — `timbre_quittance`, `bapa` et
+   `sticker_solde_alerte` commandent le comportement fiscal ;
+2. **on ne sait pas qui a raison.** Les sept écarts de DC-KNOWING le montrent :
+   un solde d'alerte à 5 000 au portail contre 5 dans Selflow, où 5 000
+   ressemble fort à une valeur par défaut jamais touchée ;
+3. **une facture certifiée à tort est pire qu'un rejet.** Un rejet se voit et se
+   répare ; une correction automatique qui « fait passer » la pièce produit un
+   document opposable, transmis à la DGI, différent de ce que l'entreprise croit
+   avoir émis. C'est exactement ce que les six écarts de la règle d'or décrivent.
+
+Quatre décisions de conception, prises contre des façons de faire plus simples :
+
+- **`FneService` n'est pas touché.** Les champs rejetés se relisent dans le
+  corps brut de la réponse, que le service conserve déjà sous `errors.api_error`
+  — plutôt que de découper le message français, qui est fait pour être lu. Les
+  quatre points de rejet (`NormaliserFactureFne`, `NormaliserAchatBapaJob`,
+  `BatchNormalisationJob`, `FneDashboardControleur`) reçoivent une ligne chacun ;
+- **la demande de relevé s'ouvre dans `FneRejet::consigner()`**, pas chez
+  l'appelant. Confier cette ouverture aux quatre endroits qui normalisent une
+  pièce, c'est s'assurer qu'un cinquième l'oubliera ;
+- **une demande n'est fermée que par l'arrivée d'un fichier**, jamais par la
+  parole du scraper. Un scraper qui échoue en silence laisse sa demande ouverte,
+  et c'est le seul endroit où l'on verra qu'il ne fonctionne plus ;
+- **un champ que le portail n'affiche pas est dit hors de portée**, pas passé
+  sous silence : `clientNcc` met en cause le NCC du *client*, absent du portail
+  de l'entreprise. Un diagnostic muet se lit comme un diagnostic favorable.
+
+**Le contrat avec le scraper tient en une commande.**
+`php artisan portail-fne:demandes --json` rend la liste des logins attendus, et
+rien d'autre :
+
+    ["1864699A", "2201455B"]
+
+Selflow ne sait pas comment le portail est consulté — script lancé à la main,
+tâche planifiée, navigateur piloté — et n'a pas à le savoir. Il dit ce qu'il
+attend ; le scraper vient le lui demander et dépose ses fichiers dans le
+dossier d'import. Le scraper lui-même reste à écrire, et arrive prochainement.
+
+**Migration appliquée** le 24/08/2026 : `fne_rejets` et `portail_fne_demandes`
+sont en base réelle, et les deux commandes répondent.
+
+#### L'environnement du scraper — posé le 24/08/2026
+
+- **`SCRAPER-PORTAIL-FNE/`** accueillera le script, sur le modèle de
+  `PASSERELLE-COMPTAFLOW/`. Il porte déjà `CONSIGNES-POUR-LE-SCRAPER.md` : la
+  file à lire, la nomenclature des fichiers, les quatorze clés du JSON avec un
+  exemple réel, les en-têtes du tableur, et ce que le scraper n'a **pas** à
+  faire — ne rien déplacer, ne fermer aucune demande, ne toucher à aucune table.
+  Une exception `.gitignore` a été ajoutée : la règle `*.md` masquait le fichier,
+  comme elle avait masqué `CLAUDE.md` en son temps.
+- **Le dossier d'import a déménagé** de `Pictures/k` vers
+  `storage/app/portail-fne/`, l'endroit que `config/selflow.php` désignait déjà
+  par défaut. Les deux relevés réels de DC-KNOWING l'ont suivi ; l'import les a
+  reconnus à leur empreinte et n'a rien redoublé — la preuve, au passage, que le
+  mécanisme tient même quand les fichiers changent de place. `.env` pointe
+  désormais dessus.
+- **`deploy-production.sh` dit enfin les deux choses qui manquaient** : créer
+  `storage/app/portail-fne` (son contenu n'est pas versionné, donc le dossier
+  n'arrive pas avec le dépôt), et poser la ligne cron du planificateur. Sans
+  elle, ni la reprise des écritures Comptaflow, ni le ramassage des relevés, ni
+  le rapprochement des rejets ne tournent — et rien ne le signale.
+
+**Reste à recevoir :** le script du scraper lui-même. Il n'a qu'à lire
+`portail-fne:demandes --json` et déposer ses fichiers ; tout le reste est
+branché.
+
 ## 5 bis. La numérotation des comptes — tranché
 
 Le classeur subdivisait certaines racines sur des positions que l'acte uniforme
@@ -1609,6 +1773,32 @@ verrouillent les trois situations.
 ## 6. Anomalies constatées et non encore corrigées
 
 Elles sont documentées pour ne pas être redécouvertes.
+
+### Le planificateur n'était déclenché par rien — **corrigé en développement**
+
+`routes/console.php` planifie deux tâches — `selflow:sync-ecritures` toutes les
+cinq minutes depuis le lot 5, `portail-fne:importer` toutes les heures depuis
+le lot 9. **Aucune des deux ne tournait.** Un planificateur Laravel ne
+s'auto-déclenche pas : il lui faut `php artisan schedule:run` appelé chaque
+minute, par le cron du serveur ou par le planificateur de tâches de Windows.
+Vérifié le 21/08/2026 : aucune tâche de ce nom n'existait sur le poste.
+
+La conséquence dépassait l'import du portail : **la reprise des écritures
+Comptaflow en échec n'avait jamais eu lieu**, et rien ne le signalait, puisqu'une
+tâche jamais lancée ne produit ni journal ni erreur.
+
+Posé sur le poste de développement le 21/08/2026 :
+
+- tâche Windows « Selflow - planificateur », toutes les minutes, sans fin ;
+- elle appelle `storage/app/planificateur-selflow.vbs`, qui lance
+  `php artisan schedule:run` **fenêtre masquée**. Sans ce lanceur, une console
+  noire s'ouvrirait soixante fois par heure sur l'écran de qui travaille. Le
+  script porte les chemins de ce poste et vit dans `storage/app`, que git
+  ignore : il n'est ni versionné ni déployé.
+
+**Reste à poser en production** (Linux) :
+`* * * * * cd /chemin/selflow && php artisan schedule:run >> /dev/null 2>&1`.
+À ajouter à `deploy-production.sh`, qui n'en dit rien aujourd'hui.
 
 ### Stock
 

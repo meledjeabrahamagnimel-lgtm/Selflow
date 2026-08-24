@@ -2,6 +2,7 @@
 
 namespace App\Jobs;
 
+use App\Modules\Admin\Modeles\FneRejet;
 use App\Modules\Admin\Modeles\Vente;
 use App\Modules\Admin\Modeles\VenteDetail;
 use App\Modules\Admin\Services\FneService;
@@ -105,6 +106,12 @@ class NormaliserFactureFne implements ShouldQueue
                 }
             } else {
                 Log::warning("NormaliserFactureFne: Réponse non-success pour Vente #{$this->vente->id}", $fneResult);
+
+                // Le message détaillé assemblé par FneService::messageRejet() — champ
+                // fautif, valeur envoyée, raison de la DGI — s’arrêtait ici, dans un
+                // fichier de log que personne ne relit. Un rejet survenu la nuit
+                // ne laissait donc aucune trace exploitable au matin.
+                FneRejet::consigner($this->vente, $fneResult);
             }
         } catch (\Exception $e) {
             Log::error("NormaliserFactureFne: Exception pour Vente #{$this->vente->id} - " . $e->getMessage());

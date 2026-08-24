@@ -109,4 +109,22 @@ return [
     */
     'fne_api_url_production' => env('FNE_API_URL_PRODUCTION', ''),
 
+    /*
+    |--------------------------------------------------------------------------
+    | Relevés du portail FNE
+    |--------------------------------------------------------------------------
+    | Dossier où sont déposés les relevés du portail de la DGI, nommés
+    | `<login>_<date>.json` (fiche entreprise) et `<login>_<date>.xlsx` (points
+    | de facturation). `ImportPortailFneService` le parcourt, range ce qu'il y
+    | lit, et ne touche à rien d'autre : ces relevés sont un constat, pas un
+    | paramétrage.
+    |
+    | Ces fichiers portent des données fiscales nominatives. Le dossier par
+    | défaut est sous `storage/app`, hors de `public/` : un dossier servi par
+    | le serveur web les exposerait à qui en devine le nom.
+    */
+    'portail_fne' => [
+        'dossier_import' => env('PORTAIL_FNE_DOSSIER_IMPORT', storage_path('app/portail-fne')),
+    ],
+
 ];

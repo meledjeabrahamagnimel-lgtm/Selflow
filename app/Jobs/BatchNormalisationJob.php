@@ -5,6 +5,7 @@ namespace App\Jobs;
 use App\Modules\Admin\Modeles\Vente;
 use App\Modules\Admin\Modeles\VenteDetail;
 use App\Modules\Admin\Modeles\Achat;
+use App\Modules\Admin\Modeles\FneRejet;
 use App\Modules\Admin\Services\FneService;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
@@ -139,6 +140,8 @@ class BatchNormalisationJob implements ShouldQueue
                             }
                         }
                     } else {
+                        FneRejet::consigner($invoice, $fneResult);
+
                         // Échec de la normalisation : on arrête immédiatement la boucle pour éviter des trous
                         $statusData['status'] = 'failed';
                         $statusData['error'] = "Échec sur {$invoice->numero_facture} : " . ($fneResult['message'] ?? 'Erreur inconnue');
@@ -163,6 +166,8 @@ class BatchNormalisationJob implements ShouldQueue
                             'fichier_fne_pdf_url' => $fneResult['pdf_url'] ?? null,
                         ] + FneService::colonnesRetoursFne($fneResult));
                     } else {
+                        FneRejet::consigner($invoice, $fneResult);
+
                         // Échec de la normalisation : on arrête
                         $statusData['status'] = 'failed';
                         $statusData['error'] = "Échec sur {$invoice->numero_facture} : " . ($fneResult['message'] ?? 'Erreur inconnue');

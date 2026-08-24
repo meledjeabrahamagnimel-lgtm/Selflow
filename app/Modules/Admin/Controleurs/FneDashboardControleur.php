@@ -729,6 +729,7 @@ class FneDashboardControleur
 
                         $successCount++;
                     } else {
+                        \App\Modules\Admin\Modeles\FneRejet::consigner($vente, $fneResult);
                         $errors[] = "Erreur sur la facture {$vente->numero_facture} : " . ($fneResult['message'] ?? 'Erreur inconnue');
                         continue;
                     }
@@ -765,6 +766,7 @@ class FneDashboardControleur
                         ] + \App\Modules\Admin\Services\FneService::colonnesRetoursFne($fneResult));
                         $successCount++;
                     } else {
+                        \App\Modules\Admin\Modeles\FneRejet::consigner($achat, $fneResult);
                         $errors[] = "Erreur sur l'achat {$achat->numero_facture} : " . ($fneResult['message'] ?? 'Erreur inconnue');
                         continue;
                     }

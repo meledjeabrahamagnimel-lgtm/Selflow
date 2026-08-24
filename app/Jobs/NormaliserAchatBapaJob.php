@@ -69,6 +69,10 @@ class NormaliserAchatBapaJob implements ShouldQueue
                 }
             } else {
                 Log::warning("NormaliserAchatBapaJob: Réponse non-success pour Achat #{$this->achat->id}", $fneResult);
+
+                // Le rejet laissait une ligne de log et rien d'autre. Consigné,
+                // il devient rapprochable du relevé du portail.
+                \App\Modules\Admin\Modeles\FneRejet::consigner($this->achat, $fneResult);
             }
         } catch (\Exception $e) {
             Log::error("NormaliserAchatBapaJob: Exception pour Achat #{$this->achat->id} - " . $e->getMessage());
