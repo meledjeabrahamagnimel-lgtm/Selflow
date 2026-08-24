@@ -2652,6 +2652,7 @@ n'est qu'un outil.
 | 3<sup>e</sup> | 16/08/2026 | 14 | la numérotation des tiers (section 8), la page d'accueil (section 9), le filtrage à l'import, `tier_digits` à vérifier chez Comptaflow |
 | 4<sup>e</sup> | 21/08/2026 | 16 | les lots 9 et 10 au tableau, les écritures de vente (section 10), la création d'un compte (section 11), le point d'entrée à écrire chez Comptaflow porté en tête des points bloquants, trois décisions arrêtées de plus |
 | 5<sup>e</sup> | 24/08/2026 | 17 | le lot 11 (section 12), le volet achat des écritures — le 401 et la TVA déductible par nature —, le régime d'imposition au volet FNE, deux décisions arrêtées de plus, et le point de la colonne `montant_autres_taxes` à trancher |
+| 6<sup>e</sup> | 24/08/2026 | 18 | le lot 12 (section 13) : la colonne de taxes retirée, le résultat par site, et ses cinq décisions. La section 7 passe de « ce que je propose » à « ce qui a été livré » ; les deux chantiers de confort quittent la liste de ce qui reste, où il ne demeure que le point d'entrée de Comptaflow |
 
 ### L'état de l'application en PDF
 
@@ -2672,6 +2673,7 @@ ensemble.
 | 2<sup>e</sup> | 21/08/2026 | 7 | le lot 9 : 752 épreuves / 3 441 vérifications, 264 classes, 95 migrations, 176 révisions, révision `5113e9d`. La passerelle n'est plus décrite comme bidirectionnelle — elle ne l'était pas |
 | 3<sup>e</sup> | 21/08/2026 | 7 | le lot 10 : 779 épreuves / 3 514 vérifications, 268 classes, 97 migrations, 180 révisions, révision `af62a53`. La création d'un compte entre au tableau des domaines |
 | 4<sup>e</sup> | 24/08/2026 | 8 | le lot 11 : 810 épreuves / 3 612 vérifications, 269 classes, 111 migrations, 187 révisions, révision `9d819c1`. Le 401 et la TVA déductible par nature à la ligne « Achats », les articles sans gestion de stock à la ligne « Stock », la question FNE avant toute information fiscale à la ligne « Création d'un compte » ; le point d'entrée à écrire chez Comptaflow porté en tête des points bloquants, et la colonne `montant_autres_taxes` au tableau de ce qui reste à trancher |
+| 5<sup>e</sup> | 24/08/2026 | 7 | le lot 12 : 847 épreuves / 3 684 vérifications, 275 classes, 113 migrations, 190 révisions, révision `a3d9630`. Les libellés et le résultat par site entrent à la ligne « Comptabilité » ; la table des chantiers proposés disparaît — il n'en reste aucun |
 
 Fabriqué par `etat.py`, dans le répertoire de travail de la session, non
 versionné — comme `plan.py`, c'est le PDF qui fait foi.
