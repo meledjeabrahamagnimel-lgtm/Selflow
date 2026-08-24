@@ -89,6 +89,7 @@ Elles ne se rediscutent pas sans raison neuve.
 | Secrets | Aucun mot de passe ni clé dans le code versionné. Ils viennent de l'environnement, ou sont tirés au hasard et affichés une seule fois |
 | Impression du reçu | **Par le navigateur** (`window.print()`, format 80 mm) pendant les tests, boîte de dialogue comprise, pour voir le rendu. **À retirer sur ordre du propriétaire**, pas avant |
 | TERNE | **Pas de terminal fiscal.** Selflow passe par l'API de la DGI, qui renvoie les trois éléments du sticker. L'imprimante de caisse est un périphérique ordinaire |
+| Achats et DGI | **Le BAPA est le seul achat transmis à la plateforme**, et il ne collecte aucune TVA — ce que le payload d'achat traduit déjà, et qui reste **gelé**. Les autres achats ne sont enregistrés **que pour la comptabilité** : c'est la finalité visée, et elle confirme le sens du lot 11.3 — 24/08/2026, propriétaire du projet |
 
 ---
 
@@ -2567,6 +2568,7 @@ ensemble.
 | 1<sup>re</sup> | 21/08/2026 | 7 | 711 épreuves / 3 331 vérifications, 262 classes PHP, 317 routes, 94 migrations, 171 révisions, révision `6bb1b16` |
 | 2<sup>e</sup> | 21/08/2026 | 7 | le lot 9 : 752 épreuves / 3 441 vérifications, 264 classes, 95 migrations, 176 révisions, révision `5113e9d`. La passerelle n'est plus décrite comme bidirectionnelle — elle ne l'était pas |
 | 3<sup>e</sup> | 21/08/2026 | 7 | le lot 10 : 779 épreuves / 3 514 vérifications, 268 classes, 97 migrations, 180 révisions, révision `af62a53`. La création d'un compte entre au tableau des domaines |
+| 4<sup>e</sup> | 24/08/2026 | 8 | le lot 11 : 810 épreuves / 3 612 vérifications, 269 classes, 111 migrations, 187 révisions, révision `9d819c1`. Le 401 et la TVA déductible par nature à la ligne « Achats », les articles sans gestion de stock à la ligne « Stock », la question FNE avant toute information fiscale à la ligne « Création d'un compte » ; le point d'entrée à écrire chez Comptaflow porté en tête des points bloquants, et la colonne `montant_autres_taxes` au tableau de ce qui reste à trancher |
 
 Fabriqué par `etat.py`, dans le répertoire de travail de la session, non
 versionné — comme `plan.py`, c'est le PDF qui fait foi.
