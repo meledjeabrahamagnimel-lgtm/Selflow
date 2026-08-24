@@ -1853,6 +1853,159 @@ L'entreprise ne configure toujours rien : elle fournit une information.
 - `tests/Feature/CreationDeCompteTest.php` — 14 tests, dont cinq échouent contre
   l'ancien code.
 
+### Lot 11 — Ce que l'usage a montré — **TERMINÉ**
+
+Quatre points signalés le 21 août, dont un que le propriétaire ne pouvait pas
+voir depuis l'application.
+
+#### Lot 11.1 — Le `.gitignore` avalait la passation — **TERMINÉ**
+
+GitHub répondait `404 (Not Found — introuvable)` sur
+`PASSERELLE-COMPTAFLOW/RECEVOIR-LE-REFERENTIEL.md`, alors que le dossier
+figurait bien dans l'arbre.
+
+`*.md` et `*xlsx` ignorent tout le dépôt ; la ligne `!PASSERELLE-COMPTAFLOW/`
+ne rétablissait que **le répertoire**. En git, la négation d'un répertoire ne
+réinclut pas les fichiers qu'il contient. Le dépôt affichait donc un dossier
+sans ce qu'on venait y chercher.
+
+N'avaient jamais quitté le poste où ils ont été écrits :
+
+- `RECEVOIR-LE-REFERENTIEL.md`, la consigne du point d'entrée que Comptaflow
+  doit écrire — **le seul point bloquant du déversement** ;
+- `CONSIGNES-POUR-COMPTAFLOW.md` ;
+- les quatre classeurs d'import refaits, dans `modeles-import/`.
+
+`!PASSERELLE-COMPTAFLOW/**` réinclut le contenu. Rien d'autre n'était perdu :
+la vérification a passé en revue tous les fichiers ignorés du dépôt.
+
+#### Lot 11.2 — Un service n'est pas en rupture de stock — **TERMINÉ**
+
+Sur l'écran de vente d'un cabinet comptable, **chaque prestation s'affichait
+« Rupture de stock » en rouge**.
+
+L'application le savait pourtant là où cela comptait : `estStockable()` existe,
+et aucun contrôleur ne décrémente le stock d'une prestation. **Mais aucun écran
+ne le lisait.**
+
+| Écran | Ce qu'il faisait |
+|---|---|
+| Vente (nouvelle et modification) | « Rupture de stock » sous chaque prestation, **et une modale d'alerte à chaque ligne ajoutée**, puis à chaque incrément de quantité |
+| Stock, et l'API mobile | tout le catalogue listé, services compris ; le compteur d'alertes comptait chaque prestation pour une rupture |
+| Rebut | les prestations y figuraient, avec un bouton de retrait |
+| Liste des articles | sa propre copie, écrite en dur, des types sans stock — **à trois endroits dans le même fichier** |
+
+Rien n'était jamais bloqué — le serveur écartait déjà ces articles — mais rien
+ne le disait, et l'écran affirmait le contraire. Un cabinet, qui ne vend que des
+services, voyait son catalogue entier en rouge et une modale par article.
+
+`etatStock()` rend désormais `Sans stock`, un scope `stockables()` borne les
+requêtes, et les cartes portent `data-stockable`.
+
+- `Produit::ETAT_SANS_STOCK`, `getEstStockableAttribute()`, `scopeStockables()`
+- `tests/Feature/ArticlesSansStockTest.php` — 11 tests, dont **huit échouent
+  contre l'ancien code**.
+
+#### Lot 11.3 — Les achats et le 401 — **TERMINÉ**
+
+« J'espère que les achats aussi sont pris en compte 401 lors des écritures. »
+**Ils ne l'étaient pas.** L'achat portait, à l'identique, le défaut que le lot
+9.1 avait corrigé sur la vente — et personne ne l'avait regardé.
+
+L'achat comptant écrivait une seule opération, « caisse contre charges », sans
+aucune ligne 401 :
+
+- le compte du fournisseur ne bougeait jamais sur ce qu'on lui payait comptant ;
+- **son numéro de tiers n'était transmis à Comptaflow sur aucun de ces achats** —
+  l'écriture y retombait sur le seul compte collectif, et le relevé d'un
+  fournisseur donné devenait impossible à établir ;
+- le journal des achats ne les contenait pas.
+
+La facturation passe désormais **toujours** par le compte du fournisseur, et le
+règlement fait l'objet d'une opération distincte. Le moyen bancaire et la
+référence de paiement, jusqu'ici perdus à la facturation comptant, lui sont
+transmis.
+
+**Second défaut, symétrique de celui de la TVA collectée.** Toute la TVA
+déductible partait en `445200`, « TVA récupérable sur achats », y compris celle
+d'un loyer, d'honoraires ou d'un billet de transport. SYSCOHADA distingue :
+
+| Compte | Nature | Racine de charge |
+|---|---|---|
+| `445100` | sur immobilisations | `2x` |
+| `445200` | sur achats | `60x` |
+| `445300` | sur transports | `61x` |
+| `445400` | sur services extérieurs et autres charges | `62x`, `63x`… |
+
+Une entreprise qui n'achète que des marchandises ne voyait pas la différence ;
+un cabinet, dont l'essentiel des charges est en 62 et 63, la voyait entièrement.
+La ventilation s'applique à la facturation comme à l'avoir — sans quoi une
+charge de service verrait sa TVA débitée en 4454 et recréditée en 4452, et les
+deux comptes dériveraient.
+
+Trois comptes entrent au référentiel (**41 comptes communs au lieu de 38**) et
+une migration les pose aux entreprises existantes.
+
+**Ce qui ne bouge pas :** le bordereau d'achat ne déduit toujours aucune TVA,
+puisque le tiers n'en facture aucune, et rien de ce qui est gelé n'est touché.
+
+- `ComptabiliteService::genererEcrituresAchat()`, `compteTvaDeductible()`
+- `2026_08_24_000001_comptes_de_tva_deductible.php`
+- `tests/Feature/EcrituresAchatTest.php` — 14 tests, dont six échouent contre
+  l'ancien code.
+
+**Signalé, non corrigé :** `Achat` déclare une colonne `montant_autres_taxes`
+qu'**aucun écran n'alimente et qu'aucune écriture ne lit**. Sur la vente, elle
+porte les taxes parafiscales collectées pour l'État. À l'achat, une taxe
+supportée est une charge, pas une dette : le compte à retenir dépend de sa
+nature, et le deviner serait pire que l'omettre. À trancher.
+
+#### Lot 11.4 — Aucune information fiscale avant la question FNE — **TERMINÉ**
+
+« Avant toute information fiscale, demander au client, lors de la création, s'il
+a déjà un compte FNE. »
+
+Le bloc du lot 10.4 posait bien la question — mais **le régime d'imposition
+était réclamé à la première étape des deux écrans**, obligatoire à
+l'inscription, avant même qu'on la pose. C'est une information fiscale : elle
+rejoint l'étape de la facture normalisée, et le volet de celles qui n'ont pas
+encore de compte. Le faire ressaisir à une entreprise dont l'espace FNE le porte
+déjà, c'est ouvrir un écart entre les deux.
+
+**En le déplaçant, quatre listes de régimes écrites en dur sont apparues, avec
+quatre contenus différents :**
+
+| Écran | Ce qu'il proposait |
+|---|---|
+| Superadministrateur | « Réel Normal », « Réel Simplifié », « Bénéfice Forfaitaire », « Micro-Entreprise », « Exonéré » |
+| Inscription | TEE, RNE, RSI, RNI — TCE et RME manquaient |
+| Paramètres | les six, seule liste juste, en dur |
+| Clients / fournisseurs | « TEE (Taxe sur l'Entreprise Employeuse) » |
+
+**Le régime n'est pas une étiquette :** `deduireCodeTva()` le compare aux
+régimes d'exonération légale pour choisir entre TVAC et TVAD. Une entreprise
+créée par le superadministrateur et enregistrée « Exonéré » voyait ses lignes à
+0 % partir en exonération conventionnelle, quel que soit son régime réel — et sa
+validation acceptait n'importe quelle chaîne de quatre-vingts caractères.
+
+Une seule source désormais : `Entreprise::REGIMES_IMPOSITION`, avec les
+définitions que l'inscription gardait dans son JavaScript pour quatre régimes
+sur six. `regimesAcceptesPour()` tolère ce que l'entreprise porte déjà — même
+raisonnement que `Categorie::domainesAcceptesPour()`.
+
+**Troisième écart, celui-là avec le périmètre gelé.** Trois vues portaient leur
+propre copie des régimes d'exonération légale — `['TEE', 'RNE']` — quand la
+constante gelée `Produit::REGIMES_EXONERATION_LEGALE` retient `TEE`, `TCE` et
+`RME`. **L'écran annonçait donc un code TVA que le payload ne transmettait
+pas** : une entreprise en RME voyait TVAC là où la pièce partait en TVAD, et
+l'inverse pour une entreprise en RNE. Les copies sont remplacées par une lecture
+de la constante ; **celle-ci n'est pas touchée** — c'est l'écran qu'on remet
+d'accord avec elle, non l'inverse.
+
+- `Entreprise::REGIMES_IMPOSITION`, `REGIMES_NOTICES`, `regimesAcceptesPour()`
+- `tests/Feature/CreationDeCompteTest.php` — 6 tests de plus, dont trois
+  échouent contre l'ancien code.
+
 ---
 
 ## 5 bis. La numérotation des comptes — tranché
@@ -1901,6 +2054,24 @@ verrouillent les trois situations.
 ## 6. Anomalies constatées et non encore corrigées
 
 Elles sont documentées pour ne pas être redécouvertes.
+
+### Taxes supportées à l'achat — **À TRANCHER**
+
+`Achat` déclare une colonne `montant_autres_taxes`, en `fillable` et en `casts`,
+qu'**aucun écran n'alimente et qu'aucune écriture ne lit**. Le formulaire
+d'achat ne la propose pas, `ventilationAchat()` l'ignore, et `montant_ttc` ne la
+comporte pas.
+
+Sur la vente, la colonne homonyme porte les taxes parafiscales collectées pour
+l'État — une dette, créditée au `447000`. **À l'achat, la symétrie ne tient
+pas** : une taxe supportée n'est pas une dette mais une charge, et le compte à
+retenir dépend de sa nature — droit d'enregistrement, taxe non récupérable,
+redevance. Le deviner reviendrait à choisir un compte au hasard dans la classe
+6, ce qui est pire que l'omettre.
+
+Deux issues, au choix du propriétaire : ouvrir la saisie et poser le compte de
+charge dans la configuration, ou retirer la colonne du modèle pour qu'elle cesse
+de promettre ce qu'elle ne fait pas.
 
 ### Stock
 
@@ -2376,6 +2547,7 @@ n'est qu'un outil.
 | 2<sup>e</sup> | 15/08/2026 | 10 | la passerelle fusionnée, les modèles d'import, les libellés (section 7) |
 | 3<sup>e</sup> | 16/08/2026 | 14 | la numérotation des tiers (section 8), la page d'accueil (section 9), le filtrage à l'import, `tier_digits` à vérifier chez Comptaflow |
 | 4<sup>e</sup> | 21/08/2026 | 16 | les lots 9 et 10 au tableau, les écritures de vente (section 10), la création d'un compte (section 11), le point d'entrée à écrire chez Comptaflow porté en tête des points bloquants, trois décisions arrêtées de plus |
+| 5<sup>e</sup> | 24/08/2026 | 17 | le lot 11 (section 12), le volet achat des écritures — le 401 et la TVA déductible par nature —, le régime d'imposition au volet FNE, deux décisions arrêtées de plus, et le point de la colonne `montant_autres_taxes` à trancher |
 
 ### L'état de l'application en PDF
 
