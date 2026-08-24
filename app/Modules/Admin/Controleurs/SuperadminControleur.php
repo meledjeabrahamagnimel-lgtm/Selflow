@@ -144,7 +144,11 @@ class SuperadminControleur
             'ncc'                     => ['nullable', 'string', 'size:8', 'regex:/^[A-Z0-9]{7}[A-Z]$/'],
             'compte_contribuable'     => ['nullable', 'string', 'max:100'],
             'centre_impots'           => ['nullable', 'string', 'max:100'],
-            'regime_imposition'       => ['nullable', 'string', 'max:80'],
+            // Le régime n'est pas une étiquette : `deduireCodeTva()` le compare
+            // aux régimes d'exonération légale pour choisir entre TVAC et TVAD.
+            // La règle acceptait ici n'importe quelle chaîne de 80 caractères,
+            // et l'écran proposait cinq intitulés que rien ne reconnaît.
+            'regime_imposition'       => ['nullable', 'string', Rule::in(Entreprise::regimesAcceptesPour())],
             'quota_points_de_vente'   => ['required', 'integer', 'min:1'],
             'plan_abonnement'         => ['required', 'string'],
 

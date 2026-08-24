@@ -162,17 +162,16 @@
                             <div class="form-group" style="margin-bottom:0;">
                                 <label class="form-label">Régime d'imposition <span
                                         style="color:var(--danger)">*</span></label>
+                                {{-- La liste vient du modele : elle vivait ici en dur,
+                                     et trois autres ecrans en portaient chacun une
+                                     version differente. TCE et RME manquaient a
+                                     certaines, alors que la DGI les cite parmi les
+                                     regimes ouvrant droit a l'exoneration legale. --}}
                                 <select name="regime_imposition" class="form-control">
                                     <option value="">— Choisir un régime —</option>
-                                    <option value="TEE" {{ old('regime_imposition', $entreprise->regime_imposition) === 'TEE' ? 'selected' : '' }}>TEE — Taxe sur Entreprise Existante</option>
-                                    {{-- TCE et RME manquaient : la DGI les cite pourtant
-                                         parmi les regimes ouvrant droit a l'exoneration
-                                         legale, aux cotes du TEE. --}}
-                                    <option value="TCE" {{ old('regime_imposition', $entreprise->regime_imposition) === 'TCE' ? 'selected' : '' }}>TCE — Taxe Communale de l'Entreprenant</option>
-                                    <option value="RME" {{ old('regime_imposition', $entreprise->regime_imposition) === 'RME' ? 'selected' : '' }}>RME — Régime des Microentreprises</option>
-                                    <option value="RNE" {{ old('regime_imposition', $entreprise->regime_imposition) === 'RNE' ? 'selected' : '' }}>RNE — Régime du Négoce et de l'Exportation</option>
-                                    <option value="RSI" {{ old('regime_imposition', $entreprise->regime_imposition) === 'RSI' ? 'selected' : '' }}>RSI — Régime Simplifié d'Imposition</option>
-                                    <option value="RNI" {{ old('regime_imposition', $entreprise->regime_imposition) === 'RNI' ? 'selected' : '' }}>RNI — Régime Normal d'Imposition</option>
+                                    @foreach(\App\Modules\Admin\Modeles\Entreprise::REGIMES_IMPOSITION as $code => $libelle)
+                                        <option value="{{ $code }}" {{ old('regime_imposition', $entreprise->regime_imposition) === $code ? 'selected' : '' }}>{{ $libelle }}</option>
+                                    @endforeach
                                 </select>
                             </div>
                         </div>

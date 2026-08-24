@@ -37,7 +37,9 @@ class InscriptionControleur
         // situation fiscale manque.
         $request->validate([
             'nom_entreprise'      => ['required', 'string', 'max:150'],
-            'regime_imposition'   => ['nullable', 'string', 'in:TEE,RNE,RSI,RNI'],
+            // La liste vivait ici, et n'était pas celle des autres écrans :
+            // elle omettait TCE et RME. Voir Entreprise::REGIMES_IMPOSITION.
+            'regime_imposition'   => ['nullable', 'string', Rule::in(Entreprise::regimesAcceptesPour())],
             'nom'                 => ['required', 'string', 'max:100'],
             'prenom'              => ['required', 'string', 'max:100'],
             'email'               => ['required', 'string', 'email', 'max:191', 'unique:utilisateurs,email'],
@@ -74,7 +76,7 @@ class InscriptionControleur
             'telephone_gerant'    => ['nullable', 'string', 'max:30'],
         ], [
             'nom_entreprise.required'    => 'Le nom de votre entreprise est obligatoire.',
-            'regime_imposition.in'       => 'Régime invalide. Choisissez TEE, RNE, RSI ou RNI.',
+            'regime_imposition.in'       => 'Régime invalide. Choisissez-en un dans la liste proposée.',
             'fne_ncc.size'               => 'Le NCC doit comporter exactement 8 caractères.',
             'fne_ncc.regex'              => 'Le NCC doit être composé de 7 chiffres ou lettres suivis d\'une lettre.',
             'ncc.size'                   => 'Le NCC doit comporter exactement 8 caractères.',

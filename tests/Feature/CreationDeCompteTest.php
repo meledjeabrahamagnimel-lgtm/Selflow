@@ -268,6 +268,101 @@ class CreationDeCompteTest extends TestCase
         $this->assertDatabaseCount('fne_credentials', 0);
     }
 
+    // ── Le régime d'imposition, une information fiscale ─────────────
+
+    public function test_aucune_information_fiscale_n_est_demandee_avant_la_question_fne(): void
+    {
+        // Le régime d'imposition était réclamé à la première étape, obligatoire,
+        // avant même qu'on demande si l'entreprise a un compte FNE. C'est une
+        // information fiscale : elle appartient à l'étape 3, et à celles qui
+        // n'ont pas encore de compte.
+        $corps = $this->get(route('inscription'))->assertOk()->getContent();
+
+        $questionFne = strpos($corps, 'name="possede_compte_fne"');
+        $regime      = strpos($corps, 'name="regime_imposition"');
+
+        $this->assertNotFalse($questionFne);
+        $this->assertNotFalse($regime);
+        $this->assertGreaterThan($questionFne, $regime,
+            'Le régime est demandé avant la question du compte FNE.');
+    }
+
+    public function test_le_regime_n_est_plus_obligatoire_a_l_inscription(): void
+    {
+        $this->post(route('inscription.traitement'), $this->inscription())
+            ->assertSessionHasNoErrors();
+
+        $this->assertNull(
+            Entreprise::where('nom', 'Boutique du carrefour')->firstOrFail()->regime_imposition
+        );
+    }
+
+    public function test_les_deux_ecrans_proposent_les_memes_regimes(): void
+    {
+        // L'écran du superadministrateur proposait « Réel Normal », « Bénéfice
+        // Forfaitaire », « Exonéré »… des intitulés qu'aucune autre partie du
+        // logiciel ne reconnaît. Le régime n'est pas une étiquette : c'est lui
+        // qui décide du code TVA transmis à la plateforme.
+        $inscription = $this->get(route('inscription'))->assertOk()->getContent();
+        $superadmin  = $this->actingAs($this->superadmin())
+            ->get(route('superadmin.entreprises.creer'))->assertOk()->getContent();
+
+        foreach (array_keys(Entreprise::REGIMES_IMPOSITION) as $code) {
+            $this->assertStringContainsString('value="' . $code . '"', $inscription);
+            $this->assertStringContainsString('value="' . $code . '"', $superadmin);
+        }
+
+        foreach (['Réel Normal', 'Bénéfice Forfaitaire', 'Micro-Entreprise'] as $fantaisie) {
+            $this->assertStringNotContainsString($fantaisie, $superadmin);
+        }
+    }
+
+    public function test_un_regime_hors_referentiel_est_refuse(): void
+    {
+        $this->actingAs($this->superadmin())
+            ->post(route('superadmin.entreprises.creer.enregistrer'),
+                $this->creationSuperadmin(['regime_imposition' => 'Réel Normal']))
+            ->assertSessionHasErrors('regime_imposition');
+
+        $this->assertDatabaseMissing('entreprises', ['nom' => 'Quincaillerie du Plateau']);
+    }
+
+    public function test_une_entreprise_sur_l_ancien_vocabulaire_reste_modifiable(): void
+    {
+        // Sans ce second terme, une entreprise enregistrée sous « Réel Normal »
+        // ne pourrait plus enregistrer aucune modification, même sans toucher à
+        // son régime. Même raisonnement que pour les domaines d'activité.
+        $entreprise = Entreprise::create([
+            'nom' => 'Ancienne maison', 'regime_imposition' => 'Réel Normal',
+        ]);
+
+        $this->assertContains('Réel Normal', Entreprise::regimesAcceptesPour($entreprise));
+        $this->assertNotContains('Réel Normal', Entreprise::regimesAcceptesPour());
+    }
+
+    public function test_l_ecran_de_vente_annonce_le_code_tva_que_le_payload_transmet(): void
+    {
+        // Les écrans portaient leur propre copie des régimes d'exonération
+        // légale : ['TEE', 'RNE'], quand la constante gelée du serveur retient
+        // TEE, TCE et RME. Une entreprise en RME voyait donc s'afficher un code
+        // d'exonération conventionnelle là où le payload partait en exonération
+        // légale — et l'inverse pour une entreprise en RNE.
+        foreach ([
+            'app/Modules/Admin/Vues/ventes/nouvelle.blade.php',
+            'app/Modules/Admin/Vues/ventes/modifier.blade.php',
+            'app/Modules/Admin/Vues/produits/index.blade.php',
+        ] as $vue) {
+            $contenu = file_get_contents(base_path($vue));
+
+            $this->assertStringNotContainsString(
+                "REGIMES_EXONERATION_LEGALE = ['TEE', 'RNE']",
+                $contenu,
+                "{$vue} porte encore sa propre copie des régimes d'exonération."
+            );
+            $this->assertStringContainsString('Produit::REGIMES_EXONERATION_LEGALE', $contenu);
+        }
+    }
+
     public function test_un_ncc_mal_forme_est_refuse(): void
     {
         // Sept caractères alphanumériques suivis d'une lettre. `26032100` a la

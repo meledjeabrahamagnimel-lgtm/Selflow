@@ -196,32 +196,19 @@
                         class="{{ $errors->has('nom_entreprise') ? 'erreur' : '' }}">
                 </div>
 
-                <div class="rangee-2">
-                    <div class="champ" style="margin-bottom:0">
-                        <label for="forme_juridique">Forme juridique</label>
-                        <select id="forme_juridique" name="forme_juridique">
-                            <option value="">— Choisir —</option>
-                            @foreach(['Entreprise individuelle','SARL','SA','SAS','SNC','GIE','Coopérative','Association'] as $fj)
-                                <option value="{{ $fj }}" {{ old('forme_juridique') == $fj ? 'selected' : '' }}>{{ $fj }}</option>
-                            @endforeach
-                        </select>
-                    </div>
-                    <div class="champ" style="margin-bottom:0">
-                        <label for="regime_imposition">Régime d'imposition <span class="req">*</span></label>
-                        <div class="regime-option-wrap">
-                            <select id="regime_imposition" name="regime_imposition" required
-                                class="{{ $errors->has('regime_imposition') ? 'erreur' : '' }}">
-                                <option value="">— Choisir —</option>
-                                <option value="TEE" {{ old('regime_imposition') == 'TEE' ? 'selected' : '' }}>TEE — Taxe de l'Entreprenant</option>
-                                <option value="RNE" {{ old('regime_imposition') == 'RNE' ? 'selected' : '' }}>RNE — Régime Normal de l'Entreprenant</option>
-                                <option value="RSI" {{ old('regime_imposition') == 'RSI' ? 'selected' : '' }}>RSI — Régime Simplifié d'Imposition</option>
-                                <option value="RNI" {{ old('regime_imposition') == 'RNI' ? 'selected' : '' }}>RNI — Régime Normal d'Imposition</option>
-                            </select>
-                            <div class="regime-info" id="regime-info-box">
-                                Sélectionnez votre régime pour voir sa définition.
-                            </div>
-                        </div>
-                    </div>
+                {{-- Le régime d'imposition vivait ici, obligatoire, avant même
+                     qu'on demande si l'entreprise a un compte FNE. C'est une
+                     information fiscale : elle appartient à l'étape 3, et à
+                     celles qui n'ont pas encore de compte. Voir
+                     `admin::partiels.compte-fne`. --}}
+                <div class="champ">
+                    <label for="forme_juridique">Forme juridique</label>
+                    <select id="forme_juridique" name="forme_juridique">
+                        <option value="">— Choisir —</option>
+                        @foreach(['Entreprise individuelle','SARL','SA','SAS','SNC','GIE','Coopérative','Association'] as $fj)
+                            <option value="{{ $fj }}" {{ old('forme_juridique') == $fj ? 'selected' : '' }}>{{ $fj }}</option>
+                        @endforeach
+                    </select>
                 </div>
 
                 <div class="rangee-2" style="margin-top:12px;">
@@ -522,18 +509,10 @@
 })();
 
 // ── Régimes ivoiriens — définitions ──
-const regimesDefs = {
-    TEE: "Taxe de l'Entreprenant (TEE) : pour les auto-entrepreneurs et très petites entreprises. CA annuel < 50 millions FCFA. Taux fixe annuel. Pas d'obligation TVA.",
-    RNE: "Régime Normal de l'Entreprenant (RNE) : pour les PME. CA entre 50M et 200M FCFA. Impôt sur le bénéfice. Comptabilité simplifiée.",
-    RSI: "Régime Simplifié d'Imposition (RSI) : pour les entreprises moyennes. CA entre 200M et 500M FCFA. TVA sur option. Comptabilité standard.",
-    RNI: "Régime Normal d'Imposition (RNI) : pour les grandes entreprises. CA > 500M FCFA. TVA obligatoire (18%). Comptabilité complète SYSCOHADA.",
-};
-
-document.getElementById('regime_imposition').addEventListener('change', function() {
-    const box = document.getElementById('regime-info-box');
-    box.textContent = regimesDefs[this.value] || 'Sélectionnez votre régime pour voir sa définition.';
-    box.style.display = this.value ? 'block' : 'none';
-});
+// Les définitions des régimes vivaient ici, pour quatre régimes sur six, et
+// l'écran du superadministrateur n'en affichait aucune. Elles sont désormais
+// sur le modèle, lues par `admin::partiels.compte-fne` — là où le régime est
+// demandé.
 
 // ── Afficher/masquer mot de passe ──
 document.getElementById('toggle-password').addEventListener('click', function() {

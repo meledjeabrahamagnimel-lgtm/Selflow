@@ -716,12 +716,15 @@ function synchroniserTauxLibre(cle) {
 // ─── Champs FNE du produit : code TVA et autres taxes ────────────────────────
 
 const REGIME_ENTREPRISE = @json(Auth::user()->entreprise->regime_imposition ?? null);
-const REGIMES_EXONERATION_LEGALE = ['TEE', 'RNE'];
+// La constante gelee du modele, et non une copie : celle qui vivait ici
+// valait ['TEE', 'RNE'] quand le serveur retient TEE, TCE et RME. L'ecran
+// annoncait donc un code TVA que le payload ne transmettait pas.
+const REGIMES_EXONERATION_LEGALE = {!! json_encode(\App\Modules\Admin\Modeles\Produit::REGIMES_EXONERATION_LEGALE) !!};
 
 /**
  * Même règle de déduction que Produit::deduireCodeTva() côté serveur : un taux
  * nul ne suffit pas à distinguer TVAC (exonération conventionnelle) de TVAD
- * (exonération légale, réservée aux régimes TEE et RNE).
+ * (exonération légale, réservée aux régimes que la DGI énumère).
  */
 function deduireCodeTva(taux) {
     const t = Math.round(parseFloat(taux || 0) * 100) / 100;

@@ -136,8 +136,70 @@ class Entreprise extends Model
     }
 
     /**
-     * Vérifie si toutes les informations requises pour l'inscription complète sont présentes.
+     * Les régimes d'imposition, et leur libellé.
+     *
+     * La liste vivait en dur dans **quatre écrans**, avec quatre contenus
+     * différents — et le régime n'est pas une étiquette : `deduireCodeTva()` le
+     * compare aux régimes d'exonération légale pour choisir entre TVAC et TVAD.
+     * Un sigle qui n'est pas celui du référentiel ne correspond à rien.
+     *
+     * L'écart le plus coûteux était celui de l'écran du superadministrateur :
+     * il proposait « Réel Normal », « Bénéfice Forfaitaire », « Exonéré »… des
+     * intitulés que rien ne reconnaît. Une entreprise créée par cette voie et
+     * enregistrée « Exonéré » voyait ses lignes à 0 % partir en exonération
+     * conventionnelle, quel que soit son régime réel.
+     *
+     * `REGIMES_EXONERATION_LEGALE`, sur `Produit`, reste gelé : cette liste-ci
+     * n'y touche pas, elle fait seulement en sorte que les écrans proposent des
+     * valeurs qu'il puisse reconnaître.
      */
+    public const REGIMES_IMPOSITION = [
+        'TEE' => "TEE — Taxe d'État de l'Entreprenant",
+        'TCE' => "TCE — Taxe Communale de l'Entreprenant",
+        'RME' => 'RME — Régime des Microentreprises',
+        'RNE' => "RNE — Régime du Négoce et de l'Exportation",
+        'RSI' => "RSI — Régime Simplifié d'Imposition",
+        'RNI' => "RNI — Régime Normal d'Imposition",
+    ];
+
+    /**
+     * Ce que chaque régime veut dire, en une phrase.
+     *
+     * L'écran d'inscription portait ces définitions dans son JavaScript, pour
+     * quatre régimes sur six. Elles vivent ici pour que les deux écrans de
+     * création les affichent, et n'en affichent qu'une version.
+     */
+    public const REGIMES_NOTICES = [
+        'TEE' => "Taxe d'État de l'Entreprenant : pour les très petites entreprises et les auto-entrepreneurs. Taux fixe annuel, pas d'obligation de TVA.",
+        'TCE' => "Taxe Communale de l'Entreprenant : la part communale du régime de l'entreprenant, pour les plus petites activités.",
+        'RME' => "Régime des Microentreprises : impôt assis sur le chiffre d'affaires, comptabilité allégée.",
+        'RNE' => "Régime du Négoce et de l'Exportation : impôt sur le bénéfice, comptabilité simplifiée.",
+        'RSI' => "Régime Simplifié d'Imposition : pour les entreprises moyennes. TVA sur option, comptabilité standard.",
+        'RNI' => "Régime Normal d'Imposition : TVA obligatoire, comptabilité complète SYSCOHADA.",
+    ];
+
+    /**
+     * Les régimes qu'un formulaire peut accepter pour CETTE entreprise : le
+     * référentiel, plus ce qu'elle porte déjà.
+     *
+     * Sans ce second terme, une entreprise enregistrée sous l'ancienne liste
+     * — « Réel Normal », par exemple — ne pourrait plus enregistrer aucune
+     * modification, même sans toucher à son régime. Même raisonnement que
+     * `Categorie::domainesAcceptesPour()`.
+     *
+     * @return array<int, string>
+     */
+    public static function regimesAcceptesPour(?self $entreprise = null): array
+    {
+        $codes = array_keys(self::REGIMES_IMPOSITION);
+
+        if ($entreprise?->regime_imposition) {
+            $codes[] = $entreprise->regime_imposition;
+        }
+
+        return array_values(array_unique($codes));
+    }
+
     /**
      * Les informations que la plateforme FNE exige de l'entreprise.
      *

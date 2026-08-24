@@ -31,25 +31,22 @@
                         @error('nom') <small style="color:var(--danger)">{{ $message }}</small> @enderror
                     </div>
 
-                    <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
-                        <div class="form-group">
-                            <label class="form-label">Forme Juridique</label>
-                            <select name="forme_juridique" class="form-control">
-                                <option value="">Sélectionner...</option>
-                                @foreach(['SARL','SA','SAS','SCI','EI','SASU','Association','GIE','Autre'] as $fj)
-                                <option value="{{ $fj }}" {{ old('forme_juridique') == $fj ? 'selected' : '' }}>{{ $fj }}</option>
-                                @endforeach
-                            </select>
-                        </div>
-                        <div class="form-group">
-                            <label class="form-label">Régime d'Imposition</label>
-                            <select name="regime_imposition" class="form-control">
-                                <option value="">Sélectionner...</option>
-                                @foreach(['Réel Normal','Réel Simplifié','Bénéfice Forfaitaire','Micro-Entreprise','Exonéré'] as $reg)
-                                <option value="{{ $reg }}" {{ old('regime_imposition') == $reg ? 'selected' : '' }}>{{ $reg }}</option>
-                                @endforeach
-                            </select>
-                        </div>
+                    {{-- Le régime d'imposition vivait ici, et proposait « Réel
+                         Normal », « Bénéfice Forfaitaire », « Exonéré » — des
+                         intitulés qu'aucune autre partie du logiciel ne
+                         reconnaît. Une entreprise ainsi enregistrée voyait ses
+                         lignes à 0 % partir en exonération conventionnelle quel
+                         que soit son régime réel. Il est demandé à l'étape de
+                         la facture normalisée, et seulement à qui n'a pas
+                         encore de compte FNE. --}}
+                    <div class="form-group">
+                        <label class="form-label">Forme Juridique</label>
+                        <select name="forme_juridique" class="form-control">
+                            <option value="">Sélectionner...</option>
+                            @foreach(['SARL','SA','SAS','SCI','EI','SASU','Association','GIE','Autre'] as $fj)
+                            <option value="{{ $fj }}" {{ old('forme_juridique') == $fj ? 'selected' : '' }}>{{ $fj }}</option>
+                            @endforeach
+                        </select>
                     </div>
 
                     {{-- Informations Gérant --}}

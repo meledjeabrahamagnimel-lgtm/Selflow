@@ -11,6 +11,11 @@
     - **Non.** Il faut lui en ouvrir un, et la DGI exige alors des informations
       précises. Ce sont celles-là qu'on demande.
 
+    **Aucune information fiscale n'est demandée avant cette question** — le
+    régime d'imposition compris, qui était réclamé à la première étape des deux
+    écrans de création. Le faire ressaisir à une entreprise dont l'espace FNE le
+    porte déjà, c'est ouvrir un écart entre les deux.
+
     Ce partiel est inclus par `/inscription` **et** par l'écran de création du
     superadministrateur : la question se pose de la même façon des deux côtés.
 
@@ -110,15 +115,27 @@
 
         <div class="rangee-2">
             <div class="champ">
+                <label for="{{ $prefixeId }}-regime">Régime d'imposition</label>
+                <select id="{{ $prefixeId }}-regime" name="regime_imposition" data-fne-regime>
+                    <option value="">— Choisir —</option>
+                    @foreach(\App\Modules\Admin\Modeles\Entreprise::REGIMES_IMPOSITION as $code => $libelle)
+                        <option value="{{ $code }}" {{ old('regime_imposition') === $code ? 'selected' : '' }}>{{ $libelle }}</option>
+                    @endforeach
+                </select>
+                <small class="fne-regime-notice" data-fne-regime-notice hidden></small>
+                @error('regime_imposition') <small class="erreur">{{ $message }}</small> @enderror
+            </div>
+            <div class="champ">
                 <label for="{{ $prefixeId }}-centre">Centre des impôts</label>
                 <input type="text" id="{{ $prefixeId }}-centre" name="centre_impots"
                        placeholder="Celui dont vous dépendez" value="{{ old('centre_impots') }}">
             </div>
-            <div class="champ">
-                <label for="{{ $prefixeId }}-adresse">Adresse de l'établissement</label>
-                <input type="text" id="{{ $prefixeId }}-adresse" name="adresse"
-                       placeholder="Ex : Cocody Cité des Cadres, Abidjan" value="{{ old('adresse') }}">
-            </div>
+        </div>
+
+        <div class="champ">
+            <label for="{{ $prefixeId }}-adresse">Adresse de l'établissement</label>
+            <input type="text" id="{{ $prefixeId }}-adresse" name="adresse"
+                   placeholder="Ex : Cocody Cité des Cadres, Abidjan" value="{{ old('adresse') }}">
         </div>
     </div>
 </div>
@@ -140,10 +157,16 @@
                 border-radius:8px; padding:11px 13px; margin-bottom:14px; }
     .fne-note i { flex-shrink:0; margin-top:1px; font-size:14px; }
     .bloc-fne .erreur { color:#DC2626; font-size:11.5px; display:block; margin-top:4px; }
+    .fne-regime-notice { display:block; font-size:11.5px; color:#6B7280; line-height:1.55; margin-top:5px; }
 </style>
 
 <script>
 (function () {
+    // Les définitions viennent du modèle : elles vivaient dans le JavaScript de
+    // l'inscription, pour quatre régimes sur six, et le second écran n'en
+    // affichait aucune.
+    var NOTICES = @js(\App\Modules\Admin\Modeles\Entreprise::REGIMES_NOTICES);
+
     // Un volet caché ne doit pas être ouvert par défaut : demander le mot de
     // passe d'un espace FNE à qui n'en a pas serait absurde, et demander un
     // RCCM à qui a déjà un compte le ferait ressaisir ce que la DGI détient.
@@ -158,6 +181,18 @@
                 });
             });
         });
+
+        var regime = bloc.querySelector('[data-fne-regime]');
+        var notice = bloc.querySelector('[data-fne-regime-notice]');
+        if (!regime || !notice) return;
+
+        function afficherLaNotice() {
+            notice.textContent = NOTICES[regime.value] || '';
+            notice.hidden = !notice.textContent;
+        }
+
+        regime.addEventListener('change', afficherLaNotice);
+        afficherLaNotice();
     });
 })();
 </script>

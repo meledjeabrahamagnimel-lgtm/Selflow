@@ -1217,12 +1217,15 @@ function saisirUnite(id, val) {
  */
 const CODES_TVA_DGI = {!! json_encode(\App\Modules\Admin\Modeles\Produit::CODES_TVA) !!};
 const REGIME_ENTREPRISE = {!! json_encode(Auth::user()->entreprise->regime_imposition ?? null) !!};
-const REGIMES_EXONERATION_LEGALE = ['TEE', 'RNE'];
+// La constante gelee du modele, et non une copie : celle qui vivait ici
+// valait ['TEE', 'RNE'] quand le serveur retient TEE, TCE et RME. L'ecran
+// annoncait donc un code TVA que le payload ne transmettait pas.
+const REGIMES_EXONERATION_LEGALE = {!! json_encode(\App\Modules\Admin\Modeles\Produit::REGIMES_EXONERATION_LEGALE) !!};
 
 /**
  * Meme regle que Produit::deduireCodeTva() cote serveur : a 0 %, seul le
  * regime distingue l'exoneration conventionnelle (TVAC) de l'exoneration
- * legale (TVAD, reservee aux regimes TEE et RNE).
+ * legale (TVAD, reservee aux regimes que la DGI enumere).
  */
 function deduireCodeTvaDgi(taux) {
     const t = Math.round(parseFloat(taux || 0) * 100) / 100;
