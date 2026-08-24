@@ -63,17 +63,23 @@ class Categorie extends Model
      * Les domaines qu'un formulaire doit accepter d'une entreprise donnée.
      *
      * Le référentiel, **plus ce que l'entreprise porte déjà**. Sans ce second
-     * terme, deux situations bloquaient l'écran des paramètres tout entier :
+     * terme, deux situations bloquent un formulaire tout entier :
      *
      * - une entreprise enregistrée sous l'ancien vocabulaire — « Commercial »,
-     *   « Agro-industrie » — ne pouvait plus enregistrer **aucune**
-     *   modification, même sans toucher à son domaine : la valeur déjà en base
-     *   revenait dans le formulaire et se faisait refuser ;
+     *   « Agro-industrie » — ne peut plus enregistrer **aucune** modification,
+     *   même sans toucher à son domaine : la valeur déjà en base revient dans
+     *   le formulaire et se fait refuser ;
      * - sur une base dont le référentiel n'est pas chargé, la liste se réduit
      *   à « Autre » et tout le reste devient invalide.
      *
      * Rien ne se perd, et rien de neuf ne se glisse : une valeur hors
      * référentiel n'est acceptée que si l'entreprise la portait déjà.
+     *
+     * Elle servait à l'écran des paramètres de l'entreprise, où le secteur se
+     * cochait à la main. Ce bloc a été retiré le 24/08/2026 — le domaine se
+     * choisit au parcours de configuration. La méthode reste : les écrans du
+     * superadministrateur valident encore sur `domaines()` seul, et y
+     * refuseront un jour une entreprise au vocabulaire d'avant.
      *
      * @return array<int, string>
      */

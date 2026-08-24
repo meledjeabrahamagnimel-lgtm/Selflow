@@ -313,6 +313,7 @@ class Habilitations
         'admin.visite.terminer'       => 'Fermer la visite guidée.',
         'admin.visite.reprendre'      => 'Rouvrir la visite guidée.',
         'admin.visite.rejouer'        => 'Rejouer la visite guidée.',
+        'admin.produits.photo.voir'   => 'La photo d\'un article de son entreprise, servie quand `public/storage` n\'est pas posé. Le caissier voit ces images sur son écran de vente sans tenir le catalogue : exiger `catalogue_produits` rendrait 403 (Forbidden — accès interdit) sur chaque carte. Le contrôleur vérifie l\'appartenance à l\'entreprise, et l\'image ne dit rien que la carte ne montre déjà.',
     ];
 
     /**

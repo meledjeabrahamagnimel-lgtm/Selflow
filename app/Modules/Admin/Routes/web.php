@@ -231,6 +231,9 @@ Route::prefix('admin')
             Route::patch('/{produit}/archiver',      [ProduitControleur::class, 'archiver'])->name('archiver');
             Route::patch('/{produit}/description',   [ProduitControleur::class, 'description'])->name('description');
             Route::post('/{produit}/photo',          [ProduitControleur::class, 'uploaderPhoto'])->name('photo');
+            // Le recours quand `public/storage` n'est pas posé — voir
+            // `Produit::photoReelle()`.
+            Route::get('/{produit}/photo',           [ProduitControleur::class, 'voirPhoto'])->name('photo.voir');
             Route::post('/{produit}/details',        [ProduitControleur::class, 'ajouterDetails'])->name('details.ajouter');
             Route::delete('/details/{detail}',       [ProduitControleur::class, 'supprimerDetail'])->name('details.supprimer');
         });

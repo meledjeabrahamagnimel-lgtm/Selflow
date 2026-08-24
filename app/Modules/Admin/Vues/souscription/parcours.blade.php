@@ -52,6 +52,25 @@
     .ligne .sous { font-size:12px; color:var(--text-3); margin-top:2px; }
     .ligne .droite { margin-left:auto; font-size:12px; color:var(--text-3); white-space:nowrap; }
 
+    /* Ce qui est acquis : un métier souscrit, un module qui porte des données.
+       La case reste cochée et désactivée ; sans un fond et un mot, l'utilisateur
+       la croit simplement grisée par erreur et cherche à la décocher. */
+    .ligne.acquise { background:rgba(5,150,105,.045); }
+    .ligne.acquise:hover { background:rgba(5,150,105,.075); }
+    .ligne.acquise .nom { color:#065f46; }
+    .badge-acquis {
+        display:inline-block; padding:3px 9px; border-radius:20px;
+        background:rgba(5,150,105,.12); color:#047857;
+        font-size:10.5px; font-weight:700; text-transform:uppercase; letter-spacing:.4px;
+    }
+    .note-verrou {
+        display:flex; gap:10px; align-items:flex-start;
+        background:rgba(5,150,105,.06); border:1px solid rgba(5,150,105,.22);
+        border-radius:10px; padding:13px 16px; margin-bottom:16px;
+        font-size:12.5px; line-height:1.6; color:#065f46;
+    }
+    .note-verrou i { margin-top:2px; color:#059669; }
+
     .autre { background:#fffbeb; border:1px solid #fcd34d; border-radius:10px; padding:16px 18px; margin-bottom:22px; }
     .autre label { font-weight:700; font-size:13px; color:#92400e; display:block; margin-bottom:6px; }
     .autre p { font-size:12.5px; color:#b45309; margin:0 0 10px; line-height:1.5; }
@@ -153,11 +172,22 @@
                coche les deux. Chaque métier apporte ses rayons, ses articles et ses comptes.</p>
         </div>
 
+        @if(!empty($profilsAcquis))
+            <p class="note-verrou">
+                <i class="fas fa-circle-check"></i>
+                Les métiers marqués <strong>déjà en place</strong> vous appartiennent : leurs rayons,
+                leurs articles et leurs comptes sont chez vous. Ils ne se retirent pas d'ici — vous
+                pouvez en ajouter d'autres, ici ou dans un autre domaine.
+            </p>
+        @endif
+
         <div class="liste">
             @foreach($profils as $profil)
-            <label class="ligne">
+            @php $acquis = in_array($profil->code, $profilsAcquis ?? [], true); @endphp
+            <label class="ligne {{ $acquis ? 'acquise' : '' }}">
                 <input type="checkbox" name="profils[]" value="{{ $profil->code }}"
-                       {{ in_array($profil->code, $choix['profils'] ?? [], true) ? 'checked' : '' }}>
+                       {{ $acquis || in_array($profil->code, $choix['profils'] ?? [], true) ? 'checked' : '' }}
+                       {{ $acquis ? 'disabled' : '' }}>
                 <div>
                     <div class="nom">{{ $profil->nom }}</div>
                     @if($profil->description)
@@ -165,9 +195,19 @@
                     @endif
                 </div>
                 <div class="droite">
-                    {{ $profil->familles_count }} rayons · {{ $profil->articles_count }} articles
+                    @if($acquis)
+                        <span class="badge-acquis">déjà en place</span>
+                    @else
+                        {{ $profil->familles_count }} rayons · {{ $profil->articles_count }} articles
+                    @endif
                 </div>
             </label>
+            {{-- Une case désactivée n'est pas transmise. Le contrôleur remet de
+                 toute façon les métiers acquis dans le choix retenu ; ce relais
+                 évite que l'écran et l'enregistrement racontent deux histoires. --}}
+            @if($acquis)
+                <input type="hidden" name="profils[]" value="{{ $profil->code }}">
+            @endif
             @endforeach
         </div>
 
@@ -201,23 +241,41 @@
             ];
         @endphp
 
+        @if(!empty($modulesVerrouilles))
+            <p class="note-verrou">
+                <i class="fas fa-lock"></i>
+                Certains modules portent déjà vos données. Les refermer ne supprimerait rien,
+                mais ferait disparaître de votre menu les écrans où ces données se lisent :
+                <strong>ils restent ouverts</strong>.
+            </p>
+        @endif
+
         <div class="liste">
             @foreach($modulesProposes as $module)
-            @php $estStructurel = in_array($module, $structurels, true); @endphp
-            <label class="ligne">
+            @php
+                $estStructurel = in_array($module, $structurels, true);
+                $verrou        = $modulesVerrouilles[$module] ?? null;
+                $fige          = $estStructurel || $verrou !== null;
+            @endphp
+            <label class="ligne {{ $verrou ? 'acquise' : '' }}">
                 <input type="checkbox" name="modules[]" value="{{ $module }}"
-                       {{ $estStructurel || in_array($module, $choix['modules'] ?? $modulesProposes, true) ? 'checked' : '' }}
-                       {{ $estStructurel ? 'disabled' : '' }}>
+                       {{ $fige || in_array($module, $choix['modules'] ?? $modulesProposes, true) ? 'checked' : '' }}
+                       {{ $fige ? 'disabled' : '' }}>
                 <div>
                     <div class="nom">{{ ucfirst(str_replace('_', ' ', $module)) }}</div>
-                    @isset($raisons[$module])
+                    @if($verrou)
+                        <div class="sous">{{ $verrou }}</div>
+                    @elseif(isset($raisons[$module]))
                         <div class="sous">{{ $raisons[$module] }}</div>
-                    @endisset
+                    @endif
                 </div>
+                @if($verrou)
+                    <div class="droite"><span class="badge-acquis">en service</span></div>
+                @endif
             </label>
             {{-- Une case désactivée n'est pas transmise : sans ce relais, valider
                  l'étape retirerait le module qu'on vient de dire indéracinable. --}}
-            @if($estStructurel)
+            @if($fige)
                 <input type="hidden" name="modules[]" value="{{ $module }}">
             @endif
             @endforeach

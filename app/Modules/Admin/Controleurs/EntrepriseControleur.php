@@ -35,7 +35,18 @@ class EntrepriseControleur
             'derniere_verification_resultat' => $fneCredential?->derniere_verification_resultat,
         ];
 
-        return view('admin::entreprise.parametres', compact('entreprise', 'periodes', 'fneStatut'));
+        // Ce que le parcours de configuration a réellement retenu. L'écran
+        // l'affiche en lecture seule : les secteurs se cochaient ici, dans une
+        // liste qui ne parlait pas au parcours, et les deux réponses pouvaient
+        // se contredire sans que rien ne le signale.
+        $configuration = [
+            'domaines' => \App\Modules\Admin\Services\VerrouConfigurationService::domainesSouscrits($entreprise),
+            'metiers'  => $entreprise->profils()->orderBy('nom')->pluck('nom')->all(),
+            'modules'  => $entreprise->modules_actifs ?? [],
+            'verrous'  => \App\Modules\Admin\Services\VerrouConfigurationService::modulesVerrouilles($entreprise),
+        ];
+
+        return view('admin::entreprise.parametres', compact('entreprise', 'periodes', 'fneStatut', 'configuration'));
     }
 
     /**
@@ -78,14 +89,12 @@ class EntrepriseControleur
             'regime_imposition'      => ['nullable', 'string', 'in:TEE,RNE,RSI,RNI'],
             'centre_impots'          => ['nullable', 'string', 'max:100'],
             'compte_contribuable'    => ['nullable', 'string', 'max:100'],
-            // Le domaine se choisit dans le référentiel, comme à l'inscription
-            // et à la première étape de la souscription. L'écran proposait déjà
-            // cette liste ; la validation, elle, acceptait encore n'importe
-            // quelle chaîne de soixante caractères.
-            'secteurs_activite'      => ['nullable', 'array'],
-            'secteurs_activite.*'    => ['nullable', 'string', \Illuminate\Validation\Rule::in(
-                \App\Modules\Admin\Modeles\Referentiel\Categorie::domainesAcceptesPour($entreprise)
-            )],
+            // `secteurs_activite` ne se saisit plus ici. Le domaine se choisit
+            // au parcours de configuration, à sa première étape, et se déduit
+            // ensuite des métiers réellement souscrits. Deux écrans posaient la
+            // même question sans se parler : on pouvait cocher « Santé » dans
+            // les paramètres et souscrire au métier « Boulangerie » dans le
+            // parcours, et les deux réponses cohabitaient.
             // Champs DGI
             'idu'                    => ['nullable', 'string', 'max:50'],
             'reference_cadastrale'   => ['nullable', 'string', 'max:100'],
@@ -120,8 +129,14 @@ class EntrepriseControleur
             'sticker_solde_alerte', 'pied_de_page_facture', 'facture_autres_mentions',
         ]);
 
-        // Secteurs d'activité
-        $data['secteur_activite'] = $request->secteurs_activite ?? [];
+        // `secteur_activite` n'est **pas** touché ici, et la ligne qui l'écrivait
+        // a été retirée plutôt que neutralisée : elle valait `$request->
+        // secteurs_activite ?? []`, donc un formulaire d'où le champ a disparu
+        // aurait vidé la colonne à chaque enregistrement — et une entreprise
+        // sans secteur retombe en « inscription incomplète », bannière comprise.
+        //
+        // C'est le parcours de configuration qui l'aligne, sur les métiers
+        // souscrits (voir `VerrouConfigurationService::alignerLeSecteur`).
 
 
         // `timbre_quittance` n'est plus lu ici, et ne doit pas l'être : c'est

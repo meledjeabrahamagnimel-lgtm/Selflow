@@ -11,6 +11,7 @@ use App\Modules\Admin\Modeles\Referentiel\Famille;
 use App\Modules\Admin\Modeles\Referentiel\Profil;
 use App\Modules\Admin\Regles\Appartenance;
 use App\Modules\Admin\Services\SouscriptionProfilService;
+use App\Modules\Admin\Services\VerrouConfigurationService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -91,13 +92,34 @@ class SouscriptionControleur
 
         $this->memoriser($entreprise, ['categorie_id' => (int) $donnees['categorie_id']]);
 
+        // Le domaine choisi vaut secteur d'activité dès maintenant, sans
+        // attendre la souscription de l'étape 4. Sans cela, une entreprise
+        // neuve reste « inscription incomplète » — bannière comprise — alors
+        // qu'elle vient de répondre à la question, et l'ancien écran où elle
+        // cochait son secteur n'existe plus pour la débloquer.
+        //
+        // L'étape 4 réalignera la colonne sur les métiers réellement souscrits.
+        if (empty($entreprise->secteur_activite)) {
+            $nom = Categorie::find($donnees['categorie_id'])?->nom;
+
+            if ($nom) {
+                $entreprise->update(['secteur_activite' => [$nom]]);
+            }
+        }
+
         return $this->avancerVers(2, $entreprise);
     }
 
     private function validerProfils(Request $request, Entreprise $entreprise): RedirectResponse
     {
+        $acquis = VerrouConfigurationService::profilsAcquis($entreprise);
+
         $donnees = $request->validate([
-            'profils'          => ['required_without:activite_autre', 'array'],
+            // Exiger un métier n'a de sens que la première fois. Une entreprise
+            // qui a déjà souscrit en porte un : lui redemander d'en cocher un
+            // bloquerait le parcours de quelqu'un qui vient seulement le
+            // traverser pour rouvrir un module ou ajouter un rayon.
+            'profils'          => [$acquis === [] ? 'required_without:activite_autre' : 'nullable', 'array'],
             'profils.*'        => ['string', 'exists:referentiel_profils,code'],
             'activite_autre'   => ['nullable', 'string', 'max:150'],
         ], [
@@ -105,9 +127,14 @@ class SouscriptionControleur
             'profils.*.exists'         => 'Un des métiers choisis est inconnu.',
         ]);
 
-        $this->memoriser($entreprise, [
-            'profils' => array_values($donnees['profils'] ?? []),
-        ]);
+        // Un métier déjà souscrit ne se décoche pas. Ce n'est pas un verrou de
+        // principe : `souscrire()` n'a jamais retiré un profil, et décocher
+        // n'enlevait donc rien — l'utilisateur croyait avoir fermé un métier
+        // qui restait ouvert, avec ses rayons et ses articles. Le remettre
+        // dans le choix retenu accorde l'écran et la base.
+        $retenus = array_values(array_unique(array_merge($donnees['profils'] ?? [], $acquis)));
+
+        $this->memoriser($entreprise, ['profils' => $retenus]);
 
         // Le référentiel ne couvre pas tous les métiers. Plutôt que de forcer
         // l'utilisateur dans une case, on retient ce qu'il dit — et cela
@@ -130,8 +157,17 @@ class SouscriptionControleur
         // Les modules structurels rejoignent le choix quoi qu'il arrive. Leurs
         // cases sont désactivées à l'écran, et une case désactivée **n'est pas
         // transmise** : sans ce rattrapage, valider l'étape les retirerait.
+        //
+        // Les modules qui portent des données rejoignent le choix de la même
+        // façon : c'est la seule étape du parcours qui **défait** quelque
+        // chose, et refermer « Comptabilité » sur six mois d'écritures les
+        // ferait disparaître de la barre latérale sans un mot d'avertissement.
         $retenus = array_values(array_intersect(
-            array_unique(array_merge($donnees['modules'] ?? [], Entreprise::MODULES_STRUCTURELS)),
+            array_unique(array_merge(
+                $donnees['modules'] ?? [],
+                Entreprise::MODULES_STRUCTURELS,
+                array_keys(VerrouConfigurationService::modulesVerrouilles($entreprise))
+            )),
             $entreprise->modulesAutorises()
         ));
 
@@ -164,6 +200,13 @@ class SouscriptionControleur
                 )),
             ]);
         }
+
+        // Le secteur d'activité se déduit d'ici, et de nulle part ailleurs. Il
+        // se cochait à la main dans les paramètres, à côté d'un parcours qui
+        // posait la même question autrement : une entreprise pouvait déclarer
+        // « Santé » d'un côté et souscrire au métier « Boulangerie » de
+        // l'autre, sans que rien ne les rapproche. Une seule réponse, désormais.
+        VerrouConfigurationService::alignerLeSecteur($entreprise->refresh());
 
         return $this->avancerVers(5, $entreprise)
             ->with('succes', sprintf(
@@ -381,10 +424,19 @@ class SouscriptionControleur
 
             2 => ['profils' => Profil::withCount(['familles', 'articles'])
                     ->when(isset($choix['categorie_id']), fn ($q) => $q->where('categorie_id', $choix['categorie_id']))
-                    ->orderBy('nom')->get()],
+                    ->orderBy('nom')->get(),
+                  'profilsAcquis' => VerrouConfigurationService::profilsAcquis($entreprise)],
 
-            3 => ['modulesProposes' => $this->modulesProposes($choix['profils'] ?? []),
-                  'modulesAutorises' => $entreprise->modulesAutorises()],
+            // Un module verrouillé rejoint la liste affichée même si aucun des
+            // métiers choisis ne l'ouvre : l'enregistrement le rétablira de
+            // toute façon, et une case qui revient cochée sans avoir été
+            // montrée serait la même surprise que celle qu'on corrige ici.
+            3 => ['modulesProposes' => array_values(array_unique(array_merge(
+                    $this->modulesProposes($choix['profils'] ?? []),
+                    array_keys(VerrouConfigurationService::modulesVerrouilles($entreprise))
+                  ))),
+                  'modulesAutorises' => $entreprise->modulesAutorises(),
+                  'modulesVerrouilles' => VerrouConfigurationService::modulesVerrouilles($entreprise)],
 
             4 => ['familles' => Famille::with(['typeArticle', 'profil'])
                     ->whereHas('profil', fn ($q) => $q->whereIn('code', $choix['profils'] ?? []))

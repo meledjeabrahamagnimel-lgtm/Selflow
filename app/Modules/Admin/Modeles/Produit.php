@@ -323,9 +323,51 @@ class Produit extends Model
             return $this->photo;
         }
 
-        return \Illuminate\Support\Facades\Storage::disk('public')->exists($this->photo)
+        if (!\Illuminate\Support\Facades\Storage::disk('public')->exists($this->photo)) {
+            return null;
+        }
+
+        // `asset('storage/…')` ne vaut que si `public/storage` existe — le lien
+        // que pose `php artisan storage:link`. Sans lui, le fichier est bien là
+        // sur le disque, `exists()` répond oui, et l'adresse rendue tombe en
+        // 404 (Not Found — introuvable). La vignette d'un article ne le montrait
+        // pas : son `onerror` basculait sur l'image d'attente, et l'écran
+        // paraissait normal. Le fond de carte, lui, n'a pas d'`onerror` : une
+        // image de fond introuvable ne laisse rien, sans un mot. C'est
+        // exactement ce qui a été constaté — le fond posé au lot 12.4 restait
+        // invisible pendant que la liste des articles semblait aller bien.
+        //
+        // On sert donc par la route quand le lien manque. Elle passe par PHP,
+        // donc elle coûte plus cher : on ne l'emprunte que faute de mieux.
+        return self::lienDeStockagePose()
             ? asset('storage/' . $this->photo)
-            : null;
+            : route('admin.produits.photo.voir', $this);
+    }
+
+    /**
+     * Le lien `public/storage` est-il en place ?
+     *
+     * Retenu pour la durée de la requête : l'écran de vente pose la question
+     * une fois par article, et un accès disque par carte n'apprendrait rien de
+     * neuf.
+     */
+    private static ?bool $lienDeStockage = null;
+
+    private static function lienDeStockagePose(): bool
+    {
+        return self::$lienDeStockage ??= file_exists(public_path('storage'));
+    }
+
+    /**
+     * Oublier ce qu'on croit savoir du lien de stockage.
+     *
+     * La réponse est retenue pour la durée de la requête ; les épreuves, elles,
+     * posent et retirent le lien dans un même processus. Sans cette porte, la
+     * première d'entre elles fixerait la réponse pour toutes les suivantes.
+     */
+    public static function oublierLeLienDeStockage(): void
+    {
+        self::$lienDeStockage = null;
     }
 
     // ─── Helpers Phase 1 ─────────────────────────────────────────────────────

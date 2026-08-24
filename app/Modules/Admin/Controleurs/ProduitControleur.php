@@ -11,6 +11,7 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Illuminate\View\View;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class ProduitControleur
 {
@@ -231,6 +232,33 @@ class ProduitControleur
         ;
 
         return back()->with('succes', $msg);
+    }
+
+    /**
+     * Servir la photo d'un article quand `public/storage` n'est pas posé.
+     *
+     * Le chemin normal reste le lien de stockage, servi par le serveur web
+     * sans passer par PHP. Mais une installation où `php artisan storage:link`
+     * n'a pas été lancé rendait des adresses en 404 (Not Found — introuvable)
+     * sans que rien ne le dise : les vignettes basculaient silencieusement sur
+     * l'image d'attente, et les fonds de carte de l'écran de vente restaient
+     * vides. Plutôt que d'exiger une commande dont personne ne se souvient,
+     * l'application sait servir ses propres images.
+     *
+     * L'accès reste celui des données de l'entreprise : la photo d'un article
+     * du voisin se refuse comme l'article lui-même.
+     */
+    public function voirPhoto(Produit $produit): StreamedResponse
+    {
+        abort_unless($produit->entreprise_id === Auth::user()->entreprise_id, 404);
+
+        $chemin = $produit->photo;
+
+        // Le chemin vient de la base, mais il a été écrit par un formulaire :
+        // on ne descend pas dans l'arborescence sur la foi d'une colonne.
+        abort_if(!$chemin || str_contains($chemin, '..') || !Storage::disk('public')->exists($chemin), 404);
+
+        return Storage::disk('public')->response($chemin);
     }
 
     /**

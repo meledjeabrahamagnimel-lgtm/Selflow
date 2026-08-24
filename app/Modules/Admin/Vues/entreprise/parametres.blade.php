@@ -8,25 +8,84 @@
             <h1><i class="fas fa-building"></i> Paramètres de l'entreprise</h1>
             <p>Informations légales, fiscales et logos qui apparaissent sur vos factures</p>
         </div>
-
-        {{-- Le parcours de configuration n'était accessible qu'une fois, au
-             démarrage. Une entreprise qui ajoute un métier, ouvre un rayon ou
-             veut rouvrir un module n'avait plus aucun chemin pour y revenir.
-             Il se reprend ici, à l'étape qu'on veut : rien n'y est écrasé, et
-             ce qui a déjà été coché revient coché. --}}
-        <a href="{{ route('admin.souscription.index') }}" class="btn btn-outline"
-            style="display:inline-flex;align-items:center;gap:8px;white-space:nowrap;">
-            <i class="fas fa-sliders"></i>
-            Configuration
-        </a>
     </div>
 
-    <p style="font-size:12px;color:var(--text-3);margin:-8px 0 20px;">
-        <i class="fas fa-circle-info"></i>
-        <strong>Configuration</strong> rouvre le parcours de démarrage — domaine, métiers,
-        modules, rayons et prix. Vous pouvez le reprendre à n'importe quelle étape :
-        rien de ce que vous avez déjà coché n'est perdu.
-    </p>
+    {{-- ══ Votre configuration ══
+
+         Les secteurs d'activité se cochaient ici, dans une liste qui ne parlait
+         pas au parcours de configuration : on pouvait déclarer « Santé » dans
+         cet écran et souscrire au métier « Boulangerie » dans l'autre, et les
+         deux réponses cohabitaient sans que rien ne le signale. Le domaine se
+         choisit désormais **au parcours**, et se lit ici. --}}
+    <div class="card" style="padding:22px 24px;margin-bottom:22px;">
+        <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:20px;flex-wrap:wrap;">
+            <div style="flex:1;min-width:280px;">
+                <div
+                    style="font-size:12px;font-weight:700;color:var(--text-2);text-transform:uppercase;letter-spacing:.5px;margin-bottom:14px;display:flex;align-items:center;gap:8px;">
+                    <i class="fas fa-sliders" style="color:var(--primary);"></i> Votre configuration
+                </div>
+
+                @php
+                    $lignesConfig = [
+                        ['Domaine',  $configuration['domaines'] ?? []],
+                        ['Métiers',  $configuration['metiers']  ?? []],
+                        ['Modules ouverts', array_map(
+                            fn ($m) => ucfirst(str_replace('_', ' ', $m)),
+                            $configuration['modules'] ?? []
+                        )],
+                    ];
+                @endphp
+
+                <div style="display:flex;flex-direction:column;gap:12px;">
+                    @foreach($lignesConfig as [$intitule, $valeurs])
+                        <div style="display:flex;gap:14px;align-items:flex-start;">
+                            <span
+                                style="font-size:12px;color:var(--text-3);min-width:120px;padding-top:3px;">{{ $intitule }}</span>
+                            <div style="display:flex;flex-wrap:wrap;gap:6px;flex:1;">
+                                @forelse($valeurs as $valeur)
+                                    <span
+                                        style="display:inline-block;padding:4px 11px;border-radius:20px;background:var(--bg3);border:1px solid var(--border);font-size:12px;font-weight:600;">{{ $valeur }}</span>
+                                @empty
+                                    <span style="font-size:12px;color:var(--text-3);font-style:italic;">— pas encore
+                                        choisi —</span>
+                                @endforelse
+                            </div>
+                        </div>
+                    @endforeach
+                </div>
+
+                @if(!empty($configuration['verrous']))
+                    <p
+                        style="margin-top:14px;font-size:12px;line-height:1.6;color:#065f46;background:rgba(5,150,105,.06);border:1px solid rgba(5,150,105,.22);border-radius:8px;padding:11px 14px;">
+                        <i class="fas fa-lock" style="color:#059669;"></i>
+                        {{ count($configuration['verrous']) }} module{{ count($configuration['verrous']) > 1 ? 's' : '' }}
+                        porte{{ count($configuration['verrous']) > 1 ? 'nt' : '' }} déjà vos données
+                        ({{ implode(', ', array_map(fn ($m) => ucfirst(str_replace('_', ' ', $m)), array_keys($configuration['verrous']))) }}).
+                        Ils ne se referment plus : les fermer ne supprimerait rien, mais ferait disparaître de votre
+                        menu les écrans où ces données se lisent.
+                    </p>
+                @endif
+            </div>
+
+            {{-- Le parcours de configuration n'était accessible qu'une fois, au
+                 démarrage. Une entreprise qui ajoute un métier, ouvre un rayon ou
+                 veut rouvrir un module n'avait plus aucun chemin pour y revenir.
+                 Il se reprend ici, à l'étape qu'on veut : rien n'y est écrasé, et
+                 ce qui a déjà été coché revient coché. --}}
+            <div style="display:flex;flex-direction:column;gap:8px;align-items:stretch;min-width:210px;">
+                <a href="{{ route('admin.souscription.index') }}" class="btn btn-primary"
+                    style="display:inline-flex;align-items:center;justify-content:center;gap:8px;white-space:nowrap;">
+                    <i class="fas fa-sliders"></i>
+                    Modifier la configuration
+                </a>
+                <small style="font-size:11px;color:var(--text-3);line-height:1.55;">
+                    Domaine, métiers, modules, rayons et prix — en cinq étapes. Reprenez-le à
+                    l'étape que vous voulez : rien de ce que vous avez déjà coché n'est perdu, et
+                    ajouter un métier n'efface jamais les précédents.
+                </small>
+            </div>
+        </div>
+    </div>
 
     @if(session('succes'))
         <div class="alert alert-success"
@@ -45,7 +104,17 @@
                     <h4 style="font-weight:700;font-size:14px;margin-bottom:2px;">Inscription incomplète</h4>
                     <p style="font-size:12px;color:#B45309;">Remplissez les champs marqués <span
                             style="color:#DC2626;font-weight:700;">*</span> pour finaliser l'inscription et débloquer toutes les
-                        fonctionnalités.</p>
+                        fonctionnalités.
+                        {{-- Le secteur ne se coche plus dans ce formulaire : sans cette
+                             phrase, une entreprise qui n'a pas fait son parcours resterait
+                             « incomplète » en remplissant pourtant tous les champs visibles,
+                             sans qu'aucun écran ne dise où aller. --}}
+                        @if(empty($entreprise->secteur_activite))
+                            <br><strong>Votre domaine d'activité n'est pas encore choisi</strong> — il se règle au
+                            <a href="{{ route('admin.souscription.index') }}"
+                                style="color:#92400E;text-decoration:underline;">parcours de configuration</a>.
+                        @endif
+                    </p>
                 </div>
             </div>
             <span
@@ -719,39 +788,6 @@
                             </script>
                         </div>
                     </div>
-                </div>
-
-                {{-- ── Secteurs d'activité ── --}}
-                <div class="card" style="padding:24px;">
-                    <div
-                        style="font-size:12px;font-weight:700;color:var(--text-2);text-transform:uppercase;letter-spacing:.5px;margin-bottom:16px;display:flex;align-items:center;gap:8px;">
-                        <i class="fas fa-briefcase" style="color:var(--primary);"></i> Secteurs d'activité <span
-                            style="color:var(--danger);">*</span>
-                    </div>
-                    <p style="font-size:12px;color:var(--text-3);margin-bottom:14px;">Sélectionnez tous les secteurs qui
-                        correspondent à votre activité principale.</p>
-                    @php
-                        // Le référentiel fait foi : c'est la même liste qu'à
-                        // l'inscription et qu'à la première étape de la
-                        // souscription. Douze valeurs écrites en dur vivaient
-                        // ici, différentes des dix de l'inscription.
-                        $secteursDispo = \App\Modules\Admin\Modeles\Referentiel\Categorie::domaines();
-                        $secteursActifs = $entreprise->secteur_activite ?? [];
-                    @endphp
-                    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
-                        @foreach($secteursDispo as $secteur)
-                            <label
-                                style="display:flex;align-items:center;gap:8px;padding:9px 12px;background:var(--bg3);border-radius:8px;cursor:pointer;font-size:13px;border:1px solid var(--border);transition:all .15s;"
-                                onmouseover="this.style.borderColor='var(--primary)';this.style.background='#EBF2FC'"
-                                onmouseout="this.style.borderColor='var(--border)';this.style.background='var(--bg3)'">
-                                <input type="checkbox" name="secteurs_activite[]" value="{{ $secteur }}" {{ in_array($secteur, old('secteurs_activite', $secteursActifs)) ? 'checked' : '' }}
-                                    style="width:15px;height:15px;cursor:pointer;accent-color:var(--primary);">
-                                <span>{{ $secteur }}</span>
-                            </label>
-                        @endforeach
-                    </div>
-                    @error('secteurs_activite') <small
-                    style="color:var(--danger);margin-top:6px;display:block;">{{ $message }}</small> @enderror
                 </div>
 
             </div>{{-- /colonne gauche --}}

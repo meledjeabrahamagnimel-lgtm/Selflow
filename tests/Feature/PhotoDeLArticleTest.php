@@ -71,7 +71,46 @@ class PhotoDeLArticleTest extends TestCase
         Client::create(['entreprise_id' => $this->entreprise->id, 'nom' => 'Konan Yao']);
 
         $this->actingAs($this->admin)->withSession(['point_de_vente_actif_id' => $this->site->id]);
+
+        Produit::oublierLeLienDeStockage();
     }
+
+    protected function tearDown(): void
+    {
+        $this->retirerLeLienDeStockage();
+
+        parent::tearDown();
+    }
+
+    /**
+     * Faire comme si `php artisan storage:link` avait été lancé.
+     *
+     * L'adresse d'une photo dépend de ce lien : posé, elle est servie
+     * directement par le serveur web ; absent, elle passe par une route de
+     * l'application. Les deux branches doivent être éprouvées, et une épreuve
+     * qui laisserait le lien derrière elle fausserait les suivantes.
+     */
+    private function poserLeLienDeStockage(): void
+    {
+        if (!file_exists(public_path('storage'))) {
+            @mkdir(public_path('storage'), 0777, true);
+            $this->lienPose = true;
+        }
+
+        Produit::oublierLeLienDeStockage();
+    }
+
+    private function retirerLeLienDeStockage(): void
+    {
+        if ($this->lienPose && is_dir(public_path('storage'))) {
+            @rmdir(public_path('storage'));
+            $this->lienPose = false;
+        }
+
+        Produit::oublierLeLienDeStockage();
+    }
+
+    private bool $lienPose = false;
 
     // ── La source : photoReelle() ────────────────────────────────────
 
@@ -91,12 +130,65 @@ class PhotoDeLArticleTest extends TestCase
         $this->assertNull($article->photoReelle());
     }
 
-    public function test_un_fichier_present_rend_son_adresse(): void
+    public function test_avec_le_lien_de_stockage_l_adresse_passe_par_public(): void
+    {
+        $this->poserLeLienDeStockage();
+
+        Storage::disk('public')->put('produits/ciment.jpg', 'contenu');
+        $article = $this->article('Ciment 50 kg', ['photo' => 'produits/ciment.jpg']);
+
+        $this->assertStringContainsString('storage/produits/ciment.jpg', (string) $article->photoReelle());
+    }
+
+    /**
+     * Le défaut qui rendait le fond de carte invisible.
+     *
+     * Sans `public/storage`, le fichier est bien là — `exists()` répond oui —
+     * mais `asset('storage/…')` désigne une adresse qui n'existe pas : 404
+     * (Not Found — introuvable). La vignette d'un article ne le montrait pas,
+     * son `onerror` basculant sur l'image d'attente ; le fond de carte, lui,
+     * n'a pas d'`onerror` et restait vide sans un mot.
+     */
+    public function test_sans_lien_de_stockage_l_adresse_passe_par_l_application(): void
+    {
+        $this->retirerLeLienDeStockage();
+
+        Storage::disk('public')->put('produits/ciment.jpg', 'contenu');
+        $article = $this->article('Ciment 50 kg', ['photo' => 'produits/ciment.jpg']);
+
+        $this->assertSame(
+            route('admin.produits.photo.voir', $article),
+            $article->photoReelle()
+        );
+    }
+
+    public function test_la_route_de_repli_sert_bien_le_fichier(): void
     {
         Storage::disk('public')->put('produits/ciment.jpg', 'contenu');
         $article = $this->article('Ciment 50 kg', ['photo' => 'produits/ciment.jpg']);
 
-        $this->assertStringContainsString('produits/ciment.jpg', (string) $article->photoReelle());
+        $reponse = $this->get(route('admin.produits.photo.voir', $article))->assertOk();
+
+        $this->assertSame('contenu', $reponse->streamedContent());
+    }
+
+    /**
+     * Simulation d'attaque : la photo d'un article appartient à son entreprise.
+     * Un identifiant deviné ne doit pas ouvrir le catalogue du voisin.
+     */
+    public function test_la_photo_d_une_autre_entreprise_se_refuse(): void
+    {
+        $voisine = Entreprise::create(['nom' => 'Voisine SARL']);
+        Storage::disk('public')->put('produits/secret.jpg', 'contenu');
+
+        $article = Produit::create([
+            'entreprise_id' => $voisine->id, 'reference' => 'REF-VOISIN',
+            'nom' => 'Article du voisin', 'type' => 'marchandise', 'unite' => 'unité',
+            'prix_achat' => 1, 'prix_vente' => 2, 'taux_tva' => 18,
+            'photo' => 'produits/secret.jpg',
+        ]);
+
+        $this->get(route('admin.produits.photo.voir', $article))->assertNotFound();
     }
 
     public function test_une_adresse_distante_est_rendue_telle_quelle(): void
@@ -122,7 +214,7 @@ class PhotoDeLArticleTest extends TestCase
     public function test_la_carte_d_un_article_photographie_porte_son_image_en_fond(): void
     {
         Storage::disk('public')->put('produits/ciment.jpg', 'contenu');
-        $this->article('Ciment 50 kg', ['photo' => 'produits/ciment.jpg']);
+        $article = $this->article('Ciment 50 kg', ['photo' => 'produits/ciment.jpg']);
 
         $html = $this->get(route('admin.ventes.nouvelle'))->assertOk()->getContent();
 
@@ -131,7 +223,12 @@ class PhotoDeLArticleTest extends TestCase
         // `::before` ou de `:hover`.
         $this->assertStringContainsString('avec-photo"', $html);
         $this->assertStringContainsString('style="--fond-produit: url(', $html);
-        $this->assertStringContainsString('produits/ciment.jpg', $html);
+
+        // L'adresse posée est **celle que le modèle rend**, quelle que soit la
+        // branche empruntée. L'épreuve écrivait ici le chemin du fichier : elle
+        // ne tenait que sur une installation où `public/storage` existe, et
+        // c'est justement l'installation où le défaut ne se voit pas.
+        $this->assertStringContainsString(e($article->photoReelle()), $html);
     }
 
     /**
@@ -155,7 +252,7 @@ class PhotoDeLArticleTest extends TestCase
     public function test_l_ecran_de_modification_pose_le_meme_fond(): void
     {
         Storage::disk('public')->put('produits/ciment.jpg', 'contenu');
-        $this->article('Ciment 50 kg', ['photo' => 'produits/ciment.jpg']);
+        $article = $this->article('Ciment 50 kg', ['photo' => 'produits/ciment.jpg']);
 
         $vente = \App\Modules\Admin\Modeles\Vente::create([
             'point_de_vente_id' => $this->site->id,
@@ -172,7 +269,7 @@ class PhotoDeLArticleTest extends TestCase
         // de la carte, jamais de la feuille de style, qui l'écrit suivie de
         // `::before` ou de `:hover`.
         $this->assertStringContainsString('avec-photo"', $html);
-        $this->assertStringContainsString('produits/ciment.jpg', $html);
+        $this->assertStringContainsString(e($article->photoReelle()), $html);
     }
 
     /**
@@ -183,6 +280,12 @@ class PhotoDeLArticleTest extends TestCase
      */
     public function test_une_apostrophe_dans_le_chemin_ne_sort_pas_de_l_attribut(): void
     {
+        // Le lien de stockage est posé exprès : c'est la branche où le **chemin
+        // du fichier** entre dans l'attribut. Par la route de repli, l'adresse
+        // ne porte que l'identifiant de l'article, et l'apostrophe n'y arrive
+        // jamais — l'épreuve ne prouverait plus rien.
+        $this->poserLeLienDeStockage();
+
         $chemin = "produits/x'onerror=alert(1).jpg";
         Storage::disk('public')->put($chemin, 'contenu');
         $this->article('Article piégé', ['photo' => $chemin]);

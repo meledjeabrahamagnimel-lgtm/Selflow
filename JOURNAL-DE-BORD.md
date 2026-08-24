@@ -93,6 +93,9 @@ Elles ne se rediscutent pas sans raison neuve.
 | Taxes supportées à l'achat | **La colonne est retirée**, pas ouverte. À l'achat, une taxe supportée est une charge dont le compte dépend de sa nature ; le deviner reviendrait à en choisir un au hasard — 24/08/2026, propriétaire du projet |
 | Libellés d'écriture | **Paramétrables par entreprise**, deux gabarits par type d'opération. Les défauts reproduisent l'ancien texte au caractère près, et **les écritures passées ne sont jamais réécrites** — 24/08/2026 |
 | Ventilation analytique | **Un seul axe : le point de vente**, celui que l'application renseigne réellement. Aucune clé de répartition : une charge de siège reste au site où elle a été saisie, et l'écran le dit — 24/08/2026 |
+| Secteur d'activité | **Ne se saisit plus à la main.** Il se déduit du parcours de configuration — domaine à l'étape 1, réaligné sur les métiers souscrits à l'étape 4. Deux écrans posaient la même question sans se parler — 24/08/2026, propriétaire du projet |
+| Configuration acquise | **Additive.** Ajouter un domaine, un métier ou un rayon est toujours possible ; ce qui est souscrit ne se retire pas. **Un module qui porte des données ne se referme plus** — le fermer ne supprimerait rien mais ferait disparaître les écrans où ces données se lisent. Le verrou ne s'applique qu'à ce qui est vérifiable par un comptage — 24/08/2026, propriétaire du projet |
+| Photos d'articles | Servies par le lien `public/storage` quand il existe, **par une route de l'application sinon**. Sans ce repli, une installation où `php artisan storage:link` n'a pas été lancé rendait des adresses en 404 (Not Found — introuvable) que seul le fond de carte laissait voir — 24/08/2026 |
 
 ---
 
@@ -2185,6 +2188,119 @@ faire, et le rôle de chaque fichier du dossier.
 
 Les six documents précédents disaient chacun une partie ; aucun ne disait par
 où commencer.
+
+---
+
+### Lot 13 — Le paramétrage ne se saisit plus deux fois — **TERMINÉ**
+
+Trois demandes du propriétaire, faites le même jour : le fond de carte des
+articles ne se voyait toujours pas ; l'ancien choix des secteurs d'activité
+était toujours là ; et ce qui est déjà configuré ne devait plus pouvoir se
+défaire dès lors que l'entreprise porte des données.
+
+#### 13.1 — La photo de fond ne s'affichait pas — le vrai motif
+
+Le lot 12.4 avait posé la photo en arrière-plan de la carte, et le code était
+bien en place. Il ne s'affichait pas pour deux raisons, et la première n'a rien
+à voir avec le style.
+
+**L'adresse tombait en 404 (Not Found — introuvable).** `photoReelle()` rendait
+`asset('storage/…')`, qui ne vaut que si `public/storage` existe — le lien que
+pose `php artisan storage:link`. Sans ce lien, le fichier est bien sur le
+disque, `Storage::exists()` répond oui, et l'adresse rendue ne désigne rien.
+
+Le défaut ne se voyait nulle part ailleurs : la vignette d'un article a un
+`onerror` qui bascule sur l'image d'attente, et l'écran des articles paraissait
+donc normal. **Un fond de carte n'a pas d'`onerror`** — une image introuvable
+ne laisse rien, sans un mot.
+
+Correction : quand le lien manque, l'image est servie par une route de
+l'application (`GET /admin/produits/{produit}/photo`), qui vérifie
+l'appartenance à l'entreprise avant de rendre le fichier. Le chemin rapide
+reste le lien de stockage, servi sans passer par PHP.
+
+**Et le voile mangeait ce qui restait.** La photo était posée à `opacity: .45`
+sous un dégradé à `.88` : il n'en restait presque rien. La photo est passée à
+pleine opacité, le voile ne s'épaissit qu'à partir de 64 % de la hauteur — là
+où se trouvent le nom, le prix et le stock —, et la carte a désormais une
+hauteur minimale qui laisse voir l'image.
+
+Les deux écrans — nouvelle vente et modification — portent le même bloc.
+
+#### 13.2 — Le secteur d'activité ne se coche plus dans les paramètres
+
+Deux écrans posaient la même question sans se parler : les paramètres de
+l'entreprise proposaient de cocher un « secteur d'activité » dans une liste,
+pendant que le parcours de configuration demandait un domaine à sa première
+étape puis des métiers à la deuxième. **On pouvait déclarer « Santé » d'un côté
+et souscrire au métier « Boulangerie » de l'autre** ; les deux réponses
+cohabitaient, et rien ne le signalait.
+
+Le bloc de cases est retiré. À sa place, un panneau « Votre configuration » en
+lecture seule — domaine, métiers, modules ouverts — et un bouton qui rouvre le
+parcours. La colonne `secteur_activite` se déduit désormais du parcours : le
+domaine choisi à l'étape 1 la remplit aussitôt, et l'étape 4 la réaligne sur
+les métiers réellement souscrits.
+
+Deux pièges évités, chacun gardé par une épreuve :
+
+- **la ligne qui l'enregistrait valait `$request->secteurs_activite ?? []`.**
+  Retirer le champ de l'écran sans retirer cette ligne aurait **vidé** la
+  colonne à chaque enregistrement — et une entreprise sans secteur retombe en
+  « inscription incomplète », bannière comprise. La ligne est supprimée, pas
+  neutralisée ;
+- **la bannière d'inscription incomplète ne disait plus où aller.** Le secteur
+  conditionne la complétude, et l'écran où on le cochait n'existe plus. Elle
+  renvoie maintenant au parcours quand c'est lui qui manque.
+
+#### 13.3 — Ce qui porte des données ne se défait plus
+
+Le parcours est **additif presque partout** : rechoisir un domaine ou cocher un
+métier de plus n'enlève rien — `souscrire()` passe sur ce qui existe déjà sans
+y toucher. Un utilisateur qui vient ajouter une activité la trouve ajoutée.
+
+Deux points demandaient tout de même correction.
+
+**Les métiers déjà souscrits paraissaient décochables.** Décocher n'a jamais
+rien retiré, mais l'utilisateur croyait avoir fermé un métier qui restait
+ouvert, avec ses rayons et ses articles. Ils reviennent désormais cochés,
+désactivés, marqués « déjà en place » — et le contrôleur les remet dans le
+choix retenu, pour que l'écran et la base racontent la même chose. La règle
+`required_without` ne s'applique plus qu'à la première fois : sans cela, une
+entreprise déjà souscrite ne pouvait plus traverser l'étape 2 sans recocher un
+métier.
+
+**L'étape des modules, elle, défait réellement.** Elle écrit `modules_actifs`
+par intersection : refermer « Comptabilité » sur six mois d'écritures ne
+supprime rien, mais fait disparaître de la barre latérale l'écran où ces
+écritures se lisent. `VerrouConfigurationService` compte ce que chaque module
+porte, et un module qui porte des données ne se referme plus — case désactivée,
+compte affiché (« 142 ventes enregistrées »), et le contrôleur le rétablit
+quand la liste postée l'omet.
+
+Le comptage a demandé de l'attention : **une vente n'appartient pas à une
+entreprise mais à un point de vente.** Un verrou posé sur `entreprise_id`
+partout aurait laissé trois modules sur cinq — ventes, achats, stock — sans
+protection, sans rien dire. Le service passe par `points_de_vente` pour
+ceux-là.
+
+Le verrou ne s'applique qu'à ce qui est vérifiable. Ce qu'on ne sait pas
+compter reste libre, plutôt que verrouillé « au cas où » : un verrou sans motif
+se contourne, et le suivant ne serait plus cru.
+
+#### Ce que les épreuves gardent
+
+`ConfigurationVerrouilleeTest` — 14 épreuves : la déduction du secteur, son
+réalignement, le fait qu'un parcours sans souscription ne le vide pas, les
+métiers acquis, le verrou par point de vente, l'isolement entre entreprises, et
+deux simulations d'attaque — un module posté sans sa case verrouillée, un
+secteur posté à la main dans un formulaire qui ne le propose plus.
+
+`PhotoDeLArticleTest` passe de 9 à 12 épreuves, dont les deux branches de
+l'adresse — avec et sans lien de stockage — et le refus de la photo d'une
+autre entreprise.
+
+**877 épreuves, 877 vertes, 3 749 vérifications.**
 
 ---
 
