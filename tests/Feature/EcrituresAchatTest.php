@@ -339,6 +339,63 @@ class EcrituresAchatTest extends TestCase
     }
 
     /**
+     * Les deux tables de taxes de l'achat sont supprimées — même décision,
+     * même jour. `achat_detail_taxes` n'avait jamais rien porté ;
+     * `achat_taxes` était **remplie par le formulaire et relue par personne**,
+     * pendant que l'écran en gonflait le total affiché.
+     */
+    public function test_l_achat_ne_porte_plus_de_tables_de_taxes(): void
+    {
+        $this->assertFalse(\Illuminate\Support\Facades\Schema::hasTable('achat_taxes'));
+        $this->assertFalse(\Illuminate\Support\Facades\Schema::hasTable('achat_detail_taxes'));
+    }
+
+    /**
+     * La vente, elle, les garde : ce sont elles qui portent le champ
+     * `customTaxes` réellement transmis à la plateforme.
+     */
+    public function test_la_vente_garde_ses_tables_de_taxes(): void
+    {
+        $this->assertTrue(\Illuminate\Support\Facades\Schema::hasTable('vente_taxes'));
+        $this->assertTrue(\Illuminate\Support\Facades\Schema::hasTable('vente_detail_taxes'));
+    }
+
+    /**
+     * Le formulaire ne propose plus un champ qui n'écrit nulle part. Garder la
+     * saisie après avoir retiré la table serait pire que le défaut d'origine.
+     */
+    public function test_le_formulaire_d_achat_ne_propose_plus_de_taxes_sur_le_ttc(): void
+    {
+        $vue = file_get_contents(
+            base_path('app/Modules/Admin/Vues/achats/nouveau.blade.php')
+        );
+
+        $this->assertStringNotContainsString('taxes_ttc[', $vue);
+        $this->assertStringNotContainsString('taxesTtcConteneur', $vue);
+        $this->assertStringNotContainsString('ajouterTaxeTtc', $vue);
+    }
+
+    /**
+     * Le pavé de totaux de l'écran d'achat n'avait **aucune ligne de TVA**, et
+     * son total valait le seul HT net : sur un achat à 18 %, l'écran annonçait
+     * 18 % de moins que la pièce enregistrée. La ligne « Autres taxes » qui
+     * disparaît lui cède la place.
+     */
+    public function test_le_formulaire_d_achat_affiche_la_tva(): void
+    {
+        $vue = file_get_contents(
+            base_path('app/Modules/Admin/Vues/achats/nouveau.blade.php')
+        );
+
+        $this->assertStringNotContainsString('totAutresTaxes', $vue);
+        $this->assertStringContainsString('totTva', $vue);
+        // Le taux du catalogue doit atteindre l'écran, sinon il ne peut pas
+        // calculer la même TVA que le serveur.
+        $this->assertStringContainsString('data-tva=', $vue);
+        $this->assertStringContainsString('const total = htNet + tvaNette;', $vue);
+    }
+
+    /**
      * Le retrait ne doit rien changer aux écritures : elles ne la lisaient pas.
      */
     public function test_les_ecritures_d_achat_sont_inchangees_par_le_retrait(): void

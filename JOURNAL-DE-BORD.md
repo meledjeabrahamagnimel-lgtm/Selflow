@@ -2129,6 +2129,53 @@ en `&#039;` ; **une épreuve le vérifie** plutôt que de le supposer.
 - `tests/Feature/PhotoDeLArticleTest.php` — 9 tests, dont trois échouent contre
   l'ancien code.
 
+#### Lot 12.6 — Les taxes de l'achat — **RETIRÉES**
+
+Le propriétaire a tranché : les tables `achat_taxes` et `achat_detail_taxes`
+sont supprimées.
+
+**Le constat du lot 12.1 était incomplet, et je le corrige ici.** J'avais
+signalé « la même plomberie dormante ». C'était vrai de
+`achat_detail_taxes` — `enregistrerTaxesDeLigne()` n'est appelée que depuis la
+vente. Ce ne l'était **pas** de `achat_taxes` : le formulaire d'achat proposait
+bien un bloc « Taxes sur total TTC », et `AchatControleur:219` l'enregistrait.
+
+Ce qui est pire que dormant :
+
+| Ce qui se passait | Effet |
+|---|---|
+| La taxe était **saisie et enregistrée** | L'utilisateur avait toute raison de la croire prise en compte |
+| **Rien ne la relisait** | Ni le payload du bordereau d'achat — qui ne transmet aucune taxe, l'un des six écarts corrigés au moment de la conformité, **gelé** —, ni `ventilationAchat()`, ni `montant_ttc`, ni le document imprimé |
+| L'écran **l'ajoutait au total affiché** | `const total = htNet + totalAutresTaxes`. Le total montait sous les yeux de l'utilisateur, et la pièce enregistrée l'ignorait, avec sa comptabilité |
+
+Le commentaire de la relation annonçait « → `customTaxes` à la racine du
+payload FNE ». C'était faux depuis le lot 3.
+
+**Le bloc de saisie part avec la table.** Garder un champ qui n'écrit plus
+nulle part serait pire que le défaut d'origine.
+
+##### Le défaut que ce retrait a mis au jour — la TVA manquait au pavé
+
+En retirant la ligne « Autres taxes » du pavé de totaux, il est apparu que
+**l'écran d'achat n'affichait aucune ligne de TVA**, et que son total valait le
+seul HT net. Sur un achat de marchandises à 18 %, **l'écran annonçait 18 % de
+moins que la pièce enregistrée** — le serveur, lui, calcule bien
+`montant_ttc = HT net + TVA`.
+
+La ligne « TVA » prend la place de « Autres taxes », et le calcul de l'écran
+suit celui du serveur au même endroit : taux du catalogue par ligne, aucune TVA
+sur un bordereau d'achat ni sur une ligne libre, puis réduction au prorata de
+la remise globale. Le taux atteint l'écran par un `data-tva` sur chaque option
+du sélecteur d'article ; `bapaActive` est déclaré en tête de script, `recalculer()`
+le lisant depuis sa zone morte sinon, et la bascule BAPA rafraîchit le pavé.
+
+- `2026_08_24_000004_retirer_les_taxes_de_l_achat.php`
+- Modèles `AchatTaxe` et `AchatDetailTaxe` supprimés, relations retirées de
+  `Achat` et `AchatDetail`
+- `AchatControleur` — l'appel et le chargement anticipé retirés
+- `achats/nouveau.blade.php` — bloc, JS et ligne de total
+- `tests/Feature/EcrituresAchatTest.php` — 4 tests de plus (21 au total)
+
 #### Lot 12.5 — La passation Comptaflow, prête à ouvrir — **TERMINÉ**
 
 `PASSERELLE-COMPTAFLOW/COMMENCER-ICI.md` : une page d'entrée pour une session
@@ -2192,17 +2239,11 @@ Elles sont documentées pour ne pas être redécouvertes.
 
 Le propriétaire a choisi le retrait, le 24/08/2026. Voir le lot 12.1.
 
-### Taxes personnalisées à l'achat — **À TRANCHER**
+### ~~Taxes personnalisées à l'achat~~ — **TRANCHÉ ET RETIRÉ au lot 12.6**
 
-Les tables `achat_taxes` et `achat_detail_taxes` existent, les relations sont
-déclarées sur `Achat` et `AchatDetail`, et **aucun écran ne les alimente**.
-C'est la même plomberie dormante que la colonne retirée au lot 12.1, posée par
-symétrie avec la vente — où elle sert, elle, à la fois aux écritures et au
-payload FNE.
-
-Les retirer suppose de supprimer deux tables, geste plus lourd qu'une colonne
-jamais remplie, et que le propriétaire n'a pas demandé. Deux issues, comme pour
-la colonne : ouvrir la saisie, ou supprimer les tables.
+Le propriétaire a choisi le retrait, le 24/08/2026. Et le constat qui figurait
+ici était **incomplet** : `achat_taxes` n'était pas dormante, elle était
+**remplie par le formulaire et relue par personne**. Voir le lot 12.6.
 
 ### Stock
 

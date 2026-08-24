@@ -25,13 +25,9 @@ class AchatDetail extends Model
         return $this->belongsTo(Achat::class, 'achat_id');
     }
 
-    /**
-     * Taxes personnalisées de la ligne (→ `items[].customTaxes` du payload FNE).
-     */
-    public function taxes(): \Illuminate\Database\Eloquent\Relations\HasMany
-    {
-        return $this->hasMany(AchatDetailTaxe::class, 'achat_detail_id');
-    }
+    // `taxes()` vivait ici — retirée le 24/08/2026 avec sa table. Elle n'a
+    // jamais rien porté : `enregistrerTaxesDeLigne()` n'est appelée que depuis
+    // la vente, et le payload du bordereau d'achat ne transmet aucune taxe.
 
     public function produit(): BelongsTo
     {

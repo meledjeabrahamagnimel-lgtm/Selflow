@@ -111,13 +111,14 @@ class Achat extends Model
         return $this->hasMany(AchatDetail::class, 'achat_id');
     }
 
-    /**
-     * Taxes sur le total TTC (→ `customTaxes` à la racine du payload FNE).
-     */
-    public function taxesPersonnalisees(): HasMany
-    {
-        return $this->hasMany(AchatTaxe::class, 'achat_id');
-    }
+    // `taxesPersonnalisees()` vivait ici — retirée le 24/08/2026, décision du
+    // propriétaire. Son commentaire annonçait « → `customTaxes` à la racine du
+    // payload FNE », et c'était faux : **le payload du bordereau d'achat ne
+    // porte aucune taxe**, ce qui est précisément l'un des six écarts corrigés
+    // au moment de la conformité, et qui est gelé. Le formulaire d'achat
+    // écrivait donc dans `achat_taxes` une valeur que rien ne relisait — ni la
+    // plateforme, ni la comptabilité, ni le document imprimé — pendant que
+    // l'écran en gonflait le total affiché. La table est supprimée avec elle.
 
     public function paiements(): HasMany
     {

@@ -215,8 +215,12 @@ class AchatControleur
                 'numero_rne'                 => $request->boolean('est_rne') ? trim($request->input('numero_rne')) : null,
             ]);
 
-            // Taxes sur le total TTC (champ `customTaxes` de la FNE)
-            self::enregistrerTaxesSurTtc($achat, $request->input('taxes_ttc', []), $montantTtc);
+            // `enregistrerTaxesSurTtc()` etait appelee ici. Elle ecrivait dans
+            // `achat_taxes`, que rien ne relisait : ni le payload du bordereau
+            // d'achat -- qui ne transmet aucune taxe, et dont la conformite est
+            // gelee --, ni la comptabilite, ni le document imprime. La taxe
+            // saisie gonflait le total a l'ecran sans entrer dans aucun montant
+            // enregistre. Table et bloc de saisie retires le 24/08/2026.
 
             foreach ($request->articles as $article) {
                 $produit = !empty($article['produit_id']) ? Produit::lockForUpdate()->find($article['produit_id']) : null;
@@ -475,7 +479,7 @@ class AchatControleur
     public function imprimer(Achat $achat): View
     {
         $this->autoriserAcces($achat);
-        $achat->load(['fournisseur', 'pointDeVente.entreprise', 'details.produit', 'details.taxes', 'taxesPersonnalisees']);
+        $achat->load(['fournisseur', 'pointDeVente.entreprise', 'details.produit']);
         $dejaPaye = \App\Modules\Admin\Modeles\TresorerieJournal::where('reference_document', $achat->numero_facture)->sum('montant_sortie');
         return view('admin::factures.achat', compact('achat', 'dejaPaye'));
     }
