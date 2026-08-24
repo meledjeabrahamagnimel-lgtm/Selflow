@@ -85,7 +85,15 @@ return [
         'tva_collectee'         => '443100', // État, TVA facturée sur ventes
         'tva_collectee_services' => '443200', // État, TVA facturée sur prestations de services
         'tva_collectee_travaux'  => '443300', // État, TVA facturée sur travaux
-        'tva_deductible'        => '445200', // État, TVA déductible sur achats
+        // La TVA déductible se range selon la nature de la charge, comme la
+        // collectée se range selon la nature du produit. Tout verser en 4452
+        // rendait faux l'état de TVA déductible d'une entreprise dont les
+        // charges ne sont pas des achats — un cabinet, l'essentiel de ses
+        // charges en 62 et 63. Voir ComptabiliteService::compteTvaDeductible().
+        'tva_deductible'        => '445200', // État, TVA récupérable sur achats
+        'tva_deductible_transport'       => '445300', // … sur transports
+        'tva_deductible_services'        => '445400', // … sur services extérieurs et autres charges
+        'tva_deductible_immobilisations' => '445100', // … sur immobilisations
         // Droit de timbre de quittance (article 873 du CGI). Encaissé du
         // client pour le compte de l'État : une dette, jamais un produit. Il
         // n'entrait dans aucune écriture — la caisse était donc débitée de

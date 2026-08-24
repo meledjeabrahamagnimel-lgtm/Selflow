@@ -229,7 +229,14 @@ class ComptabiliteService
 
     /**
      * Point d'entrée unique pour la facturation d'un achat.
-     * Symétrique de genererEcrituresVente().
+     * Symétrique de genererEcrituresVente(), y compris dans sa forme :
+     *
+     *   1. une opération de facturation au journal des achats, qui crédite
+     *      TOUJOURS le compte du fournisseur du montant dû ;
+     *   2. une opération de règlement distincte, s'il y a décaissement.
+     *
+     * L'achat comptant écrivait auparavant une seule opération, « caisse contre
+     * charges », sans aucune ligne 401.
      */
     public static function genererEcrituresAchat(
         Achat $achat,
@@ -246,48 +253,24 @@ class ComptabiliteService
         $ttc = (float) $achat->montant_ttc;
         $montantPaye = max(0, min($montantPaye, $ttc));
 
+        // Le compte et le journal financiers sont désormais résolus par
+        // `genererEcritureReglementAchat()`, qui porte seul le décaissement.
         $codeJournalAchat = self::codeJournal($entrepriseId, 'Achat', 'ACH');
-        [$compteFinancier, $codeJournalFinancier] = self::compteEtJournalFinancier($entrepriseId, $modePaiement);
 
         $ventilation = self::ventilationAchat($achat);
         $libelleGeneral = self::libelleGeneralAchat($ventilation);
 
         DB::transaction(function () use (
             $achat, $entrepriseId, $pdvId, $date, $refDoc, $ttc, $montantPaye,
-            $codeJournalAchat, $compteFinancier, $codeJournalFinancier,
-            $ventilation, $libelleGeneral, $modePaiement
+            $codeJournalAchat, $ventilation, $libelleGeneral, $modePaiement,
+            $moyenBancaire, $referencePaiement
         ) {
-            $estPaiementIntegralImmediat = $montantPaye >= $ttc && $ttc > 0;
-
-            if ($estPaiementIntegralImmediat) {
-                // ── Achat comptant : UNE SEULE opération, aucune ligne 401 ──
-                // NB : même correctif que la vente comptant — le journal
-                // Caisse/Banque n'est utilisé QUE pour la ligne financière.
-                $operation = Operation::creer(
-                    $entrepriseId, $pdvId, $date, 'AchatComptant',
-                    $codeJournalFinancier, $refDoc, $libelleGeneral . ' (comptant)'
-                );
-
-                foreach ($ventilation['comptes'] as $compte => $detailCompte) {
-                    [$libelleDetail, $description] = self::libelleEtDescriptionDetailCompte(
-                        $compte, $detailCompte['produits'], self::TABLE_SYSCOHADA_ACHAT, 'Achat suivant détail'
-                    );
-                    self::ligne($operation, $entrepriseId, $pdvId, $date, $refDoc, $codeJournalAchat,
-                        $refDoc . ' / ' . $libelleDetail, $compte, null, null, $detailCompte['montant'], 0, $description);
-                }
-                if ($ventilation['tva'] > 0) {
-                    self::ligne($operation, $entrepriseId, $pdvId, $date, $refDoc, $codeJournalAchat,
-                        $refDoc . ' / TVA Déductible Achat', config('selflow.plan_comptable_defaut.tva_deductible'), null, null, $ventilation['tva'], 0);
-                }
-
-                self::ligne($operation, $entrepriseId, $pdvId, $date, $refDoc, $codeJournalFinancier,
-                    $refDoc . ' / Achat comptant', null, $compteFinancier, null, 0, $ttc);
-
-                $operation->cloturerEquilibre();
-                return;
-            }
-
-            // ── Achat à crédit (total ou partiel) : passage obligatoire par le 401 ──
+            // ── La facturation passe TOUJOURS par le compte du fournisseur ──
+            // L'achat comptant écrivait « caisse contre charges », sans aucune
+            // ligne 401 : le compte du fournisseur ne bougeait jamais sur ce
+            // qu'on lui payait au comptant, son numéro de tiers n'était
+            // transmis à Comptaflow sur aucun de ces achats, et le journal des
+            // achats ne les contenait pas.
             $compteFournisseurGeneral = $achat->fournisseur?->compte_comptable ?? config('selflow.plan_comptable_defaut.fournisseur_collectif');
             $compteFournisseurTiers = self::tiersFournisseur($achat->fournisseur, $entrepriseId);
 
@@ -303,9 +286,10 @@ class ComptabiliteService
                 self::ligne($opFacture, $entrepriseId, $pdvId, $date, $refDoc, $codeJournalAchat,
                     $refDoc . ' / ' . $libelleDetail, $compte, null, null, $detailCompte['montant'], 0, $description);
             }
-            if ($ventilation['tva'] > 0) {
+
+            foreach ($ventilation['tva'] as $compteTva => $montantTva) {
                 self::ligne($opFacture, $entrepriseId, $pdvId, $date, $refDoc, $codeJournalAchat,
-                    $refDoc . ' / TVA Déductible Achat', config('selflow.plan_comptable_defaut.tva_deductible'), null, null, $ventilation['tva'], 0);
+                    $refDoc . ' / TVA Déductible Achat', $compteTva, null, null, $montantTva, 0);
             }
 
             self::ligne($opFacture, $entrepriseId, $pdvId, $date, $refDoc, $codeJournalAchat,
@@ -313,8 +297,12 @@ class ComptabiliteService
 
             $opFacture->cloturerEquilibre();
 
+            // ── Le règlement, s'il y en a un : opération distincte ──
             if ($montantPaye > 0) {
-                self::genererEcritureReglementAchat($achat, $montantPaye, $modePaiement, $date, null, null, 'Acompte à la facturation');
+                self::genererEcritureReglementAchat(
+                    $achat, $montantPaye, $modePaiement, $date, $moyenBancaire, $referencePaiement,
+                    $montantPaye >= $ttc ? 'Règlement à la facturation' : 'Acompte à la facturation'
+                );
             }
         });
     }
@@ -487,9 +475,12 @@ class ComptabiliteService
                     $refDoc . ' / ' . $libelleDetail, null, $compte, null, 0, $detailCompte['montant'], $description);
             }
 
-            if ($ventilation['tva'] > 0) {
+            // L'avoir annule la TVA sur les mêmes comptes que la facture : sans
+            // cela, une charge de service verrait sa TVA débitée en 4454 et
+            // recréditée en 4452, et les deux comptes dériveraient.
+            foreach ($ventilation['tva'] as $compteTva => $montantTva) {
                 self::ligne($operation, $entrepriseId, $pdvId, $date, $refDoc, $codeJournal,
-                    $refDoc . ' / Annulation TVA Déductible', null, config('selflow.plan_comptable_defaut.tva_deductible'), null, 0, $ventilation['tva']);
+                    $refDoc . ' / Annulation TVA Déductible', null, $compteTva, null, 0, $montantTva);
             }
 
             $operation->cloturerEquilibre();
@@ -676,6 +667,32 @@ class ComptabiliteService
     }
 
     /**
+     * Le compte de TVA déductible qui correspond à un compte de charge.
+     *
+     * Symétrique de `compteTvaCollectee()`, et faux de la même façon : tout
+     * partait en 4452, « TVA récupérable sur achats », y compris la TVA d'un
+     * loyer, d'honoraires ou d'un billet de transport. SYSCOHADA distingue :
+     *
+     *   445100  sur immobilisations        (comptes 2x)
+     *   445200  sur achats                 (comptes 60x)
+     *   445300  sur transports             (comptes 61x)
+     *   445400  sur services extérieurs et autres charges  (62x, 63x, 64x…)
+     *
+     * L'état de TVA déductible reprend cette ventilation. Une entreprise qui
+     * n'achète que des marchandises ne voyait pas la différence ; un cabinet,
+     * dont l'essentiel des charges est en 62 et 63, la voyait entièrement.
+     */
+    private static function compteTvaDeductible(string $compteCharge): string
+    {
+        return match (substr($compteCharge, 0, 2)) {
+            '60'    => config('selflow.plan_comptable_defaut.tva_deductible'),
+            '61'    => config('selflow.plan_comptable_defaut.tva_deductible_transport'),
+            '20', '21', '22', '23', '24' => config('selflow.plan_comptable_defaut.tva_deductible_immobilisations'),
+            default => config('selflow.plan_comptable_defaut.tva_deductible_services'),
+        };
+    }
+
+    /**
      * Ventile les lignes d'une vente par compte de produit, avec application
      * de la remise globale au prorata, ventile la TVA par compte de collecte,
      * et conserve la liste des produits par compte (nécessaire pour les
@@ -742,7 +759,7 @@ class ComptabiliteService
      * @param  array<string, float>  $ventilee
      * @return array<string, float>
      */
-    private static function accorderTva(array $ventilee, float $total): array
+    private static function accorderTva(array $ventilee, float $total, ?string $compteDeRepli = null): array
     {
         $total = round($total, 2);
 
@@ -752,8 +769,8 @@ class ComptabiliteService
 
         if ($ventilee === []) {
             // Aucune ligne ne porte de TVA alors que la pièce en annonce :
-            // le total part au compte des ventes, à défaut de savoir mieux.
-            return [config('selflow.plan_comptable_defaut.tva_collectee') => $total];
+            // le total part au compte générique, à défaut de savoir mieux.
+            return [$compteDeRepli ?? config('selflow.plan_comptable_defaut.tva_collectee') => $total];
         }
 
         $ventilee = array_map(fn ($m) => round($m, 2), $ventilee);
@@ -769,9 +786,9 @@ class ComptabiliteService
     }
 
     /**
-     * Ventile les lignes d'un achat par compte de produit, recalcule la TVA
-     * totale ligne par ligne, et conserve la liste des produits par compte.
-     * @return array{comptes: array<string, array{montant: float, produits: array<string>}>, tva: float}
+     * Ventile les lignes d'un achat par compte de charge, ventile la TVA par
+     * compte de déduction, et conserve la liste des produits par compte.
+     * @return array{comptes: array<string, array{montant: float, produits: array<string>}>, tva: array<string, float>}
      */
     private static function ventilationAchat(Achat $achat): array
     {
@@ -787,7 +804,7 @@ class ComptabiliteService
         $sansTva = $achat->type_facture === 'bapa';
 
         $comptes = [];
-        $totalTva = 0;
+        $tva = [];
         foreach ($achat->details as $detail) {
             $remiseLigne = (float) ($detail->remise_taux ?? 0);
             $ht = $detail->quantite * $detail->prix_unitaire * (1 - $remiseLigne / 100);
@@ -802,7 +819,11 @@ class ComptabiliteService
 
                 $tauxTva = $sansTva ? 0 : ($detail->produit?->taux_tva ?? 0);
                 if ($tauxTva > 0) {
-                    $totalTva += round($ht * ($tauxTva / 100), 2);
+                    // La TVA déductible suit la nature de la charge, comme la
+                    // collectée suit la nature du produit : voir
+                    // `compteTvaDeductible()`.
+                    $compteTva = self::compteTvaDeductible($compte);
+                    $tva[$compteTva] = ($tva[$compteTva] ?? 0) + round($ht * ($tauxTva / 100), 2);
                 }
             }
         }
@@ -810,9 +831,16 @@ class ComptabiliteService
         // Le repli sur `montant_tva` ne doit pas rattraper ce que l'on vient
         // d'ecarter : un bordereau dont la piece porterait une TVA — saisie a
         // tort, ou heritee d'une conversion — la verrait revenir ici.
-        $tva = $sansTva ? 0.0 : ($totalTva > 0 ? $totalTva : (float) ($achat->montant_tva ?? 0));
+        $total = $sansTva ? 0.0 : (array_sum($tva) > 0 ? array_sum($tva) : (float) ($achat->montant_tva ?? 0));
 
-        return ['comptes' => $comptes, 'tva' => $tva];
+        return [
+            'comptes' => $comptes,
+            'tva'     => self::accorderTva(
+                $sansTva ? [] : $tva,
+                $total,
+                config('selflow.plan_comptable_defaut.tva_deductible')
+            ),
+        ];
     }
 
     /**

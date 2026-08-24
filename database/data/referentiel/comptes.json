@@ -48,8 +48,20 @@
   "intitule": "État, autres impôts et contributions (droit de timbre de quittance)"
  },
  {
+  "numero": "445100",
+  "intitule": "État, TVA récupérable sur immobilisations"
+ },
+ {
   "numero": "445200",
   "intitule": "État, TVA récupérable sur achats"
+ },
+ {
+  "numero": "445300",
+  "intitule": "État, TVA récupérable sur transports"
+ },
+ {
+  "numero": "445400",
+  "intitule": "État, TVA récupérable sur services extérieurs et autres charges"
  },
  {
   "numero": "521000",
