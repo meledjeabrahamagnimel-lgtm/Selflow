@@ -91,6 +91,42 @@ class VerrouConfigurationService
     }
 
     /**
+     * Rouvrir les modules fermés qui portent pourtant des données.
+     *
+     * Le verrou empêche d'en refermer un ; il ne répare pas ceux qui l'ont été
+     * avant qu'il existe. Une entreprise s'est retrouvée avec des mouvements de
+     * stock et aucune section « Stock » dans son menu : la marchandise était
+     * comptée, valorisée, reprise dans les écritures — et l'écran où elle se
+     * lit avait disparu.
+     *
+     * L'opération est **idempotente et n'ajoute rien d'autre** : elle ne rouvre
+     * qu'un module dont on a compté les lignes. Elle est appelée à l'affichage
+     * des écrans de configuration, ce qui est inhabituel pour une lecture ;
+     * l'alternative était de laisser des données hors d'atteinte jusqu'à ce que
+     * quelqu'un pense à rouvrir la bonne case.
+     *
+     * @return array<int, string>  les modules rouverts, vide si rien à faire
+     */
+    public static function reconcilier(Entreprise $entreprise): array
+    {
+        $ouverts = $entreprise->modules_actifs ?? [];
+        $manquants = array_values(array_diff(
+            array_keys(self::modulesVerrouilles($entreprise)),
+            $ouverts
+        ));
+
+        if ($manquants === []) {
+            return [];
+        }
+
+        $entreprise->update([
+            'modules_actifs' => array_values(array_unique(array_merge($ouverts, $manquants))),
+        ]);
+
+        return $manquants;
+    }
+
+    /**
      * Les métiers déjà souscrits.
      *
      * Ils ne se décochent pas — non par verrou, mais parce que rien ne les

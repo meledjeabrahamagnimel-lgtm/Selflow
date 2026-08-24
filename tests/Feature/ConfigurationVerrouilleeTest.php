@@ -211,6 +211,128 @@ class ConfigurationVerrouilleeTest extends TestCase
 
     // ── L'écran des paramètres ───────────────────────────────────────
 
+    // ── Les noms des modules ─────────────────────────────────────────
+
+    /**
+     * L'écran fabriquait le sien à partir du code — « Comptabilite » sans
+     * accent, « Fne » pour la section que le menu appelle « Fiscalité & DGI ».
+     * L'utilisateur devait deviner quelle case commandait quelle section.
+     */
+    public function test_les_modules_portent_le_nom_de_la_barre_laterale(): void
+    {
+        $this->entreprise->update([
+            'secteur_activite' => ['Commerce'],
+            'modules_actifs'   => ['principal', 'comptabilite', 'fne', 'points_de_vente'],
+        ]);
+
+        $html = $this->actingAs($this->admin)
+            ->get(route('admin.entreprise.parametres'))->assertOk()->getContent();
+
+        $this->assertStringContainsString('Comptabilité', $html);
+        $this->assertStringContainsString('Fiscalité &amp; DGI', $html);
+        $this->assertStringNotContainsString('>Comptabilite<', $html);
+        $this->assertStringNotContainsString('>Fne<', $html);
+    }
+
+    /**
+     * Chaque module a un nom, et la liste des noms ne connaît pas de module
+     * qui n'existe pas. Une entrée oubliée retomberait en silence sur le code.
+     */
+    public function test_chaque_module_a_son_nom(): void
+    {
+        $this->assertSame(
+            Entreprise::TOUS_LES_MODULES,
+            array_keys(Entreprise::LIBELLES_MODULES)
+        );
+    }
+
+    // ── La réconciliation ────────────────────────────────────────────
+
+    /**
+     * Le cas constaté chez le propriétaire : des mouvements de stock, et
+     * aucune section « Stock » dans le menu. La marchandise était comptée,
+     * valorisée, reprise dans les écritures — et l'écran où elle se lit avait
+     * disparu. Le verrou empêche d'en refermer un ; il ne répare pas ceux qui
+     * l'ont été avant qu'il existe.
+     */
+    public function test_un_module_ferme_qui_porte_des_donnees_est_rouvert(): void
+    {
+        $this->entreprise->update([
+            'secteur_activite' => ['Commerce'],
+            'modules_actifs'   => ['principal', 'achats'],
+        ]);
+        $this->uneVente();
+
+        $this->actingAs($this->admin)->get(route('admin.entreprise.parametres'))->assertOk();
+
+        $this->assertContains('ventes', $this->entreprise->fresh()->modules_actifs);
+    }
+
+    public function test_la_reconciliation_n_ouvre_rien_d_autre(): void
+    {
+        $this->entreprise->update(['modules_actifs' => ['principal']]);
+        $this->uneVente();
+
+        VerrouConfigurationService::reconcilier($this->entreprise);
+
+        $this->assertSame(['principal', 'ventes'], $this->entreprise->fresh()->modules_actifs);
+    }
+
+    public function test_la_reconciliation_ne_fait_rien_quand_tout_est_en_ordre(): void
+    {
+        $this->entreprise->update(['modules_actifs' => ['principal', 'ventes']]);
+        $this->uneVente();
+
+        $this->assertSame([], VerrouConfigurationService::reconcilier($this->entreprise));
+        $this->assertSame(['principal', 'ventes'], $this->entreprise->fresh()->modules_actifs);
+    }
+
+    // ── Le bouton du parcours ────────────────────────────────────────
+
+    /**
+     * Sans `etape => 1`, le parcours s'ouvre à la dernière étape atteinte — la
+     * cinquième pour une entreprise déjà configurée, c'est-à-dire l'écran des
+     * prix. Le bouton servait donc à tout sauf à ce qu'on lui demandait.
+     */
+    public function test_le_bouton_renvoie_a_la_premiere_etape(): void
+    {
+        $this->entreprise->update(['secteur_activite' => ['Commerce']]);
+
+        $this->actingAs($this->admin)
+            ->get(route('admin.entreprise.parametres'))
+            ->assertOk()
+            ->assertSee(route('admin.souscription.index', ['etape' => 1]), false);
+    }
+
+    public function test_la_premiere_etape_dit_qu_elle_ajoute(): void
+    {
+        $this->parcoursComplet();
+
+        $this->actingAs($this->admin)
+            ->get(route('admin.souscription.index', ['etape' => 1]))
+            ->assertOk()
+            ->assertSee('Vous travaillez déjà en', false)
+            ->assertSee("n'enlève rien", false);
+    }
+
+    /**
+     * Le parcours doit rester traversable une fois terminé : c'est par lui
+     * qu'on ajoute un domaine. Une entreprise arrivée à la cinquième étape ne
+     * doit pas se voir refuser la première.
+     */
+    public function test_la_premiere_etape_reste_ouverte_apres_la_configuration(): void
+    {
+        $this->parcoursComplet();
+
+        $autre = Categorie::where('nom', 'Santé')->first() ?? Categorie::where('nom', '!=', 'Commerce')->firstOrFail();
+
+        $this->actingAs($this->admin)
+            ->post(route('admin.souscription.enregistrer', 1), ['categorie_id' => $autre->id])
+            ->assertRedirect(route('admin.souscription.index', ['etape' => 2]));
+    }
+
+    // ── L'écran des paramètres ───────────────────────────────────────
+
     public function test_les_parametres_ne_proposent_plus_de_cocher_un_secteur(): void
     {
         $this->entreprise->update(['secteur_activite' => ['Commerce']]);
@@ -220,7 +342,7 @@ class ConfigurationVerrouilleeTest extends TestCase
 
         $this->assertStringNotContainsString('secteurs_activite[]', $html);
         $this->assertStringContainsString('Votre configuration', $html);
-        $this->assertStringContainsString('Modifier la configuration', $html);
+        $this->assertStringContainsString('Ajouter une configuration', $html);
     }
 
     /**

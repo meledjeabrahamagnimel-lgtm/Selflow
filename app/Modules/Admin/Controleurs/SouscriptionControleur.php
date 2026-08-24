@@ -42,7 +42,13 @@ class SouscriptionControleur
     public function index(Request $request): View
     {
         $entreprise = $this->entreprise();
-        $etape = $this->etapeDemandee($request, $entreprise);
+
+        // Un module fermé qui porte des données est rouvert avant d'afficher
+        // quoi que ce soit : le verrou empêche d'en refermer un, il ne répare
+        // pas ceux qui l'ont été avant qu'il existe.
+        VerrouConfigurationService::reconcilier($entreprise);
+
+        $etape = $this->etapeDemandee($request, $entreprise->refresh());
 
         return view('admin::souscription.parcours', [
             'entreprise' => $entreprise,
@@ -420,7 +426,8 @@ class SouscriptionControleur
         $choix = $this->choix($entreprise);
 
         return match ($etape) {
-            1 => ['categories' => Categorie::withCount('profils')->orderBy('ordre')->get()],
+            1 => ['categories' => Categorie::withCount('profils')->orderBy('ordre')->get(),
+                  'domainesDejaLa' => VerrouConfigurationService::domainesSouscrits($entreprise)],
 
             2 => ['profils' => Profil::withCount(['familles', 'articles'])
                     ->when(isset($choix['categorie_id']), fn ($q) => $q->where('categorie_id', $choix['categorie_id']))

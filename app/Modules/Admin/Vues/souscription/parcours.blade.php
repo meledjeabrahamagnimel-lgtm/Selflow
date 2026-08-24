@@ -129,9 +129,21 @@
     @if($etape === 1)
         <div class="sous-tete">
             <h2>Dans quel domaine travaillez-vous ?</h2>
-            <p>Ce choix ne fait que restreindre la liste suivante. Vous pourrez revenir
-               ici et en changer tant que la configuration n'est pas terminée.</p>
+            <p>Ce choix ne fait que restreindre la liste suivante. Vous pouvez revenir ici
+               autant de fois que vous voulez, y compris une fois la configuration terminée.</p>
         </div>
+
+        {{-- Le parcours se reprend surtout pour ajouter. Sans cette phrase, un
+             utilisateur qui revient croit qu'en choisissant un autre domaine il
+             remplace le sien, et n'ose pas. --}}
+        @if(!empty($domainesDejaLa))
+            <p class="note-verrou">
+                <i class="fas fa-circle-plus"></i>
+                Vous travaillez déjà en <strong>{{ implode(', ', $domainesDejaLa) }}</strong>.
+                En choisir un autre <strong>n'enlève rien</strong> : le parcours ajoute les métiers,
+                les rayons et les comptes du nouveau domaine à ceux que vous avez déjà.
+            </p>
+        @endif
 
         {{-- Le référentiel absent laissait cette page muette : la question, le
              bouton, et rien entre les deux. L'utilisateur n'avait aucun moyen
@@ -262,7 +274,10 @@
                        {{ $fige || in_array($module, $choix['modules'] ?? $modulesProposes, true) ? 'checked' : '' }}
                        {{ $fige ? 'disabled' : '' }}>
                 <div>
-                    <div class="nom">{{ ucfirst(str_replace('_', ' ', $module)) }}</div>
+                    {{-- Le nom de la barre latérale, pas le code : la case
+                         « Fne » commandait la section « Fiscalité & DGI », et
+                         rien ne le disait. --}}
+                    <div class="nom">{{ \App\Modules\Admin\Modeles\Entreprise::libelleModule($module) }}</div>
                     @if($verrou)
                         <div class="sous">{{ $verrou }}</div>
                     @elseif(isset($raisons[$module]))

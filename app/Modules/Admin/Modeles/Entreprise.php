@@ -367,4 +367,38 @@ class Entreprise extends Model
         'cycles', 'comptabilite', 'points_de_vente', 'produits', 'tiers',
         'rapports', 'b2b', 'fne',
     ];
+
+    /**
+     * Le nom que l'utilisateur lit dans sa barre latérale.
+     *
+     * Les écrans de configuration fabriquaient le leur à partir du code :
+     * `ucfirst(str_replace('_', ' ', $module))`. Cela donnait « Comptabilite »
+     * sans accent, « Points de vente » par chance, et « Fne » pour la section
+     * que le menu appelle « Fiscalité & DGI ». L'utilisateur devait deviner que
+     * la case qu'il cochait commandait la section qu'il voyait.
+     *
+     * Cette liste est la copie de celle des `nav-section` du gabarit. Elles
+     * doivent rester d'accord ; une épreuve le vérifie.
+     */
+    public const LIBELLES_MODULES = [
+        'principal'       => 'Tableau de bord',
+        'ventes'          => 'Ventes',
+        'achats'          => 'Achats',
+        'stock'           => 'Stock',
+        'production'      => 'Production',
+        'chantiers'       => 'Chantiers',
+        'cycles'          => 'Cycles agricoles',
+        'comptabilite'    => 'Comptabilité',
+        'points_de_vente' => 'Points de vente',
+        'produits'        => 'Produits',
+        'tiers'           => 'Tiers',
+        'rapports'        => 'Rapports',
+        'b2b'             => 'B2B',
+        'fne'             => 'Fiscalité & DGI',
+    ];
+
+    public static function libelleModule(string $module): string
+    {
+        return self::LIBELLES_MODULES[$module] ?? ucfirst(str_replace('_', ' ', $module));
+    }
 }

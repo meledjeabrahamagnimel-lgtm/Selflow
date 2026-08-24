@@ -39,11 +39,19 @@ class EntrepriseControleur
         // l'affiche en lecture seule : les secteurs se cochaient ici, dans une
         // liste qui ne parlait pas au parcours, et les deux réponses pouvaient
         // se contredire sans que rien ne le signale.
+        //
+        // La réconciliation vient d'abord : un module fermé qui porte des
+        // données est rouvert avant que l'écran ne dise ce qui est ouvert.
+        // Sans cela, le panneau annonçait « Stock porte vos données » juste
+        // au-dessus d'une liste de modules ouverts où Stock ne figurait pas.
+        $rouverts = \App\Modules\Admin\Services\VerrouConfigurationService::reconcilier($entreprise);
+
         $configuration = [
             'domaines' => \App\Modules\Admin\Services\VerrouConfigurationService::domainesSouscrits($entreprise),
             'metiers'  => $entreprise->profils()->orderBy('nom')->pluck('nom')->all(),
-            'modules'  => $entreprise->modules_actifs ?? [],
+            'modules'  => $entreprise->fresh()->modules_actifs ?? [],
             'verrous'  => \App\Modules\Admin\Services\VerrouConfigurationService::modulesVerrouilles($entreprise),
+            'rouverts' => $rouverts,
         ];
 
         return view('admin::entreprise.parametres', compact('entreprise', 'periodes', 'fneStatut', 'configuration'));

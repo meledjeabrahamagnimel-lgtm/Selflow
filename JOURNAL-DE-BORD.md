@@ -2300,7 +2300,47 @@ secteur posté à la main dans un formulaire qui ne le propose plus.
 l'adresse — avec et sans lien de stockage — et le refus de la photo d'une
 autre entreprise.
 
-**877 épreuves, 877 vertes, 3 749 vérifications.**
+#### 13.4 — Trois reprises, le même jour
+
+**Les modules ouverts n'étaient pas à jour.** Le panneau annonçait « Stock
+porte vos données » juste au-dessus d'une liste de modules ouverts où Stock ne
+figurait pas — et la barre latérale n'avait pas de section Stock. Le module
+avait été fermé avant que le verrou existe : la marchandise était comptée,
+valorisée, reprise dans les écritures, et l'écran où elle se lit avait disparu.
+
+Le verrou empêche d'en refermer un ; il ne répare pas ceux qui l'ont été avant.
+`VerrouConfigurationService::reconcilier()` rouvre un module fermé qui porte
+des données, à l'affichage des écrans de configuration, et le dit. L'opération
+est idempotente et n'ouvre **que** ce dont elle a compté les lignes ; une
+épreuve le vérifie. Réparer sur une lecture est inhabituel — l'alternative
+était de laisser des données hors d'atteinte jusqu'à ce que quelqu'un pense à
+rouvrir la bonne case.
+
+**Les noms des modules étaient fabriqués à partir du code.**
+`ucfirst(str_replace('_', ' ', $module))` donnait « Comptabilite » sans accent
+et « Fne » pour la section que le menu appelle « Fiscalité & DGI ».
+L'utilisateur devait deviner quelle case commandait quelle section.
+`Entreprise::LIBELLES_MODULES` porte la liste de la barre latérale, et une
+épreuve vérifie qu'aucun module n'y manque.
+
+**Le bouton menait à la fin du parcours.** `route('admin.souscription.index')`
+ouvre la dernière étape atteinte — la cinquième pour une entreprise déjà
+configurée, c'est-à-dire l'écran des prix. Le bouton servait donc à tout sauf à
+ce qu'on lui demandait. Il repart de l'étape 1, s'appelle « Ajouter une
+configuration », et la première étape dit maintenant, quand un domaine est déjà
+souscrit, qu'en choisir un autre **n'enlève rien**.
+
+#### 13.5 — Pourquoi une photo ne s'affiche pas : `selflow:photos`
+
+Trois causes possibles, et **aucune ne se distingue à l'écran** : l'article n'a
+pas de photo, le fichier n'est plus sur le disque, ou le lien `public/storage`
+manque. Dans les trois cas la vignette montre l'image d'attente — qui ressemble
+à une photo — et le fond de carte reste vide.
+
+`php artisan selflow:photos` dit laquelle des trois s'applique, entreprise par
+entreprise, avec les noms des articles concernés.
+
+**885 épreuves, 885 vertes, 3 767 vérifications.**
 
 ---
 

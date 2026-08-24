@@ -26,13 +26,17 @@
                 </div>
 
                 @php
+                    // Les noms sont ceux de la barre latérale, pris à la même
+                    // source. L'écran fabriquait le sien à partir du code —
+                    // « Comptabilite » sans accent, « Fne » pour la section que
+                    // le menu appelle « Fiscalité & DGI » — et l'utilisateur
+                    // devait deviner quelle case commandait quelle section.
+                    $nommer = fn ($m) => \App\Modules\Admin\Modeles\Entreprise::libelleModule($m);
+
                     $lignesConfig = [
-                        ['Domaine',  $configuration['domaines'] ?? []],
+                        ['Domaines', $configuration['domaines'] ?? []],
                         ['Métiers',  $configuration['metiers']  ?? []],
-                        ['Modules ouverts', array_map(
-                            fn ($m) => ucfirst(str_replace('_', ' ', $m)),
-                            $configuration['modules'] ?? []
-                        )],
+                        ['Modules ouverts', array_map($nommer, $configuration['modules'] ?? [])],
                     ];
                 @endphp
 
@@ -54,13 +58,26 @@
                     @endforeach
                 </div>
 
+                @if(!empty($configuration['rouverts']))
+                    <p
+                        style="margin-top:14px;font-size:12px;line-height:1.6;color:#92400E;background:#FFFBEB;border:1px solid #FCD34D;border-radius:8px;padding:11px 14px;">
+                        <i class="fas fa-rotate-left" style="color:#D97706;"></i>
+                        <strong>{{ implode(', ', array_map($nommer, $configuration['rouverts'])) }}</strong>
+                        {{ count($configuration['rouverts']) > 1 ? 'ont été rouverts' : 'a été rouvert' }} :
+                        {{ count($configuration['rouverts']) > 1 ? 'ces modules portaient' : 'ce module portait' }}
+                        vos données alors {{ count($configuration['rouverts']) > 1 ? 'qu\'ils étaient fermés' : 'qu\'il était fermé' }},
+                        et les écrans où {{ count($configuration['rouverts']) > 1 ? 'elles se lisent avaient' : 'elles se lisent avaient' }}
+                        disparu de votre menu.
+                    </p>
+                @endif
+
                 @if(!empty($configuration['verrous']))
                     <p
                         style="margin-top:14px;font-size:12px;line-height:1.6;color:#065f46;background:rgba(5,150,105,.06);border:1px solid rgba(5,150,105,.22);border-radius:8px;padding:11px 14px;">
                         <i class="fas fa-lock" style="color:#059669;"></i>
                         {{ count($configuration['verrous']) }} module{{ count($configuration['verrous']) > 1 ? 's' : '' }}
                         porte{{ count($configuration['verrous']) > 1 ? 'nt' : '' }} déjà vos données
-                        ({{ implode(', ', array_map(fn ($m) => ucfirst(str_replace('_', ' ', $m)), array_keys($configuration['verrous']))) }}).
+                        ({{ implode(', ', array_map($nommer, array_keys($configuration['verrous']))) }}).
                         Ils ne se referment plus : les fermer ne supprimerait rien, mais ferait disparaître de votre
                         menu les écrans où ces données se lisent.
                     </p>
@@ -73,15 +90,21 @@
                  Il se reprend ici, à l'étape qu'on veut : rien n'y est écrasé, et
                  ce qui a déjà été coché revient coché. --}}
             <div style="display:flex;flex-direction:column;gap:8px;align-items:stretch;min-width:210px;">
-                <a href="{{ route('admin.souscription.index') }}" class="btn btn-primary"
+                {{-- `etape => 1` est indispensable. Sans elle, le parcours
+                     s'ouvre à la dernière étape atteinte — la cinquième pour
+                     une entreprise déjà configurée, c'est-à-dire l'écran des
+                     prix. Le bouton servait donc à tout sauf à ce qu'on lui
+                     demandait : ajouter un domaine ou un métier. --}}
+                <a href="{{ route('admin.souscription.index', ['etape' => 1]) }}" class="btn btn-primary"
                     style="display:inline-flex;align-items:center;justify-content:center;gap:8px;white-space:nowrap;">
-                    <i class="fas fa-sliders"></i>
-                    Modifier la configuration
+                    <i class="fas fa-plus"></i>
+                    Ajouter une configuration
                 </a>
                 <small style="font-size:11px;color:var(--text-3);line-height:1.55;">
-                    Domaine, métiers, modules, rayons et prix — en cinq étapes. Reprenez-le à
-                    l'étape que vous voulez : rien de ce que vous avez déjà coché n'est perdu, et
-                    ajouter un métier n'efface jamais les précédents.
+                    Le parcours repart du choix du domaine, puis les métiers, les modules, les
+                    rayons et les prix. <strong>Rien de ce que vous avez déjà n'est perdu</strong> :
+                    ajouter un domaine ou un métier n'efface jamais les précédents, et ce qui est
+                    souscrit revient coché.
                 </small>
             </div>
         </div>
