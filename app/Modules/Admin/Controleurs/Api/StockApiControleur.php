@@ -13,7 +13,9 @@ class StockApiControleur
     public function index(): JsonResponse
     {
         $entreprise = Auth::user()->entreprise;
+        // Le stock mobile rendait aussi les prestations, toutes en « Rupture ».
         $produits   = Produit::where('produits.entreprise_id', $entreprise->id)
+            ->stockables()
             ->with(['stocks'])
             ->leftJoin('categories', 'produits.categorie_id', '=', 'categories.id')
             ->select('produits.*')

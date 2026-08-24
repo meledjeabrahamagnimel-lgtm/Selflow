@@ -185,17 +185,20 @@
                         </span>
                     </td>
                     <td><span class="badge badge-purple">{{ $p->categorie ?? '—' }}</span></td>
-                    <td>@if(in_array($p->type, ['service', 'consommable_non_stockable'])) — @else {{ number_format($p->prix_achat, 0, ',', ' ') }} F @endif</td>
+                    <td>@if(!$p->estStockable()) — @else {{ number_format($p->prix_achat, 0, ',', ' ') }} F @endif</td>
                     <td style="color:var(--success); font-weight:600;">{{ number_format($p->prix_vente, 0, ',', ' ') }} F</td>
                     <td style="color:var(--info);">
-                        @if(in_array($p->type, ['service', 'consommable_non_stockable']))
+                        @if(!$p->estStockable())
                             —
                         @else
                             @php $marge = $p->prix_achat > 0 ? round((($p->prix_vente - $p->prix_achat) / $p->prix_achat) * 100) : 0; @endphp
                             +{{ $marge }}%
                         @endif
                     </td>
-                    @php $sansStock = in_array($p->type, ['service', 'consommable_non_stockable']); @endphp
+                    {{-- La liste des types sans stock vivait ici en dur : une
+                         seconde copie de `Produit::TYPES_STOCKABLES`, qui aurait
+                         diverge au premier type ajoute. --}}
+                    @php $sansStock = !$p->estStockable(); @endphp
                     <td style="font-weight:600; {{ $sansStock ? 'color:var(--text-3)' : ($p->stock_actuel == 0 ? 'color:var(--danger)' : ($p->stock_actuel <= $p->stock_minimum ? 'color:var(--warning)' : 'color:var(--success)')) }}">
                         @if($sansStock) — @else {{ $p->stock_actuel }} {{ $p->unite }} @endif
                     </td>

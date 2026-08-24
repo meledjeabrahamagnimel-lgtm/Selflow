@@ -56,11 +56,36 @@ class Produit extends Model
     ];
 
     /**
+     * L'état rendu par `etatStock()` pour un article qui n'a pas de stock du
+     * tout. Il n'est ni « Rupture », ni « Normal » : la question ne se pose pas.
+     */
+    public const ETAT_SANS_STOCK = 'Sans stock';
+
+    /**
      * Indique si ce produit gère un stock physique.
      */
     public function estStockable(): bool
     {
         return in_array($this->type, self::TYPES_STOCKABLES);
+    }
+
+    /**
+     * Le même renseignement, lisible depuis une vue ou sérialisé en JSON sans
+     * avoir à appeler la méthode. Les écrans de vente en ont besoin sur chaque
+     * carte produit.
+     */
+    public function getEstStockableAttribute(): bool
+    {
+        return $this->estStockable();
+    }
+
+    /**
+     * Restreint une requête aux seuls articles qui ont un stock. Les écrans de
+     * stock listaient tout le catalogue, services compris.
+     */
+    public function scopeStockables($query)
+    {
+        return $query->whereIn('type', self::TYPES_STOCKABLES);
     }
 
     /**
@@ -652,9 +677,19 @@ class Produit extends Model
 
     /**
      * Détermine l'état du stock de l'article.
+     *
+     * Un service ou un consommable non stockable n'a pas de stock : il ne peut
+     * donc pas être en rupture. L'écran de vente affichait pourtant « Rupture
+     * de stock » sous chaque prestation, et ouvrait une alerte à chaque ligne —
+     * un cabinet, qui ne vend que des services, voyait son catalogue entier en
+     * rouge et une modale par article. Le contrôle serveur, lui, écartait déjà
+     * ces articles : rien n'était jamais bloqué, mais rien ne le disait.
      */
     public function etatStock(): string
     {
+        if (!$this->estStockable()) {
+            return self::ETAT_SANS_STOCK;
+        }
         if ($this->stock_actuel <= 0) {
             return 'Rupture';
         }

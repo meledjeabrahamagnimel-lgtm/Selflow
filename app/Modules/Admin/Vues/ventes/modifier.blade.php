@@ -171,10 +171,12 @@
                 {{-- Grille produits --}}
                 <div class="produit-grid" id="grilleProduits">
                     @foreach($produits as $produit)
-                    <div class="produit-card {{ $produit->stock_actuel <= 0 ? 'out-of-stock' : '' }}"
+                    @php $suitLeStock = $produit->estStockable(); @endphp
+                    <div class="produit-card {{ $suitLeStock && $produit->stock_actuel <= 0 ? 'out-of-stock' : '' }}"
                          data-id="{{ $produit->id }}"
                          data-nom="{{ $produit->nom }}"
                          data-prix="{{ $produit->prix_vente }}"
+                         data-stockable="{{ $suitLeStock ? '1' : '0' }}"
                          data-stock="{{ $produit->stock_actuel }}"
                          data-stock-min="{{ $produit->stock_minimum }}"
                          data-cat="{{ $produit->categorie }}"
@@ -184,8 +186,11 @@
                         <div class="produit-cat">{{ $produit->categorie }}</div>
                         <div class="produit-nom">{{ $produit->nom }}</div>
                         <div class="produit-prix">{{ number_format($produit->prix_vente, 0, ',', ' ') }} F</div>
-                        <div class="produit-stock" style="{{ $produit->stock_actuel <= 0 ? 'color:var(--danger);font-weight:700;' : '' }}">
-                            @if($produit->stock_actuel <= 0)
+                        {{-- Voir ventes/nouvelle : un service n'a pas de stock. --}}
+                        <div class="produit-stock" style="{{ $suitLeStock && $produit->stock_actuel <= 0 ? 'color:var(--danger);font-weight:700;' : '' }}">
+                            @if(!$suitLeStock)
+                                {{ $produit->type === 'service' ? 'Service' : 'Sans gestion de stock' }}
+                            @elseif($produit->stock_actuel <= 0)
                                 Rupture de stock
                             @else
                                 Stock : {{ $produit->stock_actuel }} {{ $produit->unite ?? 'unités' }}
@@ -440,6 +445,7 @@ const panier = {
                 unite: @js($detail->unite ?? 'Unité'),
                 tva: {{ $detail->produit ? $detail->produit->taux_tva : 18 }},
                 remise_taux: {{ (float) ($detail->remise_taux ?? 0) }},
+                suitLeStock: {{ $detail->produit->estStockable() ? 'true' : 'false' }},
                 isVirtual: false
             },
         @else
@@ -565,6 +571,8 @@ function ajouterAuPanier(card) {
     const stock_min = parseInt(card.dataset.stockMin || 5);
     const unite     = card.dataset.unite || 'Unité';
     const tva       = parseFloat(card.dataset.tva || 18);
+    // Un service ne suit aucun stock : voir ventes/nouvelle.
+    const suitLeStock = card.dataset.stockable !== '0';
 
     // When modifying, if item was already in sale, we add back the sold qty
     let stockDispo = stock;
@@ -574,7 +582,7 @@ function ajouterAuPanier(card) {
 
     if (panier[id]) {
         const nouvelleQte = panier[id].qte + 1;
-        if (nouvelleQte > stockDispo) {
+        if (suitLeStock && nouvelleQte > stockDispo) {
             ouvrirModalRupture(id, nouvelleQte);
         } else {
             panier[id].qte++;
@@ -582,21 +590,26 @@ function ajouterAuPanier(card) {
             renderPanier();
         }
     } else {
-        if (stockDispo <= 0) {
+        if (suitLeStock && stockDispo <= 0) {
             ouvrirModalRuptureVirtual(id, nom, prix, stockDispo, stock_min, unite, tva);
         } else {
-            panier[id] = { nom, prix, qte: 1, stock: stockDispo, stock_minimum: stock_min, unite: unite, tva, isVirtual: false };
+            panier[id] = { nom, prix, qte: 1, stock: stockDispo, stock_minimum: stock_min, unite: unite, tva, isVirtual: false, suitLeStock };
             verifierLimiteMinimale(panier[id]);
             renderPanier();
         }
     }
 }
 
+// Voir ventes/nouvelle : dans le doute, l'article suit le stock.
+function articleSuitLeStock(item) {
+    return item.suitLeStock !== false;
+}
+
 function changerQte(id, delta) {
     if (!panier[id]) return;
     const item = panier[id];
 
-    if (item.isVirtual) {
+    if (item.isVirtual || !articleSuitLeStock(item)) {
         item.qte += delta;
         if (item.qte <= 0) {
             delete panier[id];
@@ -628,7 +641,7 @@ function saisirQte(id, val) {
     const item = panier[id];
     if (!item) return;
 
-    if (item.isVirtual) {
+    if (item.isVirtual || !articleSuitLeStock(item)) {
         item.qte = q;
         renderPanier();
         return;
@@ -683,6 +696,7 @@ function fermerModalRupture() {
 }
 
 function verifierLimiteMinimale(item) {
+    if (!articleSuitLeStock(item)) return;
     const stockRestant = item.stock - item.qte;
     if (stockRestant <= item.stock_minimum) {
         afficherAlerteStockMin(item.nom, item.stock_minimum);
