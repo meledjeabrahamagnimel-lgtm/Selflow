@@ -102,6 +102,12 @@ class NormaliserFactureFne implements ShouldQueue
                         }
                     }
 
+                    // La pièce est passée : les refus qu'elle avait essuyés sont
+                    // derrière elle. Sans cela, l'écran des rejets afficherait
+                    // pour toujours un refus corrigé depuis longtemps, et une
+                    // file qui ne se vide jamais cesse d'être lue.
+                    FneRejet::resoudre($vente);
+
                     Log::info("NormaliserFactureFne: Normalisation réussie - Vente #{$vente->id} → FNE: {$fneResult['numero_recu']}");
                 }
             } else {

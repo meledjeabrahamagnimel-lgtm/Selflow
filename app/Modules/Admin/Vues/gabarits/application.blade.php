@@ -763,6 +763,23 @@
             <a href="{{ route('admin.fne.stickers') }}" class="nav-item {{ request()->routeIs('admin.fne.stickers') ? 'active' : '' }}">
                 <i class="fas fa-ticket"></i> Gestion des stickers
             </a>
+            @php
+                // Le compte des pièces refusées se lit ici et non dans un
+                // composeur de vue : le gabarit calcule déjà le reste de sa barre
+                // de la même façon. L'index (entreprise_id, statut) rend le
+                // décompte négligeable, et sans ce chiffre un refus survenu la
+                // nuit n'appellerait personne — l'écran ne se visite pas au hasard.
+                $rejetsFneOuverts = $entreprise
+                    ? \App\Modules\Admin\Modeles\FneRejet::where('entreprise_id', $entreprise->id)
+                        ->whereIn('statut', ['ouvert', 'diagnostique'])->count()
+                    : 0;
+            @endphp
+            <a href="{{ route('admin.fne.rejets') }}" class="nav-item {{ request()->routeIs('admin.fne.rejets') ? 'active' : '' }}">
+                <i class="fas fa-triangle-exclamation"></i> Pièces refusées
+                @if($rejetsFneOuverts > 0)
+                <span style="background:#E53E3E;color:#fff;border-radius:20px;padding:1px 7px;font-size:10px;margin-left:6px;font-weight:700;">{{ $rejetsFneOuverts }}</span>
+                @endif
+            </a>
             @endif
 
             <!-- 6. Points de vente (Inclus Personnel & Habilitations) -->

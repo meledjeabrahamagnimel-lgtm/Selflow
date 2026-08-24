@@ -283,6 +283,14 @@ class Habilitations
         'admin.fne.config.sauvegarder'  => 'gestion_pdv',
         'admin.fne.stickers'            => 'tresorerie_journal',
         'admin.fne.stickers.acheter'    => 'tresorerie_journal',
+        // Les pièces refusées par la plateforme se lisent avec les factures.
+        'admin.fne.rejets'              => 'factures_vente',
+        'admin.fne.rejets.diagnostiquer'=> 'factures_vente',
+        'admin.fne.rejets.resoudre'     => 'factures_vente',
+        // Sauf « appliquer », qui renomme un point de vente. Le ranger avec les
+        // factures ouvrirait à qui saisit des ventes une porte latérale vers le
+        // renommage des points de vente de l'entreprise.
+        'admin.fne.rejets.appliquer'    => 'gestion_pdv',
 
         // ── Souscription ──
         'admin.souscription.index'       => 'gestion_pdv',

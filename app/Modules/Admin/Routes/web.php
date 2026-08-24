@@ -178,6 +178,16 @@ Route::prefix('admin')
             Route::post('/batch-normaliser', [\App\Modules\Admin\Controleurs\FneDashboardControleur::class, 'batchNormaliser'])->middleware('throttle:plateforme')->name('batch_normaliser');
             Route::post('/schedule-batch',   [\App\Modules\Admin\Controleurs\FneDashboardControleur::class, 'scheduleBatch'])->middleware('throttle:plateforme')->name('schedule_batch');
             Route::get('/batch-status',      [\App\Modules\Admin\Controleurs\FneDashboardControleur::class, 'batchStatus'])->name('batch_status');
+
+            // ── Pièces refusées par la plateforme ──
+            // Le rapprochement écrivait déjà son constat chaque heure ; il
+            // n'était lisible nulle part. `appliquer` renomme un point de vente
+            // pour l'aligner sur ce que le portail déclare — jamais un champ
+            // fiscal, qui reste montré et non recopié.
+            Route::get('/rejets',                      [\App\Modules\Admin\Controleurs\RejetFneControleur::class, 'index'])->name('rejets');
+            Route::post('/rejets/{rejet}/diagnostiquer',[\App\Modules\Admin\Controleurs\RejetFneControleur::class, 'diagnostiquer'])->name('rejets.diagnostiquer');
+            Route::post('/rejets/{rejet}/appliquer',    [\App\Modules\Admin\Controleurs\RejetFneControleur::class, 'appliquer'])->name('rejets.appliquer');
+            Route::post('/rejets/{rejet}/resoudre',     [\App\Modules\Admin\Controleurs\RejetFneControleur::class, 'resoudre'])->name('rejets.resoudre');
         });
 
         // ── Points de vente ──

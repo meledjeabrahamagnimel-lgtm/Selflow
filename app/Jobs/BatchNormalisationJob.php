@@ -139,6 +139,8 @@ class BatchNormalisationJob implements ShouldQueue
                                 VenteDetail::where('id', $detailId)->update(['fne_invoice_item_id' => $itemId]);
                             }
                         }
+
+                        FneRejet::resoudre($invoice);
                     } else {
                         FneRejet::consigner($invoice, $fneResult);
 
@@ -165,6 +167,8 @@ class BatchNormalisationJob implements ShouldQueue
                             'qr_code_data'  => $fneResult['qr_code_data'],
                             'fichier_fne_pdf_url' => $fneResult['pdf_url'] ?? null,
                         ] + FneService::colonnesRetoursFne($fneResult));
+
+                        FneRejet::resoudre($invoice);
                     } else {
                         FneRejet::consigner($invoice, $fneResult);
 

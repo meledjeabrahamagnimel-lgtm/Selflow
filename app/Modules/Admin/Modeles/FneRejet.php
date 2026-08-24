@@ -129,6 +129,25 @@ class FneRejet extends Model
     }
 
     /**
+     * Referme les rejets d'une pièce que la plateforme vient d'accepter.
+     *
+     * Appelée là où la normalisation réussit. Sans elle, un rejet reste ouvert
+     * pour toujours : la facture repart, passe, et l'écran continue d'afficher
+     * un refus corrigé depuis longtemps. Une file qui ne se vide jamais cesse
+     * d'être lue, et c'est ainsi qu'on rate le rejet suivant.
+     *
+     * @param  Vente|Achat  $piece
+     * @return int  Le nombre de rejets refermés.
+     */
+    public static function resoudre($piece): int
+    {
+        return self::where('piece_type', $piece instanceof Achat ? 'achat' : 'vente')
+            ->where('piece_id', $piece->id)
+            ->whereIn('statut', [self::STATUT_OUVERT, self::STATUT_DIAGNOSTIQUE])
+            ->update(['statut' => self::STATUT_RESOLU]);
+    }
+
+    /**
      * Les champs que la DGI a nommés dans son refus.
      *
      * La plateforme les rend dans la clé `errors` de sa réponse, que

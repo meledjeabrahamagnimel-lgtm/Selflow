@@ -1727,6 +1727,61 @@ sont en base réelle, et les deux commandes répondent.
 `portail-fne:demandes --json` et déposer ses fichiers ; tout le reste est
 branché.
 
+### Lot 11 — L'écran des pièces refusées — **TERMINÉ**
+
+Le rapprochement du lot 10 écrivait son constat chaque heure. **Personne ne
+pouvait le lire.** Une facture refusée la nuit, un diagnostic posé à 1 h 10, et
+rien à l'écran : tout le mécanisme était aveugle.
+
+| Élément | Détail |
+|---|---|
+| Contrôleur | `RejetFneControleur` — `index`, `diagnostiquer`, `appliquer`, `resoudre` |
+| Vue | `Vues/fne/rejets.blade.php` |
+| Routes | `admin.fne.rejets*`, dans le groupe `modules:comptabilite` |
+| Barre latérale | « Pièces refusées », avec le compte des rejets ouverts en pastille |
+| Tests | `tests/Feature/EcranRejetsFneTest.php` — 8 tests |
+
+**Le rejet se referme enfin tout seul.** `STATUT_RESOLU` était déclaré et rien ne
+le posait : une facture qui repartait et passait laissait son refus ouvert pour
+toujours. `FneRejet::resoudre()` est appelée aux six points de succès. Une file
+qui ne se vide jamais cesse d'être lue, et c'est ainsi qu'on rate le rejet
+suivant.
+
+**Un seul geste de correction est offert, et il est descriptif.** Renommer un
+point de vente pour l'aligner sur ce que le portail déclare — le même geste que
+depuis l'écran des points de vente, à ceci près que la valeur du portail est
+affichée en face. Il ne s'offre **que** si le portail ne déclare qu'un seul nom :
+avec deux, la machine ne choisit pas à la place de qui a établi la pièce.
+
+Appliquer la correction **rouvre le rejet et efface son diagnostic** : celui-ci
+décrivait un écart qui n'existe plus, et un constat périmé affiché comme actuel
+est pire que pas de constat.
+
+**Les écarts de fiche restent montrés et non appliqués.** Ils ont leur tableau en
+bas d'écran, avec la raison écrite en clair et un lien vers les paramètres de
+l'entreprise. Aucune route ne permet de les recopier ; une épreuve le vérifie.
+
+Deux prises au vol par des épreuves déjà en place, et c'est ce qu'elles valent :
+
+- **`HabilitationsTest`** a refusé les quatre routes neuves, non classées. En les
+  rangeant, un choix s'est imposé : `appliquer` va sous **`gestion_pdv`** et non
+  `factures_vente` comme ses trois voisines. La ranger avec les factures
+  ouvrirait à qui saisit des ventes une porte latérale vers le renommage des
+  points de vente de l'entreprise.
+- **`FIELD()` n'existe que chez MySQL.** L'ordre d'affichage — ouverts d'abord,
+  classés en dernier — passe par un `CASE`. C'est le piège qui fait déjà tomber
+  `TableauDeBordGeneralTest` avec `CONCAT` : une requète qui ne passe pas sur
+  SQLite n'est jamais éprouvée.
+
+Le cloisonnement répond **404 et non 403**, comme le lot 8.3 l'a établi : un 403
+confirmerait que la pièce existe, et les identifiants sont séquentiels. Vérifié
+par mutation — la garde retirée, l'épreuve tombe.
+
+**Ce que les épreuves ne couvrent pas, et il faut le savoir :** `resoudre()` est
+éprouvée comme méthode, pas comme branchement. Les six appels aux points de
+succès ont été posés à la lecture ; les éprouver demanderait de simuler la
+plateforme à chacun d'eux.
+
 ## 5 bis. La numérotation des comptes — tranché
 
 Le classeur subdivisait certaines racines sur des positions que l'acte uniforme

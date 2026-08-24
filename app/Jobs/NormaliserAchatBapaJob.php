@@ -65,6 +65,8 @@ class NormaliserAchatBapaJob implements ShouldQueue
                         'fichier_fne_pdf_url' => $fneResult['pdf_url'] ?? null,
                     ] + FneService::colonnesRetoursFne($fneResult));
 
+                    \App\Modules\Admin\Modeles\FneRejet::resoudre($achat);
+
                     Log::info("NormaliserAchatBapaJob: Normalisation BAPA réussie - Achat #{$achat->id} → FNE: {$fneResult['numero_recu']}");
                 }
             } else {
