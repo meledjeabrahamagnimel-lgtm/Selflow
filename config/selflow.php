@@ -125,6 +125,15 @@ return [
     */
     'portail_fne' => [
         'dossier_import' => env('PORTAIL_FNE_DOSSIER_IMPORT', storage_path('app/portail-fne')),
+
+        /*
+        | Au-delà de ce délai, une demande de relevé n'attend plus : elle traîne.
+        | Vingt-quatre heures parce qu'un relevé se produit au mieux une fois par
+        | jour ; passer la journée sans réponse veut dire que le scraper ne
+        | tourne pas, que le dépôt se fait ailleurs, ou que le login est faux.
+        | Aucune de ces trois causes ne se corrige toute seule.
+        */
+        'delai_alerte_heures' => (int) env('PORTAIL_FNE_DELAI_ALERTE_HEURES', 24),
     ],
 
 ];

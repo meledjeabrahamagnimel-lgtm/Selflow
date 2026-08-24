@@ -58,7 +58,7 @@ class DiagnosticFneService
      *
      * @return array{
      *   rejet_id: int,
-     *   releve: array{date: string|null, import_id: int}|null,
+     *   releve: array{date: string|null, import_id: int, fiche_id: int}|null,
      *   champs: array<int, array<string, mixed>>,
      *   ecarts_fiche: array<string, array{portail: mixed, selflow: mixed}>,
      *   conclusion: string
@@ -85,6 +85,11 @@ class DiagnosticFneService
             'releve'       => $fiche ? [
                 'date'      => $fiche->date_scraping?->format('d/m/Y'),
                 'import_id' => $fiche->import_id,
+                // L'identité du relevé, et pas seulement sa date : c'est elle
+                // qui dit si un diagnostic décrit encore le dernier état connu
+                // du portail. Une date formatée se compare mal, et deux relevés
+                // du même jour existent.
+                'fiche_id'  => $fiche->id,
             ] : null,
             'champs'       => $champs,
             'ecarts_fiche' => $ecartsFiche,
@@ -99,7 +104,7 @@ class DiagnosticFneService
      * l'entreprise ne soit créée dans Selflow reste rattaché à son seul login,
      * et il vaut mieux un relevé orphelin que pas de relevé du tout.
      */
-    private function dernierReleve(FneRejet $rejet): ?PortailFneFiche
+    public function dernierReleve(FneRejet $rejet): ?PortailFneFiche
     {
         $requete = PortailFneFiche::query()
             ->orderByDesc('date_scraping')
@@ -120,6 +125,23 @@ class DiagnosticFneService
         }
 
         return $requete->first();
+    }
+
+    /**
+     * Le diagnostic de ce rejet décrit-il encore le dernier relevé connu ?
+     *
+     * Un rejet diagnostiqué n'était plus jamais repris : si le relevé du jour
+     * était périmé, le constat restait périmé avec lui, et l'écran affichait
+     * comme actuel un rapprochement fait sur des données mortes.
+     *
+     * Un diagnostic sans identité de relevé — ceux écrits avant que le champ
+     * n'existe — est tenu pour dépassé : le rejouer une fois ne coûte rien.
+     */
+    public function diagnosticEstAJour(FneRejet $rejet): bool
+    {
+        $connu = $rejet->diagnostic['releve']['fiche_id'] ?? null;
+
+        return $connu !== null && $connu === $this->dernierReleve($rejet)?->id;
     }
 
     /**

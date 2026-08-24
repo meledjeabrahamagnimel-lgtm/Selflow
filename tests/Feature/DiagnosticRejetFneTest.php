@@ -223,6 +223,68 @@ class DiagnosticRejetFneTest extends TestCase
         $this->assertSame('ecart', $rejet->diagnostic['champs'][0]['verdict']);
     }
 
+    public function test_un_releve_plus_frais_rafraichit_un_diagnostic_deja_pose(): void
+    {
+        $rejet = FneRejet::consigner($this->uneVente('FA-0042'), $this->refusDeLaPlateforme());
+
+        $this->unReleve();
+        $this->artisan('fne:diagnostiquer-rejets')->assertExitCode(0);
+
+        $premier = $rejet->refresh()->diagnostic;
+        $this->assertSame('21/08/2026', $premier['releve']['date']);
+
+        // Repasser sans rien de neuf ne réécrit rien : le constat décrit déjà le
+        // dernier état connu du portail.
+        $this->artisan('fne:diagnostiquer-rejets')->assertExitCode(0);
+        $this->assertSame($premier['releve']['fiche_id'], $rejet->refresh()->diagnostic['releve']['fiche_id']);
+
+        // Un relevé plus récent, où le point de vente est enfin écrit comme
+        // dans Selflow : le diagnostic doit changer d'avis.
+        $this->unReleve('2026-08-25', ['FACTURATION SIEGE']);
+        $this->artisan('fne:diagnostiquer-rejets')->assertExitCode(0);
+
+        $second = $rejet->refresh()->diagnostic;
+
+        $this->assertSame('25/08/2026', $second['releve']['date']);
+        $this->assertNotSame($premier['releve']['fiche_id'], $second['releve']['fiche_id']);
+        $this->assertSame('concordant', $second['champs'][0]['verdict']);
+    }
+
+    public function test_une_demande_qui_traine_est_signalee(): void
+    {
+        FneRejet::consigner($this->uneVente('FA-0042'), $this->refusDeLaPlateforme());
+
+        $demande = PortailFneDemande::sole();
+
+        // Fraîche, elle attend simplement.
+        $this->assertFalse($demande->estEnRetard());
+
+        $demande->forceFill(['created_at' => now()->subHours(30)])->save();
+
+        $this->assertTrue($demande->refresh()->estEnRetard());
+        $this->assertSame(1, PortailFneDemande::enRetard()->count());
+
+        $this->artisan('fne:diagnostiquer-rejets')
+            ->expectsOutputToContain('sans réponse depuis plus de')
+            ->assertExitCode(0);
+    }
+
+    public function test_la_demande_est_abandonnee_quand_plus_aucun_rejet_ne_la_justifie(): void
+    {
+        $premiere = $this->uneVente('FA-0042');
+        $seconde  = $this->uneVente('FA-0043');
+
+        FneRejet::consigner($premiere, $this->refusDeLaPlateforme());
+        FneRejet::consigner($seconde, $this->refusDeLaPlateforme());
+
+        // Deux rejets, une seule demande : en refermer un ne l'éteint pas.
+        FneRejet::resoudre($premiere);
+        $this->assertSame(PortailFneDemande::STATUT_EN_ATTENTE, PortailFneDemande::sole()->statut);
+
+        FneRejet::resoudre($seconde);
+        $this->assertSame(PortailFneDemande::STATUT_ABANDONNEE, PortailFneDemande::sole()->statut);
+    }
+
     /**
      * Le refus tel que la plateforme le rend : le détail vit dans le corps
      * brut de la réponse, que `FneService` range sous `errors.api_error`.
@@ -258,12 +320,15 @@ class DiagnosticRejetFneTest extends TestCase
     /**
      * Un relevé du portail déjà rangé : une fiche et deux points, dont un fermé.
      */
-    private function unReleve(): PortailFneImport
+    /**
+     * @param  array<int, string>  $noms
+     */
+    private function unReleve(string $date = '2026-08-21', array $noms = ['FACTURATION SIÈGE', 'FACTURATION FERMEE']): PortailFneImport
     {
         $import = PortailFneImport::create([
             'entreprise_id'     => $this->entreprise->id,
             'login'             => '1864699A',
-            'date_scraping'     => '2026-08-21',
+            'date_scraping'     => $date,
             'type'              => PortailFneImport::TYPE_FICHE,
             'fichier_nom'       => '1864699A_20260821.json',
             'fichier_empreinte' => hash('sha256', uniqid('', true)),
@@ -274,20 +339,20 @@ class DiagnosticRejetFneTest extends TestCase
             'import_id'            => $import->id,
             'entreprise_id'        => $this->entreprise->id,
             'login'                => '1864699A',
-            'date_scraping'        => '2026-08-21',
+            'date_scraping'        => $date,
             'timbre_quittance'     => true,
             'sticker_solde_alerte' => 5000,
         ]);
 
-        foreach ([['FACTURATION SIÈGE', '1'], ['FACTURATION FERMEE', '0']] as [$nom, $statut]) {
+        foreach ($noms as $nom) {
             PortailFnePointFacturation::create([
                 'import_id'        => $import->id,
                 'entreprise_id'    => $this->entreprise->id,
                 'login'            => '1864699A',
-                'date_scraping'    => '2026-08-21',
+                'date_scraping'    => $date,
                 'nom'              => $nom,
                 'outil'            => 'Application FNE',
-                'statut'           => $statut,
+                'statut'           => $nom === 'FACTURATION FERMEE' ? '0' : '1',
                 'etablissement_id' => '42200613-f402-40a8-bd4d-a778bb5b96f0',
             ]);
         }

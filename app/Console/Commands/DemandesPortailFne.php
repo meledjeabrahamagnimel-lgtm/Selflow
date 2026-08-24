@@ -57,14 +57,23 @@ class DemandesPortailFne extends Command
         }
 
         $this->table(
-            ['Login', 'Entreprise', 'Motif', 'Demandé le'],
+            ['Login', 'Entreprise', 'Motif', 'Demandé le', 'Attend depuis'],
             $demandes->map(fn (PortailFneDemande $d) => [
                 $d->login,
                 $d->entreprise?->nom ?? '—',
                 $d->motif ?? '—',
                 $d->created_at?->format('d/m/Y H:i') ?? '—',
+                // L'âge et non la seule date : « 03/07 » ne dit rien à qui lit,
+                // « 52 jours » dit qu'il y a un problème.
+                $d->attenteLisible() . ($d->estEnRetard() ? '  <fg=red>(en retard)</>' : ''),
             ])->all()
         );
+
+        if ($demandes->filter(fn (PortailFneDemande $d) => $d->estEnRetard())->isNotEmpty()) {
+            $heures = config('selflow.portail_fne.delai_alerte_heures', 24);
+            $this->warn("Des demandes attendent depuis plus de {$heures} h : "
+                . 'le scraper ne tourne pas, il dépose ailleurs, ou le login est faux.');
+        }
 
         return self::SUCCESS;
     }

@@ -122,12 +122,38 @@
     @else
         <span style="color:#92400e;">Aucun relevé du portail pour cette entreprise — le rapprochement ne peut rien comparer.</span>
     @endif
-    @if($enAttente > 0)
+    @if($demandes->isNotEmpty())
         <span style="padding:2px 9px;border-radius:20px;background:#fffbeb;color:#92400e;font-weight:700;">
-            {{ $enAttente }} relèvement(s) en attente
+            {{ $demandes->count() }} relèvement(s) en attente
         </span>
     @endif
 </div>
+
+{{-- Une demande ouverte est un signal voulu : c'est ainsi qu'on voit qu'un
+     scraper ne répond plus. Encore faut-il que quelqu'un le voie — sans l'âge,
+     une demande de mars ressemble à une demande de ce matin. --}}
+@php $enRetard = $demandes->filter(fn ($d) => $d->estEnRetard()); @endphp
+@if($enRetard->isNotEmpty())
+<div style="display:flex;gap:12px;padding:14px 18px;background:#fff5f5;border:1px solid #fed7d7;border-radius:10px;margin-bottom:20px;color:#c53030;">
+    <i class="fas fa-plug-circle-exclamation" style="font-size:18px;margin-top:2px;"></i>
+    <div style="line-height:1.6;">
+        <strong>{{ $enRetard->count() }} relevé(s) demandé(s) sans réponse.</strong>
+        @foreach($enRetard as $demande)
+            <div style="font-size:12px;">
+                <span style="font-family:monospace;font-weight:700;">{{ $demande->login }}</span>
+                — attend depuis <strong>{{ $demande->attenteLisible() }}</strong>
+                @if($demande->motif) <span style="opacity:.75;">({{ $demande->motif }})</span> @endif
+            </div>
+        @endforeach
+        <div style="font-size:12px;margin-top:6px;">
+            Trois causes possibles, et aucune ne se corrige toute seule : le relevé du
+            portail n'est pas lancé, il dépose ses fichiers ailleurs que dans le
+            dossier d'import, ou le NCC de l'entreprise ne correspond pas au login du
+            portail.
+        </div>
+    </div>
+</div>
+@endif
 
 {{-- Liste des rejets --}}
 @forelse($rejets as $rejet)

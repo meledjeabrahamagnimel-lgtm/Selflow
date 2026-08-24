@@ -64,9 +64,10 @@ class RejetFneControleur
             'rejets'      => $rejets,
             'fiche'       => $fiche,
             'ecartsFiche' => $fiche?->ecartsAvecEntreprise() ?? [],
-            'enAttente'   => PortailFneDemande::where('entreprise_id', $entreprise->id)
+            'demandes'    => PortailFneDemande::where('entreprise_id', $entreprise->id)
                 ->where('statut', PortailFneDemande::STATUT_EN_ATTENTE)
-                ->count(),
+                ->orderBy('created_at')
+                ->get(),
             'kpis' => [
                 'ouverts'      => $compte(FneRejet::STATUT_OUVERT),
                 'diagnostiques' => $compte(FneRejet::STATUT_DIAGNOSTIQUE),

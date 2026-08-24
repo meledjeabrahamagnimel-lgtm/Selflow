@@ -141,10 +141,26 @@ class FneRejet extends Model
      */
     public static function resoudre($piece): int
     {
-        return self::where('piece_type', $piece instanceof Achat ? 'achat' : 'vente')
+        $logins = self::where('piece_type', $piece instanceof Achat ? 'achat' : 'vente')
+            ->where('piece_id', $piece->id)
+            ->whereIn('statut', [self::STATUT_OUVERT, self::STATUT_DIAGNOSTIQUE])
+            ->pluck('login')
+            ->filter()
+            ->unique();
+
+        $refermes = self::where('piece_type', $piece instanceof Achat ? 'achat' : 'vente')
             ->where('piece_id', $piece->id)
             ->whereIn('statut', [self::STATUT_OUVERT, self::STATUT_DIAGNOSTIQUE])
             ->update(['statut' => self::STATUT_RESOLU]);
+
+        // Une demande de relevé sans rejet à éclairer n'a plus d'objet. La
+        // laisser ouverte ferait passer pour une panne du scraper ce qui n'est
+        // qu'une demande devenue sans cause.
+        foreach ($logins as $login) {
+            PortailFneDemande::abandonnerSiPlusDeCause((string) $login);
+        }
+
+        return $refermes;
     }
 
     /**

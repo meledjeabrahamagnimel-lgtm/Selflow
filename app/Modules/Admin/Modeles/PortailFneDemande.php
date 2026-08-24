@@ -107,4 +107,75 @@ class PortailFneDemande extends Model
             'servie_at' => now(),
         ]);
     }
+
+    /**
+     * Abandonne les demandes que plus rien ne justifie pour ce login.
+     *
+     * Une demande est ouverte par un rejet. Quand tous les rejets de ce login
+     * sont refermés — les pièces sont passées — le relevé n'a plus d'objet, et
+     * la laisser ouverte ferait passer pour une panne du scraper ce qui n'est
+     * qu'une demande devenue sans cause.
+     *
+     * L'abandon est conditionnel : dix rejets d'affilée ne partagent qu'une
+     * demande, et en refermer un seul ne l'éteint pas.
+     */
+    public static function abandonnerSiPlusDeCause(string $login): int
+    {
+        $resteDesRejets = FneRejet::where('login', $login)
+            ->whereIn('statut', [FneRejet::STATUT_OUVERT, FneRejet::STATUT_DIAGNOSTIQUE])
+            ->exists();
+
+        if ($resteDesRejets) {
+            return 0;
+        }
+
+        return self::where('login', $login)
+            ->where('statut', self::STATUT_EN_ATTENTE)
+            ->update(['statut' => self::STATUT_ABANDONNEE]);
+    }
+
+    /**
+     * Les demandes qui n'attendent plus : elles traînent.
+     *
+     * Une demande ouverte est un signal voulu — c'est ainsi qu'on voit qu'un
+     * scraper ne répond plus. Encore faut-il que quelqu'un le voie : sans
+     * cette limite, une demande de mars ressemble à une demande de ce matin.
+     */
+    public function scopeEnRetard($requete)
+    {
+        return $requete->where('statut', self::STATUT_EN_ATTENTE)
+            ->where('created_at', '<', now()->subHours(self::delaiAlerte()));
+    }
+
+    public function estEnRetard(): bool
+    {
+        return $this->statut === self::STATUT_EN_ATTENTE
+            && $this->created_at !== null
+            && $this->created_at->lt(now()->subHours(self::delaiAlerte()));
+    }
+
+    /**
+     * Depuis combien de temps cette demande attend, en clair.
+     */
+    public function attenteLisible(): string
+    {
+        if ($this->created_at === null) {
+            return 'date inconnue';
+        }
+
+        $heures = (int) $this->created_at->diffInHours(now());
+
+        if ($heures < 1) {
+            return "moins d'une heure";
+        }
+
+        return $heures < 48
+            ? $heures . ' h'
+            : (int) floor($heures / 24) . ' jours';
+    }
+
+    private static function delaiAlerte(): int
+    {
+        return max(1, (int) config('selflow.portail_fne.delai_alerte_heures', 24));
+    }
 }

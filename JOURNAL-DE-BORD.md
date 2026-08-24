@@ -1782,6 +1782,51 @@ par mutation — la garde retirée, l'épreuve tombe.
 succès ont été posés à la lecture ; les éprouver demanderait de simuler la
 plateforme à chacun d'eux.
 
+#### Deux fins de course — 24/08/2026
+
+**Un diagnostic ne vieillit plus en silence.** Un rejet passé à `diagnostique`
+n'était plus jamais repris : si le relevé du jour était périmé, le constat
+restait périmé avec lui, et l'écran affichait comme actuel un rapprochement fait
+sur des données mortes. Le diagnostic porte désormais **l'identité du relevé**
+(`releve.fiche_id`) et non sa seule date — deux relevés du même jour existent, et
+une date formatée se compare mal. La commande horaire reprend les rejets
+diagnostiqués et écarte ceux qui décrivent déjà le dernier état connu, pour ne
+pas réécrire la même chose toutes les heures. `--tous` force la réécriture.
+
+Un diagnostic sans identité de relevé — ceux écrits avant que le champ n'existe —
+est tenu pour dépassé et rejoué une fois.
+
+**Une demande qui traîne se voit.** Une demande ouverte est un signal voulu :
+c'est ainsi qu'on voit qu'un scraper ne répond plus. Encore fallait-il que
+quelqu'un le voie — sans l'âge, une demande de mars ressemble à une demande de
+ce matin, et la seule façon de s'en apercevoir était de remarquer un chiffre qui
+ne bouge pas, ce qui suppose de l'avoir remarqué la veille.
+
+| Où | Quoi |
+|---|---|
+| `config('selflow.portail_fne.delai_alerte_heures')` | 24 h par défaut — un relevé se produit au mieux une fois par jour |
+| Écran des rejets | bandeau rouge, login par login, avec l'âge et les trois causes possibles |
+| `portail-fne:demandes` | colonne « Attend depuis » et avertissement |
+| `fne:diagnostiquer-rejets` | avertissement à l'écran **et** `Log::warning` dans `portail-fne.log` |
+
+Les trois causes sont nommées à l'écran parce qu'aucune ne se corrige toute
+seule : le relevé n'est pas lancé, il dépose ailleurs que dans le dossier
+d'import, ou le NCC de l'entreprise ne correspond pas au login du portail.
+
+**`STATUT_ABANDONNEE` a enfin un sens.** Une demande est ouverte par un rejet ;
+quand tous les rejets de ce login sont refermés — les pièces sont passées — le
+relevé n'a plus d'objet. La laisser ouverte ferait passer pour une panne du
+scraper ce qui n'est qu'une demande devenue sans cause. L'abandon est
+conditionnel : dix rejets ne partagent qu'une demande, et en refermer un seul ne
+l'éteint pas.
+
+Le signalement passe aussi quand il n'y a **aucun** rejet à rapprocher : une
+demande peut traîner seule, le rejet qui l'avait ouverte ayant été classé
+entre-temps. C'est même le cas où personne ne regarde.
+
+Trois épreuves de plus, vérifiées par mutation : l'ancien comportement rétabli,
+le rafraîchissement tombe.
+
 ## 5 bis. La numérotation des comptes — tranché
 
 Le classeur subdivisait certaines racines sur des positions que l'acte uniforme
