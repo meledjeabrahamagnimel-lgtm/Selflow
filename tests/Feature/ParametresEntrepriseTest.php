@@ -217,6 +217,87 @@ class ParametresEntrepriseTest extends TestCase
             ->assertSee('à vérifier sur votre espace FNE', false);
     }
 
+    // ── La page occupe la largeur qu'on lui donne ────────────────────
+
+    /**
+     * Découpe la grille en ses deux colonnes, telles que le navigateur les
+     * empilera.
+     *
+     * @return array{0: string, 1: string}
+     */
+    private function colonnes(string $corps): array
+    {
+        $morceaux = explode('class="colonne-parametres"', $corps);
+        $this->assertCount(3, $morceaux, 'La grille ne porte plus exactement deux colonnes.');
+
+        $droite = explode('pleine-largeur', $morceaux[2])[0];
+
+        return [$morceaux[1], $droite];
+    }
+
+    public function test_les_deux_colonnes_portent_chacune_leur_part_des_cartes(): void
+    {
+        // Huit cartes sur dix tenaient à gauche : de « DGI & Local
+        // professionnel » jusqu'à « Impression des factures », la moitié
+        // droite de la page restait blanche sur quatre écrans de défilement.
+        [$gauche, $droite] = $this->colonnes(
+            $this->get(route('admin.entreprise.parametres'))->assertOk()->getContent()
+        );
+
+        $aGauche = substr_count($gauche, 'class="card"');
+        $aDroite = substr_count($droite, 'class="card"');
+
+        $this->assertGreaterThanOrEqual(4, $aGauche);
+        $this->assertGreaterThanOrEqual(4, $aDroite);
+        $this->assertLessThanOrEqual(2, abs($aGauche - $aDroite),
+            "Colonne gauche : {$aGauche} cartes, colonne droite : {$aDroite}.");
+    }
+
+    public function test_chaque_carte_se_trouve_dans_une_seule_colonne(): void
+    {
+        [$gauche, $droite] = $this->colonnes(
+            $this->get(route('admin.entreprise.parametres'))->assertOk()->getContent()
+        );
+
+        // Déplacer une carte d'une colonne à l'autre se fait en coupant du
+        // Blade : une carte laissée en double, ou perdue en route, ne se verrait
+        // qu'à l'écran.
+        foreach (['identite' => $gauche, 'fiscal' => $gauche, 'dgi' => $gauche,
+                  'tiers' => $gauche, 'compte-fne' => $droite, 'options' => $droite,
+                  'impression' => $droite] as $ancre => $attendue) {
+            $this->assertSame(1, substr_count($attendue, 'id="' . $ancre . '"'),
+                "La carte « {$ancre} » n'est pas dans la colonne attendue, ou s'y trouve en double.");
+        }
+    }
+
+    public function test_la_procedure_de_conformite_occupe_toute_la_largeur(): void
+    {
+        $corps = $this->get(route('admin.entreprise.parametres'))->assertOk()->getContent();
+
+        // La plus longue des cartes : sur une demi-largeur, ses six points
+        // formaient une colonne de texte de deux écrans de haut.
+        $this->assertStringContainsString('class="card pleine-largeur"', $corps);
+        $this->assertStringContainsString('class="conformite-etapes"', $corps);
+
+        $this->assertGreaterThan(
+            strpos($corps, 'id="impression"'),
+            strpos($corps, 'id="conformite"'),
+            'La conformité passe en pleine largeur : elle vient donc après les deux colonnes.'
+        );
+    }
+
+    public function test_la_grille_se_replie_sur_un_ecran_etroit(): void
+    {
+        $corps = $this->get(route('admin.entreprise.parametres'))->assertOk()->getContent();
+
+        // Un style écrit dans la balise l'emporte sur la feuille, media query
+        // comprise : tant que la grille portait le sien, les deux colonnes
+        // restaient côte à côte sur un portable.
+        $this->assertStringNotContainsString(
+            '<div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;align-items:start;">', $corps);
+        $this->assertStringContainsString('@media (max-width: 1024px)', $corps);
+    }
+
     // ── La page se parcourt ──────────────────────────────────────────
 
     public function test_la_page_porte_ses_ancres(): void

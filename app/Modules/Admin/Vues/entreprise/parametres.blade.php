@@ -2,6 +2,57 @@
 @section('titre', 'Paramètres de l\'entreprise')
 @section('topbar_titre', 'Mon entreprise — Paramètres')
 
+{{-- La grille vivait en style écrit dans la balise, ce qui interdisait toute
+     règle de largeur : un style de balise l'emporte sur la feuille, même sous
+     media query. Sur un portable, les deux colonnes restaient donc côte à côte
+     et les champs devenaient illisibles. --}}
+@section('styles')
+    <style>
+        .grille-parametres {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            align-items: start;
+        }
+
+        .colonne-parametres {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+            min-width: 0;
+        }
+
+        .pleine-largeur {
+            grid-column: 1 / -1;
+        }
+
+        .conformite-corps {
+            display: grid;
+            grid-template-columns: 2fr 1fr;
+            gap: 22px;
+            align-items: start;
+        }
+
+        .conformite-etapes {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 16px 22px;
+        }
+
+        @media (max-width: 1280px) {
+            .conformite-corps { grid-template-columns: 1fr; }
+        }
+
+        @media (max-width: 1024px) {
+            .grille-parametres { grid-template-columns: 1fr; }
+            .conformite-etapes { grid-template-columns: 1fr; }
+        }
+    </style>
+@endsection
+
 @section('contenu')
     <div class="page-header">
         <div>
@@ -10,9 +61,12 @@
         </div>
     </div>
 
-    {{-- La page porte neuf cartes sur deux colonnes et trois écrans de haut :
+    {{-- La page porte dix cartes sur deux colonnes et trois écrans de haut :
          on y cherchait un réglage en faisant défiler. Les ancres disent d'un
-         coup d'œil ce qu'elle contient, et y mènent. --}}
+         coup d'œil ce qu'elle contient, et y mènent. Leur ordre suit celui des
+         cartes à l'écran — colonne gauche, puis colonne droite, puis la
+         conformité en pleine largeur — sans quoi un raccourci renverrait plus
+         haut que le précédent. --}}
     <nav aria-label="Sections des paramètres"
          style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:22px;">
         @foreach([
@@ -20,11 +74,11 @@
             'fiscal'        => ['Identité fiscale', 'fa-file-invoice'],
             'comptaflow'    => ['Liaison Comptaflow', 'fa-link'],
             'dgi'           => ['DGI & local', 'fa-map-marker-alt'],
-            'compte-fne'    => ['Compte FNE', 'fa-id-card-clip'],
-            'conformite'    => ['Conformité FNE', 'fa-clipboard-check'],
-            'options'       => ['Options fiscales', 'fa-check-square'],
             'tiers'         => ['Numérotation des tiers', 'fa-hashtag'],
+            'compte-fne'    => ['Compte FNE', 'fa-id-card-clip'],
+            'options'       => ['Options fiscales', 'fa-check-square'],
             'impression'    => ['Impression', 'fa-print'],
+            'conformite'    => ['Conformité FNE', 'fa-clipboard-check'],
             'exercices'     => ['Exercices comptables', 'fa-calendar-alt'],
             'statut-fne'    => ['Statut FNE', 'fa-key'],
         ] as $ancre => [$libelle, $icone])
@@ -176,10 +230,17 @@
         @csrf
         @method('PUT')
 
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;align-items:start;">
+        {{-- Les cartes tenaient toutes dans la colonne de gauche, sauf les
+             logos et le récapitulatif : de « DGI & Local professionnel »
+             jusqu'à « Impression des factures », la moitié droite de la
+             page restait blanche sur quatre écrans de défilement. Les deux
+             colonnes portent maintenant des hauteurs comparables, et la
+             procédure de conformité — la plus longue — passe en pleine
+             largeur sous elles. --}}
+        <div class="grille-parametres">
 
-            {{-- Colonne gauche --}}
-            <div style="display:flex;flex-direction:column;gap:20px;">
+            {{-- Colonne gauche — l'entreprise telle que la DGI la connaît --}}
+            <div class="colonne-parametres">
 
                 {{-- Informations générales --}}
                 <div class="card" style="padding:24px;">
@@ -461,6 +522,132 @@
                     </div>
                 </div>
 
+                {{-- ── Numérotation des tiers ──
+
+                     Le numéro de tiers n'est pas le compte général. 411000 est
+                     le compte collectif « Clients » du plan comptable ; 411001
+                     ou 411KONE désigne un client précis. Les confondre fait
+                     remonter, dans le relevé d'un client, le solde de tous. --}}
+                <div class="card" style="padding:24px;">
+                    <div
+                        style="font-size:12px;font-weight:700;color:var(--text-2);text-transform:uppercase;letter-spacing:.5px;margin-bottom:16px;display:flex;align-items:center;gap:8px;">
+                        <span id="tiers" style="scroll-margin-top:90px;"></span><i class="fas fa-hashtag" style="color:var(--primary);"></i> Numérotation des tiers
+                    </div>
+
+                    <div style="font-size:12px;color:var(--text-3);margin-bottom:14px;line-height:1.6;">
+                        Le système attribue lui-même le numéro d'un client ou d'un fournisseur —
+                        il ne se saisit pas. Vous choisissez seulement sa forme.
+                        <strong>Ce réglage doit être le même que dans Comptaflow</strong>
+                        (Configuration &rsaquo; Type d'identifiant tiers) : la passerelle retrouve un
+                        tiers par son numéro exact, et deux conventions différentes feraient
+                        retomber chaque écriture sur son compte collectif.
+                        Les fiches déjà créées gardent leur numéro.
+                    </div>
+
+                    <div style="display:flex;flex-direction:column;gap:10px;">
+                        @foreach(\App\Modules\Admin\Services\NumerotationTiersService::CONVENTIONS as $cle => $libelle)
+                        <label
+                            style="display:flex;align-items:flex-start;gap:12px;cursor:pointer;padding:14px;background:var(--bg3);border-radius:10px;border:1px solid var(--border);">
+                            <input type="radio" name="numerotation_tiers" value="{{ $cle }}"
+                                {{ old('numerotation_tiers', $entreprise->numerotation_tiers ?? \App\Modules\Admin\Services\NumerotationTiersService::NUMERIQUE) === $cle ? 'checked' : '' }}
+                                style="margin-top:3px;width:16px;height:16px;cursor:pointer;">
+                            <div>
+                                <div style="font-weight:600;font-size:13px;color:var(--text);">{{ $libelle }}</div>
+                                <div style="font-size:12px;color:var(--text-3);margin-top:2px;">
+                                    @if($cle === \App\Modules\Admin\Services\NumerotationTiersService::NUMERIQUE)
+                                        Le préfixe du collectif, puis un compteur :
+                                        <code>410001</code>, <code>410002</code> pour les clients,
+                                        <code>400001</code> pour les fournisseurs. Jamais d'homonyme,
+                                        mais il faut ouvrir la fiche pour savoir de qui il s'agit.
+                                    @else
+                                        Le préfixe, trois lettres du nom, puis un compteur :
+                                        <code>41KON1</code>, <code>40KOF1</code>. Lisible directement
+                                        en grand livre ; deux Koné reçoivent <code>41KON1</code> et
+                                        <code>41KON2</code>.
+                                    @endif
+                                </div>
+                            </div>
+                        </label>
+                        @endforeach
+                    </div>
+
+                    <div style="margin-top:12px;font-size:12px;color:var(--text-3);line-height:1.6;">
+                        Le numéro fait {{ \App\Modules\Admin\Services\NumerotationTiersService::LONGUEUR }} caractères,
+                        préfixe compris — la même longueur que <code>tier_digits</code> dans Comptaflow.
+                        Le préfixe tient sur deux chiffres&nbsp;: <code>41</code> pour un client rattaché
+                        au <code>411000</code>, <code>40</code> pour un fournisseur rattaché au
+                        <code>401000</code>. <strong>Le numéro de tiers n'est pas le compte
+                        collectif</strong> : le premier désigne une personne, le second regroupe
+                        tout le monde.
+                    </div>
+                </div>
+
+            </div>{{-- /colonne gauche --}}
+
+            {{-- Colonne droite — ce que Selflow en fait : la plateforme FNE,
+                 les options constatées, les logos et l'impression --}}
+            <div class="colonne-parametres">
+
+                {{-- Logos --}}
+                <div class="card" style="padding:24px;">
+                    <div
+                        style="font-size:12px;font-weight:700;color:var(--text-2);text-transform:uppercase;letter-spacing:.5px;margin-bottom:16px;display:flex;align-items:center;gap:8px;">
+                        <i class="fas fa-image" style="color:var(--primary);"></i> Logos (affichés sur les factures)
+                    </div>
+
+                    {{-- Logo principal --}}
+                    <div style="margin-bottom:20px;">
+                        <label class="form-label" style="margin-bottom:10px;display:block;">Logo principal de
+                            l'entreprise</label>
+                        @if($entreprise->logo_path)
+                            <div
+                                style="margin-bottom:10px;padding:12px;background:var(--bg3);border-radius:8px;display:flex;align-items:center;gap:12px;">
+                                <img src="{{ (str_starts_with($entreprise->logo_path, 'http://') || str_starts_with($entreprise->logo_path, 'https://')) ? $entreprise->logo_path : Storage::disk('public')->url($entreprise->logo_path) }}"
+                                    alt="Logo entreprise"
+                                    style="max-height:60px;max-width:140px;object-fit:contain;border-radius:4px;">
+                                <span style="font-size:12px;color:var(--text-2);">Logo actuel</span>
+                            </div>
+                        @else
+                            <div
+                                style="margin-bottom:10px;padding:16px;background:var(--bg3);border-radius:8px;text-align:center;border:1.5px dashed var(--border);">
+                                <i class="fas fa-image"
+                                    style="font-size:28px;color:var(--text-3);margin-bottom:6px;display:block;"></i>
+                                <span style="font-size:12px;color:var(--text-3);">Aucun logo défini</span>
+                            </div>
+                        @endif
+                        <input type="file" name="logo" id="logo" class="form-control"
+                            accept="image/png,image/jpeg,image/jpg,image/svg+xml,image/webp" style="margin-top:8px;">
+                        <small style="color:var(--text-3);font-size:11px;">PNG, JPG ou SVG · Max 2 Mo. Ce logo apparaît en
+                            haut à gauche des factures.</small>
+                    </div>
+
+                    {{-- Logo FNE / secondaire --}}
+                    <div>
+                        <label class="form-label" style="margin-bottom:10px;display:block;">Logo secondaire (FNE,
+                            certification, etc.)</label>
+                        @if($entreprise->logo_fne_path)
+                            <div
+                                style="margin-bottom:10px;padding:12px;background:var(--bg3);border-radius:8px;display:flex;align-items:center;gap:12px;">
+                                <img src="{{ (str_starts_with($entreprise->logo_fne_path, 'http://') || str_starts_with($entreprise->logo_fne_path, 'https://')) ? $entreprise->logo_fne_path : Storage::disk('public')->url($entreprise->logo_fne_path) }}"
+                                    alt="Logo FNE"
+                                    style="max-height:60px;max-width:140px;object-fit:contain;border-radius:4px;">
+                                <span style="font-size:12px;color:var(--text-2);">Logo actuel</span>
+                            </div>
+                        @else
+                            <div
+                                style="margin-bottom:10px;padding:16px;background:var(--bg3);border-radius:8px;text-align:center;border:1.5px dashed var(--border);">
+                                <i class="fas fa-award"
+                                    style="font-size:28px;color:var(--text-3);margin-bottom:6px;display:block;"></i>
+                                <span style="font-size:12px;color:var(--text-3);">Aucun logo secondaire défini</span>
+                            </div>
+                        @endif
+                        <input type="file" name="logo_fne" id="logo_fne" class="form-control"
+                            accept="image/png,image/jpeg,image/jpg,image/svg+xml,image/webp" style="margin-top:8px;">
+                        <small style="color:var(--text-3);font-size:11px;">PNG, JPG ou SVG · Max 2 Mo. Peut être un label
+                            qualité, logo FNE, etc.</small>
+                    </div>
+                </div>
+
                 {{-- ── Compte sur la plateforme FNE ──
                      Pose la question une fois, puis affiche ce qui manque selon
                      la reponse : reporter les informations d'un espace existant,
@@ -547,170 +734,6 @@
                             l'administrateur Selflow une fois délivrée par la DGI.
                         </p>
                     @endif
-                </div>
-
-                {{-- ── Procédure de conformité FNE ──
-                Ce qui suit n'est pas un rappel decoratif : chaque point
-                correspond a un cas ou une facture part chez la DGI avec
-                des montants ou des mentions differents de ceux etablis
-                ici. On les a tous rencontres a la mise au point. --}}
-                <div class="card" style="padding:24px;">
-                    <div
-                        style="font-size:12px;font-weight:700;color:var(--text-2);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px;display:flex;align-items:center;gap:8px;">
-                        <span id="conformite" style="scroll-margin-top:90px;"></span><i class="fas fa-clipboard-check" style="color:var(--primary);"></i> Procédure à suivre — conformité
-                        FNE
-                    </div>
-                    {{-- La phrase d'introduction disait « Selflow établit vos
-                         factures et les certifient directement auprès de la
-                         DGI. Les deux doivent dire la même chose. » — reste
-                         d'une version où Selflow et la plateforme étaient deux
-                         systèmes à tenir d'accord. Depuis, Selflow certifie
-                         lui-même ; « les deux » ne désignait plus rien. --}}
-                    <p style="font-size:12px;color:var(--text-3);line-height:1.6;margin-bottom:16px;">
-                        Selflow établit vos factures et les envoie lui-même à la plateforme de la
-                        DGI, qui les certifie. Ce que vous renseignez ici part avec elles : ces six
-                        points sont ceux qui, négligés, font revenir une pièce certifiée
-                        <strong>différente de celle que vous avez établie</strong> — ou pas de pièce
-                        du tout.
-                    </p>
-
-                    @php
-                        // Chaque point porte son motif : sans lui, l'utilisateur
-                        // n'a aucun moyen de juger de ce qu'il risque a le negliger.
-                        //
-                        // `fait` valait `null` sur cinq points des six : la liste
-                        // affichait cinq pastilles numerotees, indiscernables
-                        // d'un travail non fait, alors que rien n'avait ete
-                        // verifie. Ce qui se verifie porte maintenant sa coche ;
-                        // ce qui ne se verifie pas d'ici le dit, plutot que de
-                        // laisser croire a un manquement.
-                        $sitesNommes = $entreprise->pointsDeVente()->count();
-                        $clientsAvecNcc = \App\Modules\Admin\Modeles\Client::where('entreprise_id', $entreprise->id)
-                            ->whereNotNull('ncc')->where('ncc', '!=', '')->count();
-                        $tauxHorsBareme = \App\Modules\Admin\Modeles\Produit::where('entreprise_id', $entreprise->id)
-                            ->selectionnables()
-                            ->whereNotNull('taux_tva')
-                            ->whereNotIn('taux_tva', \App\Modules\Admin\Modeles\Produit::TAUX_TVA_DGI)
-                            ->count();
-
-                        $etapesConformite = [
-                            [
-                                'titre' => 'Renseigner l\'identité fiscale complète',
-                                'texte' => 'NCC, régime d\'imposition, RCCM et centre des impôts. Le NCC identifie votre entreprise auprès de la plateforme : sans lui, aucune facture n\'est certifiée.',
-                                'fait' => !empty($entreprise->ncc) && !empty($entreprise->regime_imposition) && !empty($entreprise->rccm),
-                                'constat' => null,
-                            ],
-                            [
-                                'titre' => 'Nommer les points de vente à l\'identique',
-                                'texte' => 'Le nom saisi dans Selflow est transmis tel quel à la plateforme, qui refuse la facture s\'il ne correspond à aucun point de vente déclaré sur votre espace.',
-                                // On sait compter les sites ; on ne peut pas lire
-                                // les noms declares chez la DGI — l'API ne les
-                                // expose pas. Le point reste donc a verifier a la
-                                // main, et le dire vaut mieux que le taire.
-                                'fait' => null,
-                                'constat' => $sitesNommes === 1
-                                    ? 'Un point de vente déclaré ici. Vérifiez qu\'il porte le même nom sur votre espace FNE.'
-                                    : $sitesNommes . ' points de vente déclarés ici. Vérifiez que chacun porte le même nom sur votre espace FNE.',
-                            ],
-                            [
-                                'titre' => 'N\'utiliser que les taux de TVA du barème DGI',
-                                'texte' => '18 %, 9 % ou 0 %. La plateforme ne reçoit pas un pourcentage mais un code, et applique le taux attaché à ce code : un taux intermédiaire — 5 % par exemple — serait taxé à 18 % sur la facture certifiée.',
-                                'fait' => $tauxHorsBareme === 0,
-                                'constat' => $tauxHorsBareme === 0
-                                    ? 'Aucun article hors barème dans votre catalogue.'
-                                    : $tauxHorsBareme . ' article(s) portent un taux que la plateforme ne sait pas représenter.',
-                            ],
-                            [
-                                'titre' => 'Saisir le NCC des clients professionnels',
-                                'texte' => 'Une facture B2B sans NCC client est rejetée par la plateforme. Sans NCC, la vente relève du B2C — ce qui est juste pour un particulier, et faux pour une entreprise.',
-                                // Aucun moyen de savoir lesquels de vos clients
-                                // sont des professionnels : la fiche ne porte pas
-                                // la distinction. On compte ce qu'on sait compter.
-                                'fait' => null,
-                                'constat' => $clientsAvecNcc . ' de vos clients portent un NCC.',
-                            ],
-                            [
-                                'titre' => 'Signaler un écart avec les options de votre espace FNE',
-                                'texte' => 'Le timbre de quittance et le bordereau d\'achat agricole se règlent sur la plateforme, et l\'API ne permet pas de les lire. L\'état affiché plus bas est celui que votre administrateur Selflow y a constaté : s\'il ne correspond plus, signalez-le — vous encaisseriez un timbre que la plateforme ne retiendra pas.',
-                                'fait' => null,
-                                'constat' => 'Timbre de quittance : ' . ($entreprise->timbre_quittance ? 'appliqué' : 'non appliqué')
-                                    . ' · BAPA : ' . ($entreprise->bapa ? 'ouvert' : 'fermé') . '.',
-                            ],
-                            [
-                                'titre' => 'Surveiller le solde de stickers',
-                                'texte' => 'La certification consomme un sticker par pièce. À zéro, plus rien n\'est normalisé. Le solde figure sur la page Gestion FNE, tel que la plateforme l\'a renvoyé à la dernière certification.',
-                                'fait' => null,
-                                'constat' => 'Vous serez alerté à ' . (int) ($entreprise->sticker_solde_alerte ?? 5) . ' sticker(s) restants.',
-                            ],
-                        ];
-                    @endphp
-
-                    <ol
-                        style="list-style:none;padding:0;margin:0;display:flex;flex-direction:column;gap:12px;counter-reset:etape;">
-                        @foreach($etapesConformite as $etape)
-                            @php
-                                // Trois états, et non deux : vérifié, à corriger,
-                                // et « nous ne pouvons pas le vérifier d'ici ».
-                                // Confondre les deux derniers sous une même
-                                // pastille grise faisait passer six points pour
-                                // autant de travaux en retard.
-                                $couleurs = match ($etape['fait']) {
-                                    true  => ['fond' => '#d1fae5', 'bord' => '#6ee7b7', 'encre' => '#047857'],
-                                    false => ['fond' => '#fef3c7', 'bord' => '#fcd34d', 'encre' => '#b45309'],
-                                    default => ['fond' => 'var(--bg3)', 'bord' => 'var(--border)', 'encre' => 'var(--text-3)'],
-                                };
-                            @endphp
-                            <li style="display:flex;gap:12px;align-items:flex-start;">
-                                <span
-                                    style="flex-shrink:0;width:22px;height:22px;border-radius:50%;background:{{ $couleurs['fond'] }};border:1px solid {{ $couleurs['bord'] }};display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:{{ $couleurs['encre'] }};margin-top:1px;">
-                                    @if($etape['fait'] === true)
-                                        <i class="fas fa-check" style="font-size:9px;"></i>
-                                    @elseif($etape['fait'] === false)
-                                        <i class="fas fa-exclamation" style="font-size:9px;"></i>
-                                    @else
-                                        {{ $loop->iteration }}
-                                    @endif
-                                </span>
-                                <div>
-                                    <div style="font-weight:600;font-size:13px;color:var(--text);">
-                                        {{ $etape['titre'] }}
-                                        @if($etape['fait'] === null)
-                                            <span style="font-size:10px;font-weight:600;color:var(--text-3);text-transform:none;letter-spacing:0;">
-                                                — à vérifier sur votre espace FNE
-                                            </span>
-                                        @endif
-                                    </div>
-                                    <div style="font-size:12px;color:var(--text-3);line-height:1.6;margin-top:2px;">
-                                        {{ $etape['texte'] }}</div>
-                                    @if($etape['constat'])
-                                        <div style="font-size:11.5px;color:{{ $couleurs['encre'] }};line-height:1.5;margin-top:4px;font-weight:600;">
-                                            {{ $etape['constat'] }}
-                                        </div>
-                                    @endif
-                                </div>
-                            </li>
-                        @endforeach
-                    </ol>
-
-                    <div
-                        style="margin-top:16px;padding:12px 14px;background:#fffbeb;border:1px solid #fcd34d;border-radius:8px;font-size:12px;color:#92400e;line-height:1.6;">
-                        <strong><i class="fas fa-scale-balanced"></i> Droit de timbre de quittance</strong> —
-                        barème de l'article 873 du Code général des impôts, appliqué aux règlements
-                        en espèces. Il est dû par le client (article 875) : vous le collectez pour l'État.
-                        <div
-                            style="margin-top:8px;display:grid;grid-template-columns:1fr auto;gap:2px 16px;font-family:ui-monospace,monospace;font-size:11px;">
-                            <span>0 – 5 000</span><span style="text-align:right;">0 F</span>
-                            <span>5 001 – 100 000</span><span style="text-align:right;">100 F</span>
-                            <span>100 001 – 500 000</span><span style="text-align:right;">500 F</span>
-                            <span>500 001 – 1 000 000</span><span style="text-align:right;">1 000 F</span>
-                            <span>1 000 001 – 5 000 000</span><span style="text-align:right;">2 000 F</span>
-                            <span>au-delà de 5 000 000</span><span style="text-align:right;">5 000 F</span>
-                        </div>
-                        <div style="margin-top:8px;">
-                            Ni les avoirs ni les bordereaux d'achat n'en relèvent : le timbre frappe
-                            la quittance, l'acte qui constate un encaissement.
-                        </div>
-                    </div>
                 </div>
 
                 {{-- ── Options fiscales ──
@@ -828,66 +851,6 @@
                     </div>
                 </div>
 
-                {{-- ── Numérotation des tiers ──
-
-                     Le numéro de tiers n'est pas le compte général. 411000 est
-                     le compte collectif « Clients » du plan comptable ; 411001
-                     ou 411KONE désigne un client précis. Les confondre fait
-                     remonter, dans le relevé d'un client, le solde de tous. --}}
-                <div class="card" style="padding:24px;">
-                    <div
-                        style="font-size:12px;font-weight:700;color:var(--text-2);text-transform:uppercase;letter-spacing:.5px;margin-bottom:16px;display:flex;align-items:center;gap:8px;">
-                        <span id="tiers" style="scroll-margin-top:90px;"></span><i class="fas fa-hashtag" style="color:var(--primary);"></i> Numérotation des tiers
-                    </div>
-
-                    <div style="font-size:12px;color:var(--text-3);margin-bottom:14px;line-height:1.6;">
-                        Le système attribue lui-même le numéro d'un client ou d'un fournisseur —
-                        il ne se saisit pas. Vous choisissez seulement sa forme.
-                        <strong>Ce réglage doit être le même que dans Comptaflow</strong>
-                        (Configuration &rsaquo; Type d'identifiant tiers) : la passerelle retrouve un
-                        tiers par son numéro exact, et deux conventions différentes feraient
-                        retomber chaque écriture sur son compte collectif.
-                        Les fiches déjà créées gardent leur numéro.
-                    </div>
-
-                    <div style="display:flex;flex-direction:column;gap:10px;">
-                        @foreach(\App\Modules\Admin\Services\NumerotationTiersService::CONVENTIONS as $cle => $libelle)
-                        <label
-                            style="display:flex;align-items:flex-start;gap:12px;cursor:pointer;padding:14px;background:var(--bg3);border-radius:10px;border:1px solid var(--border);">
-                            <input type="radio" name="numerotation_tiers" value="{{ $cle }}"
-                                {{ old('numerotation_tiers', $entreprise->numerotation_tiers ?? \App\Modules\Admin\Services\NumerotationTiersService::NUMERIQUE) === $cle ? 'checked' : '' }}
-                                style="margin-top:3px;width:16px;height:16px;cursor:pointer;">
-                            <div>
-                                <div style="font-weight:600;font-size:13px;color:var(--text);">{{ $libelle }}</div>
-                                <div style="font-size:12px;color:var(--text-3);margin-top:2px;">
-                                    @if($cle === \App\Modules\Admin\Services\NumerotationTiersService::NUMERIQUE)
-                                        Le préfixe du collectif, puis un compteur :
-                                        <code>410001</code>, <code>410002</code> pour les clients,
-                                        <code>400001</code> pour les fournisseurs. Jamais d'homonyme,
-                                        mais il faut ouvrir la fiche pour savoir de qui il s'agit.
-                                    @else
-                                        Le préfixe, trois lettres du nom, puis un compteur :
-                                        <code>41KON1</code>, <code>40KOF1</code>. Lisible directement
-                                        en grand livre ; deux Koné reçoivent <code>41KON1</code> et
-                                        <code>41KON2</code>.
-                                    @endif
-                                </div>
-                            </div>
-                        </label>
-                        @endforeach
-                    </div>
-
-                    <div style="margin-top:12px;font-size:12px;color:var(--text-3);line-height:1.6;">
-                        Le numéro fait {{ \App\Modules\Admin\Services\NumerotationTiersService::LONGUEUR }} caractères,
-                        préfixe compris — la même longueur que <code>tier_digits</code> dans Comptaflow.
-                        Le préfixe tient sur deux chiffres&nbsp;: <code>41</code> pour un client rattaché
-                        au <code>411000</code>, <code>40</code> pour un fournisseur rattaché au
-                        <code>401000</code>. <strong>Le numéro de tiers n'est pas le compte
-                        collectif</strong> : le premier désigne une personne, le second regroupe
-                        tout le monde.
-                    </div>
-                </div>
-
                 {{-- ── Impression des factures ── --}}
                 <div class="card" style="padding:24px;">
                     <div
@@ -926,70 +889,6 @@
                                 });
                             </script>
                         </div>
-                    </div>
-                </div>
-
-            </div>{{-- /colonne gauche --}}
-
-            <div style="display:flex;flex-direction:column;gap:20px;">
-
-                {{-- Logos --}}
-                <div class="card" style="padding:24px;">
-                    <div
-                        style="font-size:12px;font-weight:700;color:var(--text-2);text-transform:uppercase;letter-spacing:.5px;margin-bottom:16px;display:flex;align-items:center;gap:8px;">
-                        <i class="fas fa-image" style="color:var(--primary);"></i> Logos (affichés sur les factures)
-                    </div>
-
-                    {{-- Logo principal --}}
-                    <div style="margin-bottom:20px;">
-                        <label class="form-label" style="margin-bottom:10px;display:block;">Logo principal de
-                            l'entreprise</label>
-                        @if($entreprise->logo_path)
-                            <div
-                                style="margin-bottom:10px;padding:12px;background:var(--bg3);border-radius:8px;display:flex;align-items:center;gap:12px;">
-                                <img src="{{ (str_starts_with($entreprise->logo_path, 'http://') || str_starts_with($entreprise->logo_path, 'https://')) ? $entreprise->logo_path : Storage::disk('public')->url($entreprise->logo_path) }}"
-                                    alt="Logo entreprise"
-                                    style="max-height:60px;max-width:140px;object-fit:contain;border-radius:4px;">
-                                <span style="font-size:12px;color:var(--text-2);">Logo actuel</span>
-                            </div>
-                        @else
-                            <div
-                                style="margin-bottom:10px;padding:16px;background:var(--bg3);border-radius:8px;text-align:center;border:1.5px dashed var(--border);">
-                                <i class="fas fa-image"
-                                    style="font-size:28px;color:var(--text-3);margin-bottom:6px;display:block;"></i>
-                                <span style="font-size:12px;color:var(--text-3);">Aucun logo défini</span>
-                            </div>
-                        @endif
-                        <input type="file" name="logo" id="logo" class="form-control"
-                            accept="image/png,image/jpeg,image/jpg,image/svg+xml,image/webp" style="margin-top:8px;">
-                        <small style="color:var(--text-3);font-size:11px;">PNG, JPG ou SVG · Max 2 Mo. Ce logo apparaît en
-                            haut à gauche des factures.</small>
-                    </div>
-
-                    {{-- Logo FNE / secondaire --}}
-                    <div>
-                        <label class="form-label" style="margin-bottom:10px;display:block;">Logo secondaire (FNE,
-                            certification, etc.)</label>
-                        @if($entreprise->logo_fne_path)
-                            <div
-                                style="margin-bottom:10px;padding:12px;background:var(--bg3);border-radius:8px;display:flex;align-items:center;gap:12px;">
-                                <img src="{{ (str_starts_with($entreprise->logo_fne_path, 'http://') || str_starts_with($entreprise->logo_fne_path, 'https://')) ? $entreprise->logo_fne_path : Storage::disk('public')->url($entreprise->logo_fne_path) }}"
-                                    alt="Logo FNE"
-                                    style="max-height:60px;max-width:140px;object-fit:contain;border-radius:4px;">
-                                <span style="font-size:12px;color:var(--text-2);">Logo actuel</span>
-                            </div>
-                        @else
-                            <div
-                                style="margin-bottom:10px;padding:16px;background:var(--bg3);border-radius:8px;text-align:center;border:1.5px dashed var(--border);">
-                                <i class="fas fa-award"
-                                    style="font-size:28px;color:var(--text-3);margin-bottom:6px;display:block;"></i>
-                                <span style="font-size:12px;color:var(--text-3);">Aucun logo secondaire défini</span>
-                            </div>
-                        @endif
-                        <input type="file" name="logo_fne" id="logo_fne" class="form-control"
-                            accept="image/png,image/jpeg,image/jpg,image/svg+xml,image/webp" style="margin-top:8px;">
-                        <small style="color:var(--text-3);font-size:11px;">PNG, JPG ou SVG · Max 2 Mo. Peut être un label
-                            qualité, logo FNE, etc.</small>
                     </div>
                 </div>
 
@@ -1032,8 +931,179 @@
                         @endif
                     </div>
                 </div>
-            </div>
-        </div>
+
+            </div>{{-- /colonne droite --}}
+
+                {{-- ── Procédure de conformité FNE ──
+                Ce qui suit n'est pas un rappel decoratif : chaque point
+                correspond a un cas ou une facture part chez la DGI avec
+                des montants ou des mentions differents de ceux etablis
+                ici. On les a tous rencontres a la mise au point. --}}
+                <div class="card pleine-largeur" style="padding:24px;">
+                    <div
+                        style="font-size:12px;font-weight:700;color:var(--text-2);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px;display:flex;align-items:center;gap:8px;">
+                        <span id="conformite" style="scroll-margin-top:90px;"></span><i class="fas fa-clipboard-check" style="color:var(--primary);"></i> Procédure à suivre — conformité
+                        FNE
+                    </div>
+                    {{-- La phrase d'introduction disait « Selflow établit vos
+                         factures et les certifient directement auprès de la
+                         DGI. Les deux doivent dire la même chose. » — reste
+                         d'une version où Selflow et la plateforme étaient deux
+                         systèmes à tenir d'accord. Depuis, Selflow certifie
+                         lui-même ; « les deux » ne désignait plus rien. --}}
+                    <p style="font-size:12px;color:var(--text-3);line-height:1.6;margin-bottom:16px;">
+                        Selflow établit vos factures et les envoie lui-même à la plateforme de la
+                        DGI, qui les certifie. Ce que vous renseignez ici part avec elles : ces six
+                        points sont ceux qui, négligés, font revenir une pièce certifiée
+                        <strong>différente de celle que vous avez établie</strong> — ou pas de pièce
+                        du tout.
+                    </p>
+
+                    @php
+                        // Chaque point porte son motif : sans lui, l'utilisateur
+                        // n'a aucun moyen de juger de ce qu'il risque a le negliger.
+                        //
+                        // `fait` valait `null` sur cinq points des six : la liste
+                        // affichait cinq pastilles numerotees, indiscernables
+                        // d'un travail non fait, alors que rien n'avait ete
+                        // verifie. Ce qui se verifie porte maintenant sa coche ;
+                        // ce qui ne se verifie pas d'ici le dit, plutot que de
+                        // laisser croire a un manquement.
+                        $sitesNommes = $entreprise->pointsDeVente()->count();
+                        $clientsAvecNcc = \App\Modules\Admin\Modeles\Client::where('entreprise_id', $entreprise->id)
+                            ->whereNotNull('ncc')->where('ncc', '!=', '')->count();
+                        $tauxHorsBareme = \App\Modules\Admin\Modeles\Produit::where('entreprise_id', $entreprise->id)
+                            ->selectionnables()
+                            ->whereNotNull('taux_tva')
+                            ->whereNotIn('taux_tva', \App\Modules\Admin\Modeles\Produit::TAUX_TVA_DGI)
+                            ->count();
+
+                        $etapesConformite = [
+                            [
+                                'titre' => 'Renseigner l\'identité fiscale complète',
+                                'texte' => 'NCC, régime d\'imposition, RCCM et centre des impôts. Le NCC identifie votre entreprise auprès de la plateforme : sans lui, aucune facture n\'est certifiée.',
+                                'fait' => !empty($entreprise->ncc) && !empty($entreprise->regime_imposition) && !empty($entreprise->rccm),
+                                'constat' => null,
+                            ],
+                            [
+                                'titre' => 'Nommer les points de vente à l\'identique',
+                                'texte' => 'Le nom saisi dans Selflow est transmis tel quel à la plateforme, qui refuse la facture s\'il ne correspond à aucun point de vente déclaré sur votre espace.',
+                                // On sait compter les sites ; on ne peut pas lire
+                                // les noms declares chez la DGI — l'API ne les
+                                // expose pas. Le point reste donc a verifier a la
+                                // main, et le dire vaut mieux que le taire.
+                                'fait' => null,
+                                'constat' => $sitesNommes === 1
+                                    ? 'Un point de vente déclaré ici. Vérifiez qu\'il porte le même nom sur votre espace FNE.'
+                                    : $sitesNommes . ' points de vente déclarés ici. Vérifiez que chacun porte le même nom sur votre espace FNE.',
+                            ],
+                            [
+                                'titre' => 'N\'utiliser que les taux de TVA du barème DGI',
+                                'texte' => '18 %, 9 % ou 0 %. La plateforme ne reçoit pas un pourcentage mais un code, et applique le taux attaché à ce code : un taux intermédiaire — 5 % par exemple — serait taxé à 18 % sur la facture certifiée.',
+                                'fait' => $tauxHorsBareme === 0,
+                                'constat' => $tauxHorsBareme === 0
+                                    ? 'Aucun article hors barème dans votre catalogue.'
+                                    : $tauxHorsBareme . ' article(s) portent un taux que la plateforme ne sait pas représenter.',
+                            ],
+                            [
+                                'titre' => 'Saisir le NCC des clients professionnels',
+                                'texte' => 'Une facture B2B sans NCC client est rejetée par la plateforme. Sans NCC, la vente relève du B2C — ce qui est juste pour un particulier, et faux pour une entreprise.',
+                                // Aucun moyen de savoir lesquels de vos clients
+                                // sont des professionnels : la fiche ne porte pas
+                                // la distinction. On compte ce qu'on sait compter.
+                                'fait' => null,
+                                'constat' => $clientsAvecNcc . ' de vos clients portent un NCC.',
+                            ],
+                            [
+                                'titre' => 'Signaler un écart avec les options de votre espace FNE',
+                                'texte' => 'Le timbre de quittance et le bordereau d\'achat agricole se règlent sur la plateforme, et l\'API ne permet pas de les lire. L\'état affiché plus bas est celui que votre administrateur Selflow y a constaté : s\'il ne correspond plus, signalez-le — vous encaisseriez un timbre que la plateforme ne retiendra pas.',
+                                'fait' => null,
+                                'constat' => 'Timbre de quittance : ' . ($entreprise->timbre_quittance ? 'appliqué' : 'non appliqué')
+                                    . ' · BAPA : ' . ($entreprise->bapa ? 'ouvert' : 'fermé') . '.',
+                            ],
+                            [
+                                'titre' => 'Surveiller le solde de stickers',
+                                'texte' => 'La certification consomme un sticker par pièce. À zéro, plus rien n\'est normalisé. Le solde figure sur la page Gestion FNE, tel que la plateforme l\'a renvoyé à la dernière certification.',
+                                'fait' => null,
+                                'constat' => 'Vous serez alerté à ' . (int) ($entreprise->sticker_solde_alerte ?? 5) . ' sticker(s) restants.',
+                            ],
+                        ];
+                    @endphp
+
+                    {{-- Sur une demi-largeur, les six points formaient une
+                         colonne de texte longue de deux écrans, et la moitié
+                         droite de la page restait vide. La carte prend toute
+                         la largeur : les points tiennent sur deux colonnes et
+                         le barème du timbre occupe la place laissée libre. --}}
+                    <div class="conformite-corps">
+                        <ol class="conformite-etapes">
+                        @foreach($etapesConformite as $etape)
+                            @php
+                                // Trois états, et non deux : vérifié, à corriger,
+                                // et « nous ne pouvons pas le vérifier d'ici ».
+                                // Confondre les deux derniers sous une même
+                                // pastille grise faisait passer six points pour
+                                // autant de travaux en retard.
+                                $couleurs = match ($etape['fait']) {
+                                    true  => ['fond' => '#d1fae5', 'bord' => '#6ee7b7', 'encre' => '#047857'],
+                                    false => ['fond' => '#fef3c7', 'bord' => '#fcd34d', 'encre' => '#b45309'],
+                                    default => ['fond' => 'var(--bg3)', 'bord' => 'var(--border)', 'encre' => 'var(--text-3)'],
+                                };
+                            @endphp
+                            <li style="display:flex;gap:12px;align-items:flex-start;">
+                                <span
+                                    style="flex-shrink:0;width:22px;height:22px;border-radius:50%;background:{{ $couleurs['fond'] }};border:1px solid {{ $couleurs['bord'] }};display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:{{ $couleurs['encre'] }};margin-top:1px;">
+                                    @if($etape['fait'] === true)
+                                        <i class="fas fa-check" style="font-size:9px;"></i>
+                                    @elseif($etape['fait'] === false)
+                                        <i class="fas fa-exclamation" style="font-size:9px;"></i>
+                                    @else
+                                        {{ $loop->iteration }}
+                                    @endif
+                                </span>
+                                <div>
+                                    <div style="font-weight:600;font-size:13px;color:var(--text);">
+                                        {{ $etape['titre'] }}
+                                        @if($etape['fait'] === null)
+                                            <span style="font-size:10px;font-weight:600;color:var(--text-3);text-transform:none;letter-spacing:0;">
+                                                — à vérifier sur votre espace FNE
+                                            </span>
+                                        @endif
+                                    </div>
+                                    <div style="font-size:12px;color:var(--text-3);line-height:1.6;margin-top:2px;">
+                                        {{ $etape['texte'] }}</div>
+                                    @if($etape['constat'])
+                                        <div style="font-size:11.5px;color:{{ $couleurs['encre'] }};line-height:1.5;margin-top:4px;font-weight:600;">
+                                            {{ $etape['constat'] }}
+                                        </div>
+                                    @endif
+                                </div>
+                            </li>
+                        @endforeach
+                    </ol>
+
+                    <div
+                        style="padding:12px 14px;background:#fffbeb;border:1px solid #fcd34d;border-radius:8px;font-size:12px;color:#92400e;line-height:1.6;">
+                        <strong><i class="fas fa-scale-balanced"></i> Droit de timbre de quittance</strong> —
+                        barème de l'article 873 du Code général des impôts, appliqué aux règlements
+                        en espèces. Il est dû par le client (article 875) : vous le collectez pour l'État.
+                        <div
+                            style="margin-top:8px;display:grid;grid-template-columns:1fr auto;gap:2px 16px;font-family:ui-monospace,monospace;font-size:11px;">
+                            <span>0 – 5 000</span><span style="text-align:right;">0 F</span>
+                            <span>5 001 – 100 000</span><span style="text-align:right;">100 F</span>
+                            <span>100 001 – 500 000</span><span style="text-align:right;">500 F</span>
+                            <span>500 001 – 1 000 000</span><span style="text-align:right;">1 000 F</span>
+                            <span>1 000 001 – 5 000 000</span><span style="text-align:right;">2 000 F</span>
+                            <span>au-delà de 5 000 000</span><span style="text-align:right;">5 000 F</span>
+                        </div>
+                        <div style="margin-top:8px;">
+                            Ni les avoirs ni les bordereaux d'achat n'en relèvent : le timbre frappe
+                            la quittance, l'acte qui constate un encaissement.
+                        </div>
+                    </div>
+                    </div>{{-- /corps sur deux colonnes --}}
+                </div>
+        </div>{{-- /grille --}}
 
         <div style="display:flex;justify-content:flex-end;margin-top:20px;gap:10px;">
             <a href="{{ route('admin.tableau_de_bord') }}" class="btn btn-outline">Annuler</a>

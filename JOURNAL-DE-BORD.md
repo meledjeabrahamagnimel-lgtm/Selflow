@@ -2511,6 +2511,75 @@ d'œil ce que la page contient, et y mène.
 
 ---
 
+### Lot 15 — La page des paramètres occupe sa largeur — **15.1 TERMINÉ**
+
+#### 15.1 — Huit cartes sur dix tenaient dans la colonne de gauche
+
+Le propriétaire : « à partir de *DGI & Local professionnel* jusqu'à *Impression
+des factures*, tout est aligné sur la ligne gauche, ça fait long, l'espace de
+droite n'est pas occupé. »
+
+La grille avait bien deux colonnes. Seules **les logos et le récapitulatif**
+étaient à droite ; les huit autres cartes s'empilaient à gauche. La moitié
+droite de la page restait blanche sur quatre écrans de défilement.
+
+| Colonne | Cartes |
+|---|---|
+| Gauche | Identité, Identité fiscale (avec la liaison Comptaflow), DGI & local, Numérotation des tiers |
+| Droite | Logos, Compte FNE, Options fiscales, Impression des factures, Récapitulatif |
+| Pleine largeur | Procédure de conformité FNE |
+
+La conformité est la plus longue des cartes : sur une demi-largeur, ses six
+points formaient une colonne de texte de deux écrans de haut. Elle passe sous
+les deux colonnes, en pleine largeur, ses points sur deux colonnes internes et
+le barème du timbre de quittance à droite — la place qui restait vide.
+
+**Ce que le déplacement a mis au jour : la grille ne se repliait pas.** Elle
+portait son `grid-template-columns` en style écrit dans la balise, et un style
+de balise l'emporte sur la feuille, media query comprise. Aucune règle de
+largeur n'était donc possible : sur un portable, les deux colonnes restaient
+côte à côte et les champs devenaient illisibles. Les quatre classes vivent
+maintenant dans `@section('styles')`, et la page se replie à 1 024 px.
+
+L'ordre de la barre d'ancres suit celui des cartes à l'écran — sans quoi un
+raccourci renvoyait plus haut que le précédent.
+
+- `app/Modules/Admin/Vues/entreprise/parametres.blade.php`
+- `tests/Feature/ParametresEntrepriseTest.php` — 4 épreuves ajoutées (18 au total)
+
+Les quatre tombent sans le correctif. **946 épreuves, 946 vertes,
+3 945 vérifications.**
+
+#### 15.2 — Une clé de liaison par entreprise — **EN ATTENTE D'ARBITRAGE**
+
+Question du propriétaire : au lieu d'un secret unique partagé, une clé générée
+par entreprise, délivrée quand le superadministrateur valide la demande de
+compte Comptaflow, la liaison s'établissant sans que l'entreprise manipule quoi
+que ce soit.
+
+L'état actuel, à ne pas confondre avec ce qui est demandé :
+
+| Élément | Aujourd'hui |
+|---|---|
+| `EXTERNAL_SYNC_SECRET` | **Un seul secret**, la même valeur dans les deux `.env`. Il authentifie Selflow auprès de Comptaflow, et Comptaflow auprès de Selflow |
+| `entreprises.comptaflow_sync_key` | Déjà **une valeur par entreprise** — mais **saisie à la main** : le champ est libre dans les paramètres, et la consigne à l'écran dit « obtenir depuis Comptaflow → Configuration → Liaison Selflow » |
+
+**Le défaut que cela porte** — `EntrepriseControleur::enregistrer()` accepte
+`comptaflow_sync_key` comme un champ de formulaire ordinaire, et déclenche le
+déversement dès qu'il change. Une entreprise qui obtient la clé d'une autre la
+colle dans ses propres paramètres : la liaison s'ouvre, **et son référentiel
+puis ses écritures partent dans les livres de l'autre**. Le secret partagé ne
+l'en empêche pas — il est détenu par le serveur, pas par l'entreprise. Rien
+côté Selflow ne vérifie que la clé saisie désigne bien l'entreprise qui la
+saisit ; c'est Comptaflow qui décide, sur la seule foi de la clé.
+
+Ce que la demande du propriétaire corrige donc, au-delà du confort : **la clé
+cesse d'être une donnée que l'utilisateur saisit** pour devenir une donnée que
+le système délivre. Conception détaillée à faire ; la moitié Comptaflow n'est
+pas atteignable depuis ce dépôt.
+
+---
+
 ## 5 bis. La numérotation des comptes — tranché
 
 Le classeur subdivisait certaines racines sur des positions que l'acte uniforme
