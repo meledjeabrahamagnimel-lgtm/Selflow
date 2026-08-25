@@ -49,7 +49,11 @@ class PointDeVenteControleur
         // Initialisation automatique des stocks (vides) pour tous les produits existants de l'entreprise
         // Seuls les articles qui se comptent recoivent une fiche : un service
         // n'a ni quantite disponible, ni seuil, ni rupture.
-        $produits = \App\Modules\Admin\Modeles\Produit::where('entreprise_id', $entreprise->id)->get();
+        // Un article archivé ne reçoit pas de fiche de stock sur un site qui
+        // vient d'ouvrir : il ne s'y vendra jamais.
+        $produits = \App\Modules\Admin\Modeles\Produit::where('entreprise_id', $entreprise->id)
+            ->selectionnables()
+            ->get();
         foreach ($produits as $prod) {
             if (!$prod->estStockable()) {
                 continue;

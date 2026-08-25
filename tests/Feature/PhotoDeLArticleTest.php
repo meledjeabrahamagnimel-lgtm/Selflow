@@ -200,13 +200,18 @@ class PhotoDeLArticleTest extends TestCase
 
     /**
      * `photo_url` garde son rôle : une vignette a besoin d'une image, toujours.
+     *
+     * Ce n'est plus le sac gris qui la fournit. Il était le même sous chaque
+     * article — trente cartes identiques où seul le texte distinguait un sac de
+     * ciment d'une prestation de conseil. À défaut de photo, on montre
+     * désormais la nature de l'article ; voir `IllustrationArticleTest`.
      */
-    public function test_photo_url_rend_toujours_l_image_d_attente_en_repli(): void
+    public function test_photo_url_rend_toujours_une_image_en_repli(): void
     {
-        $this->assertStringContainsString(
-            'placeholder-produit.png',
-            $this->article('Ciment 50 kg')->photo_url
-        );
+        $adresse = $this->article('Ciment 50 kg')->photo_url;
+
+        $this->assertStringContainsString('images/articles/construction.svg', $adresse);
+        $this->assertStringNotContainsString('placeholder-produit', $adresse);
     }
 
     // ── L'écran de vente ─────────────────────────────────────────────

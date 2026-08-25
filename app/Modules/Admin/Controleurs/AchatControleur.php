@@ -32,7 +32,12 @@ class AchatControleur
     {
         $entreprise  = Auth::user()->entreprise;
         $fournisseurs = Fournisseur::obtenirFournisseursPrioritaires($entreprise->id);
-        $produits     = Produit::where('entreprise_id', $entreprise->id)->orderBy('nom')->get();
+        // Un article rangé ne se rachète pas : le formulaire d'achat le
+        // proposait encore, le filtre ne vivant que sur le catalogue.
+        $produits     = Produit::where('entreprise_id', $entreprise->id)
+            ->selectionnables()
+            ->orderBy('nom')
+            ->get();
         // Repli sur un point de vente EXISTANT plutot que sur un « Siege » cree
         // a la volee : un point de vente inconnu de la plateforme FNE fait
         // rejeter toute normalisation avec « Point of sale is invalid », et

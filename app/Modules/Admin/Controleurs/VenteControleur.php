@@ -48,7 +48,11 @@ class VenteControleur
                     'statut'        => 'Ouvert',
                 ]))->id);
         $clients        = Client::obtenirClientsPrioritaires($entreprise->id);
+        // Archiver un article, c'est dire qu'on ne le vend plus. La caisse le
+        // proposait quand même : le filtre ne vivait que sur l'écran du
+        // catalogue.
         $produits       = Produit::where('entreprise_id', $entreprise->id)
+            ->selectionnables()
             ->with('taxes')
             ->orderBy('nom')
             ->get();
@@ -639,12 +643,21 @@ class VenteControleur
 
         $entreprise = Auth::user()->entreprise;
         $clients    = Client::obtenirClientsPrioritaires($entreprise->id);
-        $produits   = Produit::where('entreprise_id', $entreprise->id)->orderBy('nom')->get();
-        $categories = $produits->pluck('categorie')->unique()->sort()->values();
-        $banques    = CodeJournal::where('type', 'Banque')->where('entreprise_id', $entreprise->id)->orderBy('intitule')->get();
-
         // Load details with products
         $vente->load(['details.produit', 'client']);
+
+        // Le catalogue n'offre plus que ce qui se vend encore — mais un devis
+        // établi avant l'archivage porte peut-être un article rangé depuis. Le
+        // taire ici retirerait la ligne du formulaire, donc de la pièce, à la
+        // première modification. Les articles déjà portés restent proposés.
+        $dejaPortes = $vente->details->pluck('produit_id')->filter()->all();
+
+        $produits   = Produit::where('entreprise_id', $entreprise->id)
+            ->where(fn ($q) => $q->selectionnables()->orWhereIn('id', $dejaPortes))
+            ->orderBy('nom')
+            ->get();
+        $categories = $produits->pluck('categorie')->unique()->sort()->values();
+        $banques    = CodeJournal::where('type', 'Banque')->where('entreprise_id', $entreprise->id)->orderBy('intitule')->get();
 
         return view('admin::ventes.modifier', compact('vente', 'clients', 'produits', 'categories', 'banques'));
     }

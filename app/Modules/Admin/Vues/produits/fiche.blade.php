@@ -38,7 +38,7 @@
         <div style="background:var(--bg3); position:relative; display:flex; align-items:center; justify-content:center;">
             <img id="img-produit-principal" src="{{ $produit->photo_url }}" alt="{{ $produit->nom }}"
                 style="width:100%; height:220px; object-fit:cover;"
-                onerror="this.src='{{ asset('images/placeholder-produit.png') }}'">
+                onerror="this.src='{{ $produit->illustration() }}'">
 
             {{-- Badge statut archivé --}}
             @if($produit->statut === 'archive')

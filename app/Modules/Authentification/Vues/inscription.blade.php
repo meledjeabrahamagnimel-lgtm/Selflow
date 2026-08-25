@@ -68,15 +68,6 @@
         .regime-info { display:none; position:absolute; top:100%; left:0; right:0; z-index:10; background:#1e293b; color:#e2e8f0; font-size:11px; line-height:1.5; padding:10px 12px; border-radius:8px; margin-top:4px; box-shadow:0 8px 24px rgba(0,0,0,.2); }
         select:focus + .regime-info { display:block; }
 
-        /* Secteurs d'activité */
-        .secteurs-grille { display:grid; grid-template-columns:repeat(2, 1fr); gap:8px; }
-        .secteur-case { display:flex; align-items:center; gap:8px; padding:9px 12px; border:1.5px solid #E5E7EB; border-radius:8px; cursor:pointer; transition:all .12s; user-select:none; }
-        .secteur-case:hover { border-color:#93c5fd; background:#eff6ff; }
-        .secteur-case input[type=checkbox] { width:15px; height:15px; accent-color:#002B5C; flex-shrink:0; }
-        .secteur-case span { font-size:12.5px; color:#374151; font-weight:500; }
-        .secteur-case input:checked ~ span { color:#002B5C; font-weight:600; }
-        .secteur-case:has(input:checked) { border-color:#002B5C; background:#eff6ff; }
-
         /* Force mot de passe */
         .force-mdp { margin-top:5px; }
         .force-barres { display:flex; gap:4px; margin-bottom:3px; }
@@ -109,9 +100,16 @@
             font-family:inherit; display:flex; align-items:center; justify-content:center; gap:8px; transition:all .15s; }
         .btn-secondaire:hover { border-color:#002B5C; color:#002B5C; }
         .btn-secondaire[hidden], .btn-inscription[hidden], .btn-passer[hidden] { display:none; }
-        .btn-passer { width:100%; padding:9px; background:none; border:none; cursor:pointer;
-            font-family:inherit; font-size:12px; color:#9CA3AF; text-decoration:underline; }
-        .btn-passer:hover { color:#002B5C; }
+        /* Il etait un lien souligne, gris clair, de douze pixels, sous le
+           bouton principal : personne ne le voyait. C'est pourtant la sortie
+           de l'inscription — les etapes qui suivent sont facultatives. */
+        .btn-passer { width:100%; padding:12px; border-radius:10px; cursor:pointer;
+            font-family:inherit; font-size:13.5px; font-weight:600;
+            color:#002B5C; background:#EFF6FF; border:1.5px solid #BFDBFE;
+            display:flex; align-items:center; justify-content:center; gap:8px;
+            transition:all .15s; }
+        .btn-passer:hover { background:#DBEAFE; border-color:#002B5C; }
+        .btn-passer small { display:block; font-weight:400; font-size:11px; color:#6B7280; }
 
         /* Boutons */
         .btn-inscription { width:100%; padding:13px; border-radius:10px; background:#002B5C; color:#fff; font-size:14px; font-weight:700; border:none; cursor:pointer; transition:all .15s; font-family:inherit; display:flex; align-items:center; justify-content:center; gap:8px; }
@@ -179,12 +177,20 @@
                 @csrf
 
 
-                {{-- ══ Étape 1 — L'entreprise ══ --}}
+                {{-- ══ Étape 1 — L'entreprise ══
+
+                     Un seul champ. La forme juridique, l'adresse électronique
+                     et le téléphone vivaient ici : on demandait quatre choses
+                     pour créer une entreprise dont une seule est indispensable,
+                     et l'adresse électronique — qui est l'identifiant de
+                     connexion — était réclamée une étape avant qu'on sache qui
+                     se connecte. Elle a rejoint le responsable ; la forme
+                     juridique se renseigne depuis les paramètres. --}}
                 <section class="pas" data-pas="1">
                     <div class="pas-tete">
-                        <div class="pas-rang">Étape 1 sur 4</div>
+                        <div class="pas-rang">Étape 1 sur 3</div>
                         <h2>L'entreprise</h2>
-                        <p>Son nom et sa forme. C'est tout ce qu'il faut pour commencer.</p>
+                        <p>Son nom. C'est tout ce qu'il faut pour commencer.</p>
                     </div>
                 <div class="section-label"><i class="ti ti-building"></i> Votre entreprise</div>
 
@@ -194,37 +200,10 @@
                         placeholder="Ex: SARL Mon Commerce CI"
                         value="{{ old('nom_entreprise') }}" required autofocus
                         class="{{ $errors->has('nom_entreprise') ? 'erreur' : '' }}">
-                </div>
-
-                {{-- Le régime d'imposition vivait ici, obligatoire, avant même
-                     qu'on demande si l'entreprise a un compte FNE. C'est une
-                     information fiscale : elle appartient à l'étape 3, et à
-                     celles qui n'ont pas encore de compte. Voir
-                     `admin::partiels.compte-fne`. --}}
-                <div class="champ">
-                    <label for="forme_juridique">Forme juridique</label>
-                    <select id="forme_juridique" name="forme_juridique">
-                        <option value="">— Choisir —</option>
-                        @foreach(['Entreprise individuelle','SARL','SA','SAS','SNC','GIE','Coopérative','Association'] as $fj)
-                            <option value="{{ $fj }}" {{ old('forme_juridique') == $fj ? 'selected' : '' }}>{{ $fj }}</option>
-                        @endforeach
-                    </select>
-                </div>
-
-                <div class="rangee-2" style="margin-top:12px;">
-                    <div class="champ" style="margin-bottom:0">
-                        <label for="email">Email professionnel <span class="req">*</span></label>
-                        <input type="email" id="email" name="email"
-                            placeholder="vous@entreprise.com"
-                            value="{{ old('email') }}" required autocomplete="email"
-                            class="{{ $errors->has('email') ? 'erreur' : '' }}">
-                    </div>
-                    <div class="champ" style="margin-bottom:0">
-                        <label for="telephone">Téléphone</label>
-                        <input type="tel" id="telephone" name="telephone"
-                            placeholder="+225 07 00 00 00"
-                            value="{{ old('telephone') }}">
-                    </div>
+                    <small style="display:block;margin-top:6px;font-size:11.5px;color:#9CA3AF;line-height:1.55;">
+                        Le nom sous lequel vous facturez. Vous pourrez le corriger
+                        depuis vos paramètres.
+                    </small>
                 </div>
 
                 </section>
@@ -233,9 +212,9 @@
                 {{-- ══ Étape 2 — Le responsable ══ --}}
                 <section class="pas" data-pas="2" hidden>
                     <div class="pas-tete">
-                        <div class="pas-rang">Étape 2 sur 4</div>
-                        <h2>Le responsable</h2>
-                        <p>Qui administrera l'espace, et avec quel mot de passe.</p>
+                        <div class="pas-rang">Étape 2 sur 3</div>
+                        <h2>Le responsable et son accès</h2>
+                        <p>Qui administrera l'espace, avec quelle adresse et quel mot de passe.</p>
                     </div>
                 {{-- ──── Section IDENTITÉ ──── --}}
                 <div class="section-label" style="margin-top:18px;"><i class="ti ti-user"></i> Votre identité (Gérant / Admin)</div>
@@ -257,18 +236,34 @@
                     </div>
                 </div>
 
+                <div class="champ" style="margin-top:12px;">
+                    <label for="fonction_gerant">Fonction / Titre</label>
+                    <input type="text" id="fonction_gerant" name="fonction_gerant"
+                        placeholder="Ex: Gérant, DG, PDG, Directeur"
+                        value="{{ old('fonction_gerant') }}">
+                </div>
+
+                {{-- L'adresse et le téléphone étaient demandés à l'étape
+                     précédente, sous le nom de l'entreprise. Or l'adresse est
+                     l'identifiant de connexion : elle appartient à qui ouvre
+                     l'accès. Un second numéro, « Téléphone personnel », vivait
+                     ici : il était validé et **jamais enregistré**, ni sur
+                     l'entreprise ni sur l'utilisateur. Il est retiré plutôt que
+                     branché — un seul numéro suffit à joindre le responsable. --}}
                 <div class="rangee-2" style="margin-top:12px;">
                     <div class="champ" style="margin-bottom:0">
-                        <label for="fonction_gerant">Fonction / Titre</label>
-                        <input type="text" id="fonction_gerant" name="fonction_gerant"
-                            placeholder="Ex: Gérant, DG, PDG, Directeur"
-                            value="{{ old('fonction_gerant') }}">
+                        <label for="email">Email professionnel <span class="req">*</span>
+                            <small>c'est votre identifiant de connexion</small></label>
+                        <input type="email" id="email" name="email"
+                            placeholder="vous@entreprise.com"
+                            value="{{ old('email') }}" required autocomplete="email"
+                            class="{{ $errors->has('email') ? 'erreur' : '' }}">
                     </div>
                     <div class="champ" style="margin-bottom:0">
-                        <label for="telephone_gerant">Téléphone personnel</label>
-                        <input type="tel" id="telephone_gerant" name="telephone_gerant"
+                        <label for="telephone">Téléphone</label>
+                        <input type="tel" id="telephone" name="telephone"
                             placeholder="+225 07 00 00 00"
-                            value="{{ old('telephone_gerant') }}">
+                            value="{{ old('telephone') }}">
                     </div>
                 </div>
 
@@ -317,7 +312,7 @@
                 {{-- ══ Étape 3 — La facture normalisée ══ --}}
                 <section class="pas" data-pas="3" hidden>
                     <div class="pas-tete">
-                        <div class="pas-rang">Étape 3 sur 4 · facultative</div>
+                        <div class="pas-rang">Étape 3 sur 3 · facultative</div>
                         <h2>La facture normalisée</h2>
                         <p>Avez-vous déjà un compte auprès de la DGI ? Vous pourrez y revenir plus tard.</p>
                     </div>
@@ -325,35 +320,17 @@
                 </section>
 
 
-                {{-- ══ Étape 4 — Le domaine d'activité ══ --}}
-                <section class="pas" data-pas="4" hidden>
-                    <div class="pas-tete">
-                        <div class="pas-rang">Étape 4 sur 4 · facultative</div>
-                        <h2>Le domaine d'activité</h2>
-                        <p>Il décide des modules ouverts et du catalogue proposé. Vous pourrez le changer.</p>
-                    </div>
-                {{-- Secteurs d'activité --}}
-                <div class="section-label" style="margin-top:16px;"><i class="ti ti-category"></i> Secteurs d'activité <small style="font-size:10px;font-weight:400;text-transform:none;letter-spacing:0;margin-left:4px;">(cochez tous ceux qui s'appliquent)</small></div>
-                {{-- Les douze domaines du référentiel, et rien d'autre : c'est ce
-                     même vocabulaire que la première étape de la souscription
-                     propose. Dix valeurs écrites en dur vivaient ici, qui n'en
-                     recoupaient aucune — l'entreprise cochait « Commercial »
-                     pour choisir « Commerce » à l'écran suivant. --}}
-                <div class="secteurs-grille">
-                    @php
-                        $oldSecteurs = old('secteurs_activite', []);
-                    @endphp
-                    @foreach($domaines as $nom)
-                        <label class="secteur-case">
-                            <input type="checkbox" name="secteurs_activite[]" value="{{ $nom }}"
-                                {{ in_array($nom, $oldSecteurs) ? 'checked' : '' }}>
-                            <i class="ti ti-point-filled" style="font-size:14px;color:#002B5C;flex-shrink:0;"></i>
-                            <span>{{ $nom }}</span>
-                        </label>
-                    @endforeach
-                </div>
-                </section>
+                {{-- L'étape 4 posait le domaine d'activité par une grille de
+                     cases à cocher. C'était l'ancien mécanisme, retiré des
+                     paramètres au lot 13 : le domaine se choisit désormais à la
+                     première étape du parcours de configuration, avec les
+                     métiers qui en découlent, leurs rayons et leurs articles.
+                     Le garder ici faisait poser la même question par deux
+                     écrans qui ne se parlaient pas — on pouvait déclarer
+                     « Santé » à l'inscription et souscrire « Boulangerie »
+                     ensuite, sans que rien ne le signale.
 
+                     Le parcours s'ouvre de lui-même à la première visite. --}}
 
                 {{-- La barre de progression et les deux boutons.
 
@@ -380,12 +357,23 @@
 
                     <button type="submit" class="btn-passer" id="btn-passer" hidden
                             title="Les étapes restantes se complètent depuis vos paramètres">
+                        <i class="ti ti-player-skip-forward"></i>
                         Terminer sans remplir la suite
                     </button>
+                    <p id="note-passer" hidden
+                       style="text-align:center;font-size:11.5px;color:#9CA3AF;line-height:1.55;margin-top:-2px;">
+                        Votre espace est créé tout de suite. La facture normalisée
+                        se règle ensuite depuis vos paramètres.
+                    </p>
                 </div>
 
             </form>
 
+            {{-- S'inscrire par Google remplace le formulaire ; passé le
+                 responsable, il n'y a plus rien à remplacer — proposer la
+                 bascule ferait perdre ce qui vient d'être saisi. Le bloc ne
+                 vaut donc que pour les deux premières étapes. --}}
+            <div id="bloc-google">
             <div class="separateur">ou</div>
 
             <a href="{{ route('auth.google') }}" class="btn-google" id="btn-google-inscription">
@@ -397,6 +385,7 @@
                 </svg>
                 S'inscrire avec Google
             </a>
+            </div>
 
             <div class="lien-connexion">
                 Déjà un compte ?
@@ -429,6 +418,11 @@
     var suivant   = document.getElementById('btn-suivant');
     var soumettre = document.getElementById('btn-soumettre');
     var passer    = document.getElementById('btn-passer');
+    var notePasser = document.getElementById('note-passer');
+    var google    = document.getElementById('bloc-google');
+
+    // Au-delà, s'inscrire par Google effacerait ce qui vient d'être saisi.
+    var DERNIERE_AVEC_GOOGLE = 2;
 
     // Les deux premières étapes ne se sautent pas.
     var DERNIERE_OBLIGATOIRE = 2;
@@ -449,6 +443,9 @@
         // On ne propose de terminer sans la suite qu'une fois le nécessaire
         // fourni : plus tôt, le bouton créerait un compte inutilisable.
         passer.hidden = n < DERNIERE_OBLIGATOIRE || n === pas.length;
+        if (notePasser) notePasser.hidden = passer.hidden;
+
+        if (google) google.hidden = n > DERNIERE_AVEC_GOOGLE;
 
         barre.style.width = Math.round((n / pas.length) * 100) + '%';
 

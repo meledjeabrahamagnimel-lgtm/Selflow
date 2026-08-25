@@ -52,7 +52,10 @@ class ProductionControleur extends Controller
         $entrepriseId = Auth::user()->entreprise_id;
 
         // Récupérer les produits finis qui n'ont pas encore de fiche technique
+        // Archiver un article le retire de la production comme du reste :
+        // on n'ouvre pas une fiche technique pour ce qu'on ne fabrique plus.
         $produitsFini = Produit::where('entreprise_id', $entrepriseId)
+            ->selectionnables()
             ->where('type', 'produit_fini')
             ->whereDoesntHave('ficheTechnique')
             ->orderBy('nom')
@@ -60,6 +63,7 @@ class ProductionControleur extends Controller
 
         // Récupérer uniquement les ingrédients de type matière première
         $ingredients = Produit::where('entreprise_id', $entrepriseId)
+            ->selectionnables()
             ->where('type', 'matiere_premiere')
             ->orderBy('nom')
             ->get();
@@ -177,6 +181,7 @@ class ProductionControleur extends Controller
 
         // Récupérer uniquement les ingrédients de type matière première
         $ingredients = Produit::where('entreprise_id', $entrepriseId)
+            ->selectionnables()
             ->where('type', 'matiere_premiere')
             ->orderBy('nom')
             ->get();
@@ -274,6 +279,7 @@ class ProductionControleur extends Controller
         // Récupérer les produits finis ayant une fiche technique, avec fiches et stocks ingrédients
         $produitsFini = Produit::with(['ficheTechnique.details.ingredient.stocks'])
             ->where('entreprise_id', $entrepriseId)
+            ->selectionnables()
             ->where('type', 'produit_fini')
             ->whereHas('ficheTechnique')
             ->orderBy('nom')

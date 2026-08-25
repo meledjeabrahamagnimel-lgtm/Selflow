@@ -80,10 +80,13 @@
             onclick="window.location='{{ route('admin.produits.fiche', $p) }}'">
 
             {{-- Photo --}}
+            @php $illustre = $p->photoReelle() === null; @endphp
             <div style="height:140px; background:var(--bg3); position:relative; overflow:hidden;">
+                {{-- Une photo remplit le cadre ; un dessin au trait étiré se
+                     déforme. Il tient donc sa place, centré, sans recadrage. --}}
                 <img src="{{ $p->photo_url }}" alt="{{ $p->nom }}"
-                    style="width:100%; height:100%; object-fit:cover;"
-                    onerror="this.src='{{ asset('images/placeholder-produit.png') }}'">
+                    style="width:100%; height:100%; object-fit:{{ $illustre ? 'contain' : 'cover' }}; {{ $illustre ? 'padding:22px;' : '' }}"
+                    onerror="this.src='{{ $p->illustration() }}'; this.style.objectFit='contain'; this.style.padding='22px';">
                 {{-- Badge type --}}
                 @php
                     $typeColors = [

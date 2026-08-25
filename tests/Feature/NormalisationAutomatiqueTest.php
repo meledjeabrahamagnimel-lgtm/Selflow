@@ -177,4 +177,40 @@ class NormalisationAutomatiqueTest extends TestCase
         $this->assertFalse((bool) $entreprise->normalisation_auto_factures);
         $this->assertTrue((bool) $entreprise->normalisation_auto_recus);
     }
+
+    // ══════════════ Ce que l'écran en dit ══════════════
+
+    public function test_l_ecran_de_vente_n_annonce_plus_une_certification_suspendue(): void
+    {
+        // L'encadré annonçait une certification « suspendue tant que la FNE
+        // n'a pas fourni les champs de mappage du reçu normalisé
+        // électronique ». C'était vrai avant la refonte du reçu : depuis, il
+        // emprunte la porte de la facture, et rien ne le retient. Le texte
+        // disait à l'utilisateur que ses reçus n'étaient pas certifiés alors
+        // qu'ils l'étaient.
+        $corps = $this->get(route('admin.ventes.nouvelle'))->assertOk()->getContent();
+
+        $this->assertStringNotContainsString('Normalisation RNE en attente', $corps);
+        $this->assertStringNotContainsString('champs de mappage du reçu', $corps);
+        $this->assertStringContainsString('Le reçu se certifie comme une facture', $corps);
+    }
+
+    public function test_l_ecran_dit_que_le_recu_part_des_son_emission(): void
+    {
+        $this->entreprise->update(['normalisation_auto_recus' => true]);
+
+        $corps = $this->get(route('admin.ventes.nouvelle'))->assertOk()->getContent();
+
+        $this->assertStringContainsString('Il part à la certification dès son émission', $corps);
+    }
+
+    public function test_l_ecran_dit_que_le_recu_attend_quand_le_reglage_est_decoche(): void
+    {
+        $this->entreprise->update(['normalisation_auto_recus' => false]);
+
+        $corps = $this->get(route('admin.ventes.nouvelle'))->assertOk()->getContent();
+
+        $this->assertStringContainsString('est décochée dans vos', $corps);
+        $this->assertStringNotContainsString('Il part à la certification dès son émission', $corps);
+    }
 }

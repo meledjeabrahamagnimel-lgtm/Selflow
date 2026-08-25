@@ -11,6 +11,8 @@ use Illuminate\Support\Facades\Log;
 use App\Modules\Admin\Traits\JournaliseActions;
 use Illuminate\View\View;
 use App\Modules\Admin\Regles\Appartenance;
+use App\Modules\Admin\Modeles\Entreprise;
+use Illuminate\Validation\Rule;
 
 class EntrepriseControleur
 {
@@ -94,7 +96,18 @@ class EntrepriseControleur
             // Nouveaux champs d'inscription complète dégrisés
             'rccm'                   => ['nullable', 'string', 'max:100'],
             'ncc'                    => ['nullable', 'string', 'size:8', 'regex:/^[A-Z0-9]{7}[A-Z]$/'],
-            'regime_imposition'      => ['nullable', 'string', 'in:TEE,RNE,RSI,RNI'],
+            // La liste vivait ici, écrite en dur, et n'était pas celle que
+            // l'écran propose : le `<select>` offre les six régimes du modèle,
+            // la règle n'en acceptait que quatre. Une entreprise au TCE ou au
+            // régime des microentreprises choisissait son régime, enregistrait,
+            // et se voyait refuser sans comprendre — les deux régimes que la
+            // DGI cite pourtant pour l'exonération légale.
+            'regime_imposition'      => ['nullable', 'string', Rule::in(Entreprise::regimesAcceptesPour($entreprise))],
+            // La forme juridique ne se saisissait nulle part une fois
+            // l'entreprise créée : elle n'était demandée qu'au formulaire
+            // d'inscription, et la passerelle Comptaflow retombait sur « SARL »
+            // pour tout le monde.
+            'forme_juridique'        => ['nullable', 'string', 'max:60'],
             'centre_impots'          => ['nullable', 'string', 'max:100'],
             'compte_contribuable'    => ['nullable', 'string', 'max:100'],
             // `secteurs_activite` ne se saisit plus ici. Le domaine se choisit
@@ -132,6 +145,7 @@ class EntrepriseControleur
             'nom', 'gerant_nom', 'gerant_prenom', 'gerant_fonction',
             'adresse', 'telephone', 'email', 'ref_bancaire', 'comptaflow_sync_key',
             'rccm', 'ncc', 'regime_imposition', 'centre_impots', 'compte_contribuable',
+            'forme_juridique',
             // Champs DGI
             'idu', 'reference_cadastrale', 'proprietaire_local', 'commune', 'quartier',
             'sticker_solde_alerte', 'pied_de_page_facture', 'facture_autres_mentions',

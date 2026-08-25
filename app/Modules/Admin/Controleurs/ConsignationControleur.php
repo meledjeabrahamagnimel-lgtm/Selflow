@@ -53,6 +53,7 @@ class ConsignationControleur extends Controller
             'etat'          => $request->input('etat', 'en_cours'),
             'dehors'        => ConsignationService::ceQuiEstDehors($entrepriseId, $sens),
             'emballages'    => Produit::where('entreprise_id', $entrepriseId)
+                ->selectionnables()
                 ->whereNotNull('prix_consignation')
                 ->where('prix_consignation', '>', 0)
                 ->orderBy('nom')->get(),

@@ -96,6 +96,10 @@ Elles ne se rediscutent pas sans raison neuve.
 | Secteur d'activité | **Ne se saisit plus à la main.** Il se déduit du parcours de configuration — domaine à l'étape 1, réaligné sur les métiers souscrits à l'étape 4. Deux écrans posaient la même question sans se parler — 24/08/2026, propriétaire du projet |
 | Configuration acquise | **Additive.** Ajouter un domaine, un métier ou un rayon est toujours possible ; ce qui est souscrit ne se retire pas. **Un module qui porte des données ne se referme plus** — le fermer ne supprimerait rien mais ferait disparaître les écrans où ces données se lisent. Le verrou ne s'applique qu'à ce qui est vérifiable par un comptage — 24/08/2026, propriétaire du projet |
 | Photos d'articles | Servies par le lien `public/storage` quand il existe, **par une route de l'application sinon**. Sans ce repli, une installation où `php artisan storage:link` n'a pas été lancé rendait des adresses en 404 (Not Found — introuvable) que seul le fond de carte laissait voir — 24/08/2026 |
+| Article archivé | **Il disparaît des écrans de saisie** : vente, achat, production, consignation, alertes de rupture, ouverture d'un point de vente. Il **reste** visible au stock tant qu'il porte une quantité : la marchandise est là, et les écritures la portent — 25/08/2026, propriétaire du projet |
+| Formulaire d'inscription | **L'étape 1 ne demande que le nom de l'entreprise.** Trois étapes, dont la dernière est facultative ; l'adresse électronique, qui est l'identifiant de connexion, est demandée avec le responsable. La forme juridique et le domaine d'activité se renseignent depuis l'application — 25/08/2026, propriétaire du projet |
+| Illustration d'article | **Vingt-deux dessins au trait tenus dans le dépôt**, choisis d'après le nom de l'article. Ce ne sont pas des photos et cela ne prétend pas l'être : aller chercher une image du commerce montrerait une marchandise que l'entreprise ne vend pas. La vraie photo passe toujours devant — 25/08/2026 |
+
 
 ---
 
@@ -2341,6 +2345,169 @@ manque. Dans les trois cas la vignette montre l'image d'attente — qui ressembl
 entreprise, avec les noms des articles concernés.
 
 **885 épreuves, 885 vertes, 3 767 vérifications.**
+
+---
+
+### Lot 14 — Ce que six écrans disaient encore de travers — **TERMINÉ**
+
+Six remarques du propriétaire, faites d'un coup. Cinq portaient sur un défaut
+réel ; la sixième — les images de cartes — a ouvert une question qui n'avait
+jamais été posée.
+
+#### 14.1 — Archiver un article ne le retirait de rien
+
+**Le mot n'avait d'effet que sur un écran.** Le catalogue rangeait les archivés
+dans un second onglet ; partout ailleurs, l'article continuait de se proposer
+comme avant. La caisse l'affichait en carte, prix compris, et on pouvait le
+vendre. Le formulaire d'achat le proposait au réapprovisionnement. La fiche
+technique l'acceptait en ingrédient. L'écran des consignations le comptait
+parmi les emballages. Le tableau de bord le portait en rupture — **poussant à
+commander ce qu'on avait décidé de ne plus vendre**. L'ouverture d'un point de
+vente lui créait une fiche de stock neuve.
+
+Le filtre était pourtant écrit : `scopeActifs()` existait, et un seul écran
+l'appelait.
+
+| Décision | Raison |
+|---|---|
+| **Un nom pour la règle, `selectionnables()`** | Et non `actifs()` répété à dix endroits. Quand une raison de plus d'écarter un article apparaîtra — périmé, suspendu —, elle se posera à un seul endroit |
+| **Le stock garde l'archivé qui porte une quantité** | La marchandise est là, et les écritures la portent. La taire ferait tomber la valeur de l'inventaire sans que rien ne l'explique, et l'écart resterait sans moyen de le solder. `visiblesEnStock()` le retient tant qu'il n'est pas à zéro |
+| **La modification d'une pièce garde ce qu'elle porte déjà** | Un devis établi avant l'archivage porte peut-être l'article rangé depuis. Le taire retirerait la ligne du formulaire, donc de la pièce, à la première modification |
+| **Les alertes de rupture l'écartent** | Il ne se réapprovisionne pas |
+
+- `Produit::scopeSelectionnables()`, `Produit::scopeVisiblesEnStock()`
+- Vente, achat, production, consignation, points de vente, tableau de bord
+- `tests/Feature/ArticleArchiveTest.php` — 8 épreuves, dont 7 tombent contre
+  l'ancien code.
+
+#### 14.2 — L'inscription demandait quatre choses pour une
+
+**L'étape 1 réclamait le nom, la forme juridique, l'adresse électronique et le
+téléphone.** Une seule est indispensable — et l'adresse électronique, qui est
+l'**identifiant de connexion**, était demandée une étape avant qu'on sache qui
+se connecte.
+
+Elle rejoint le responsable, avec le téléphone. La forme juridique quitte le
+formulaire : elle se renseigne désormais depuis les paramètres, où elle
+manquait (voir 14.6).
+
+**Un champ était demandé puis jeté.** `telephone_gerant` — « Téléphone
+personnel » — était validé et **jamais enregistré**, ni sur l'entreprise ni sur
+l'utilisateur. Retiré plutôt que branché : un seul numéro suffit à joindre le
+responsable.
+
+**Le bouton de sortie ne se voyait pas.** « Terminer sans remplir la suite »
+était un lien souligné, gris clair, de douze pixels, sous le bouton principal.
+C'est pourtant la sortie de l'inscription — les étapes qui suivent sont
+facultatives. Il devient un vrai bouton, avec la phrase qui dit ce qu'il fait.
+
+**Le bloc Google se referme après le responsable.** S'inscrire par Google
+remplace le formulaire ; passé cette étape, il n'y a plus rien à remplacer, et
+la bascule perdrait la saisie.
+
+#### 14.3 — L'étape 4 était l'ancien mécanisme
+
+Elle posait le domaine d'activité par une grille de cases à cocher — celle-là
+même qui a été retirée des paramètres au lot 13.2. Deux écrans posaient la même
+question sans se parler : **on pouvait déclarer « Santé » à l'inscription et
+souscrire « Boulangerie » au parcours**, et les deux réponses cohabitaient.
+
+L'étape part, la règle `secteurs_activite` avec elle, et l'inscription se
+parcourt en trois étapes. Une épreuve vérifie qu'un domaine posté à la main ne
+s'écrit pas — le champ n'est plus proposé, rien n'empêche de le poster.
+
+**L'écran du superadministrateur garde le sien.** Il crée une entreprise pour
+elle et n'a pas le parcours sous la main ; c'était déjà la décision du lot 13.
+
+#### 14.4 — Le reçu s'annonçait non certifié alors qu'il l'était
+
+L'écran de vente affichait, sous le bouton « Reçu » : « Normalisation RNE en
+attente. Sa certification auprès de la DGI reste suspendue tant que la FNE n'a
+pas fourni les champs de mappage du reçu normalisé électronique. »
+
+C'était vrai avant la refonte du reçu. **Depuis, le reçu emprunte la porte de
+la facture** — mêmes champs, même envoi, même sticker consommé —, et rien ne le
+retient. Le texte est resté : il disait à l'utilisateur que ses reçus
+n'étaient pas certifiés alors qu'ils l'étaient. Le commentaire du code juste
+au-dessus disait déjà le contraire.
+
+L'encadré dit maintenant ce qui se passe, et lit le réglage de normalisation
+automatique des reçus pour annoncer si la pièce part tout de suite ou attend.
+
+**Rien de la FNE n'a été touché** : ni payload, ni champ, ni colonne. Seul le
+texte d'un formulaire.
+
+#### 14.5 — Un seul sac gris pour tout le catalogue
+
+L'image d'attente était la même sous chaque article : trente cartes identiques
+où **seul le texte distinguait un sac de riz d'une prestation de conseil**. Sur
+un écran de caisse, on cherche l'article à sa forme avant de lire son nom.
+
+| Décision | Raison |
+|---|---|
+| **Des dessins au trait, tenus dans le dépôt** | Vingt-deux illustrations. Aller chercher sur internet « une bouteille qui ressemble à la vôtre » montrerait une marchandise que l'entreprise ne vend pas — c'est la règle des contenus inventés, appliquée au catalogue |
+| **Le choix se fait par mots, du plus précis au plus large** | Le nom de l'article, puis sa famille, puis sa catégorie. L'ordre fait la règle : « eau de javel » doit rencontrer « javel » avant « eau », sans quoi le produit d'entretien s'illustrerait d'une goutte d'eau minérale |
+| **Rien n'est deviné au-delà** | Un article dont aucun mot ne parle reçoit le dessin de son type — marchandise ou prestation — plutôt qu'une image prise au hasard qui raconterait autre chose |
+| **Les relations ne sont pas chargées à la volée** | La méthode est appelée une fois par carte ; trente cartes feraient soixante requêtes de plus à chaque ouverture de la caisse. Ce qui a été chargé sert, le reste est absent du texte examiné |
+| **La photo passe toujours devant** | Elle tient tout le fond de la carte ; le dessin, à défaut, se pose en filigrane au coin. Les deux ne cohabitent pas |
+
+**Simulation d'attaque.** Le nom de l'article traverse le service et revient
+dans un attribut `style` entre apostrophes. Un nom bien choisi refermerait
+l'attribut. L'adresse ne porte rien du nom — elle vient d'une liste fermée de
+vingt-deux dessins — et le nom, qui voyage bien dans la carte, y est échappé.
+Une épreuve le vérifie sur les deux points.
+
+Une épreuve relit aussi les dix-sept articles du catalogue réel du propriétaire,
+et une autre vérifie que **chaque dessin annoncé existe sur le disque** : un nom
+sans fichier rendrait une adresse en 404 (Not Found — introuvable) et la carte
+resterait vide sans un mot, exactement le défaut du lot 13.
+
+#### 14.6 — Les paramètres ne disaient pas l'état réel
+
+Le propriétaire a demandé de relire chaque carte à partir de « DGI & Local
+professionnel ». Quatre écarts, dont deux qui empêchaient de travailler.
+
+**Le régime d'imposition se refusait à l'enregistrement.** L'écran proposait les
+six régimes du modèle ; la règle de validation en portait **quatre, écrits en
+dur**, dont `RNE` — qui n'est pas un régime mais le sigle du reçu normalisé, la
+confusion déjà corrigée au lot 3. Une entreprise au **TCE** ou au **régime des
+microentreprises** choisissait son régime, enregistrait, et se voyait refuser
+sans comprendre — les deux régimes que la DGI cite pourtant pour l'exonération
+légale. La règle lit désormais `Entreprise::regimesAcceptesPour()`, comme les
+quatre autres écrans.
+
+**La forme juridique ne se corrigeait nulle part.** Demandée au seul formulaire
+d'inscription, elle n'était plus modifiable ensuite, et la passerelle Comptaflow
+retombait sur « SARL » pour tout le monde. Elle rejoint le RCCM.
+
+**Une carte s'annonçait « Lecture seule »** au-dessus de cinq champs qui se
+saisissent tous, dont le NCC et le régime — ceux-là mêmes qui décident du code
+TVA transmis à la DGI. Annoncer qu'on ne peut rien changer là où tout se change
+est la pire des indications. Elle s'appelle « Identité fiscale ».
+
+**La procédure de conformité ne vérifiait rien.** Six points, dont **cinq
+portaient `fait => null`** : autant de pastilles grises numérotées,
+indiscernables d'un travail non fait. Et sa phrase d'introduction — « Selflow
+établit vos factures et les certifient directement aupres de la DGI . Les deux
+doivent dire la même chose. » — restait d'une version où Selflow et la
+plateforme étaient deux systèmes à tenir d'accord.
+
+| Décision | Raison |
+|---|---|
+| **Trois états, et non deux** | Vérifié, à corriger, et « nous ne pouvons pas le vérifier d'ici ». Les confondre faisait passer six points pour autant de travaux en retard |
+| **Ce qui se compte porte son constat** | Les articles dont le taux de TVA sort du barème DGI, les clients qui portent un NCC, les points de vente déclarés, le seuil d'alerte de stickers. Un nombre vaut mieux qu'une consigne |
+| **Ce qui ne se vérifie pas d'ici le dit** | L'API ne communique ni les noms de points de vente déclarés chez la DGI, ni les options cochées sur l'espace. Le point porte « à vérifier sur votre espace FNE » plutôt qu'une pastille qui ressemble à un manquement |
+| **L'article archivé ne compte pas dans les taux hors barème** | Il ne part sur aucune facture : le signaler enverrait corriger ce qui n'a plus d'effet |
+
+**La page se parcourt.** Onze cartes sur deux colonnes et trois écrans de haut :
+on y cherchait un réglage en faisant défiler. Une barre d'ancres dit d'un coup
+d'œil ce que la page contient, et y mène.
+
+- `tests/Feature/ParametresEntrepriseTest.php` — 14 épreuves
+- `tests/Feature/IllustrationArticleTest.php` — 27 épreuves
+- `tests/Feature/ArticleArchiveTest.php` — 8 épreuves
+
+**942 épreuves, 942 vertes, 3 921 vérifications.**
 
 ---
 

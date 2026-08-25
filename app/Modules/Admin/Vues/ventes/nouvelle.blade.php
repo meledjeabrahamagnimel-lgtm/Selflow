@@ -45,6 +45,20 @@
         opacity: .94; pointer-events: none;
     }
     .produit-card.avec-photo:hover::after { opacity: .86; }
+
+    /* L'article sans photo. La carte etait vide : trente rectangles gris ou
+       seul le texte distinguait un sac de riz d'une prestation de conseil.
+       Le dessin ne remplit pas la carte comme une photo — il se tient au
+       fond a droite, en filigrane, la ou aucun texte ne passe. */
+    .produit-card.avec-dessin::before {
+        content: ''; position: absolute; z-index: 0;
+        right: -6px; top: 6px; width: 62px; height: 62px;
+        background-image: var(--dessin-produit);
+        background-size: contain; background-repeat: no-repeat;
+        background-position: center;
+        opacity: .5; transition: opacity .15s;
+    }
+    .produit-card.avec-dessin:hover::before { opacity: .8; }
     /* Sans cela, le texte passerait sous le voile. */
     .produit-card > * { position: relative; z-index: 2; }
     .produit-card:hover { border-color: var(--primary); background: rgba(99,102,241,.08); transform: translateY(-2px); }
@@ -197,8 +211,11 @@
                     @foreach($produits as $produit)
                     @php $suitLeStock = $produit->estStockable(); @endphp
                     @php $photo = $produit->photoReelle(); @endphp
-                    <div class="produit-card {{ $suitLeStock && $produit->stock_actuel <= 0 ? 'out-of-stock' : '' }} {{ $photo ? 'avec-photo' : '' }}"
-                         @if($photo) style="--fond-produit: url('{{ $photo }}');" @endif
+                    {{-- Une vraie photo tient tout le fond ; a defaut, le dessin
+                         de la nature de l'article se pose en filigrane. Les deux
+                         ne cohabitent pas : la photo dit deja tout. --}}
+                    <div class="produit-card {{ $suitLeStock && $produit->stock_actuel <= 0 ? 'out-of-stock' : '' }} {{ $photo ? 'avec-photo' : 'avec-dessin' }}"
+                         style="{{ $photo ? '--fond-produit: url(\'' . $photo . '\');' : '--dessin-produit: url(\'' . $produit->illustration() . '\');' }}"
                          data-id="{{ $produit->id }}"
                          data-nom="{{ $produit->nom }}"
                          data-prix="{{ $produit->prix_vente }}"
@@ -345,12 +362,31 @@
                                 Passé ce terme, les prix indiqués ne vous engagent plus. Trente jours par défaut.
                             </small>
                         </div>
-                        <div id="avertissementRne" style="display:none; margin-top:8px; padding:10px 12px; background:#fffbeb; border:1px solid #fcd34d; border-radius:8px; font-size:11px; color:#92400e; line-height:1.5;">
-                            <i class="fas fa-triangle-exclamation"></i>
-                            <strong>Normalisation RNE en attente.</strong>
-                            Le reçu sera enregistré et imprimable, mais sa certification auprès de la DGI
-                            reste suspendue tant que la FNE n'a pas fourni les champs de mappage du reçu
-                            normalisé électronique. Il pourra être normalisé rétroactivement.
+                        {{-- Cet encadré annonçait une certification « suspendue
+                             tant que la FNE n'a pas fourni les champs de mappage
+                             du reçu normalisé électronique ». C'était vrai avant
+                             la refonte du reçu : depuis, le reçu emprunte la
+                             porte de la facture — mêmes champs, même envoi,
+                             même sticker —, et rien ne le retient. Le texte est
+                             resté, et disait à l'utilisateur que ses reçus
+                             n'étaient pas certifiés alors qu'ils l'étaient. --}}
+                        <div id="noteRecu" style="display:none; margin-top:8px; padding:10px 12px; background:#eff6ff; border:1px solid #bfdbfe; border-radius:8px; font-size:11px; color:#1e40af; line-height:1.5;">
+                            <i class="fas fa-circle-info"></i>
+                            <strong>Le reçu se certifie comme une facture.</strong>
+                            Même envoi à la DGI, même code QR, même sticker consommé —
+                            seule la nature du document change.
+                            @php
+                                // `null` vaut « automatique » : c'était le seul
+                                // comportement avant que le réglage existe.
+                                $recuAuto = $entrepriseCourante?->normalisation_auto_recus ?? true;
+                            @endphp
+                            @if($recuAuto)
+                                Il part à la certification dès son émission.
+                            @else
+                                La normalisation automatique des reçus est décochée dans vos
+                                paramètres : celui-ci s'enregistrera sans être certifié, et
+                                vous pourrez le normaliser depuis la liste des ventes.
+                            @endif
                         </div>
                     </div>
 
@@ -649,10 +685,9 @@ function selectionnerEtapeVente(btn) {
     const montantPayeInput = document.getElementById('montantPayeInput');
 
     // Le reçu est bien enregistré comme tel : il ne bascule pas en facture.
-    // Sa certification RNE reste en revanche suspendue tant que la FNE n'a pas
-    // communiqué les champs de mappage du reçu normalisé électronique.
-    const avertissement = document.getElementById('avertissementRne');
-    if (avertissement) avertissement.style.display = estRecu ? 'block' : 'none';
+    // Sa certification suit celle de la facture — voir `#noteRecu`.
+    const noteRecu = document.getElementById('noteRecu');
+    if (noteRecu) noteRecu.style.display = estRecu ? 'block' : 'none';
 
     // Seules les offres ont un terme : une facture engage des son emission.
     const blocValidite = document.getElementById('blocValidite');
@@ -662,7 +697,7 @@ function selectionnerEtapeVente(btn) {
 
     if (estRecu) {
         blocPaiement.style.display = 'block';
-        infoEtape.textContent = 'Reçu encaissé — normalisation RNE en attente des champs de mappage FNE';
+        infoEtape.textContent = 'Reçu encaissé — certifié auprès de la DGI comme une facture';
         labelBtn.textContent = 'Valider et émettre le reçu';
         montantPayeInput.removeAttribute('disabled');
     } else if (etape === 'Facture') {

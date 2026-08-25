@@ -3,7 +3,6 @@
 namespace App\Modules\Authentification\Controleurs;
 
 use App\Modules\Admin\Modeles\Entreprise;
-use App\Modules\Admin\Modeles\Referentiel\Categorie;
 use App\Modules\Authentification\Modeles\Utilisateur;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -20,9 +19,9 @@ class InscriptionControleur
     /** Afficher le formulaire d'inscription. */
     public function afficher(): View
     {
-        return view('authentification::inscription', [
-            'domaines' => Categorie::domaines(),
-        ]);
+        // La liste des domaines n'est plus transmise : l'étape qui les cochait
+        // est partie, le parcours de configuration s'en charge.
+        return view('authentification::inscription');
     }
 
     /** Traiter la soumission du formulaire d'inscription. */
@@ -50,7 +49,10 @@ class InscriptionControleur
             'telephone'           => ['nullable', 'string', 'max:30'],
             'rccm'                => ['nullable', 'string', 'max:100'],
             'compte_contribuable' => ['nullable', 'string', 'max:100'],
-            'forme_juridique'     => ['nullable', 'string', 'max:60'],
+            // La forme juridique a quitté le formulaire : on demandait quatre
+            // choses pour créer une entreprise dont une seule est
+            // indispensable. Elle se renseigne depuis les paramètres, avec le
+            // reste de l'identité légale.
             'centre_impots'       => ['nullable', 'string', 'max:100'],
             'ncc'                 => ['nullable', 'string', 'size:8', 'regex:/^[A-Z0-9]{7}[A-Z]$/'],
 
@@ -67,13 +69,12 @@ class InscriptionControleur
             'possede_compte_fne'  => ['nullable', 'in:0,1'],
             'fne_ncc'             => ['nullable', 'string', 'size:8', 'regex:/^[A-Z0-9]{7}[A-Z]$/'],
             'fne_mot_de_passe'    => ['nullable', 'string', 'max:255'],
-            // Le domaine se choisit dans le référentiel, pas au clavier : une
-            // valeur libre ne correspondrait à aucune catégorie, et l'étape 1
-            // de la souscription ne saurait pas la retrouver.
-            'secteurs_activite'   => ['nullable', 'array'],
-            'secteurs_activite.*' => ['nullable', 'string', Rule::in(Categorie::domaines())],
+            // Le domaine ne se coche plus ici. Il se choisit à la première
+            // étape du parcours de configuration, avec les métiers qui en
+            // découlent, leurs rayons et leurs articles. Deux écrans posaient
+            // la même question sans se parler : on pouvait déclarer « Santé »
+            // à l'inscription et souscrire « Boulangerie » ensuite.
             'fonction_gerant'     => ['nullable', 'string', 'max:100'],
-            'telephone_gerant'    => ['nullable', 'string', 'max:30'],
         ], [
             'nom_entreprise.required'    => 'Le nom de votre entreprise est obligatoire.',
             'regime_imposition.in'       => 'Régime invalide. Choisissez-en un dans la liste proposée.',
@@ -102,13 +103,18 @@ class InscriptionControleur
                 'adresse'             => trim($request->adresse ?? ''),
                 'rccm'                => trim($request->rccm ?? ''),
                 'compte_contribuable' => trim($request->compte_contribuable ?? ''),
-                'forme_juridique'     => trim($request->forme_juridique ?? ''),
                 'regime_imposition'   => $request->regime_imposition,
                 'ncc'                 => $request->filled('fne_ncc')
                     ? strtoupper(trim($request->fne_ncc))
                     : ($request->filled('ncc') ? strtoupper(trim($request->ncc)) : null),
                 'centre_impots'       => trim($request->centre_impots ?? ''),
-                'secteur_activite'    => $request->secteurs_activite ?? [],
+                // `secteur_activite` n'est plus écrit ici : la colonne se
+                // remplit au parcours, dès le domaine choisi. Y poser un
+                // tableau vide serait sans effet aujourd'hui, mais la ligne
+                // survivrait au prochain écran qui la renseignerait avant.
+                //
+                // Tant qu'elle est vide, l'entreprise est « inscription
+                // incomplète » et la bannière renvoie au parcours.
                 // Trois états : la question peut n'avoir pas encore été posée,
                 // l'étape étant facultative.
                 'possede_compte_fne'  => $request->filled('possede_compte_fne')

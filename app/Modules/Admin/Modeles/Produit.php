@@ -296,11 +296,60 @@ class Produit extends Model
         return $query->where('statut', 'archive');
     }
 
+    /**
+     * Les articles qu'on peut porter sur une pièce à établir.
+     *
+     * Archiver un article, c'est dire « je ne le vends plus ». Le mot n'avait
+     * pourtant d'effet que sur l'écran du catalogue : la caisse, l'achat, la
+     * production, la consignation et le B2B continuaient de le proposer, et
+     * l'utilisateur le retrouvait sur une facture après l'avoir rangé.
+     *
+     * Un seul nom pour la règle, et non `actifs()` répété à dix endroits :
+     * quand une raison de plus d'écarter un article apparaîtra — un article
+     * périmé, un article suspendu —, elle se posera ici.
+     */
+    public function scopeSelectionnables($query)
+    {
+        return $query->where('statut', 'actif');
+    }
+
+    /**
+     * Les articles qu'un écran de stock doit montrer.
+     *
+     * Un article archivé qui porte encore de la marchandise n'a pas quitté le
+     * magasin. Le taire ferait tomber la valeur de l'inventaire sans que rien
+     * ne l'explique, et la quantité resterait dans les écritures : on
+     * afficherait un stock qui ne vaut plus ce que la comptabilité en dit.
+     * Il reste donc visible tant qu'il n'est pas à zéro.
+     */
+    public function scopeVisiblesEnStock($query)
+    {
+        return $query->where(function ($q) {
+            $q->where('statut', 'actif')
+              ->orWhereHas('stocks', fn ($s) => $s->where('quantite_disponible', '>', 0));
+        });
+    }
+
     // ─── Accessor Photo ──────────────────────────────────────────────────────
 
     public function getPhotoUrlAttribute(): string
     {
-        return $this->photoReelle() ?? asset('images/placeholder-produit.png');
+        // L'image d'attente était un sac gris, le même sous chaque article :
+        // trente cartes identiques où seul le texte distinguait un sac de riz
+        // d'une prestation de conseil. À défaut de photo, on montre au moins
+        // de quelle nature d'article il s'agit.
+        return $this->photoReelle() ?? $this->illustration();
+    }
+
+    /**
+     * Le dessin qui tient lieu d'image quand l'article n'a pas de photo.
+     *
+     * Ce n'est pas une photo et cela ne prétend pas l'être — voir
+     * `IllustrationArticleService`.
+     */
+    public function illustration(): string
+    {
+        return \App\Modules\Admin\Services\IllustrationArticleService::pour($this);
     }
 
     /**

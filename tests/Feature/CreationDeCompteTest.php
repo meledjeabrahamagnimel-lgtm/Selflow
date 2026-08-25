@@ -191,15 +191,89 @@ class CreationDeCompteTest extends TestCase
             array_column(EtapesCreation::facultatives(), 'cle'));
     }
 
-    public function test_la_page_d_inscription_se_parcourt_en_quatre_etapes(): void
+    public function test_la_page_d_inscription_se_parcourt_en_trois_etapes(): void
     {
+        // Elles étaient quatre. La dernière posait le domaine d'activité par
+        // une grille de cases — l'ancien mécanisme, retiré des paramètres au
+        // lot 13 : deux écrans posaient la même question sans se parler.
         $corps = $this->get(route('inscription'))->assertOk()->getContent();
 
-        foreach ([1, 2, 3, 4] as $rang) {
+        foreach ([1, 2, 3] as $rang) {
             $this->assertStringContainsString('data-pas="' . $rang . '"', $corps);
         }
 
+        $this->assertStringNotContainsString('data-pas="4"', $corps);
         $this->assertStringContainsString('btn-suivant', $corps);
+    }
+
+    public function test_l_inscription_ne_coche_plus_de_secteur_d_activite(): void
+    {
+        $corps = $this->get(route('inscription'))->assertOk()->getContent();
+
+        $this->assertStringNotContainsString('secteurs_activite', $corps);
+    }
+
+    public function test_un_secteur_poste_a_la_main_n_est_pas_retenu(): void
+    {
+        // Simulation d'attaque : le champ n'est plus proposé, mais rien
+        // n'empêche de le poster. Il ne doit rien écrire — sans quoi on
+        // rouvrirait la double saisie par la porte de derrière.
+        $this->post(route('inscription.traitement'), $this->inscription([
+            'secteurs_activite' => ['Santé'],
+        ]))->assertSessionHasNoErrors();
+
+        $entreprise = Entreprise::where('nom', 'Boutique du carrefour')->firstOrFail();
+
+        $this->assertEmpty($entreprise->secteur_activite ?? []);
+    }
+
+    public function test_la_premiere_etape_ne_demande_que_le_nom(): void
+    {
+        // La forme juridique, l'adresse électronique et le téléphone y
+        // vivaient : quatre questions pour créer une entreprise dont une seule
+        // est indispensable, et l'identifiant de connexion réclamé avant qu'on
+        // sache qui se connecte.
+        $corps = $this->get(route('inscription'))->assertOk()->getContent();
+
+        $etape1 = substr($corps,
+            strpos($corps, 'data-pas="1"'),
+            strpos($corps, 'data-pas="2"') - strpos($corps, 'data-pas="1"'));
+
+        $this->assertStringContainsString('name="nom_entreprise"', $etape1);
+        $this->assertStringNotContainsString('name="email"', $etape1);
+        $this->assertStringNotContainsString('name="telephone"', $etape1);
+        $this->assertStringNotContainsString('name="forme_juridique"', $etape1);
+    }
+
+    public function test_l_adresse_de_connexion_est_demandee_avec_le_responsable(): void
+    {
+        $corps = $this->get(route('inscription'))->assertOk()->getContent();
+
+        $etape2 = substr($corps,
+            strpos($corps, 'data-pas="2"'),
+            strpos($corps, 'data-pas="3"') - strpos($corps, 'data-pas="2"'));
+
+        $this->assertStringContainsString('name="email"', $etape2);
+        $this->assertStringContainsString('name="telephone"', $etape2);
+    }
+
+    public function test_le_telephone_personnel_ne_se_demande_plus(): void
+    {
+        // Il était validé et jamais enregistré — ni sur l'entreprise, ni sur
+        // l'utilisateur. Un champ demandé puis jeté.
+        $corps = $this->get(route('inscription'))->assertOk()->getContent();
+
+        $this->assertStringNotContainsString('telephone_gerant', $corps);
+    }
+
+    public function test_le_bloc_google_se_referme_apres_le_responsable(): void
+    {
+        // S'inscrire par Google remplace le formulaire : passé le responsable,
+        // il n'y a plus rien à remplacer, et la bascule perdrait la saisie.
+        $corps = $this->get(route('inscription'))->assertOk()->getContent();
+
+        $this->assertStringContainsString('id="bloc-google"', $corps);
+        $this->assertStringContainsString('DERNIERE_AVEC_GOOGLE = 2', $corps);
     }
 
     // ── L'accès à l'espace FNE ───────────────────────────────────────

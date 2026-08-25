@@ -54,28 +54,27 @@ class DomainesActiviteTest extends TestCase
         $this->assertContains(Categorie::AUTRE, Categorie::domaines());
     }
 
-    public function test_la_page_d_inscription_propose_le_referentiel(): void
+    public function test_l_inscription_ne_propose_plus_aucun_domaine(): void
     {
+        // Elle en proposait douze, par cases à cocher, pendant que le parcours
+        // de configuration posait la même question à sa première étape. Les
+        // deux écrans ne se parlaient pas : on pouvait déclarer « Santé » ici
+        // et souscrire « Boulangerie » là, et les deux réponses cohabitaient.
+        // Une seule question désormais, au parcours.
         $reponse = $this->get(route('inscription'))->assertOk();
 
-        foreach (['Commerce', 'E-commerce', 'Agriculture-Élevage', 'BTP-Travaux', 'ONG-Associations'] as $domaine) {
-            $reponse->assertSee($domaine, false);
+        $reponse->assertDontSee('secteurs_activite', false);
+
+        foreach (['Agriculture-Élevage', 'BTP-Travaux', 'ONG-Associations'] as $domaine) {
+            $reponse->assertDontSee('value="' . $domaine . '"', false);
         }
     }
 
-    public function test_la_page_d_inscription_ne_propose_plus_l_ancienne_liste(): void
+    public function test_un_domaine_poste_a_l_inscription_reste_sans_effet(): void
     {
-        $reponse = $this->get(route('inscription'))->assertOk();
-
-        // « Agro-industrie » et « Finance » n'ont jamais existé ailleurs que
-        // dans cette vue.
-        foreach (['Agro-industrie', 'Finance', 'Industriel'] as $ancien) {
-            $reponse->assertDontSee($ancien, false);
-        }
-    }
-
-    public function test_un_domaine_hors_referentiel_est_refuse_a_l_inscription(): void
-    {
+        // La règle qui refusait un domaine hors référentiel est partie avec le
+        // champ. Ce qui compte désormais n'est plus qu'une valeur inventée soit
+        // refusée, mais qu'aucune valeur postée n'atteigne la colonne.
         $this->post(route('inscription.traitement'), [
             'nom_entreprise'        => 'Boutique du carrefour',
             'regime_imposition'     => 'RSI',
@@ -86,9 +85,11 @@ class DomainesActiviteTest extends TestCase
             'password_confirmation' => 'un-mot-de-passe',
             'conditions'            => '1',
             'secteurs_activite'     => ['Agro-industrie'],
-        ])->assertSessionHasErrors('secteurs_activite.0');
+        ])->assertSessionHasNoErrors();
 
-        $this->assertDatabaseMissing('entreprises', ['nom' => 'Boutique du carrefour']);
+        $entreprise = \App\Modules\Admin\Modeles\Entreprise::where('nom', 'Boutique du carrefour')->firstOrFail();
+
+        $this->assertEmpty($entreprise->secteur_activite ?? []);
     }
 
     public function test_un_domaine_du_referentiel_est_accepte_a_l_inscription(): void

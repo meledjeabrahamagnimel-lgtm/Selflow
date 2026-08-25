@@ -10,6 +10,33 @@
         </div>
     </div>
 
+    {{-- La page porte neuf cartes sur deux colonnes et trois écrans de haut :
+         on y cherchait un réglage en faisant défiler. Les ancres disent d'un
+         coup d'œil ce qu'elle contient, et y mènent. --}}
+    <nav aria-label="Sections des paramètres"
+         style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:22px;">
+        @foreach([
+            'identite'      => ['Identité', 'fa-info-circle'],
+            'fiscal'        => ['Identité fiscale', 'fa-file-invoice'],
+            'comptaflow'    => ['Liaison Comptaflow', 'fa-link'],
+            'dgi'           => ['DGI & local', 'fa-map-marker-alt'],
+            'compte-fne'    => ['Compte FNE', 'fa-id-card-clip'],
+            'conformite'    => ['Conformité FNE', 'fa-clipboard-check'],
+            'options'       => ['Options fiscales', 'fa-check-square'],
+            'tiers'         => ['Numérotation des tiers', 'fa-hashtag'],
+            'impression'    => ['Impression', 'fa-print'],
+            'exercices'     => ['Exercices comptables', 'fa-calendar-alt'],
+            'statut-fne'    => ['Statut FNE', 'fa-key'],
+        ] as $ancre => [$libelle, $icone])
+            <a href="#{{ $ancre }}"
+               style="display:inline-flex;align-items:center;gap:7px;padding:7px 13px;border-radius:20px;
+                      background:var(--bg3);border:1px solid var(--border);color:var(--text-2);
+                      font-size:12px;font-weight:600;text-decoration:none;">
+                <i class="fas {{ $icone }}" style="color:var(--primary);font-size:11px;"></i>{{ $libelle }}
+            </a>
+        @endforeach
+    </nav>
+
     {{-- ══ Votre configuration ══
 
          Les secteurs d'activité se cochaient ici, dans une liste qui ne parlait
@@ -158,7 +185,7 @@
                 <div class="card" style="padding:24px;">
                     <div
                         style="font-size:12px;font-weight:700;color:var(--text-2);text-transform:uppercase;letter-spacing:.5px;margin-bottom:16px;display:flex;align-items:center;gap:8px;">
-                        <i class="fas fa-info-circle" style="color:var(--primary);"></i> Informations générales
+                        <span id="identite" style="scroll-margin-top:90px;"></span><i class="fas fa-info-circle" style="color:var(--primary);"></i> Informations générales
                     </div>
                     <div style="display:flex;flex-direction:column;gap:14px;">
                         @php
@@ -224,14 +251,28 @@
                                     placeholder="Ex: contact@monentreprise.com">
                             </div>
                         </div>
-                        <div class="form-group">
-                            <label class="form-label">
-                                RCCM <span style="color:var(--danger)">*</span>
-                                <span style="font-size:10px;color:var(--text-3);font-weight:400;"> — Registre du Commerce et
-                                    du Crédit Mobilier</span>
-                            </label>
-                            <input type="text" name="rccm" class="form-control" value="{{ old('rccm', $entreprise->rccm) }}"
-                                placeholder="Ex: CI-ABJ-03-2021-B13-05438">
+                        <div style="display:grid;grid-template-columns:2fr 1fr;gap:12px;">
+                            <div class="form-group" style="margin-bottom:0;">
+                                <label class="form-label">
+                                    RCCM <span style="color:var(--danger)">*</span>
+                                    <span style="font-size:10px;color:var(--text-3);font-weight:400;"> — Registre du Commerce et
+                                        du Crédit Mobilier</span>
+                                </label>
+                                <input type="text" name="rccm" class="form-control" value="{{ old('rccm', $entreprise->rccm) }}"
+                                    placeholder="Ex: CI-ABJ-03-2021-B13-05438">
+                            </div>
+                            {{-- Elle n'était demandée qu'au formulaire d'inscription,
+                                 et ne se corrigeait plus ensuite : la passerelle
+                                 Comptaflow retombait sur « SARL » pour tout le monde. --}}
+                            <div class="form-group" style="margin-bottom:0;">
+                                <label class="form-label">Forme juridique</label>
+                                <select name="forme_juridique" class="form-control">
+                                    <option value="">— Choisir —</option>
+                                    @foreach(['Entreprise individuelle','SARL','SARL Unipersonnelle','SA','SAS','SNC','GIE','Coopérative','Association'] as $fj)
+                                        <option value="{{ $fj }}" {{ old('forme_juridique', $entreprise->forme_juridique) === $fj ? 'selected' : '' }}>{{ $fj }}</option>
+                                    @endforeach
+                                </select>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -240,8 +281,12 @@
                 <div class="card" style="padding:24px;">
                     <div
                         style="font-size:12px;font-weight:700;color:var(--text-2);text-transform:uppercase;letter-spacing:.5px;margin-bottom:16px;display:flex;align-items:center;gap:8px;">
-                        <i class="fas fa-file-invoice" style="color:var(--primary);"></i> Informations fiscales (Lecture
-                        seule)
+                        {{-- L'en-tête annonçait « Lecture seule » au-dessus de cinq
+                             champs qui se saisissent tous, et dont deux — le NCC et
+                             le régime — décident du code TVA transmis à la DGI.
+                             Annoncer qu'on ne peut rien changer là où tout se change
+                             est la pire des indications. --}}
+                        <span id="fiscal" style="scroll-margin-top:90px;"></span><i class="fas fa-file-invoice" style="color:var(--primary);"></i> Identité fiscale
                     </div>
                     <div style="display:flex;flex-direction:column;gap:14px;">
                         <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
@@ -288,7 +333,7 @@
                                     style="font-size:12px;font-weight:700;color:{{ $entreprise->comptaflow_sync_status === 'active' ? '#065f46' : 'var(--text-2)' }};text-transform:uppercase;letter-spacing:.5px;display:flex;align-items:center;gap:8px;">
                                     <i class="fas fa-link"
                                         style="color:{{ $entreprise->comptaflow_sync_status === 'active' ? '#10b981' : 'var(--text-3)' }};"></i>
-                                    Liaison COMPTAFLOW
+                                    <span id="comptaflow" style="scroll-margin-top:90px;"></span>Liaison COMPTAFLOW
                                 </div>
                                 @if($entreprise->comptaflow_sync_status === 'active')
                                     <span
@@ -354,7 +399,7 @@
                 <div class="card" style="padding:24px;">
                     <div
                         style="font-size:12px;font-weight:700;color:var(--text-2);text-transform:uppercase;letter-spacing:.5px;margin-bottom:16px;display:flex;align-items:center;gap:8px;">
-                        <i class="fas fa-map-marker-alt" style="color:var(--primary);"></i> DGI & Local professionnel
+                        <span id="dgi" style="scroll-margin-top:90px;"></span><i class="fas fa-map-marker-alt" style="color:var(--primary);"></i> DGI & Local professionnel
                     </div>
                     <div style="display:flex;flex-direction:column;gap:14px;">
 
@@ -432,7 +477,7 @@
 
                 <div class="card" style="padding:24px;">
                     <div style="font-size:12px;font-weight:700;color:var(--text-2);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px;display:flex;align-items:center;gap:8px;">
-                        <i class="fas fa-id-card-clip" style="color:var(--primary);"></i> Compte sur la plateforme FNE
+                        <span id="compte-fne" style="scroll-margin-top:90px;"></span><i class="fas fa-id-card-clip" style="color:var(--primary);"></i> Compte sur la plateforme FNE
                     </div>
 
                     <p style="font-size:12px;color:var(--text-3);line-height:1.6;margin-bottom:14px;">
@@ -512,48 +557,90 @@
                 <div class="card" style="padding:24px;">
                     <div
                         style="font-size:12px;font-weight:700;color:var(--text-2);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px;display:flex;align-items:center;gap:8px;">
-                        <i class="fas fa-clipboard-check" style="color:var(--primary);"></i> Procédure à suivre — conformité
+                        <span id="conformite" style="scroll-margin-top:90px;"></span><i class="fas fa-clipboard-check" style="color:var(--primary);"></i> Procédure à suivre — conformité
                         FNE
                     </div>
+                    {{-- La phrase d'introduction disait « Selflow établit vos
+                         factures et les certifient directement auprès de la
+                         DGI. Les deux doivent dire la même chose. » — reste
+                         d'une version où Selflow et la plateforme étaient deux
+                         systèmes à tenir d'accord. Depuis, Selflow certifie
+                         lui-même ; « les deux » ne désignait plus rien. --}}
                     <p style="font-size:12px;color:var(--text-3);line-height:1.6;margin-bottom:16px;">
-                        Selflow établit vos factures et les certifient directement aupres de la DGI . Les deux doivent
-                        dire la même chose. Ces six points sont ceux qui, s'ils sont négligés,
-                        font diverger la facture certifiée de la vôtre.
+                        Selflow établit vos factures et les envoie lui-même à la plateforme de la
+                        DGI, qui les certifie. Ce que vous renseignez ici part avec elles : ces six
+                        points sont ceux qui, négligés, font revenir une pièce certifiée
+                        <strong>différente de celle que vous avez établie</strong> — ou pas de pièce
+                        du tout.
                     </p>
 
                     @php
-                        // Chaque etape porte son motif : sans lui, l'utilisateur
-                        // n'a aucun moyen de juger de ce qu'il risque a la sauter.
+                        // Chaque point porte son motif : sans lui, l'utilisateur
+                        // n'a aucun moyen de juger de ce qu'il risque a le negliger.
+                        //
+                        // `fait` valait `null` sur cinq points des six : la liste
+                        // affichait cinq pastilles numerotees, indiscernables
+                        // d'un travail non fait, alors que rien n'avait ete
+                        // verifie. Ce qui se verifie porte maintenant sa coche ;
+                        // ce qui ne se verifie pas d'ici le dit, plutot que de
+                        // laisser croire a un manquement.
+                        $sitesNommes = $entreprise->pointsDeVente()->count();
+                        $clientsAvecNcc = \App\Modules\Admin\Modeles\Client::where('entreprise_id', $entreprise->id)
+                            ->whereNotNull('ncc')->where('ncc', '!=', '')->count();
+                        $tauxHorsBareme = \App\Modules\Admin\Modeles\Produit::where('entreprise_id', $entreprise->id)
+                            ->selectionnables()
+                            ->whereNotNull('taux_tva')
+                            ->whereNotIn('taux_tva', \App\Modules\Admin\Modeles\Produit::TAUX_TVA_DGI)
+                            ->count();
+
                         $etapesConformite = [
                             [
                                 'titre' => 'Renseigner l\'identité fiscale complète',
                                 'texte' => 'NCC, régime d\'imposition, RCCM et centre des impôts. Le NCC identifie votre entreprise auprès de la plateforme : sans lui, aucune facture n\'est certifiée.',
                                 'fait' => !empty($entreprise->ncc) && !empty($entreprise->regime_imposition) && !empty($entreprise->rccm),
+                                'constat' => null,
                             ],
                             [
                                 'titre' => 'Nommer les points de vente à l\'identique',
-                                'texte' => 'Le nom saisi dans Selflow est transmis tel quel à la FNE, qui refuse la facture s\'il ne correspond à aucun point de vente déclaré sur votre espace.',
+                                'texte' => 'Le nom saisi dans Selflow est transmis tel quel à la plateforme, qui refuse la facture s\'il ne correspond à aucun point de vente déclaré sur votre espace.',
+                                // On sait compter les sites ; on ne peut pas lire
+                                // les noms declares chez la DGI — l'API ne les
+                                // expose pas. Le point reste donc a verifier a la
+                                // main, et le dire vaut mieux que le taire.
                                 'fait' => null,
+                                'constat' => $sitesNommes === 1
+                                    ? 'Un point de vente déclaré ici. Vérifiez qu\'il porte le même nom sur votre espace FNE.'
+                                    : $sitesNommes . ' points de vente déclarés ici. Vérifiez que chacun porte le même nom sur votre espace FNE.',
                             ],
                             [
                                 'titre' => 'N\'utiliser que les taux de TVA du barème DGI',
-                                'texte' => '18 %, 9 % ou 0 %. La FNE ne reçoit pas un pourcentage mais un code, et applique le taux attaché à ce code : un taux intermédiaire serait taxé à 18 % sur la facture certifiée.',
-                                'fait' => null,
+                                'texte' => '18 %, 9 % ou 0 %. La plateforme ne reçoit pas un pourcentage mais un code, et applique le taux attaché à ce code : un taux intermédiaire — 5 % par exemple — serait taxé à 18 % sur la facture certifiée.',
+                                'fait' => $tauxHorsBareme === 0,
+                                'constat' => $tauxHorsBareme === 0
+                                    ? 'Aucun article hors barème dans votre catalogue.'
+                                    : $tauxHorsBareme . ' article(s) portent un taux que la plateforme ne sait pas représenter.',
                             ],
                             [
                                 'titre' => 'Saisir le NCC des clients professionnels',
-                                'texte' => 'Une facture B2B sans NCC client est rejetée par la plateforme. Sans NCC, la vente relève du B2C.',
+                                'texte' => 'Une facture B2B sans NCC client est rejetée par la plateforme. Sans NCC, la vente relève du B2C — ce qui est juste pour un particulier, et faux pour une entreprise.',
+                                // Aucun moyen de savoir lesquels de vos clients
+                                // sont des professionnels : la fiche ne porte pas
+                                // la distinction. On compte ce qu'on sait compter.
                                 'fait' => null,
+                                'constat' => $clientsAvecNcc . ' de vos clients portent un NCC.',
                             ],
                             [
-                                'titre' => 'Reporter ici les options cochées sur votre espace FNE',
-                                'texte' => 'Timbre de quittance et BAPA se règlent sur la plateforme, et l\'API ne permet pas de les lire. Si la case ci-dessous est cochée alors qu\'elle ne l\'est pas chez la DGI, vous encaisserez un timbre que la plateforme ne retiendra pas.',
+                                'titre' => 'Signaler un écart avec les options de votre espace FNE',
+                                'texte' => 'Le timbre de quittance et le bordereau d\'achat agricole se règlent sur la plateforme, et l\'API ne permet pas de les lire. L\'état affiché plus bas est celui que votre administrateur Selflow y a constaté : s\'il ne correspond plus, signalez-le — vous encaisseriez un timbre que la plateforme ne retiendra pas.',
                                 'fait' => null,
+                                'constat' => 'Timbre de quittance : ' . ($entreprise->timbre_quittance ? 'appliqué' : 'non appliqué')
+                                    . ' · BAPA : ' . ($entreprise->bapa ? 'ouvert' : 'fermé') . '.',
                             ],
                             [
                                 'titre' => 'Surveiller le solde de stickers',
                                 'texte' => 'La certification consomme un sticker par pièce. À zéro, plus rien n\'est normalisé. Le solde figure sur la page Gestion FNE, tel que la plateforme l\'a renvoyé à la dernière certification.',
                                 'fait' => null,
+                                'constat' => 'Vous serez alerté à ' . (int) ($entreprise->sticker_solde_alerte ?? 5) . ' sticker(s) restants.',
                             ],
                         ];
                     @endphp
@@ -561,16 +648,45 @@
                     <ol
                         style="list-style:none;padding:0;margin:0;display:flex;flex-direction:column;gap:12px;counter-reset:etape;">
                         @foreach($etapesConformite as $etape)
+                            @php
+                                // Trois états, et non deux : vérifié, à corriger,
+                                // et « nous ne pouvons pas le vérifier d'ici ».
+                                // Confondre les deux derniers sous une même
+                                // pastille grise faisait passer six points pour
+                                // autant de travaux en retard.
+                                $couleurs = match ($etape['fait']) {
+                                    true  => ['fond' => '#d1fae5', 'bord' => '#6ee7b7', 'encre' => '#047857'],
+                                    false => ['fond' => '#fef3c7', 'bord' => '#fcd34d', 'encre' => '#b45309'],
+                                    default => ['fond' => 'var(--bg3)', 'bord' => 'var(--border)', 'encre' => 'var(--text-3)'],
+                                };
+                            @endphp
                             <li style="display:flex;gap:12px;align-items:flex-start;">
                                 <span
-                                    style="flex-shrink:0;width:22px;height:22px;border-radius:50%;background:{{ $etape['fait'] === true ? '#d1fae5' : 'var(--bg3)' }};border:1px solid {{ $etape['fait'] === true ? '#6ee7b7' : 'var(--border)' }};display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:{{ $etape['fait'] === true ? '#047857' : 'var(--text-3)' }};margin-top:1px;">
-                                    @if($etape['fait'] === true)<i class="fas fa-check"
-                                    style="font-size:9px;"></i>@else{{ $loop->iteration }}@endif
+                                    style="flex-shrink:0;width:22px;height:22px;border-radius:50%;background:{{ $couleurs['fond'] }};border:1px solid {{ $couleurs['bord'] }};display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:{{ $couleurs['encre'] }};margin-top:1px;">
+                                    @if($etape['fait'] === true)
+                                        <i class="fas fa-check" style="font-size:9px;"></i>
+                                    @elseif($etape['fait'] === false)
+                                        <i class="fas fa-exclamation" style="font-size:9px;"></i>
+                                    @else
+                                        {{ $loop->iteration }}
+                                    @endif
                                 </span>
                                 <div>
-                                    <div style="font-weight:600;font-size:13px;color:var(--text);">{{ $etape['titre'] }}</div>
+                                    <div style="font-weight:600;font-size:13px;color:var(--text);">
+                                        {{ $etape['titre'] }}
+                                        @if($etape['fait'] === null)
+                                            <span style="font-size:10px;font-weight:600;color:var(--text-3);text-transform:none;letter-spacing:0;">
+                                                — à vérifier sur votre espace FNE
+                                            </span>
+                                        @endif
+                                    </div>
                                     <div style="font-size:12px;color:var(--text-3);line-height:1.6;margin-top:2px;">
                                         {{ $etape['texte'] }}</div>
+                                    @if($etape['constat'])
+                                        <div style="font-size:11.5px;color:{{ $couleurs['encre'] }};line-height:1.5;margin-top:4px;font-weight:600;">
+                                            {{ $etape['constat'] }}
+                                        </div>
+                                    @endif
                                 </div>
                             </li>
                         @endforeach
@@ -606,7 +722,7 @@
                 <div class="card" style="padding:24px;">
                     <div
                         style="font-size:12px;font-weight:700;color:var(--text-2);text-transform:uppercase;letter-spacing:.5px;margin-bottom:16px;display:flex;align-items:center;gap:8px;">
-                        <i class="fas fa-check-square" style="color:var(--primary);"></i> Options fiscales
+                        <span id="options" style="scroll-margin-top:90px;"></span><i class="fas fa-check-square" style="color:var(--primary);"></i> Options fiscales
                     </div>
 
                     <div
@@ -721,7 +837,7 @@
                 <div class="card" style="padding:24px;">
                     <div
                         style="font-size:12px;font-weight:700;color:var(--text-2);text-transform:uppercase;letter-spacing:.5px;margin-bottom:16px;display:flex;align-items:center;gap:8px;">
-                        <i class="fas fa-hashtag" style="color:var(--primary);"></i> Numérotation des tiers
+                        <span id="tiers" style="scroll-margin-top:90px;"></span><i class="fas fa-hashtag" style="color:var(--primary);"></i> Numérotation des tiers
                     </div>
 
                     <div style="font-size:12px;color:var(--text-3);margin-bottom:14px;line-height:1.6;">
@@ -776,7 +892,7 @@
                 <div class="card" style="padding:24px;">
                     <div
                         style="font-size:12px;font-weight:700;color:var(--text-2);text-transform:uppercase;letter-spacing:.5px;margin-bottom:16px;display:flex;align-items:center;gap:8px;">
-                        <i class="fas fa-print" style="color:var(--primary);"></i> Impression des factures
+                        <span id="impression" style="scroll-margin-top:90px;"></span><i class="fas fa-print" style="color:var(--primary);"></i> Impression des factures
                     </div>
                     <div style="display:flex;flex-direction:column;gap:14px;">
                         <div class="form-group">
@@ -885,11 +1001,16 @@
                     </div>
                     <div style="display:flex;flex-direction:column;gap:8px;font-size:13px;">
                         @php
+                            // Le récapitulatif taisait la forme juridique et
+                            // l'IDU, deux informations que la page demande et
+                            // qu'on vient justement vérifier ici.
                             $infos = [
+                                ['Forme juridique', $entreprise->forme_juridique],
                                 ['NCC', $entreprise->ncc],
                                 ['Régime', $entreprise->regime_imposition],
                                 ['Centre des impôts', $entreprise->centre_impots],
                                 ['RCCM', $entreprise->rccm],
+                                ['IDU', $entreprise->idu],
                                 ['Téléphone', $entreprise->telephone],
                                 ['E-mail', $entreprise->email],
                             ];
@@ -925,7 +1046,7 @@
     <div class="card" style="margin-top:24px; padding:24px;">
         <div
             style="font-size:14px;font-weight:700;color:var(--text);text-transform:uppercase;letter-spacing:.5px;margin-bottom:20px;display:flex;align-items:center;gap:8px;border-bottom:1px solid var(--border);padding-bottom:10px;">
-            <i class="far fa-calendar-alt" style="color:var(--primary); font-size:16px;"></i> Gestion des Exercices
+            <span id="exercices" style="scroll-margin-top:90px;"></span><i class="far fa-calendar-alt" style="color:var(--primary); font-size:16px;"></i> Gestion des Exercices
             Comptables (Périodes)
         </div>
 
@@ -1142,7 +1263,7 @@
     <div class="card" style="margin-top:24px; padding:24px;">
         <div
             style="font-size:14px;font-weight:700;color:var(--text);text-transform:uppercase;letter-spacing:.5px;margin-bottom:20px;display:flex;align-items:center;gap:8px;border-bottom:1px solid var(--border);padding-bottom:10px;">
-            <i class="fas fa-key" style="color:var(--primary); font-size:16px;"></i> FNE — Facture Normalisée Électronique
+            <span id="statut-fne" style="scroll-margin-top:90px;"></span><i class="fas fa-key" style="color:var(--primary); font-size:16px;"></i> FNE — Facture Normalisée Électronique
             (DGI)
         </div>
 
