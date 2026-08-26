@@ -2805,6 +2805,73 @@ le mot de passe est celui de Selflow.
 
 ---
 
+### Lot 17 — La clé borne aussi ce que l'API rend — **TERMINÉ**
+
+La session Comptaflow a livré sa moitié du lot 15 et signalé, dans son
+rapport, que trois de ses points d'entrée restaient sur le seul secret
+partagé. **C'était vrai chez nous aussi**, et personne ne l'avait relevé : le
+lot 15 avait fermé le chemin par le formulaire, pas celui par l'API.
+
+#### Ce qu'un seul secret volé ouvrait
+
+Le secret est le même pour toutes les entreprises, détenu par le serveur, et
+il **ne dit pas qui appelle**. Simulation d'attaque — il fuit par un ancien
+salarié, un journal de requêtes, un `.env` recopié sur un poste de
+développement :
+
+| Point d'entrée | Ce qu'il rendait |
+|---|---|
+| `list-companies` | **Toutes les entreprises de la plateforme**, avec adresse, NCC, RCCM, nom du gérant et **adresse électronique de l'administrateur**. L'annuaire complet des clients, et de quoi monter un hameçonnage crédible contre le compte le plus puissant de chaque entreprise |
+| `company-info` | La fiche de n'importe laquelle |
+| `tier-info` | Le téléphone, l'adresse et le NCC de n'importe quel client de n'importe quelle entreprise — son carnet d'adresses commercial |
+
+#### Ce qui le ferme
+
+La clé du dossier désigne une entreprise et une seule. Présentée en en-tête
+`X-Company-Key`, elle borne la réponse à cette entreprise. Une clé qui en
+désigne une autre reçoit **403 (Forbidden — accès interdit)** ; une clé
+inconnue ou révoquée, **401 (Unauthorized — non authentifié)**. Les confondre
+rendrait le journal illisible — on ne distinguerait plus un déploiement mal
+configuré d'une tentative de lecture croisée.
+
+`list-companies` ne rend plus que ce qui sert à **rapprocher** un dossier —
+identifiant, nom, date, état de liaison. Le détail se demande par
+`company-info`, clé en main.
+
+#### Ce qui reste ouvert, et il faut le dire
+
+**La tolérance de transition est encore en place, des deux côtés.** Un appel
+sans en-tête passe toujours sur le seul secret. Trois blocs, marqués en
+majuscules, à retirer **ensemble** le jour du déploiement conjoint :
+
+| Où | Quoi |
+|---|---|
+| Selflow | `ExternalSyncControleur::entrepriseDeLaCle()` |
+| Comptaflow | `VerifieCleEntreprise::handle()` |
+| Comptaflow | le `??` de `ExternalSyncController::entrepriseDeLaRequete()` |
+
+En retirer un ou deux laisse la porte ouverte du côté qu'on n'a pas fermé.
+`PasserelleEntranteTest::test_la_tolerance_de_transition_est_encore_ouverte`
+documente la porte et **tombera** le jour où elle sera fermée : c'est ce qui
+forcera à activer l'épreuve qui la remplace, écrite juste en dessous et
+commentée.
+
+#### Ce que la session Comptaflow a rapporté
+
+| Point | Ce qui a été trouvé chez elle |
+|---|---|
+| Stockage de la clé | Haché pour la recherche, **plus une copie chiffrée** — le haché seul interdisait l'idempotence de `provision`, qui suppose de pouvoir retourner la clé. Elle n'est en clair nulle part |
+| `referentiel/deverser` | **N'existait pas dans `main`** : il vivait sur une branche non fusionnée, reprise telle quelle plutôt que réécrite |
+| `tier_digits` | **Valait 8, et non 6.** Deux migrations se contredisaient — celle qui posait 6 ne s'exécutait que si la colonne n'existait pas, donc jamais. Corrigé, et nos 6 caractères de `NumerotationTiersService::LONGUEUR` sont bien la référence |
+| Lien d'activation | Aucune infrastructure de réinitialisation n'existait ; elle a été construite. Elle sert de repli — le cas normal est l'empreinte du mot de passe Selflow, transmise au lot 16 |
+
+- `tests/Feature/PasserelleEntranteTest.php` — 10 épreuves, **6 tombent** sans
+  le correctif (les 4 autres décrivent un comportement déjà juste)
+
+**1 006 épreuves, 1 006 vertes, 4 086 vérifications.**
+
+---
+
 ## 5 bis. La numérotation des comptes — tranché
 
 Le classeur subdivisait certaines racines sur des positions que l'acte uniforme
@@ -2851,6 +2918,35 @@ verrouillent les trois situations.
 ## 6. Anomalies constatées et non encore corrigées
 
 Elles sont documentées pour ne pas être redécouvertes.
+
+### La tolérance de transition de la passerelle — **OUVERTE, DÉLIBÉRÉMENT**
+
+Un appel entrant **sans** en-tête `X-Company-Key` passe encore sur le seul
+secret partagé, des deux côtés de la passerelle. C'est ce qui permet de
+déployer Selflow et Comptaflow séparément sans rien casser — et **tant que
+c'est en place, un secret volé écrit et lit dans n'importe quel dossier**.
+
+Trois blocs, marqués en majuscules dans le code, à retirer **ensemble** :
+
+| Où | Quoi |
+|---|---|
+| Selflow | `ExternalSyncControleur::entrepriseDeLaCle()` |
+| Comptaflow | `VerifieCleEntreprise::handle()` |
+| Comptaflow | le `??` de `ExternalSyncController::entrepriseDeLaRequete()` |
+
+Deux épreuves les gardent, une de chaque côté : elles **passent** aujourd'hui
+et **tomberont** le jour de la fermeture, forçant à activer celles qui les
+remplacent, écrites juste en dessous et commentées.
+
+### Le secret partagé et la clé Gemini — **À RÉVOQUER**
+
+`selflow-comptaflow-secret-2026` a circulé en clair et doit être changé dans
+les deux `.env` avant toute mise en service. Et le `.env.example` du dépôt
+**Comptaflow** versionne une clé d'API Gemini en clair : à révoquer chez le
+fournisseur, pas seulement à retirer du fichier — ce qui est entré dans
+l'historique d'un dépôt y reste. Rien d'équivalent côté Selflow : aucun
+fichier d'environnement n'est versionné, et la recherche de secrets écrits en
+dur ne remonte rien.
 
 ### ~~Taxes supportées à l'achat~~ — **TRANCHÉ ET RETIRÉ au lot 12.1**
 
