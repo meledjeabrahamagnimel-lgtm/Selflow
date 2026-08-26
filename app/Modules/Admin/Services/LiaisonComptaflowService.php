@@ -2,10 +2,12 @@
 
 namespace App\Modules\Admin\Services;
 
+use App\Mail\CompteComptaflowOuvert;
 use App\Modules\Admin\Modeles\Entreprise;
 use App\Modules\Authentification\Modeles\Utilisateur;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Mail;
 
 /**
  * La liaison Comptaflow, délivrée et non saisie.
@@ -166,6 +168,8 @@ class LiaisonComptaflowService
         // chez Comptaflow sur des comptes qu'il ne connaît pas.
         $deversement = DeversementReferentielService::deverser($entreprise->fresh());
 
+        self::prevenirLeTitulaire($entreprise->fresh());
+
         return [
             'success' => true,
             'message' => 'Liaison ouverte. ' . ($deversement['success']
@@ -239,6 +243,47 @@ class LiaisonComptaflowService
         ])->save();
 
         return ['success' => true, 'message' => 'Liaison supprimée.' . $note];
+    }
+
+    /**
+     * Prévenir celui au nom de qui le dossier vient d'être ouvert.
+     *
+     * Un compte s'ouvrait chez une autre application au nom du client **sans
+     * qu'il en soit informé**. Le superadministrateur le voyait, l'écran des
+     * paramètres le disait à qui allait le lire ; le titulaire, lui, ne savait
+     * rien.
+     *
+     * L'envoi est enveloppé, et volontairement : une messagerie indisponible
+     * ne doit pas faire échouer une liaison qui, elle, a réussi. Le contraire
+     * laisserait la demande en attente alors que le dossier existe chez
+     * Comptaflow — et le rejeu ouvrirait un second dossier.
+     */
+    private static function prevenirLeTitulaire(Entreprise $entreprise): void
+    {
+        $destinataire = $entreprise->utilisateurs()
+            ->where('role', 'admin')
+            ->orderBy('created_at')
+            ->first();
+
+        if (!$destinataire || blank($destinataire->email)) {
+            Log::warning('Liaison Comptaflow ouverte sans destinataire à prévenir', [
+                'entreprise_id' => $entreprise->id,
+            ]);
+
+            return;
+        }
+
+        try {
+            Mail::to($destinataire->email)->send(new CompteComptaflowOuvert(
+                $entreprise,
+                $destinataire,
+                rtrim((string) config('selflow.comptaflow_app_url'), '/')
+            ));
+        } catch (\Throwable $e) {
+            Log::error('Avis d\'ouverture Comptaflow non envoyé : ' . $e->getMessage(), [
+                'entreprise_id' => $entreprise->id,
+            ]);
+        }
     }
 
     // ── Ce que les appels sortants utilisent ─────────────────────────

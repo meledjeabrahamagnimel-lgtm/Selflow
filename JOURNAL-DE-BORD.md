@@ -100,7 +100,8 @@ Elles ne se rediscutent pas sans raison neuve.
 | Formulaire d'inscription | **L'étape 1 ne demande que le nom de l'entreprise.** Trois étapes, dont la dernière est facultative ; l'adresse électronique, qui est l'identifiant de connexion, est demandée avec le responsable. La forme juridique et le domaine d'activité se renseignent depuis l'application — 25/08/2026, propriétaire du projet |
 | Illustration d'article | **Vingt-deux dessins au trait tenus dans le dépôt**, choisis d'après le nom de l'article. Ce ne sont pas des photos et cela ne prétend pas l'être : aller chercher une image du commerce montrerait une marchandise que l'entreprise ne vend pas. La vraie photo passe toujours devant — 25/08/2026 |
 | Clé de liaison Comptaflow | **Délivrée, jamais saisie.** L'entreprise demande, le superadministrateur valide, **Comptaflow génère la clé** et la renvoie. Elle est chiffrée en base, retirée de `$fillable`, et n'apparaît jamais entière à l'écran. C'est elle — et non le secret partagé, qui ne dit pas qui appelle — qui authentifie chaque déversement — 26/08/2026, propriétaire du projet |
-| Accès Selflow et Comptaflow | **Un seul compte pour les deux** : même adresse, même mot de passe, dans les deux sens. Ce qui voyage est l'**empreinte** `bcrypt`, jamais le mot de passe — personne ne le lit, et le superadministrateur n'en choisit aucun — 26/08/2026, propriétaire du projet |
+| Accès Selflow et Comptaflow | **Un seul compte pour les deux** : même adresse, même mot de passe, dans les deux sens. Ce qui voyage est l'**empreinte** `bcrypt`, jamais le mot de passe — personne ne le lit, et le superadministrateur n'en choisit aucun. **Pas de lien d'activation** dans le cas normal : il ferait choisir un second mot de passe à qui n'a rien demandé. Il reste le repli quand l'empreinte manque — 26/08/2026, propriétaire du projet |
+| Avis d'ouverture d'un dossier | **Un courriel prévient le titulaire**, avec en-tête, corps et pied. Un compte ne s'ouvre pas au nom de quelqu'un sans qu'il l'apprenne. Il ne porte **ni mot de passe ni clé de liaison** : on dit lequel est le mot de passe, jamais quel il est — 26/08/2026, propriétaire du projet |
 | Plan comptable par défaut | **Le plan de l'acte uniforme en entier**, et non les 41 comptes usuels. Un compte manquant se créait à la main, son numéro deviné, et l'imputation fausse traversait la balance, le grand livre et la liasse. Deux boutons rejouent la dotation à tout moment — 26/08/2026, propriétaire du projet |
 | Compte d'un journal | **Seuls les journaux de trésorerie en portent un** — le `521` de la banque, le `571` de la caisse. La contrepartie d'une vente ou d'un achat est le tiers de la pièce, et elle change à chaque écriture — 26/08/2026 |
 | Identifiants fiscaux d'un client | **Retirés pour un B2C.** Un particulier n'a ni NCC, ni RCCM, ni régime d'imposition ; les lui demander en les grisant laissait trois champs vides à jamais — 26/08/2026, propriétaire du projet |
@@ -2869,6 +2870,60 @@ commentée.
   le correctif (les 4 autres décrivent un comportement déjà juste)
 
 **1 006 épreuves, 1 006 vertes, 4 086 vérifications.**
+
+---
+
+### Lot 18 — L'avis d'ouverture du dossier comptable — **TERMINÉ**
+
+Question du propriétaire : lien d'activation où le client choisit un mot de
+passe, ou mot de passe identique à celui de Selflow ?
+
+**Tranché : le mot de passe reste celui de Selflow, et un courriel prévient.**
+
+Le lien d'activation fait choisir un second mot de passe à quelqu'un qui n'a
+rien demandé, il expire, il se perd, et il produit exactement ce qu'on voulait
+éviter — deux mots de passe pour la même personne. Il reste le **repli** quand
+l'empreinte manque.
+
+Mais l'avis, lui, n'est pas du confort. **Un compte s'ouvrait au nom du client,
+chez une autre application, sans qu'il en soit informé.** Le
+superadministrateur le voyait, l'écran des paramètres le disait à qui allait le
+lire ; le titulaire ne savait rien.
+
+#### Ce que le message ne contient pas, et ne contiendra jamais
+
+| Ce qui n'y est pas | Pourquoi |
+|---|---|
+| **Le mot de passe** | On dit *lequel* c'est, jamais *quel* il est. Un courriel traverse des serveurs qu'on ne choisit pas, se range dans une boîte parfois partagée, et dort des années dans une sauvegarde |
+| **La clé de liaison** | Elle ne concerne pas le client : la lui montrer ferait d'un secret d'infrastructure une donnée qui traîne |
+
+Le message porte en revanche **« Vous n'attendiez pas ce message ? »** — une
+personne qui reçoit l'avis d'un dossier ouvert à son nom sans l'avoir demandé
+doit savoir à qui s'adresser.
+
+#### La réserve, écrite dans le message
+
+Les deux mots de passe sont identiques **au jour de l'ouverture**, et le
+courriel le dit ainsi. Si le client change celui de Selflow ensuite, celui de
+Comptaflow ne suit pas : **ils divergent en silence**, et le client à qui on a
+dit « c'est le même » ne comprendra pas. Trois issues, à trancher plus tard :
+l'accepter et le dire (fait), propager le changement par la passerelle
+(recommandé, petit lot), ou une connexion unique (chantier).
+
+#### Ce qui a été soigné en chemin
+
+- **Une messagerie en panne ne défait pas la liaison.** L'envoi est enveloppé :
+  le contraire laisserait la demande en attente alors que le dossier existe
+  déjà chez Comptaflow, et le rejeu en ouvrirait un second ;
+- la mise en page tient sur des **tableaux imbriqués et des styles écrits dans
+  les balises** — Outlook rend le HTML avec le moteur de Word, Gmail retire les
+  feuilles de style. Ce qui serait une faute sur une page l'est ici l'inverse.
+
+- `app/Mail/CompteComptaflowOuvert.php`
+- `resources/views/emails/comptaflow/compte-ouvert.blade.php`
+- `tests/Feature/LiaisonComptaflowTest.php` — 4 épreuves ajoutées (31 au total)
+
+**1 010 épreuves, 1 010 vertes, 4 091 vérifications.**
 
 ---
 

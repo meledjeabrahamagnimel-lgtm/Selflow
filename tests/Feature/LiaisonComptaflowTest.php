@@ -348,6 +348,82 @@ class LiaisonComptaflowTest extends TestCase
             ->assertSee('celui de votre compte Selflow', false);
     }
 
+    // ── L'avis d'ouverture ───────────────────────────────────────────
+
+    public function test_le_titulaire_est_prevenu_de_l_ouverture(): void
+    {
+        \Illuminate\Support\Facades\Mail::fake();
+        $this->comptaflowRepond();
+
+        LiaisonComptaflowService::valider($this->entreprise);
+
+        // Un compte s'ouvrait chez une autre application au nom du client sans
+        // qu'il en soit informé.
+        \Illuminate\Support\Facades\Mail::assertSent(
+            \App\Mail\CompteComptaflowOuvert::class,
+            fn ($mail) => $mail->hasTo('lewis-liaison@dc-knowing.ci')
+        );
+    }
+
+    public function test_l_avis_ne_porte_ni_mot_de_passe_ni_cle(): void
+    {
+        \Illuminate\Support\Facades\Mail::fake();
+        $this->comptaflowRepond();
+
+        LiaisonComptaflowService::valider($this->entreprise);
+
+        \Illuminate\Support\Facades\Mail::assertSent(
+            \App\Mail\CompteComptaflowOuvert::class,
+            function ($mail) {
+                $corps = $mail->render();
+
+                // On dit **lequel** est le mot de passe, jamais **quel** il
+                // est : un courriel traverse des serveurs qu'on ne choisit pas
+                // et dort des années dans une sauvegarde. Et la clé de liaison
+                // ne concerne pas le client.
+                return !str_contains($corps, 'secret-de-test')
+                    && !str_contains($corps, 'cptf_live_9f3b7d2a4c81')
+                    && str_contains($corps, 'lewis-liaison@dc-knowing.ci')
+                    && str_contains($corps, 'celui de votre compte Selflow');
+            }
+        );
+    }
+
+    public function test_l_avis_porte_son_en_tete_son_corps_et_son_pied(): void
+    {
+        \Illuminate\Support\Facades\Mail::fake();
+        $this->comptaflowRepond();
+
+        LiaisonComptaflowService::valider($this->entreprise);
+
+        \Illuminate\Support\Facades\Mail::assertSent(
+            \App\Mail\CompteComptaflowOuvert::class,
+            function ($mail) {
+                $corps = $mail->render();
+
+                return str_contains($corps, 'Votre dossier comptable est ouvert')
+                    && str_contains($corps, rtrim(config('selflow.comptaflow_app_url'), '/'))
+                    && str_contains($corps, 'Nous ne vous demanderons jamais votre mot de passe')
+                    && str_contains($corps, 'Vous n\'attendiez pas ce message');
+            }
+        );
+    }
+
+    public function test_une_messagerie_en_panne_ne_defait_pas_la_liaison(): void
+    {
+        $this->comptaflowRepond();
+
+        // Le contraire laisserait la demande en attente alors que le dossier
+        // existe déjà chez Comptaflow — et le rejeu en ouvrirait un second.
+        \Illuminate\Support\Facades\Mail::shouldReceive('to')
+            ->andThrow(new \RuntimeException('SMTP injoignable'));
+
+        $resultat = LiaisonComptaflowService::valider($this->entreprise);
+
+        $this->assertTrue($resultat['success']);
+        $this->assertTrue($this->entreprise->fresh()->liaisonComptaflowActive());
+    }
+
     // ── Le superadministrateur lie sans attendre de demande ──────────
 
     public function test_le_superadministrateur_peut_lier_sans_demande(): void
