@@ -194,6 +194,148 @@ class LiaisonComptaflowService
     }
 
     /**
+     * Combien de jours une clé vit avant qu'on la renouvelle.
+     *
+     * Une clé posée une fois et jamais changée ouvre le dossier aussi
+     * longtemps que l'entreprise existe. Un prestataire qui a vu passer une
+     * requête, une sauvegarde égarée, un journal mal purgé : rien ne referme
+     * derrière eux. La rotation borne la durée de vie d'une fuite.
+     */
+    public const JOURS_AVANT_ROTATION = 30;
+
+    /**
+     * Ne pas retenter une rotation qui vient d'échouer.
+     *
+     * Comptaflow peut être en panne pour la journée : marteler son API ne la
+     * réveillera pas, et une tâche mensuelle qui repart en boucle sur trente
+     * dossiers en échec ferait plus de mal que la clé qu'elle renouvelle.
+     */
+    public const HEURES_AVANT_NOUVEL_ESSAI = 12;
+
+    /**
+     * Renouveler la clé d'un dossier.
+     *
+     * ── Ce qui garantit que rien ne casse ──
+     *
+     * **Rien n'est écrit tant que la nouvelle clé n'est pas en main.** Un
+     * appel qui échoue laisse l'ancienne en place, active : le déversement
+     * continue de fonctionner comme avant, et la rotation se rejoue plus tard.
+     * L'inverse — effacer d'abord, demander ensuite — couperait la liaison à
+     * la première panne réseau.
+     *
+     * **Les écritures déjà en file d'attente repartent avec la bonne clé.**
+     * `DeverserEcritureComptaflow` sérialise le modèle et le relit en base au
+     * moment de s'exécuter : elle lira donc la nouvelle.
+     *
+     * **Une requête déjà partie avec l'ancienne clé doit encore être
+     * acceptée.** C'est le rôle de la période de grâce, tenue par Comptaflow :
+     * l'ancienne clé reste valable quelques minutes après la rotation. Sans
+     * elle, un déversement en vol au moment précis du renouvellement
+     * échouerait — rarement, et sans qu'on comprenne pourquoi.
+     *
+     * @return array{success: bool, message: string}
+     */
+    public static function renouvelerLaCle(Entreprise $entreprise): array
+    {
+        if (!$entreprise->liaisonComptaflowActive()) {
+            return ['success' => false, 'message' => 'Cette entreprise n\'est pas liée à Comptaflow.'];
+        }
+
+        if (!config('selflow.comptaflow_api_secret')) {
+            return ['success' => false, 'message' => "Le secret serveur n'est pas configuré (EXTERNAL_SYNC_SECRET)."];
+        }
+
+        try {
+            $reponse = Http::timeout(self::DELAI)
+                ->withHeaders(self::enTete($entreprise))
+                ->post(self::url('/api/external/companies/rotate-key'), [
+                    'secret'                => config('selflow.comptaflow_api_secret'),
+                    'selflow_company_id'    => $entreprise->id,
+                    'comptaflow_company_id' => $entreprise->comptaflow_company_id,
+                ]);
+        } catch (\Throwable $e) {
+            return self::rotationEchouee($entreprise, 'Comptaflow injoignable : ' . $e->getMessage());
+        }
+
+        if (in_array($reponse->status(), [404, 405], true)) {
+            return self::rotationEchouee(
+                $entreprise,
+                "Comptaflow n'expose pas encore /api/external/companies/rotate-key. "
+                . "L'ancienne clé reste en place et continue de fonctionner."
+            );
+        }
+
+        $nouvelle = $reponse->json('sync_key');
+
+        if (!$reponse->successful() || !$reponse->json('success') || !$nouvelle) {
+            return self::rotationEchouee(
+                $entreprise,
+                $reponse->json('message') ?? 'Comptaflow a refusé le renouvellement (code ' . $reponse->status() . ').'
+            );
+        }
+
+        // La clé n'est pas `$fillable` : elle s'écrit ici, et seulement une
+        // fois la nouvelle valeur en main.
+        $entreprise->comptaflow_sync_key = $nouvelle;
+
+        $entreprise->fill([
+            'comptaflow_cle_indice'          => substr((string) $nouvelle, -4),
+            'comptaflow_cle_tournee_le'      => now(),
+            'comptaflow_rotation_echouee_le' => null,
+        ])->save();
+
+        Log::info('Clé de liaison Comptaflow renouvelée', ['entreprise_id' => $entreprise->id]);
+
+        return ['success' => true, 'message' => 'Clé renouvelée.'];
+    }
+
+    /**
+     * Dater l'échec, sans toucher à la clé qui marche.
+     *
+     * @return array{success: bool, message: string}
+     */
+    private static function rotationEchouee(Entreprise $entreprise, string $message): array
+    {
+        $entreprise->update(['comptaflow_rotation_echouee_le' => now()]);
+
+        Log::warning('Renouvellement de clé Comptaflow en échec : ' . $message, [
+            'entreprise_id' => $entreprise->id,
+        ]);
+
+        return ['success' => false, 'message' => $message];
+    }
+
+    /**
+     * Les dossiers dont la clé est à renouveler.
+     *
+     * Ceux dont la clé n'a jamais tourné comptent depuis leur liaison : une
+     * clé posée il y a six mois et jamais renouvelée est la plus en retard de
+     * toutes, et une comparaison sur une colonne nulle l'aurait laissée
+     * tranquille.
+     *
+     * @return \Illuminate\Support\Collection<int, Entreprise>
+     */
+    public static function dossiersARenouveler(): \Illuminate\Support\Collection
+    {
+        $limite = now()->subDays(self::JOURS_AVANT_ROTATION);
+        $repos  = now()->subHours(self::HEURES_AVANT_NOUVEL_ESSAI);
+
+        return Entreprise::where('comptaflow_sync_status', 'active')
+            ->whereNull('comptaflow_revoquee_le')
+            ->whereNotNull('comptaflow_sync_key')
+            ->where(fn ($q) => $q
+                ->where('comptaflow_cle_tournee_le', '<=', $limite)
+                ->orWhere(fn ($sans) => $sans
+                    ->whereNull('comptaflow_cle_tournee_le')
+                    ->where('comptaflow_liee_le', '<=', $limite)))
+            ->where(fn ($q) => $q
+                ->whereNull('comptaflow_rotation_echouee_le')
+                ->orWhere('comptaflow_rotation_echouee_le', '<=', $repos))
+            ->orderBy('comptaflow_cle_tournee_le')
+            ->get();
+    }
+
+    /**
      * Délier : la clé est révoquée des deux côtés.
      *
      * L'ancienne version effaçait la clé chez Selflow et n'en disait rien à

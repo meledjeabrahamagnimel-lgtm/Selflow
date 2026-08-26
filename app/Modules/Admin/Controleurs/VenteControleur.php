@@ -15,6 +15,7 @@ use App\Modules\Admin\Modeles\CodeJournal;
 use App\Modules\Admin\Modeles\BonLivraison;
 use App\Modules\Admin\Modeles\B2bNegotiation;
 use App\Modules\Admin\Modeles\Entreprise;
+use App\Modules\Admin\Modeles\PointDeVente;
 use App\Modules\Admin\Traits\GereLesChampsFne;
 use App\Modules\Admin\Traits\JournaliseActions;
 use Illuminate\Http\RedirectResponse;
@@ -36,17 +37,16 @@ class VenteControleur
         $entreprise = Auth::user()->entreprise;
         $pointDeVenteId = Auth::user()->estCaissier()
             ? Auth::user()->point_de_vente_id
-            : (session('point_de_vente_actif_id') 
-                ?? Auth::user()->point_de_vente_id 
-                ?? (\App\Modules\Admin\Modeles\PointDeVente::firstOrCreate([
-                    'entreprise_id' => $entreprise->id,
-                    'nom'           => 'Siège',
-                ], [
-                    'ville'         => 'Abidjan',
-                    'commune'       => 'Cocody',
-                    'responsable'   => 'Superviseur',
-                    'statut'        => 'Ouvert',
-                ]))->id);
+            // La caisse creait un point de vente « Siege » a Abidjan, commune
+            // Cocody, responsable « Superviseur », des qu'aucun n'etait actif.
+            // Trois informations inventees — et le nom du point de vente est ce
+            // que la plateforme de la DGI recoit : elle refuse la piece s'il ne
+            // correspond a aucun site declare sur l'espace FNE. On ouvrait donc
+            // en silence un magasin qui n'existe nulle part, et la premiere
+            // facture partait a son nom.
+            : (session('point_de_vente_actif_id')
+                ?? Auth::user()->pointDeVenteDOuverture()
+                ?? PointDeVente::where('entreprise_id', $entreprise->id)->orderBy('nom')->value('id'));
         $clients        = Client::obtenirClientsPrioritaires($entreprise->id);
         // Archiver un article, c'est dire qu'on ne le vend plus. La caisse le
         // proposait quand même : le filtre ne vivait que sur l'écran du
@@ -68,17 +68,16 @@ class VenteControleur
         $entreprise = Auth::user()->entreprise;
         $pointDeVenteId = Auth::user()->estCaissier()
             ? Auth::user()->point_de_vente_id
-            : (session('point_de_vente_actif_id') 
-                ?? Auth::user()->point_de_vente_id 
-                ?? (\App\Modules\Admin\Modeles\PointDeVente::firstOrCreate([
-                    'entreprise_id' => $entreprise->id,
-                    'nom'           => 'Siège',
-                ], [
-                    'ville'         => 'Abidjan',
-                    'commune'       => 'Cocody',
-                    'responsable'   => 'Superviseur',
-                    'statut'        => 'Ouvert',
-                ]))->id);
+            // La caisse creait un point de vente « Siege » a Abidjan, commune
+            // Cocody, responsable « Superviseur », des qu'aucun n'etait actif.
+            // Trois informations inventees — et le nom du point de vente est ce
+            // que la plateforme de la DGI recoit : elle refuse la piece s'il ne
+            // correspond a aucun site declare sur l'espace FNE. On ouvrait donc
+            // en silence un magasin qui n'existe nulle part, et la premiere
+            // facture partait a son nom.
+            : (session('point_de_vente_actif_id')
+                ?? Auth::user()->pointDeVenteDOuverture()
+                ?? PointDeVente::where('entreprise_id', $entreprise->id)->orderBy('nom')->value('id'));
 
         $request->validate(array_merge([
             'client_id'      => ['nullable', 'integer', Appartenance::a('clients', 'id')],

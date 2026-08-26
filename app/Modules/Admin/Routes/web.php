@@ -420,6 +420,10 @@ Route::prefix('superadmin')
             // de demandes : la cle est delivree par Comptaflow, jamais saisie.
             Route::post('/{entreprise}/valider',               [SuperadminLiaisonControleur::class, 'validerDemande'])->middleware('throttle:plateforme')->name('valider');
             Route::post('/{entreprise}/refuser',               [SuperadminLiaisonControleur::class, 'refuserDemande'])->name('refuser');
+            // Le renouvellement a la main, sans attendre le premier du mois :
+            // un prestataire qui part, un journal retrouve sur un poste
+            // partage, un doute. Limite : c'est un appel a Comptaflow.
+            Route::post('/{entreprise}/renouveler-cle',        [SuperadminLiaisonControleur::class, 'renouvelerLaCle'])->middleware('throttle:plateforme')->name('renouveler_cle');
             Route::delete('/{entreprise}/delierEntreprise',    [SuperadminLiaisonControleur::class, 'delierEntreprise'])->name('delierEntreprise');
             Route::post('/{entreprise}/verifier',              [SuperadminLiaisonControleur::class, 'verifierLiaison'])->middleware('throttle:plateforme')->name('verifier');
         });

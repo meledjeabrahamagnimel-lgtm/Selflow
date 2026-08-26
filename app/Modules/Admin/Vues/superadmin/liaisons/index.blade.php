@@ -262,6 +262,20 @@
                          une clé entière, ni ne permet de la copier. --}}
                     <td style="font-family:monospace; font-size:12px; color:var(--text-2);">
                         {{ $ent->indiceCleComptaflow() ?? '—' }}
+                        @if($estLiee)
+                            @php
+                                $tournee = $ent->comptaflow_cle_tournee_le ?? $ent->comptaflow_liee_le;
+                                $enRetard = $tournee && $tournee->lte(now()->subDays(\App\Modules\Admin\Services\LiaisonComptaflowService::JOURS_AVANT_ROTATION));
+                            @endphp
+                            <div style="font-family:inherit; font-size:10.5px; color:{{ $enRetard ? '#b45309' : 'var(--text-3)' }}; margin-top:3px;">
+                                {{ $enRetard ? 'à renouveler — ' : '' }}{{ $tournee?->format('d/m/Y') ?? '—' }}
+                            </div>
+                            @if($ent->comptaflow_rotation_echouee_le)
+                                <div style="font-family:inherit; font-size:10.5px; color:#991b1b; margin-top:2px;">
+                                    dernier essai en échec le {{ $ent->comptaflow_rotation_echouee_le->format('d/m') }}
+                                </div>
+                            @endif
+                        @endif
                     </td>
                     <td style="font-size:12px; color:var(--text-2);">
                         @if($ent->comptaflow_last_sync_at)
@@ -285,6 +299,16 @@
                                     @csrf
                                     <button type="submit" class="btn btn-outline btn-sm" title="Vérifier la liaison auprès de Comptaflow" style="padding:5px 8px;">
                                         <i class="fas fa-satellite-dish"></i>
+                                    </button>
+                                </form>
+                                {{-- Sans attendre le premier du mois. Ne coupe
+                                     rien : l'ancienne clé reste en place tant
+                                     que la nouvelle n'est pas en main. --}}
+                                <form method="POST" action="{{ route('superadmin.liaisons.renouveler_cle', $ent) }}" style="display:inline;"
+                                      onsubmit="return confirm('Renouveler la clé de « {{ $ent->nom }} » ? L\'ancienne cessera de valoir.')">
+                                    @csrf
+                                    <button type="submit" class="btn btn-outline btn-sm" title="Renouveler la clé maintenant" style="padding:5px 8px;">
+                                        <i class="fas fa-key"></i>
                                     </button>
                                 </form>
                                 <form method="POST" action="{{ route('superadmin.liaisons.delierEntreprise', $ent) }}"

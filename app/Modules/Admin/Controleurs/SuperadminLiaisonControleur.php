@@ -102,6 +102,26 @@ class SuperadminLiaisonControleur extends Controller
     }
 
     /**
+     * Renouveler la clé d'un dossier, sans attendre la rotation mensuelle.
+     *
+     * Il y a des jours où l'on ne veut pas attendre le premier du mois : un
+     * prestataire qui part, un journal de serveur retrouvé sur un poste
+     * partagé, un doute. Le renouvellement est alors immédiat.
+     *
+     * Il ne coupe rien : l'ancienne clé reste en place tant que la nouvelle
+     * n'est pas en main, et Comptaflow la tient valable quelques minutes de
+     * plus pour les requêtes déjà parties.
+     */
+    public function renouvelerLaCle(Entreprise $entreprise): RedirectResponse
+    {
+        $resultat = LiaisonComptaflowService::renouvelerLaCle($entreprise);
+
+        return $resultat['success']
+            ? back()->with('success', "🔑 « {$entreprise->nom} » : clé renouvelée. L'ancienne ne vaut plus.")
+            : back()->with('error', "❌ « {$entreprise->nom} » : " . $resultat['message']);
+    }
+
+    /**
      * Délier : la clé est révoquée des deux côtés.
      */
     public function delierEntreprise(Entreprise $entreprise): RedirectResponse

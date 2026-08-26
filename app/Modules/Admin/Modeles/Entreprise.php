@@ -55,6 +55,8 @@ class Entreprise extends Model
         'comptaflow_liee_le',
         'comptaflow_revoquee_le',
         'comptaflow_cle_indice',
+        'comptaflow_cle_tournee_le',
+        'comptaflow_rotation_echouee_le',
         // Champs DGI / Fiscal
         'idu',
         'reference_cadastrale',
@@ -106,6 +108,8 @@ class Entreprise extends Model
         'comptaflow_demande_le' => 'datetime',
         'comptaflow_liee_le'    => 'datetime',
         'comptaflow_revoquee_le' => 'datetime',
+        'comptaflow_cle_tournee_le' => 'datetime',
+        'comptaflow_rotation_echouee_le' => 'datetime',
         'comptaflow_last_sync_at' => 'datetime',
     ];
 
@@ -320,21 +324,80 @@ class Entreprise extends Model
 
     public function estInscriptionComplete(): bool
     {
-        // Nom ne doit pas être temporaire
+        return $this->elementsInscriptionManquants() === [];
+    }
+
+    /**
+     * Ce qui manque pour qu'une pièce puisse partir à la DGI, et où le régler.
+     *
+     * ── Pourquoi une liste, et non un booléen ──
+     *
+     * L'écran de blocage disait « Terminer votre inscription avant de
+     * continuer. Vous devez renseigner toutes les informations réglementaires »
+     * — sans jamais dire **lesquelles**. L'utilisateur arrivait sur une page de
+     * paramètres de trois écrans de haut et cherchait ce qui n'allait pas.
+     *
+     * ── Le point de vente, ajouté à la demande du propriétaire ──
+     *
+     * Il n'y figurait pas, et c'est le plus déterminant de tous. **Le nom du
+     * point de vente est transmis tel quel à la plateforme de la DGI**, qui
+     * refuse la facture s'il ne correspond à aucun site déclaré sur l'espace
+     * FNE. Une entreprise sans point de vente ne peut donc rien certifier — et
+     * l'application le lui laissait découvrir au premier encaissement.
+     *
+     * Ce qui manquait auparavant se comblait tout seul : la caisse créait un
+     * « Siège » à Abidjan, commune Cocody, responsable « Superviseur ». Trois
+     * informations inventées, sous un nom qui n'était pas celui de l'espace
+     * FNE. La création d'office est retirée ; la réclamation la remplace.
+     *
+     * @return array<int, array{cle: string, libelle: string, ou: string}>
+     */
+    public function elementsInscriptionManquants(): array
+    {
+        // Le nom temporaire de l'inscription par Google : tant qu'il est là,
+        // rien d'autre ne vaut la peine d'être demandé.
         if ($this->nom === '[PENDING_ONBOARDING]') {
-            return false;
+            return [['cle' => 'nom', 'libelle' => 'Le nom de votre entreprise', 'ou' => 'identite']];
         }
 
-        return !empty($this->regime_imposition)
-            && !empty($this->adresse)
-            && !empty($this->rccm)
+        $manquants = [];
+
+        $aRenseigner = [
+            'nom'               => ['Le nom de votre entreprise', 'identite'],
+            'gerant_fonction'   => ['La fonction du gérant', 'identite'],
+            'adresse'           => ['L\'adresse de l\'entreprise', 'identite'],
+            'ncc'               => ['Le NCC — sans lui, aucune pièce n\'est certifiée', 'fiscal'],
+            'rccm'              => ['Le RCCM', 'fiscal'],
             // Le compte contribuable (CC) a été retiré des paramètres : il
             // désignait le même numéro que le NCC, saisi deux fois pour rien.
-            // C'est donc le NCC qui conditionne désormais la complétude.
-            && !empty($this->ncc)
-            && !empty($this->gerant_fonction)
-            && is_array($this->secteur_activite)
-            && count($this->secteur_activite) > 0;
+            'regime_imposition' => ['Le régime d\'imposition', 'fiscal'],
+        ];
+
+        foreach ($aRenseigner as $champ => [$libelle, $ou]) {
+            if (blank($this->{$champ})) {
+                $manquants[] = ['cle' => $champ, 'libelle' => $libelle, 'ou' => $ou];
+            }
+        }
+
+        if (!is_array($this->secteur_activite) || count($this->secteur_activite) === 0) {
+            $manquants[] = [
+                'cle'     => 'secteur_activite',
+                'libelle' => 'Votre domaine d\'activité',
+                'ou'      => 'parcours',
+            ];
+        }
+
+        // Compté à la demande : la question ne se pose qu'aux écrans de
+        // blocage, et une requête de plus sur chaque page ne se justifie pas.
+        if ($this->exists && $this->pointsDeVente()->count() === 0) {
+            $manquants[] = [
+                'cle'     => 'point_de_vente',
+                'libelle' => 'Au moins un point de vente — son nom part à la DGI avec chaque facture',
+                'ou'      => 'points_de_vente',
+            ];
+        }
+
+        return $manquants;
     }
 
     /**

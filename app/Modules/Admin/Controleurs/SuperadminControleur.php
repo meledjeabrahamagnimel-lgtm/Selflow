@@ -239,16 +239,18 @@ class SuperadminControleur
             $entreprise, $request->fne_ncc, $request->fne_mot_de_passe
         );
 
-        // Création automatique du Siège comme point de vente par défaut
-        PointDeVente::create([
-            'entreprise_id' => $entreprise->id,
-            'nom'           => 'Siège',
-            'ville'         => $request->adresse ? explode(',', $request->adresse)[0] : 'Abidjan',
-            'commune'       => 'Plateau',
-            'responsable'   => 'Responsable Général',
-            'telephone'     => $request->telephone,
-            'statut'        => 'Ouvert',
-        ]);
+        // Un point de vente « Siège » se créait ici d'office, ville devinée en
+        // coupant l'adresse à la première virgule, commune « Plateau »,
+        // responsable « Responsable Général ». Trois informations inventées.
+        //
+        // **Le nom du point de vente est ce que la plateforme de la DGI
+        // reçoit**, et elle refuse la facture s'il ne correspond à aucun site
+        // déclaré sur l'espace FNE. Le créer d'office, c'est décider à la place
+        // de l'entreprise du nom sous lequel ses pièces seront certifiées — et
+        // celui-là, « Siège », a toutes les chances de ne pas être le sien.
+        //
+        // L'entreprise crée son premier point de vente elle-même ; tant qu'elle
+        // ne l'a pas fait, l'écran le lui réclame et la caisse reste fermée.
 
         // ── Liaison COMPTAFLOW (si case cochée) ──
         //

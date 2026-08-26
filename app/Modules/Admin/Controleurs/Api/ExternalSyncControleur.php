@@ -137,16 +137,14 @@ class ExternalSyncControleur
                 'statut'        => 'actif',
             ]);
 
-            // 3. Créer le point de vente Siège par défaut
-            PointDeVente::create([
-                'entreprise_id' => $entreprise->id,
-                'nom'           => 'Siège',
-                'ville'         => $request->adresse ? explode(',', $request->adresse)[0] : 'Abidjan',
-                'commune'       => 'Plateau',
-                'responsable'   => ($request->gerant_nom ?? 'Admin') . ' ' . ($request->gerant_prenom ?? ''),
-                'telephone'     => $request->telephone,
-                'statut'        => 'Ouvert',
-            ]);
+            // Un point de vente « Siège » se créait ici, ville devinée en
+            // coupant l'adresse à la première virgule et commune « Plateau ».
+            // **Le nom du point de vente est ce que la plateforme de la DGI
+            // reçoit** : elle refuse la facture s'il ne correspond à aucun site
+            // déclaré sur l'espace FNE. Le créer d'office décidait à la place
+            // de l'entreprise du nom sous lequel ses pièces seraient
+            // certifiées. Elle crée le sien, et l'écran le lui réclame tant
+            // qu'elle ne l'a pas fait.
 
             DB::commit();
 

@@ -103,6 +103,9 @@ Elles ne se rediscutent pas sans raison neuve.
 | Accès Selflow et Comptaflow | **Un seul compte pour les deux** : même adresse, même mot de passe, dans les deux sens. Ce qui voyage est l'**empreinte** `bcrypt`, jamais le mot de passe — personne ne le lit, et le superadministrateur n'en choisit aucun. **Pas de lien d'activation** dans le cas normal : il ferait choisir un second mot de passe à qui n'a rien demandé. Il reste le repli quand l'empreinte manque — 26/08/2026, propriétaire du projet |
 | Avis d'ouverture d'un dossier | **Un courriel prévient le titulaire**, avec en-tête, corps et pied. Un compte ne s'ouvre pas au nom de quelqu'un sans qu'il l'apprenne. Il ne porte **ni mot de passe ni clé de liaison** : on dit lequel est le mot de passe, jamais quel il est — 26/08/2026, propriétaire du projet |
 | Divergence des deux mots de passe | **Acceptée et dite**, plutôt que corrigée. Le courriel écrit « au jour de l'ouverture » : changer son mot de passe Selflow ne change pas celui de Comptaflow, et promettre « c'est le même » deviendrait faux sans que rien ne le signale. La propagation par la passerelle reste possible, elle n'est pas retenue — 26/08/2026, propriétaire du projet |
+| Point de vente | **Il ne se crée jamais tout seul, et il en faut au moins un.** Son nom part tel quel à la DGI, qui refuse la pièce s'il ne correspond à aucun site déclaré sur l'espace FNE : en inventer un décidait à la place de l'entreprise du nom sous lequel ses factures seraient certifiées. Il figure désormais parmi les éléments réclamés avant toute vente — 26/08/2026, propriétaire du projet |
+| Point de vente actif | **Retenu au-delà de la session**, sur une colonne à part de l'affectation du caissier. Il mourait avec la déconnexion, et un responsable de trois magasins repartait chaque matin sur le premier venu — 26/08/2026, propriétaire du projet |
+| Durée de vie d'une clé de liaison | **Trente jours.** Rotation à la main par le superadministrateur, et automatique le 1ᵉʳ de chaque mois. Rien n'est écrit tant que la nouvelle clé n'est pas en main, et Comptaflow tient une période de grâce pour les requêtes déjà parties — 26/08/2026, propriétaire du projet |
 | Adresse publique de Comptaflow | **`https://comptaflow.dc-knowing.com/`**, réglable par `COMPTAFLOW_APP_URL`. En `https` et non `http` : l'adresse part dans un courriel, vers une page où l'utilisateur saisira son mot de passe — 26/08/2026, propriétaire du projet |
 | Plan comptable par défaut | **Le plan de l'acte uniforme en entier**, et non les 41 comptes usuels. Un compte manquant se créait à la main, son numéro deviné, et l'imputation fausse traversait la balance, le grand livre et la liasse. Deux boutons rejouent la dotation à tout moment — 26/08/2026, propriétaire du projet |
 | Compte d'un journal | **Seuls les journaux de trésorerie en portent un** — le `521` de la banque, le `571` de la caisse. La contrepartie d'une vente ou d'un achat est le tiers de la pièce, et elle change à chaque écriture — 26/08/2026 |
@@ -2926,6 +2929,104 @@ l'accepter et le dire (fait), propager le changement par la passerelle
 - `tests/Feature/LiaisonComptaflowTest.php` — 4 épreuves ajoutées (31 au total)
 
 **1 010 épreuves, 1 010 vertes, 4 091 vérifications.**
+
+---
+
+### Lot 19 — Le point de vente, et la clé qui tourne — **TERMINÉ**
+
+#### 19.1 — Le point de vente ne s'invente plus
+
+**Le nom du point de vente part tel quel à la plateforme de la DGI**, avec
+chaque facture, et elle refuse la pièce s'il ne correspond à aucun site
+déclaré sur l'espace FNE. Ce n'est pas une commodité d'organisation : c'est
+une donnée fiscale, et elle appartient à l'entreprise.
+
+**Quatre endroits en créaient un d'office** — la création par le
+superadministrateur, la passerelle entrante, et la caisse **deux fois**, dans
+`nouvelle()` et dans `enregistrer()` :
+
+```
+nom : « Siège » · ville : l'adresse coupée à la première virgule
+commune : « Cocody » ou « Plateau » · responsable : « Superviseur »
+```
+
+Trois informations inventées, sous un nom qui n'a aucune raison d'être celui
+de l'espace FNE. **La première facture partait à ce nom-là.** L'entreprise
+crée le sien ; les quatre créations d'office sont retirées.
+
+#### 19.2 — Le point de vente entre dans les blocages
+
+Il n'y figurait pas, et c'est le plus déterminant de tous : une entreprise
+sans point de vente ne peut rien certifier, et le découvrait au premier
+encaissement — ou ne le découvrait pas, puisque la caisse en fabriquait un.
+
+`estInscriptionComplete()` devient un comptage :
+`elementsInscriptionManquants()` rend la liste, avec pour chaque manque **son
+libellé et l'écran où il se règle**.
+
+**Ce que le changement a mis au jour :** l'écran de blocage disait « Terminer
+votre inscription… renseigner toutes les informations réglementaires » sans
+jamais dire **lesquelles**, et son bouton menait toujours aux paramètres —
+même quand ce qui manquait se réglait ailleurs. Il liste maintenant les
+manques et mène au premier : les paramètres, le parcours, ou l'écran des
+points de vente.
+
+#### 19.3 — Le point de vente actif survit à la déconnexion
+
+Il ne vivait que dans `session('point_de_vente_actif_id')`, et
+`deconnecter()` appelle `session()->invalidate()` — ce qui est juste. Le choix
+partait avec.
+
+Un responsable de trois magasins **repartait donc chaque matin sur le premier
+venu**, sans que rien ne le dise, et pouvait encaisser au nom d'un magasin où
+il n'était pas. Une pièce certifiée sous le mauvais site ne se corrige pas :
+elle s'annule par un avoir.
+
+Une colonne à part, `utilisateurs.point_de_vente_actif_id`, et non
+`point_de_vente_id` : pour un caissier, celui-ci est son **affectation**,
+décidée par son responsable. Y écrire le dernier choix ferait qu'un caissier
+qui bascule d'écran changerait son affectation. Deux idées, deux colonnes — et
+l'affectation prime toujours pour un caissier.
+
+Le point de vente retenu est **revérifié à chaque reprise** : il peut avoir
+été supprimé, ou appartenir à une autre entreprise si la valeur a été écrite à
+la main.
+
+#### 19.4 — La clé de liaison tourne
+
+Décision du propriétaire : le superadministrateur renouvelle quand il veut, et
+une rotation automatique passe chaque mois.
+
+Une clé posée une fois et jamais changée ouvre le dossier comptable aussi
+longtemps que l'entreprise existe. La rotation ne rend pas une fuite
+impossible : **elle borne sa durée de vie à un mois.**
+
+| Ce qui garantit que rien ne casse | Comment |
+|---|---|
+| Un appel qui échoue ne coupe rien | **Rien n'est écrit tant que la nouvelle clé n'est pas en main.** L'ancienne reste active, et la rotation se rejoue |
+| Les écritures en file repartent bien | `DeverserEcritureComptaflow` relit le modèle en base au moment de s'exécuter : elle lira la nouvelle clé |
+| Une requête déjà en vol est acceptée | **Période de grâce tenue par Comptaflow** — l'ancienne clé vaut encore quelques minutes. Sans elle, un déversement parti à l'instant du renouvellement échouerait, rarement et sans qu'on comprenne |
+| Comptaflow pas encore déployé | 404 et 405 sont reconnus comme « ce point d'entrée n'existe pas », le message le dit, la clé en place continue de servir |
+| Une panne ne déclenche pas une boucle | Un échec est **daté** et met le dossier **au repos douze heures** |
+| Un dossier en échec n'arrête pas les autres | Chaque renouvellement dans son propre `try`, et la commande rend toujours la main |
+
+`php artisan selflow:renouveler-cles-comptaflow`, avec `--a-blanc` pour voir
+sans appeler. Planifiée le 1ᵉʳ du mois à 3 h — heure où aucune caisse
+n'encaisse, donc où une clé qui change ne croise aucun déversement.
+
+L'écran du superadministrateur montre la date de la dernière rotation, signale
+celles qui ont dépassé leur durée, et affiche le dernier échec s'il y en a un.
+
+**Ce qui reste dû chez Comptaflow :** le point d'entrée
+`POST /api/external/companies/rotate-key` et sa période de grâce. Spécifiés
+dans `docs/passerelle-comptaflow/05-…`. Tant qu'il n'existe pas, la rotation
+le dit et ne casse rien.
+
+- `tests/Feature/PointDeVenteObligatoireTest.php` — 13 épreuves, **11 tombent**
+  sans le correctif
+- `tests/Feature/LiaisonComptaflowTest.php` — 11 épreuves ajoutées (42 au total)
+
+**1 034 épreuves, 1 034 vertes, 4 141 vérifications.**
 
 ---
 

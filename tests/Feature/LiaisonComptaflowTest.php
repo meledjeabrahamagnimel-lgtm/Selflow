@@ -462,6 +462,183 @@ class LiaisonComptaflowTest extends TestCase
         $this->assertStringContainsString(rtrim(config('selflow.comptaflow_app_url'), '/'), $corps);
     }
 
+    // ── La rotation des clés ─────────────────────────────────────────
+
+    /** Une entreprise liée, dont la clé date. */
+    private function lieeDepuis(int $jours): Entreprise
+    {
+        $this->entreprise->comptaflow_sync_key = 'cptf_live_ancienne';
+        $this->entreprise->fill([
+            'comptaflow_sync_status'    => 'active',
+            'comptaflow_company_id'     => 42,
+            'comptaflow_cle_indice'     => 'enne',
+            'comptaflow_liee_le'        => now()->subDays($jours),
+            'comptaflow_cle_tournee_le' => now()->subDays($jours),
+        ])->save();
+
+        return $this->entreprise->fresh();
+    }
+
+    public function test_le_superadministrateur_renouvelle_une_cle_quand_il_veut(): void
+    {
+        $entreprise = $this->lieeDepuis(2);
+
+        Http::fake(['*/api/external/companies/rotate-key' => Http::response([
+            'success' => true, 'sync_key' => 'cptf_live_toute_neuve_9f3b',
+        ])]);
+
+        $this->actingAs($this->superadmin)
+            ->post(route('superadmin.liaisons.renouveler_cle', $entreprise));
+
+        $fraiche = $entreprise->fresh();
+
+        // Il y a des jours où l'on n'attend pas le premier du mois : un
+        // prestataire qui part, un journal retrouvé sur un poste partagé.
+        $this->assertSame('cptf_live_toute_neuve_9f3b', $fraiche->comptaflow_sync_key);
+        $this->assertSame('9f3b', $fraiche->comptaflow_cle_indice);
+        $this->assertNotNull($fraiche->comptaflow_cle_tournee_le);
+        $this->assertTrue($fraiche->liaisonComptaflowActive());
+    }
+
+    public function test_un_renouvellement_en_echec_laisse_l_ancienne_cle_en_place(): void
+    {
+        $entreprise = $this->lieeDepuis(40);
+
+        Http::fake(['*' => Http::response(['success' => false], 500)]);
+
+        $resultat = LiaisonComptaflowService::renouvelerLaCle($entreprise);
+        $fraiche = $entreprise->fresh();
+
+        // C'est le point qui garantit que rien ne casse : effacer d'abord et
+        // demander ensuite couperait la liaison à la première panne réseau.
+        $this->assertFalse($resultat['success']);
+        $this->assertSame('cptf_live_ancienne', $fraiche->comptaflow_sync_key);
+        $this->assertTrue($fraiche->liaisonComptaflowActive());
+        $this->assertNotNull($fraiche->comptaflow_rotation_echouee_le);
+    }
+
+    public function test_un_comptaflow_sans_la_rotation_le_dit_sans_rien_casser(): void
+    {
+        $entreprise = $this->lieeDepuis(40);
+
+        Http::fake(['*' => Http::response(['message' => 'Not Found'], 404)]);
+
+        $resultat = LiaisonComptaflowService::renouvelerLaCle($entreprise);
+
+        $this->assertFalse($resultat['success']);
+        $this->assertStringContainsString('companies/rotate-key', $resultat['message']);
+        $this->assertStringContainsString('continue de fonctionner', $resultat['message']);
+        $this->assertTrue($entreprise->fresh()->liaisonComptaflowActive());
+    }
+
+    public function test_la_rotation_mensuelle_ne_prend_que_ce_qui_a_depasse_sa_duree(): void
+    {
+        $recente = $this->lieeDepuis(3);
+        $this->assertCount(0, LiaisonComptaflowService::dossiersARenouveler());
+
+        $ancienne = $this->lieeDepuis(LiaisonComptaflowService::JOURS_AVANT_ROTATION + 1);
+        $this->assertCount(1, LiaisonComptaflowService::dossiersARenouveler());
+    }
+
+    public function test_une_cle_jamais_tournee_compte_depuis_sa_liaison(): void
+    {
+        // Une clé posée il y a six mois et jamais renouvelée est la plus en
+        // retard de toutes : une comparaison sur une colonne nulle l'aurait
+        // laissée tranquille.
+        $this->entreprise->comptaflow_sync_key = 'cptf_live_ancienne';
+        $this->entreprise->fill([
+            'comptaflow_sync_status'    => 'active',
+            'comptaflow_company_id'     => 42,
+            'comptaflow_liee_le'        => now()->subMonths(6),
+            'comptaflow_cle_tournee_le' => null,
+        ])->save();
+
+        $this->assertCount(1, LiaisonComptaflowService::dossiersARenouveler());
+    }
+
+    public function test_un_dossier_en_echec_recent_est_mis_au_repos(): void
+    {
+        $entreprise = $this->lieeDepuis(40);
+        $entreprise->update(['comptaflow_rotation_echouee_le' => now()->subHour()]);
+
+        // Comptaflow peut être en panne pour la journée : marteler son API ne
+        // la réveillera pas.
+        $this->assertCount(0, LiaisonComptaflowService::dossiersARenouveler());
+
+        $entreprise->update(['comptaflow_rotation_echouee_le' => now()->subDay()]);
+        $this->assertCount(1, LiaisonComptaflowService::dossiersARenouveler());
+    }
+
+    public function test_une_liaison_revoquee_n_est_pas_renouvelee(): void
+    {
+        $entreprise = $this->lieeDepuis(40);
+        $entreprise->update(['comptaflow_revoquee_le' => now()]);
+
+        $this->assertCount(0, LiaisonComptaflowService::dossiersARenouveler());
+    }
+
+    public function test_la_commande_mensuelle_renouvelle_et_rend_la_main(): void
+    {
+        $entreprise = $this->lieeDepuis(40);
+
+        Http::fake(['*/api/external/companies/rotate-key' => Http::response([
+            'success' => true, 'sync_key' => 'cptf_live_du_mois_abcd',
+        ])]);
+
+        $this->artisan('selflow:renouveler-cles-comptaflow')
+            ->assertSuccessful();
+
+        $this->assertSame('cptf_live_du_mois_abcd', $entreprise->fresh()->comptaflow_sync_key);
+    }
+
+    public function test_un_echec_n_empeche_pas_les_autres_dossiers(): void
+    {
+        $enEchec = $this->lieeDepuis(40);
+
+        $seconde = Entreprise::create([
+            'nom' => 'Seconde SARL', 'comptaflow_sync_status' => 'active',
+            'comptaflow_company_id' => 43, 'comptaflow_liee_le' => now()->subDays(40),
+            'comptaflow_cle_tournee_le' => now()->subDays(40),
+        ]);
+        $seconde->comptaflow_sync_key = 'cptf_live_seconde';
+        $seconde->save();
+
+        // La première échoue, la seconde doit passer : une entreprise dont
+        // Comptaflow refuse le renouvellement ne doit pas empêcher les
+        // suivantes de tourner.
+        Http::fake(['*' => Http::sequence()
+            ->push(['success' => false], 500)
+            ->push(['success' => true, 'sync_key' => 'cptf_live_seconde_neuve'])]);
+
+        $this->artisan('selflow:renouveler-cles-comptaflow')->assertSuccessful();
+
+        $this->assertSame('cptf_live_ancienne', $enEchec->fresh()->comptaflow_sync_key);
+        $this->assertSame('cptf_live_seconde_neuve', $seconde->fresh()->comptaflow_sync_key);
+    }
+
+    public function test_la_rotation_a_blanc_n_appelle_personne(): void
+    {
+        $this->lieeDepuis(40);
+        Http::fake();
+
+        $this->artisan('selflow:renouveler-cles-comptaflow --a-blanc')->assertSuccessful();
+
+        Http::assertNothingSent();
+        $this->assertSame('cptf_live_ancienne', $this->entreprise->fresh()->comptaflow_sync_key);
+    }
+
+    public function test_un_administrateur_ne_renouvelle_pas_la_cle(): void
+    {
+        $entreprise = $this->lieeDepuis(40);
+        Http::fake();
+
+        $this->actingAs($this->admin)
+            ->post(route('superadmin.liaisons.renouveler_cle', $entreprise))
+            ->assertForbidden();
+
+        Http::assertNothingSent();
+    }
+
     // ── Le refus ─────────────────────────────────────────────────────
 
     public function test_le_refus_porte_un_motif_que_l_entreprise_lit(): void

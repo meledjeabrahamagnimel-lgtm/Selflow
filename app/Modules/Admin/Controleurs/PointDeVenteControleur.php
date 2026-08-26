@@ -101,7 +101,11 @@ class PointDeVenteControleur
 
         session(['point_de_vente_actif_id' => $pdv->id, 'point_de_vente_actif_nom' => $pdv->nom]);
 
-        return back()->with('succes', "Point de vente « {$pdv->nom} » activé pour cette session.");
+        // Et retenu au-delà de la session : elle meurt à la déconnexion, et le
+        // choix mourait avec elle.
+        Auth::user()->retenirLePointDeVente($pdv->id);
+
+        return back()->with('succes', "Point de vente « {$pdv->nom} » activé. Vous le retrouverez à votre prochaine connexion.");
     }
 
     public function activerApercu(PointDeVente $pdv): RedirectResponse

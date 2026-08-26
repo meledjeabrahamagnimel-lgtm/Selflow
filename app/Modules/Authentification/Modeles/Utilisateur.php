@@ -61,6 +61,48 @@ class Utilisateur extends Authenticatable
         return $this->belongsTo(\App\Modules\Admin\Modeles\PointDeVente::class, 'point_de_vente_id');
     }
 
+    /**
+     * Le point de vente sur lequel cet utilisateur travaillait en dernier.
+     *
+     * Distinct de `point_de_vente_id`, qui est l'**affectation** d'un caissier
+     * — décidée par son responsable, et qu'un changement d'écran ne doit pas
+     * toucher. Celui-ci est une préférence, et il survit à la déconnexion : le
+     * choix ne vivait qu'en session, que `session()->invalidate()` efface. Un
+     * responsable de trois magasins repartait donc chaque matin sur le premier
+     * venu, sans que rien ne le dise.
+     */
+    public function pointDeVenteActif(): BelongsTo
+    {
+        return $this->belongsTo(\App\Modules\Admin\Modeles\PointDeVente::class, 'point_de_vente_actif_id');
+    }
+
+    /**
+     * Retenir le point de vente choisi, pour la prochaine fois.
+     *
+     * Écrit hors affectation en masse : la valeur ne vient jamais d'un
+     * formulaire, seulement d'un choix explicite fait à l'écran.
+     */
+    public function retenirLePointDeVente(int $pointDeVenteId): void
+    {
+        $this->point_de_vente_actif_id = $pointDeVenteId;
+        $this->save();
+    }
+
+    /**
+     * Sur quel point de vente cet utilisateur doit-il ouvrir sa journée ?
+     *
+     * Un caissier n'a pas le choix : son affectation prime, sans quoi il
+     * encaisserait au nom d'un magasin où il n'est pas.
+     */
+    public function pointDeVenteDOuverture(): ?int
+    {
+        if ($this->estCaissier()) {
+            return $this->point_de_vente_id;
+        }
+
+        return $this->point_de_vente_actif_id ?? $this->point_de_vente_id;
+    }
+
     public function estSuperAdmin(): bool
     {
         return $this->role === 'superadmin';

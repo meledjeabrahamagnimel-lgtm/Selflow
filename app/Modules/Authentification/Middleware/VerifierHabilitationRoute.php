@@ -55,6 +55,7 @@ class VerifierHabilitationRoute
         // Comptaflow a la validation, elle ne se colle plus a la main.
         'superadmin.liaisons.valider'          => 'gestion_comptaflow',
         'superadmin.liaisons.refuser'          => 'gestion_comptaflow',
+        'superadmin.liaisons.renouveler_cle'   => 'gestion_comptaflow',
         'superadmin.liaisons.delierEntreprise' => 'gestion_comptaflow',
         'superadmin.liaisons.verifier'         => 'gestion_comptaflow',
 
