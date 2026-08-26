@@ -430,27 +430,27 @@
                                 </div>
                             @endif
 
-                            <div class="form-group" style="margin-bottom:0;">
-                                <label class="form-label" style="font-size:12px;margin-bottom:6px;">
-                                    Clé de synchronisation COMPTAFLOW
-                                    <span style="font-size:10px;color:var(--text-3);font-weight:400;"> — Obtenir depuis
-                                        COMPTAFLOW → Configuration → Liaison SELFLOW</span>
-                                </label>
-                                <input type="text" name="comptaflow_sync_key" class="form-control"
-                                    value="{{ old('comptaflow_sync_key', $entreprise->comptaflow_sync_key) }}"
-                                    placeholder="Collez ici la clé copiée depuis COMPTAFLOW…"
-                                    style="font-family:monospace;font-size:12px;">
-                                @if($entreprise->comptaflow_sync_status === 'active')
-                                    <small style="color:#10b981;font-size:11px;margin-top:4px;display:block;">
-                                        <i class="fas fa-check-circle"></i> Liaison active. Modifier la clé relancera une
-                                        re-synchronisation complète.
-                                    </small>
+                            {{-- Le champ « Clé de synchronisation COMPTAFLOW »
+                                 était ici, en saisie libre, avec la consigne
+                                 d'aller la chercher sur Comptaflow. Coller la
+                                 clé d'une autre entreprise ouvrait la liaison
+                                 vers ses livres : le secret partagé est détenu
+                                 par le serveur, il ne dit pas qui appelle.
+                                 La liaison se demande en bas de page ; la clé
+                                 est délivrée, jamais saisie. --}}
+                            <div style="font-size:12px;color:var(--text-2);line-height:1.6;">
+                                @if($entreprise->liaisonComptaflowActive())
+                                    <i class="fas fa-circle-check" style="color:#10b981;"></i>
+                                    Vos écritures partent vers votre dossier comptable
+                                    <strong>#{{ $entreprise->comptaflow_company_id }}</strong>.
+                                @elseif($entreprise->demandeComptaflowEnAttente())
+                                    <i class="fas fa-hourglass-half" style="color:#d97706;"></i>
+                                    Votre demande de dossier comptable attend d'être validée.
                                 @else
-                                    <small style="color:var(--text-3);font-size:11px;margin-top:4px;display:block;">
-                                        <i class="fas fa-info-circle"></i> Copiez la clé depuis COMPTAFLOW pour synchroniser
-                                        automatiquement vos tiers, plan comptable et écritures.
-                                    </small>
+                                    <i class="fas fa-circle-info" style="color:var(--text-3);"></i>
+                                    Aucun dossier comptable relié.
                                 @endif
+                                <a href="#comptaflow-liaison" style="color:var(--primary);font-weight:600;">Voir le détail</a>
                             </div>
                         </div>
                     </div>
@@ -1222,112 +1222,113 @@
         </div>
     </div>
 
-    {{-- ── INTÉGRATION COMPTAFLOW ─────────────────────────────────────────── --}}
+    {{-- ── LIAISON COMPTAFLOW ──────────────────────────────────────────────
+
+         Cette carte portait un bouton « Lancer la synchronisation test » qui
+         annonçait « Synchronisation bidirectionnelle réussie ! Les écritures
+         comptables et les statuts des factures ont été synchronisés » sans
+         qu'aucun appel ne parte. Elle affichait par ailleurs un statut
+         comparé à « Actif » quand le reste du code écrit « active » : le
+         voyant restait rouge sur une liaison qui marchait.
+
+         Et le champ de clé, plus haut dans la page, laissait coller la clé
+         d'une autre entreprise — la liaison s'ouvrait alors vers ses livres.
+         Personne ne saisit plus de clé : on demande, le superadministrateur
+         valide, Comptaflow la délivre. --}}
     <div class="card" style="margin-top:24px; padding:24px;">
         <div
             style="font-size:14px;font-weight:700;color:var(--text);text-transform:uppercase;letter-spacing:.5px;margin-bottom:20px;display:flex;align-items:center;gap:8px;border-bottom:1px solid var(--border);padding-bottom:10px;">
-            <i class="fas fa-sync" style="color:var(--primary); font-size:16px;"></i> Intégration COMPTAFLOW &
-            Synchronisation bidirectionnelle
+            <span id="comptaflow-liaison" style="scroll-margin-top:90px;"></span><i class="fas fa-link" style="color:var(--primary); font-size:16px;"></i> Comptabilité — liaison Comptaflow
         </div>
 
-        <div style="display:grid; grid-template-columns: 1fr 2fr; gap:32px; align-items:center;">
+        @php
+            $liee     = $entreprise->liaisonComptaflowActive();
+            $enAttente = $entreprise->demandeComptaflowEnAttente();
+            $refusee  = $entreprise->comptaflow_demande_statut === \App\Modules\Admin\Modeles\Entreprise::DEMANDE_REFUSEE;
+        @endphp
+
+        <div style="display:grid; grid-template-columns: 1fr 1fr; gap:28px; align-items:start;" class="conformite-corps">
             <div>
-                <div style="font-size:13px; color:var(--text-2); margin-bottom:14px; line-height:1.5;">
-                    COMPTAFLOW est la solution comptable connectée à Selflow. Activez la liaison pour synchroniser en temps
-                    réel vos factures d'achat, de vente, les encaissements, décaissements et générer automatiquement vos
-                    écritures de journal.
+                <div style="font-size:13px; color:var(--text-2); margin-bottom:16px; line-height:1.6;">
+                    Comptaflow est la solution comptable reliée à Selflow. Une fois la liaison
+                    ouverte, chaque écriture produite ici — vente, achat, règlement, mouvement de
+                    stock — part vers votre dossier comptable au fil de l'eau, avec votre plan
+                    comptable, vos journaux et vos tiers.
+                    <br><br>
+                    <strong>Vous n'avez aucune clé à saisir ni à aller chercher.</strong> Elle est
+                    délivrée à votre dossier quand votre demande est validée.
                 </div>
 
                 <div style="display:flex; flex-direction:column; gap:10px; font-size:13px;">
                     <div>
-                        Statut de liaison :
-                        <span id="sync-status-badge"
-                            class="badge {{ $entreprise->comptaflow_sync_status === 'Actif' ? 'badge-success' : 'badge-danger' }}">
-                            {{ $entreprise->comptaflow_sync_status }}
-                        </span>
+                        État :
+                        @if($liee)
+                            <span class="badge badge-success">Liaison active</span>
+                        @elseif($enAttente)
+                            <span class="badge badge-warning">Demande en attente de validation</span>
+                        @elseif($refusee)
+                            <span class="badge badge-danger">Demande refusée</span>
+                        @else
+                            <span class="badge badge-danger">Aucune liaison</span>
+                        @endif
                     </div>
-                    <div>
-                        Dernière synchronisation :
-                        <strong
-                            id="sync-last-time">{{ $entreprise->comptaflow_last_sync_at ? \Carbon\Carbon::parse($entreprise->comptaflow_last_sync_at)->format('d/m/Y \à H:i:s') : 'Jamais synchronisé' }}</strong>
-                    </div>
+                    @if($liee)
+                        <div>Dossier Comptaflow : <strong>#{{ $entreprise->comptaflow_company_id ?? '—' }}</strong></div>
+                        <div>Liaison ouverte le :
+                            <strong>{{ $entreprise->comptaflow_liee_le?->format('d/m/Y à H:i') ?? '—' }}</strong>
+                        </div>
+                        <div>Dernier déversement :
+                            <strong>{{ $entreprise->comptaflow_last_sync_at?->format('d/m/Y à H:i') ?? 'aucun' }}</strong>
+                        </div>
+                        {{-- Quatre caractères, et rien de plus : de quoi
+                             reconnaître la clé, pas de quoi s'en servir. --}}
+                        <div style="color:var(--text-3);">Clé du dossier :
+                            <code>{{ $entreprise->indiceCleComptaflow() ?? '••••' }}</code>
+                        </div>
+                    @elseif($enAttente)
+                        <div>Demandée le :
+                            <strong>{{ $entreprise->comptaflow_demande_le?->format('d/m/Y à H:i') ?? '—' }}</strong>
+                        </div>
+                    @endif
                 </div>
             </div>
 
-            <div
-                style="background:var(--bg3); border-radius:10px; padding:24px; border:1px solid var(--border); text-align:center;">
-                <p style="font-size:13px; font-weight:600; margin-bottom:16px; color:var(--text-1);">Simuler la
-                    communication d'API bidirectionnelle</p>
-
-                <div id="sync-feedback"
-                    style="display:none; padding:12px; border-radius:8px; font-size:13px; margin-bottom:16px; text-align:left; font-weight:500;">
-                </div>
-
-                <button type="button" id="btn-sync-simulation" onclick="lancerSyncSimulation()" class="btn btn-primary"
-                    style="margin:0 auto; padding:10px 24px; font-weight:700; gap:8px;">
-                    <i class="fas fa-rotate"></i> Lancer la synchronisation test
-                </button>
-                <span id="sync-loader" style="display:none; font-size:13px; color:var(--text-3); font-weight:600;">
-                    <i class="fas fa-spinner fa-spin" style="color:var(--primary); margin-right:8px;"></i> Communication
-                    avec COMPTAFLOW en cours...
-                </span>
+            <div style="background:var(--bg3); border-radius:10px; padding:22px; border:1px solid var(--border);">
+                @if($liee)
+                    <div style="font-size:13px;color:#065f46;line-height:1.7;">
+                        <i class="fas fa-circle-check" style="color:#10b981;"></i>
+                        <strong>Tout est en place.</strong> Vos écritures partent d'elles-mêmes.
+                        Rien ne vous est demandé ici ; pour délier ce dossier, écrivez au support —
+                        la clé doit être révoquée des deux côtés le même jour.
+                    </div>
+                @elseif($enAttente)
+                    <div style="font-size:13px;color:#92400e;line-height:1.7;">
+                        <i class="fas fa-hourglass-half"></i>
+                        <strong>Votre demande est enregistrée.</strong> Elle est vérifiée avant
+                        qu'un livre s'ouvre à votre nom : identité fiscale, NCC, RCCM. Vous
+                        n'avez rien d'autre à faire — la liaison se fera seule.
+                    </div>
+                @else
+                    @if($refusee && $entreprise->comptaflow_refus_motif)
+                        <div style="font-size:12.5px;color:#991b1b;background:#fee2e2;border:1px solid #fca5a5;border-radius:8px;padding:10px 12px;margin-bottom:14px;line-height:1.6;">
+                            <strong>Demande précédente refusée :</strong>
+                            {{ $entreprise->comptaflow_refus_motif }}
+                        </div>
+                    @endif
+                    <p style="font-size:13px;color:var(--text-2);line-height:1.6;margin-bottom:16px;">
+                        Demandez l'ouverture d'un dossier comptable. Les informations déjà
+                        renseignées sur cette page suffisent ; rien ne vous sera redemandé.
+                    </p>
+                    <form method="POST" action="{{ route('admin.entreprise.comptaflow.demander') }}" style="margin:0;">
+                        @csrf
+                        <button type="submit" class="btn btn-primary" style="padding:10px 22px;font-weight:700;gap:8px;">
+                            <i class="fas fa-link"></i> Demander la liaison Comptaflow
+                        </button>
+                    </form>
+                @endif
             </div>
         </div>
     </div>
-
-    <script>
-        function lancerSyncSimulation() {
-            const btn = document.getElementById('btn-sync-simulation');
-            const loader = document.getElementById('sync-loader');
-            const feedback = document.getElementById('sync-feedback');
-            const badge = document.getElementById('sync-status-badge');
-            const lastTime = document.getElementById('sync-last-time');
-
-            btn.style.display = 'none';
-            loader.style.display = 'inline-flex';
-            feedback.style.display = 'none';
-
-            fetch("{{ route('admin.entreprise.comptaflow.sync') }}", {
-                method: "POST",
-                headers: {
-                    "Content-Type": "application/json",
-                    "X-CSRF-TOKEN": "{{ csrf_token() }}"
-                }
-            })
-                .then(response => response.json())
-                .then(data => {
-                    btn.style.display = 'inline-flex';
-                    loader.style.display = 'none';
-
-                    if (data.success) {
-                        feedback.style.display = 'block';
-                        feedback.style.background = '#d1fae5';
-                        feedback.style.border = '1px solid #6ee7b7';
-                        feedback.style.color = '#065f46';
-                        feedback.innerHTML = `<i class="fas fa-circle-check"></i> ${data.message}`;
-
-                        badge.className = 'badge badge-success';
-                        badge.textContent = 'Actif';
-                        lastTime.textContent = data.last_sync;
-                    } else {
-                        feedback.style.display = 'block';
-                        feedback.style.background = '#fee2e2';
-                        feedback.style.border = '1px solid #fca5a5';
-                        feedback.style.color = '#991b1b';
-                        feedback.innerHTML = `<i class="fas fa-circle-exclamation"></i> ${data.message}`;
-                    }
-                })
-                .catch(error => {
-                    btn.style.display = 'inline-flex';
-                    loader.style.display = 'none';
-                    feedback.style.display = 'block';
-                    feedback.style.background = '#fee2e2';
-                    feedback.style.border = '1px solid #fca5a5';
-                    feedback.style.color = '#991b1b';
-                    feedback.innerHTML = `<i class="fas fa-circle-xmark"></i> Une erreur réseau s'est produite lors de la synchronisation.`;
-                });
-        }
-    </script>
 
     {{-- ── STATUT FNE (DGI) — Lecture seule, la clé n'est jamais affichée ici ── --}}
     <div class="card" style="margin-top:24px; padding:24px;">

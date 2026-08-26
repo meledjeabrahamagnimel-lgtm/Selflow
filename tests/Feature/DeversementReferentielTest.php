@@ -44,8 +44,13 @@ class DeversementReferentielTest extends TestCase
         $this->entreprise = Entreprise::create([
             'nom'                    => 'Quincaillerie du Plateau',
             'comptaflow_sync_status' => 'active',
-            'comptaflow_sync_key'    => 'cle-de-liaison',
         ]);
+
+        // La clé ne passe plus par l'affectation en masse : elle n'est pas
+        // `$fillable`, précisément pour qu'aucune requête ne puisse l'y
+        // glisser. Elle se pose comme le service la pose.
+        $this->entreprise->comptaflow_sync_key = 'cle-de-liaison';
+        $this->entreprise->save();
 
         foreach ([['411000', 'Clients'], ['401000', 'Fournisseurs'], ['701000', 'Ventes de marchandises']] as [$numero, $libelle]) {
             PlanComptable::create([
@@ -265,7 +270,11 @@ class DeversementReferentielTest extends TestCase
         // La doublure est posée exprès : sans elle, « rien n'est parti » ne
         // prouverait rien — aucun appel n'aurait été observable.
         $this->comptaflowRepond();
-        $this->entreprise->update(['comptaflow_sync_key' => null]);
+
+        // Hors affectation en masse, comme la pose : la clé n'est pas
+        // `$fillable`, et `update()` l'ignorerait en silence.
+        $this->entreprise->comptaflow_sync_key = null;
+        $this->entreprise->save();
 
         $resultat = DeversementReferentielService::deverser($this->entreprise);
 

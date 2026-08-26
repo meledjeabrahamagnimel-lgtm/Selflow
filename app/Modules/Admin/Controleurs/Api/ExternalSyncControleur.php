@@ -92,10 +92,22 @@ class ExternalSyncControleur
                 'secteur_activite'       => [\App\Modules\Admin\Modeles\Referentiel\Categorie::AUTRE],
                 'modules_actifs'         => ['principal', 'ventes', 'achats', 'stock', 'tiers', 'produits', 'rapports', 'b2b', 'fne'],
                 'comptaflow_company_id'  => $request->comptaflow_company_id,
-                'comptaflow_sync_key'    => $request->comptaflow_sync_key,
                 'comptaflow_sync_status' => 'active',
                 'comptaflow_last_sync_at' => now(),
+                'comptaflow_liee_le'     => now(),
+                'comptaflow_cle_indice'  => $request->comptaflow_sync_key
+                    ? substr((string) $request->comptaflow_sync_key, -4)
+                    : null,
             ]);
+
+            // La clé n'est pas `$fillable` : elle ne doit jamais entrer par un
+            // tableau de requête. Ici, l'appel vient de Comptaflow lui-même,
+            // authentifié par le secret serveur, et c'est lui qui l'a générée.
+            // On la pose donc explicitement, hors de l'affectation en masse.
+            if ($request->filled('comptaflow_sync_key')) {
+                $entreprise->comptaflow_sync_key = $request->comptaflow_sync_key;
+                $entreprise->save();
+            }
 
             // Sans plan comptable ni journal, la premiere vente s'impute sur des
             // comptes inventes a la volee. L'entreprise recoit donc de quoi

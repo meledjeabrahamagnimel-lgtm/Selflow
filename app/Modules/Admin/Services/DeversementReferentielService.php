@@ -80,10 +80,16 @@ class DeversementReferentielService
         }
 
         try {
-            $liaison = self::etablirLaLiaison($entreprise);
+            // La liaison peut déjà être ouverte : `LiaisonComptaflowService`
+            // la fait établir par Comptaflow lui-même à la validation de la
+            // demande, et en rapporte l'identifiant du dossier. La rouvrir à
+            // chaque déversement était un appel pour rien.
+            if (empty($entreprise->comptaflow_company_id)) {
+                $liaison = self::etablirLaLiaison($entreprise);
 
-            if (!$liaison['success']) {
-                return $liaison;
+                if (!$liaison['success']) {
+                    return $liaison;
+                }
             }
 
             return self::envoyerLeReferentiel($entreprise);
@@ -106,7 +112,9 @@ class DeversementReferentielService
      */
     private static function etablirLaLiaison(Entreprise $entreprise): array
     {
-        $reponse = Http::timeout(self::DELAI)->post(
+        $reponse = Http::timeout(self::DELAI)->withHeaders(
+            LiaisonComptaflowService::enTete($entreprise)
+        )->post(
             self::url('/api/external/link-company'),
             [
                 'secret'             => config('selflow.comptaflow_api_secret'),
@@ -142,7 +150,13 @@ class DeversementReferentielService
         $journaux = self::codesJournaux($entreprise);
         $tiers = self::tiers($entreprise);
 
-        $reponse = Http::timeout(self::DELAI)->post(
+        // La clé du dossier voyage en en-tête : c'est elle qui dit à
+        // Comptaflow **quelle entreprise** appelle. Le secret partagé ne le
+        // dit pas — il est le même pour toutes, et un secret volé suffisait
+        // à écrire dans les livres de n'importe qui.
+        $reponse = Http::timeout(self::DELAI)->withHeaders(
+            LiaisonComptaflowService::enTete($entreprise)
+        )->post(
             self::url('/api/external/referentiel/deverser'),
             [
                 'secret'                => config('selflow.comptaflow_api_secret'),

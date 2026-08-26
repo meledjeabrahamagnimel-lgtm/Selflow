@@ -164,8 +164,10 @@ class SuperadminControleur
             'fne_ncc'                 => ['nullable', 'string', 'size:8', 'regex:/^[A-Z0-9]{7}[A-Z]$/'],
             'fne_mot_de_passe'        => ['nullable', 'string', 'max:255'],
 
-            // Champs COMPTAFLOW conditionnels
-            'comptaflow_password'     => [$request->boolean('creer_compte_comptaflow') ? 'required' : 'nullable', 'string', 'min:8', 'confirmed'],
+            // Le mot de passe du compte Comptaflow etait demande ici : le
+            // superadministrateur choisissait celui d'un client, et il partait
+            // en clair dans le corps de la requete. Comptaflow envoie son
+            // propre lien d'activation au responsable.
         ], [
             'email.required'           => "L'adresse du responsable est obligatoire : c'est avec elle qu'il se connectera.",
             'email.unique'             => 'Cette adresse est déjà utilisée par un autre compte.',
@@ -249,49 +251,23 @@ class SuperadminControleur
         ]);
 
         // ── Liaison COMPTAFLOW (si case cochée) ──
+        //
+        // Ce bloc tirait `Str::random(40)` et déclarait cette valeur « clé de
+        // synchronisation » : Selflow inventait donc une clé que Comptaflow
+        // devait accepter sur parole. Et il demandait au superadministrateur
+        // de **choisir le mot de passe** du compte du client, qu'il envoyait
+        // en clair dans le corps de la requête.
+        //
+        // Le provisionnement est passé au service : Comptaflow ouvre le
+        // dossier, génère la clé, la renvoie, et envoie lui-même son lien
+        // d'activation au responsable.
         $messageSupplement = '';
-        if ($request->boolean('creer_compte_comptaflow') && $request->filled('comptaflow_password')) {
-            try {
-                $syncKey = Str::random(40);
-                $comptaflowUrl = config('selflow.comptaflow_api_url', 'http://127.0.0.1:8002');
+        if ($request->boolean('creer_compte_comptaflow')) {
+            $resultat = \App\Modules\Admin\Services\LiaisonComptaflowService::valider($entreprise);
 
-                $response = Http::timeout(15)->post($comptaflowUrl . '/api/external/register-enterprise', [
-                    'secret'         => config('selflow.comptaflow_api_secret'),
-                    'company_name'   => $entreprise->nom,
-                    'activity'       => implode(', ', $entreprise->secteur_activite ?? ['Commercial']),
-                    'juridique_form' => $entreprise->forme_juridique ?? 'SARL',
-                    'adresse'        => $entreprise->adresse,
-                    'city'           => $entreprise->adresse ? explode(',', $entreprise->adresse)[0] : 'Abidjan',
-                    'country'        => 'Côte d\'Ivoire',
-                    'phone_number'   => $entreprise->telephone,
-                    'email_adresse'  => $entreprise->email,
-                    'ncc'            => $entreprise->ncc,
-                    'rccm'           => $entreprise->rccm,
-                    'compte_contribuable' => $entreprise->compte_contribuable,
-                    'regime'         => $entreprise->regime_imposition,
-                    'admin_nom'      => $entreprise->gerant_nom,
-                    'admin_prenom'   => $entreprise->gerant_prenom,
-                    'admin_password' => $request->comptaflow_password,
-                    'selflow_company_id' => $entreprise->id,
-                    'selflow_sync_key'   => $syncKey,
-                ]);
-
-                if ($response->successful() && $response->json('success')) {
-                    $entreprise->update([
-                        'comptaflow_company_id' => $response->json('company_id'),
-                        'comptaflow_sync_key'   => $syncKey,
-                        'comptaflow_sync_status' => 'active',
-                        'comptaflow_last_sync_at' => now(),
-                    ]);
-                    $messageSupplement = ' Le compte COMPTAFLOW a été créé et lié avec succès.';
-                } else {
-                    $messageSupplement = ' ⚠️ Avertissement : L\'entreprise Selflow a été créée, mais la création du compte COMPTAFLOW a échoué (' . ($response->json('message') ?? 'Erreur inconnue') . ').';
-                    Log::warning('COMPTAFLOW register-enterprise failed', ['response' => $response->json()]);
-                }
-            } catch (\Exception $e) {
-                $messageSupplement = ' ⚠️ Avertissement : Impossible de contacter COMPTAFLOW (' . $e->getMessage() . ').';
-                Log::error('COMPTAFLOW register-enterprise exception', ['error' => $e->getMessage()]);
-            }
+            $messageSupplement = $resultat['success']
+                ? ' Le dossier Comptaflow a été ouvert et la liaison établie. ' . $resultat['message']
+                : ' ⚠️ L\'entreprise Selflow est créée, mais le dossier Comptaflow n\'a pas pu être ouvert : ' . $resultat['message'];
         }
 
         return redirect()->route('superadmin.entreprises')->with('succes',

@@ -51,9 +51,11 @@ class VerifierHabilitationRoute
         'superadmin.utilisateurs.modifier'            => 'gestion_entreprises',
 
         'superadmin.liaisons.index'            => 'gestion_comptaflow',
-        'superadmin.liaisons.lier'             => 'gestion_comptaflow',
+        // `lier` et `creerComptaflow` n'existent plus : la cle est delivree par
+        // Comptaflow a la validation, elle ne se colle plus a la main.
+        'superadmin.liaisons.valider'          => 'gestion_comptaflow',
+        'superadmin.liaisons.refuser'          => 'gestion_comptaflow',
         'superadmin.liaisons.delierEntreprise' => 'gestion_comptaflow',
-        'superadmin.liaisons.creerComptaflow'  => 'gestion_comptaflow',
         'superadmin.liaisons.verifier'         => 'gestion_comptaflow',
 
         'superadmin.fne.index'          => 'gestion_fne',

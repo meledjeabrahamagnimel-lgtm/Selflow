@@ -99,6 +99,8 @@ Elles ne se rediscutent pas sans raison neuve.
 | Article archivé | **Il disparaît des écrans de saisie** : vente, achat, production, consignation, alertes de rupture, ouverture d'un point de vente. Il **reste** visible au stock tant qu'il porte une quantité : la marchandise est là, et les écritures la portent — 25/08/2026, propriétaire du projet |
 | Formulaire d'inscription | **L'étape 1 ne demande que le nom de l'entreprise.** Trois étapes, dont la dernière est facultative ; l'adresse électronique, qui est l'identifiant de connexion, est demandée avec le responsable. La forme juridique et le domaine d'activité se renseignent depuis l'application — 25/08/2026, propriétaire du projet |
 | Illustration d'article | **Vingt-deux dessins au trait tenus dans le dépôt**, choisis d'après le nom de l'article. Ce ne sont pas des photos et cela ne prétend pas l'être : aller chercher une image du commerce montrerait une marchandise que l'entreprise ne vend pas. La vraie photo passe toujours devant — 25/08/2026 |
+| Clé de liaison Comptaflow | **Délivrée, jamais saisie.** L'entreprise demande, le superadministrateur valide, **Comptaflow génère la clé** et la renvoie. Elle est chiffrée en base, retirée de `$fillable`, et n'apparaît jamais entière à l'écran. C'est elle — et non le secret partagé, qui ne dit pas qui appelle — qui authentifie chaque déversement — 26/08/2026, propriétaire du projet |
+| Mot de passe d'un compte client | **Jamais choisi par le superadministrateur, jamais transmis.** L'application qui ouvre le compte envoie son propre lien d'activation — 26/08/2026 |
 
 
 ---
@@ -2550,33 +2552,115 @@ raccourci renvoyait plus haut que le précédent.
 Les quatre tombent sans le correctif. **946 épreuves, 946 vertes,
 3 945 vérifications.**
 
-#### 15.2 — Une clé de liaison par entreprise — **EN ATTENTE D'ARBITRAGE**
+#### 15.2 — Une clé de liaison par entreprise — **CÔTÉ SELFLOW TERMINÉ**
 
-Question du propriétaire : au lieu d'un secret unique partagé, une clé générée
-par entreprise, délivrée quand le superadministrateur valide la demande de
-compte Comptaflow, la liaison s'établissant sans que l'entreprise manipule quoi
-que ce soit.
+Demande du propriétaire : au lieu d'un secret unique partagé, une clé par
+entreprise, délivrée quand le superadministrateur valide la demande de dossier
+comptable, la liaison s'établissant sans que l'entreprise manipule quoi que ce
+soit.
 
-L'état actuel, à ne pas confondre avec ce qui est demandé :
+L'état de départ, à ne pas confondre avec ce qui était demandé :
 
-| Élément | Aujourd'hui |
+| Élément | Avant ce lot |
 |---|---|
-| `EXTERNAL_SYNC_SECRET` | **Un seul secret**, la même valeur dans les deux `.env`. Il authentifie Selflow auprès de Comptaflow, et Comptaflow auprès de Selflow |
-| `entreprises.comptaflow_sync_key` | Déjà **une valeur par entreprise** — mais **saisie à la main** : le champ est libre dans les paramètres, et la consigne à l'écran dit « obtenir depuis Comptaflow → Configuration → Liaison Selflow » |
+| `EXTERNAL_SYNC_SECRET` | **Un seul secret**, la même valeur dans les deux `.env`. Il authentifie Selflow auprès de Comptaflow, et réciproquement |
+| `entreprises.comptaflow_sync_key` | Déjà **une valeur par entreprise** — mais **saisie à la main** : champ libre dans les paramètres, avec la consigne « obtenir depuis Comptaflow → Configuration → Liaison Selflow » |
 
-**Le défaut que cela porte** — `EntrepriseControleur::enregistrer()` accepte
-`comptaflow_sync_key` comme un champ de formulaire ordinaire, et déclenche le
-déversement dès qu'il change. Une entreprise qui obtient la clé d'une autre la
-colle dans ses propres paramètres : la liaison s'ouvre, **et son référentiel
-puis ses écritures partent dans les livres de l'autre**. Le secret partagé ne
-l'en empêche pas — il est détenu par le serveur, pas par l'entreprise. Rien
-côté Selflow ne vérifie que la clé saisie désigne bien l'entreprise qui la
-saisit ; c'est Comptaflow qui décide, sur la seule foi de la clé.
+##### Le défaut, et il n'était pas d'ergonomie
 
-Ce que la demande du propriétaire corrige donc, au-delà du confort : **la clé
-cesse d'être une donnée que l'utilisateur saisit** pour devenir une donnée que
-le système délivre. Conception détaillée à faire ; la moitié Comptaflow n'est
-pas atteignable depuis ce dépôt.
+`EntrepriseControleur::enregistrerParametres()` acceptait
+`comptaflow_sync_key` comme un champ de formulaire ordinaire et déclenchait le
+déversement dès qu'il changeait. **Une entreprise qui obtenait la clé d'une
+autre la collait dans ses propres paramètres : la liaison s'ouvrait, et son
+référentiel puis toutes ses écritures partaient dans les livres de l'autre.**
+Le secret partagé n'y changeait rien — il est détenu par le serveur, part sur
+tous les appels, et ne dit pas qui appelle.
+
+Quatre autres écrans mentaient sur le même sujet :
+
+| Écran | Ce qu'il faisait |
+|---|---|
+| « Lancer la synchronisation test » | Annonçait « Synchronisation bidirectionnelle réussie ! Les écritures comptables et les statuts des factures ont été synchronisés » **sans qu'aucun appel ne parte** — et écrivait `comptaflow_sync_status = 'Actif'`, valeur qu'aucun autre code ne reconnaît : le déversement, qui attend `active`, s'arrêtait net après cette « réussite » |
+| « Lier manuellement » (superadmin) | Sa route pointait sur une méthode absente du contrôleur : **500 (Internal Server Error) depuis un renommage** que personne n'avait remarqué |
+| « Créer compte COMPTAFLOW » | Demandait au superadministrateur de **choisir le mot de passe** du compte d'un client, transmis en clair, et tirait `Str::random(40)` en le déclarant « clé de synchronisation » — Selflow inventait une clé que Comptaflow devait accepter sur parole |
+| « Délier » | Effaçait la clé chez Selflow **sans rien dire à Comptaflow**, où elle continuait d'ouvrir le dossier |
+
+Un cinquième, trouvé en chemin : le statut de liaison se déduisait de la
+présence du champ dans la requête, si bien qu'enregistrer les paramètres sans y
+toucher pouvait faire passer une liaison active à `inactive` — les écritures
+cessaient de partir sans que rien ne le dise.
+
+##### La procédure retenue
+
+1. L'entreprise demande. Un bouton, aucun champ.
+2. Le superadministrateur voit la file, avec ce qui manque à l'identité fiscale
+   signalé — un livre va s'ouvrir au nom de quelqu'un. Il valide, ou refuse
+   avec un motif que l'entreprise lit.
+3. Selflow appelle `POST /api/external/companies/provision` avec le secret
+   **serveur**.
+4. **Comptaflow crée le dossier, génère la clé, la renvoie.**
+5. Selflow la range chiffrée et déverse le référentiel dans la foulée.
+6. L'entreprise lit « Liaison active ». Elle n'a rien manipulé.
+
+C'est Comptaflow qui génère : la clé désigne un dossier chez lui, c'est lui qui
+doit la reconnaître. Selflow ne fait que la conserver.
+
+##### Ce que la clé change au modèle d'authentification
+
+Une fois délivrée, **c'est elle qui authentifie chaque déversement**, en
+en-tête `X-Company-Key`, et Comptaflow vérifie que la clé et l'entreprise
+annoncée dans le corps désignent le même dossier. Le secret partagé se rétracte
+alors sur le seul provisionnement. **Un secret volé ne suffit plus à écrire
+dans les livres de n'importe qui.**
+
+##### Les garde-fous posés
+
+| Décision | Raison |
+|---|---|
+| **La clé n'est pas `$fillable`** | Aucune requête ne peut l'y glisser. `LiaisonComptaflowService` est le seul endroit qui la pose, hors affectation en masse |
+| **Chiffrée en base** (cast `encrypted`) | Une sauvegarde égarée livrait toutes les clés en clair, donc l'écriture dans les livres de chaque entreprise. La migration chiffre l'existant, et sait reconnaître ce qui l'est déjà pour ne pas chiffrer deux fois |
+| **Jamais affichée entière** | Quatre derniers caractères, précédés de points. De quoi reconnaître une clé, pas de quoi s'en servir |
+| **Un provisionnement en échec ne lie rien** | La demande reste en attente et se rejoue. Une liaison à moitié ouverte enverrait des écritures qui n'arrivent nulle part, en les disant déversées |
+| **404 et 405 sont reconnus comme « point d'entrée absent »** | Le message envoie au déploiement en retard, pas à chercher une clé perdue |
+| **Délier révoque des deux côtés** | Une clé oubliée chez l'autre est une clé qui marche |
+
+##### Fichiers
+
+- `app/Modules/Admin/Migrations/2026_08_26_000001_liaison_comptaflow_delivree_et_non_saisie.php`
+- `app/Modules/Admin/Services/LiaisonComptaflowService.php` — demander, valider, refuser, révoquer, en-tête
+- `EntrepriseControleur`, `SuperadminLiaisonControleur`, `SuperadminControleur`,
+  `ExternalSyncControleur`, `DeversementReferentielService`,
+  `DeverserEcritureComptaflow`, `Entreprise`
+- `Vues/entreprise/parametres.blade.php`, `Vues/superadmin/liaisons/index.blade.php`,
+  `Vues/superadmin/entreprises/creer.blade.php`
+- `tests/Feature/LiaisonComptaflowTest.php` — 21 épreuves, **20 tombent sans le
+  correctif**
+
+**967 épreuves, 967 vertes, 4 007 vérifications.**
+
+##### La moitié Comptaflow — livrée en fichiers, non appliquée
+
+Ce dépôt n'a pas accès à `guysergekouassi/COMPTAFLOW` : une session Claude Code
+ne peut pas ajouter un dépôt d'un autre propriétaire que celui avec lequel elle
+a démarré. Le travail est donc écrit et rangé dans `docs/passerelle-comptaflow/`,
+à remettre à la session Comptaflow :
+
+| Fichier | Contenu |
+|---|---|
+| `README.md` | Le défaut, le modèle d'authentification visé, la procédure |
+| `01-migration-cles-de-liaison.php` | Clé, révocation, index, unicité |
+| `02-VerifieCleEntreprise.php` | Middleware `X-Company-Key`, avec la distinction 401 / 403 |
+| `03-ExternalCompanyController.php` | `provision`, `revoke`, `verify` |
+| `04-routes-api.php` | Les routes et leurs limitations de débit |
+| `05-modifications-des-points-existants.md` | Les retouches sur les deux déversements |
+| `06-tests-attendus.md` | Ce que les épreuves doivent établir |
+
+Les noms de table et de modèle y sont ceux que la passerelle laisse deviner ;
+chaque endroit à contrôler porte un `// À VÉRIFIER`.
+
+**Tant que le middleware n'est pas en place chez Comptaflow, le secret partagé
+suffit toujours à écrire dans n'importe quel dossier.** La moitié Selflow ferme
+le chemin par le formulaire ; elle ne peut pas fermer celui par l'API.
 
 ---
 

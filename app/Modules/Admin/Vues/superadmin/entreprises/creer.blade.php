@@ -256,18 +256,13 @@
                     </span>
                 </label>
 
+                {{-- Deux champs de mot de passe vivaient ici : le
+                     superadministrateur choisissait le mot de passe du compte
+                     d'un client, et il partait en clair dans le corps de la
+                     requête. Comptaflow envoie son propre lien d'activation au
+                     responsable, et génère lui-même la clé de liaison — Selflow
+                     n'invente ni l'un ni l'autre. --}}
                 <div id="comptaflow-fields" style="display:none; flex-direction:column; gap:12px;">
-                    <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
-                        <div class="form-group">
-                            <label class="form-label">Mot de passe admin COMPTAFLOW <span style="color:var(--danger)">*</span></label>
-                            <input type="password" name="comptaflow_password" id="comptaflow_password" class="form-control" placeholder="Min. 8 caractères" value="">
-                            @error('comptaflow_password') <small style="color:var(--danger)">{{ $message }}</small> @enderror
-                        </div>
-                        <div class="form-group">
-                            <label class="form-label">Confirmer le mot de passe <span style="color:var(--danger)">*</span></label>
-                            <input type="password" name="comptaflow_password_confirmation" class="form-control" placeholder="Répéter le mot de passe">
-                        </div>
-                    </div>
                     <div style="padding:10px; background:rgba(26,115,232,0.05); border:1px solid rgba(26,115,232,0.2); border-radius:8px;">
                         <div style="font-size:11.5px; color:#1a73e8; display:flex; align-items:center; gap:6px;">
                             <i class="fas fa-info-circle"></i> 

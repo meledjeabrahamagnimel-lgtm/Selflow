@@ -326,7 +326,10 @@ Route::prefix('admin')
         // la DGI, puis Comptaflow. Les marteler use un quota qui n'est pas le
         // nôtre.
         Route::post('/entreprise/fne/tester-connexion', [EntrepriseControleur::class, 'testerConnexionFne'])->middleware('throttle:plateforme')->name('entreprise.fne.tester_connexion');
-        Route::post('/entreprise/comptaflow/sync-simulation', [EntrepriseControleur::class, 'simulerSyncComptaflow'])->middleware('throttle:plateforme')->name('entreprise.comptaflow.sync');
+        // `sync-simulation` annoncait une synchronisation reussie sans qu'aucun
+        // appel ne parte. Elle est remplacee par la demande de dossier, qui
+        // n'annonce que ce qu'elle fait.
+        Route::post('/entreprise/comptaflow/demander', [EntrepriseControleur::class, 'demanderComptaflow'])->middleware('throttle:plateforme')->name('entreprise.comptaflow.demander');
         Route::post('/entreprise/comptaflow/sync', [EntrepriseControleur::class, 'synchroniserComptaflow'])->middleware('throttle:plateforme')->name('entreprise.comptaflow.sync_real');
         Route::post('/entreprise/onboarding/entreprise-nom', [EntrepriseControleur::class, 'enregistrerNomOnboarding'])->name('onboarding.entreprise_nom');
 
@@ -405,10 +408,15 @@ Route::prefix('superadmin')
         // ── Liaisons SELFLOW ↔ COMPTAFLOW ──
         Route::prefix('liaisons')->name('liaisons.')->group(function () {
             Route::get('/',                                    [SuperadminLiaisonControleur::class, 'index'])->name('index');
-            Route::post('/lier',                               [SuperadminLiaisonControleur::class, 'lier'])->name('lier');
+            // `lier` pointait sur une methode absente du controleur — le
+            // formulaire tombait en 500 depuis un renommage. `creerComptaflow`
+            // demandait au superadministrateur de choisir le mot de passe du
+            // compte d'un client. Les deux chemins sont remplaces par une file
+            // de demandes : la cle est delivree par Comptaflow, jamais saisie.
+            Route::post('/{entreprise}/valider',               [SuperadminLiaisonControleur::class, 'validerDemande'])->middleware('throttle:plateforme')->name('valider');
+            Route::post('/{entreprise}/refuser',               [SuperadminLiaisonControleur::class, 'refuserDemande'])->name('refuser');
             Route::delete('/{entreprise}/delierEntreprise',    [SuperadminLiaisonControleur::class, 'delierEntreprise'])->name('delierEntreprise');
-            Route::post('/creer-comptaflow',                   [SuperadminLiaisonControleur::class, 'creerComptaflow'])->name('creerComptaflow');
-            Route::post('/{entreprise}/verifier',              [SuperadminLiaisonControleur::class, 'verifierLiaison'])->name('verifier');
+            Route::post('/{entreprise}/verifier',              [SuperadminLiaisonControleur::class, 'verifierLiaison'])->middleware('throttle:plateforme')->name('verifier');
         });
 
         // ── Gestion des clés FNE (DGI) ──

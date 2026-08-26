@@ -50,8 +50,13 @@ class PasserelleComptaflowTest extends TestCase
         $this->entreprise = Entreprise::create([
             'nom' => 'Boutique du carrefour',
             'comptaflow_sync_status' => 'active',
-            'comptaflow_sync_key'    => 'cle-de-liaison',
         ]);
+
+        // La clé ne passe plus par l'affectation en masse : elle n'est pas
+        // `$fillable`, précisément pour qu'aucune requête ne puisse l'y
+        // glisser. Elle se pose comme le service la pose.
+        $this->entreprise->comptaflow_sync_key = 'cle-de-liaison';
+        $this->entreprise->save();
 
         $this->site = PointDeVente::create([
             'entreprise_id' => $this->entreprise->id,

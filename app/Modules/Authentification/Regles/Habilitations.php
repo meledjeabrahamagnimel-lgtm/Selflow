@@ -272,7 +272,7 @@ class Habilitations
         'admin.entreprise.periodes.creer'         => 'comptabilite_globale',
         'admin.entreprise.periodes.cloturer'      => 'comptabilite_globale',
         'admin.entreprise.fne.tester_connexion'   => 'gestion_pdv',
-        'admin.entreprise.comptaflow.sync'        => 'comptabilite_globale',
+        'admin.entreprise.comptaflow.demander'    => 'comptabilite_globale',
         'admin.entreprise.comptaflow.sync_real'   => 'comptabilite_globale',
 
         // ── FNE ──

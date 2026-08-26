@@ -39,10 +39,22 @@ class Entreprise extends Model
         'souscription_etape',
         'souscription_terminee_le',
         'activite_autre',
-        'comptaflow_sync_key',
+        // La clé de liaison Comptaflow ne figure PAS ici, et c'est délibéré :
+        // elle était un champ du formulaire des paramètres, et coller celle
+        // d'une autre entreprise ouvrait la liaison vers ses livres. Elle
+        // s'écrit désormais par `LiaisonComptaflowService`, qui la reçoit de
+        // Comptaflow, et par lui seul. Voir la migration
+        // `liaison_comptaflow_delivree_et_non_saisie`.
         'comptaflow_sync_status',
         'comptaflow_last_sync_at',
         'comptaflow_company_id',
+        'comptaflow_demande_statut',
+        'comptaflow_demande_le',
+        'comptaflow_demande_par',
+        'comptaflow_refus_motif',
+        'comptaflow_liee_le',
+        'comptaflow_revoquee_le',
+        'comptaflow_cle_indice',
         // Champs DGI / Fiscal
         'idu',
         'reference_cadastrale',
@@ -86,7 +98,50 @@ class Entreprise extends Model
         'possede_compte_fne'  => 'boolean',
         'normalisation_auto_factures' => 'boolean',
         'normalisation_auto_recus'    => 'boolean',
+
+        // Chiffrée en base : une sauvegarde égarée, ou un accès en lecture à
+        // la table, livrait toutes les clés en clair — donc l'écriture dans
+        // les livres de chaque entreprise.
+        'comptaflow_sync_key'  => 'encrypted',
+        'comptaflow_demande_le' => 'datetime',
+        'comptaflow_liee_le'    => 'datetime',
+        'comptaflow_revoquee_le' => 'datetime',
+        'comptaflow_last_sync_at' => 'datetime',
     ];
+
+    // ── La liaison Comptaflow ────────────────────────────────────────
+
+    /** L'entreprise a demandé un dossier comptable ; le superadmin n'a pas tranché. */
+    public const DEMANDE_EN_ATTENTE = 'en_attente';
+
+    /** Le superadmin a validé : la clé est délivrée, la liaison ouverte. */
+    public const DEMANDE_VALIDEE = 'validee';
+
+    /** Le superadmin a refusé, avec un motif que l'entreprise voit. */
+    public const DEMANDE_REFUSEE = 'refusee';
+
+    public function liaisonComptaflowActive(): bool
+    {
+        return $this->comptaflow_sync_status === 'active'
+            && filled($this->comptaflow_sync_key)
+            && $this->comptaflow_revoquee_le === null;
+    }
+
+    public function demandeComptaflowEnAttente(): bool
+    {
+        return $this->comptaflow_demande_statut === self::DEMANDE_EN_ATTENTE;
+    }
+
+    /**
+     * De quoi reconnaître une clé sans la donner.
+     *
+     * Le superadministrateur doit pouvoir distinguer deux liaisons ; aucun
+     * écran ne doit afficher une clé entière, ni pouvoir la copier.
+     */
+    public function indiceCleComptaflow(): ?string
+    {
+        return $this->comptaflow_cle_indice ? '••••' . $this->comptaflow_cle_indice : null;
+    }
 
     /**
      * Cette pièce doit-elle être certifiée dès son émission ?

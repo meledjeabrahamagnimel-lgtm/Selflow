@@ -92,7 +92,11 @@ class EntrepriseControleur
             'ref_bancaire'           => ['nullable', 'string', 'max:1000'],
             'logo'                   => ['nullable', 'image', 'mimes:png,jpg,jpeg,svg,webp', 'max:2048'],
             'logo_fne'               => ['nullable', 'image', 'mimes:png,jpg,jpeg,svg,webp', 'max:2048'],
-            'comptaflow_sync_key'    => ['nullable', 'string', 'max:255'],
+            // `comptaflow_sync_key` était ici, en champ libre. Coller la clé
+            // d'une autre entreprise ouvrait la liaison vers ses livres : le
+            // secret partagé est détenu par le serveur, il ne dit pas qui
+            // appelle. La clé est désormais délivrée par Comptaflow à la
+            // validation du superadministrateur, et n'est plus jamais saisie.
             // Nouveaux champs d'inscription complète dégrisés
             'rccm'                   => ['nullable', 'string', 'max:100'],
             'ncc'                    => ['nullable', 'string', 'size:8', 'regex:/^[A-Z0-9]{7}[A-Z]$/'],
@@ -143,7 +147,7 @@ class EntrepriseControleur
 
         $data = $request->only([
             'nom', 'gerant_nom', 'gerant_prenom', 'gerant_fonction',
-            'adresse', 'telephone', 'email', 'ref_bancaire', 'comptaflow_sync_key',
+            'adresse', 'telephone', 'email', 'ref_bancaire',
             'rccm', 'ncc', 'regime_imposition', 'centre_impots', 'compte_contribuable',
             'forme_juridique',
             // Champs DGI
@@ -187,10 +191,12 @@ class EntrepriseControleur
             $data['numerotation_tiers'] = $request->input('numerotation_tiers');
         }
 
-        $syncKeyChanged =$request->filled('comptaflow_sync_key') && ($request->comptaflow_sync_key !== $entreprise->comptaflow_sync_key);
-
-        // Mettre à jour le statut en fonction de la présence de la clé
-        $data['comptaflow_sync_status'] = !empty($request->comptaflow_sync_key) ? 'active' : 'inactive';
+        // Le statut de la liaison Comptaflow se déduisait de la présence du
+        // champ dans la requête : enregistrer les paramètres sans y toucher
+        // faisait donc passer une liaison active à `inactive`, et les
+        // écritures cessaient de partir sans que rien ne le dise. Le statut
+        // n'appartient plus à ce formulaire — il appartient à
+        // `LiaisonComptaflowService`.
 
         // Traitement du logo principal
         if ($request->hasFile('logo')) {
@@ -213,24 +219,13 @@ class EntrepriseControleur
         $entreprise->update($data);
         $this->journaliser('modification_parametres', 'Entreprise', $entreprise->id, $ancien, $data);
 
-        // ── Liaison a posteriori si la clé a changé et est remplie ──
-        //
-        // La liaison ouverte, le référentiel de l'entreprise part vers
-        // Comptaflow. Le sens compte : Selflow déverse, Comptaflow reçoit.
-        // L'appel tirait auparavant le plan comptable de Comptaflow et
-        // effaçait celui de l'entreprise.
-        $messageSync = '';
-        if ($syncKeyChanged) {
-            $syncResult = \App\Modules\Admin\Services\DeversementReferentielService::deverser($entreprise);
-            if ($syncResult['success']) {
-                $messageSync = ' Liaison COMPTAFLOW établie. ' . $syncResult['message'];
-            } else {
-                $entreprise->update(['comptaflow_sync_status' => 'failed']);
-                $messageSync = ' ⚠️ Échec de la liaison COMPTAFLOW : ' . $syncResult['message'];
-            }
-        }
+        // L'enregistrement des paramètres ouvrait la liaison Comptaflow dès
+        // que la clé changeait. C'est ce chemin qui permettait de se lier aux
+        // livres d'une autre entreprise en collant sa clé. La liaison s'ouvre
+        // maintenant par `LiaisonComptaflowService::valider()`, appelé par le
+        // seul superadministrateur.
 
-        return back()->with('succes', 'Paramètres de l\'entreprise mis à jour avec succès.' . $messageSync);
+        return back()->with('succes', 'Paramètres de l\'entreprise mis à jour avec succès.');
     }
 
     /**
@@ -320,30 +315,28 @@ class EntrepriseControleur
     }
 
     /**
-     * Simuler une synchronisation bidirectionnelle avec COMPTAFLOW.
+     * Demander un dossier comptable Comptaflow.
+     *
+     * Un bouton, aucun champ. La clé est délivrée par Comptaflow quand le
+     * superadministrateur valide, et l'entreprise ne la voit jamais.
+     *
+     * Cette méthode remplace `simulerSyncComptaflow()`, qui annonçait
+     * « Synchronisation bidirectionnelle réussie ! Les écritures comptables et
+     * les statuts des factures ont été synchronisés » sans qu'aucun appel ne
+     * parte — et écrivait au passage `comptaflow_sync_status = 'Actif'`, une
+     * valeur qu'aucun autre code ne reconnaît : le déversement, qui attend
+     * `active`, s'arrêtait donc net après cette « réussite ».
      */
-    public function simulerSyncComptaflow(Request $request): \Illuminate\Http\JsonResponse
+    public function demanderComptaflow(): RedirectResponse
     {
-        $entreprise = Auth::user()->entreprise;
+        $utilisateur = Auth::user();
+        $entreprise  = $utilisateur->entreprise;
 
-        if (empty($entreprise->comptaflow_sync_key)) {
-            return response()->json([
-                'success' => false,
-                'message' => "La clé de synchronisation n'est pas configurée. Veuillez renseigner une clé valide.",
-            ]);
-        }
+        $resultat = \App\Modules\Admin\Services\LiaisonComptaflowService::demander($entreprise, $utilisateur);
 
-        // Simuler la synchronisation
-        $entreprise->update([
-            'comptaflow_sync_status'  => 'Actif',
-            'comptaflow_last_sync_at' => now(),
-        ]);
-
-        return response()->json([
-            'success' => true,
-            'message' => "Synchronisation bidirectionnelle réussie avec COMPTAFLOW ! Les écritures comptables et les statuts des factures ont été synchronisés avec succès.",
-            'last_sync' => now()->format('d/m/Y \à H:i:s'),
-        ]);
+        return $resultat['success']
+            ? back()->with('succes', $resultat['message'])
+            : back()->withErrors(['comptaflow' => $resultat['message']]);
     }
 
     /**
