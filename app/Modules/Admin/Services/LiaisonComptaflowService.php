@@ -258,10 +258,22 @@ class LiaisonComptaflowService
     /**
      * Ce que Comptaflow a besoin de savoir pour ouvrir un dossier.
      *
-     * Le mot de passe de l'administrateur n'en fait pas partie : l'ancienne
-     * route `register-enterprise` le demandait au superadministrateur, qui
-     * choisissait donc le mot de passe d'un compte qui n'est pas le sien.
-     * Comptaflow envoie son propre lien d'activation.
+     * ── Les accès, décidés par le propriétaire ──────────────────────
+     *
+     * **Le compte Comptaflow est le compte Selflow** : même adresse, même mot
+     * de passe. L'utilisateur n'en apprend pas un second, et le jour où il
+     * change celui de Selflow, il n'a pas deux endroits où penser.
+     *
+     * Ce qui voyage n'est pourtant **jamais le mot de passe** : c'est son
+     * empreinte `bcrypt`, telle qu'elle est en base. Comptaflow la range comme
+     * elle arrive, et le même mot de passe y ouvre le compte — sans que
+     * personne, ni le superadministrateur ni le réseau ni le journal
+     * d'application, ne l'ait jamais lu.
+     *
+     * C'est ce qui distingue cette version de celle d'avant : la route
+     * `register-enterprise` demandait au superadministrateur de **choisir** le
+     * mot de passe d'un compte qui n'est pas le sien, et le transportait en
+     * clair dans le corps de la requête.
      *
      * @return array<string, mixed>
      */
@@ -285,7 +297,16 @@ class LiaisonComptaflowService
                 'telephone'         => $entreprise->telephone,
                 'email'             => $entreprise->email ?? $admin?->email,
                 'admin_nom'         => trim(($admin?->nom ?? '') . ' ' . ($admin?->prenom ?? '')) ?: null,
+
+                // L'identifiant de connexion Selflow, et lui seul : c'est le
+                // même compte des deux côtés.
                 'admin_email'       => $admin?->email,
+                'admin_prenom'      => $admin?->prenom,
+
+                // L'empreinte `bcrypt`, jamais le mot de passe. Comptaflow la
+                // range telle quelle : le même mot de passe y ouvre le compte,
+                // sans que personne ne l'ait lu.
+                'admin_password_hash' => $admin?->password,
             ],
             // La convention de numérotation des tiers doit être la même des
             // deux côtés : la passerelle retrouve un tiers par son numéro

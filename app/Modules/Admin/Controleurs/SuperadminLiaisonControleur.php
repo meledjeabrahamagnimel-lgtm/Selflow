@@ -53,15 +53,35 @@ class SuperadminLiaisonControleur extends Controller
     }
 
     /**
-     * Valider une demande : Comptaflow ouvre le dossier et délivre la clé.
+     * Ouvrir le dossier Comptaflow d'une entreprise.
+     *
+     * Deux chemins, un seul geste : valider une demande que l'entreprise a
+     * faite, ou la lier de sa propre initiative — un client qui souscrit
+     * Comptaflow par téléphone n'a pas à cliquer dans un écran pour que le
+     * superadministrateur puisse lui ouvrir son dossier.
+     *
+     * Ce que cela n'est pas : l'ancien « Lier manuellement », qui demandait de
+     * coller un identifiant et une clé sans que rien ne vérifie que ce dossier
+     * appartenait à cette entreprise. La clé continue d'être délivrée par
+     * Comptaflow, et personne ne la saisit.
      */
     public function validerDemande(Entreprise $entreprise): RedirectResponse
     {
+        $spontanee = !$entreprise->demandeComptaflowEnAttente();
+
         $resultat = LiaisonComptaflowService::valider($entreprise);
 
-        return $resultat['success']
-            ? back()->with('success', "✅ « {$entreprise->nom} » : " . $resultat['message'])
-            : back()->with('error', "❌ « {$entreprise->nom} » : " . $resultat['message']);
+        if (!$resultat['success']) {
+            return back()->with('error', "❌ « {$entreprise->nom} » : " . $resultat['message']);
+        }
+
+        // L'entreprise n'a rien demandé : elle doit lire, en ouvrant ses
+        // paramètres, qu'un dossier lui a été ouvert et avec quels accès.
+        $mot = $spontanee
+            ? "Dossier ouvert à l'initiative du support ; l'entreprise le voit dans ses paramètres."
+            : $resultat['message'];
+
+        return back()->with('success', "✅ « {$entreprise->nom} » : " . $mot);
     }
 
     /**

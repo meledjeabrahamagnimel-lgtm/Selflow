@@ -20,6 +20,16 @@
                 <i class="fas fa-sync"></i> COMPTAFLOW
             </button>
         </div>
+        {{-- Le trousseau se posait à la création de l'entreprise, et jamais
+             plus. Une entreprise créée avant qu'un journal entre au référentiel
+             — le mobile money, par exemple — ne l'obtenait plus par aucun
+             chemin : il fallait le ressaisir à la main, avec son compte. --}}
+        <form method="POST" action="{{ route('admin.tresorerie.poser_journaux_defaut') }}" style="margin:0;">
+            @csrf
+            <button type="submit" class="btn btn-outline" title="Ajoute ce qui manque, sans toucher à vos journaux">
+                <i class="fas fa-wand-magic-sparkles"></i> Journaux par défaut
+            </button>
+        </form>
         <button id="btn-nouveau-journal" type="button" class="btn btn-primary" data-modal-open="modalNouveauJournal">
             <i class="fas fa-plus-circle"></i> Nouveau code
         </button>
@@ -190,12 +200,13 @@
             @csrf
             <div class="form-group">
                 <label class="form-label">Type de journal <span style="color:var(--danger)">*</span></label>
-                <select name="type" class="form-control" required>
-                    <option value="Vente">Vente</option>
-                    <option value="Achat">Achat</option>
-                    <option value="Caisse">Caisse</option>
-                    <option value="Banque">Banque</option>
-                    <option value="Général">Général</option>
+                {{-- La liste vivait ici, écrite en dur ; elle vit maintenant sur
+                     le modèle, où la règle de validation la lit aussi. --}}
+                <select name="type" id="type-journal" class="form-control" required
+                        onchange="ajusterCompteJournal()">
+                    @foreach(\App\Modules\Admin\Modeles\CodeJournal::TYPES as $type)
+                        <option value="{{ $type }}">{{ $type }}</option>
+                    @endforeach
                 </select>
             </div>
             
@@ -209,9 +220,20 @@
                 <input type="text" name="intitule" class="form-control" placeholder="Ex: Journal de Caisse" required>
             </div>
 
-            <div class="form-group">
+            {{-- Le compte de contrepartie ne concerne que les journaux de
+                 trésorerie : le 521 de la banque, le 571 de la caisse — celui
+                 que chaque écriture du journal mouvemente. Un journal de ventes
+                 ou d'achats n'en a pas : sa contrepartie est le tiers de la
+                 pièce, et elle change à chaque écriture. Le champ était pourtant
+                 exigé pour les cinq types, et il fallait donc inventer une
+                 valeur pour créer un journal de ventes. --}}
+            <div class="form-group" id="groupe-compte-journal" style="display:none;">
                 <label class="form-label">Compte comptable <span style="color:var(--danger)">*</span></label>
-                <input type="text" name="compte" class="form-control" placeholder="Ex: 571000, 521000" required>
+                <input type="text" name="compte" id="compte-journal" class="form-control"
+                       placeholder="Ex: 521000 pour une banque, 571000 pour une caisse">
+                <small style="color:var(--text-3);font-size:11px;">
+                    Le compte que ce journal mouvemente à chaque écriture.
+                </small>
             </div>
 
             <div style="display:flex; justify-content:flex-end; gap:12px; margin-top:24px;">
@@ -219,6 +241,32 @@
                 <button type="submit" class="btn btn-primary">Enregistrer</button>
             </div>
         </form>
+
+        <script>
+            // La liste vient du modèle : la règle de validation du contrôleur
+            // lit la même, et les deux ne peuvent plus diverger.
+            var TYPES_AVEC_COMPTE = @js(array_values(array_filter(
+                \App\Modules\Admin\Modeles\CodeJournal::TYPES,
+                fn ($t) => \App\Modules\Admin\Modeles\CodeJournal::porteUnCompteDeTresorerie($t)
+            )));
+
+            function ajusterCompteJournal() {
+                var type = document.getElementById('type-journal');
+                var groupe = document.getElementById('groupe-compte-journal');
+                var champ = document.getElementById('compte-journal');
+                if (!type || !groupe || !champ) return;
+
+                var concerne = TYPES_AVEC_COMPTE.indexOf(type.value) !== -1;
+                groupe.style.display = concerne ? '' : 'none';
+                // `required` sur un champ caché bloque l'envoi du formulaire
+                // sans rien afficher : le navigateur refuse de pointer un
+                // champ qu'il ne peut pas montrer.
+                champ.required = concerne;
+                if (!concerne) champ.value = '';
+            }
+
+            ajusterCompteJournal();
+        </script>
     </div>
 </div>
 

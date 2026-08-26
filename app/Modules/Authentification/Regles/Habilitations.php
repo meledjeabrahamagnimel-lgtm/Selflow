@@ -151,6 +151,7 @@ class Habilitations
         'admin.tresorerie.journal'                => 'tresorerie_journal',
         'admin.tresorerie.codes_journaux'         => 'tresorerie_codes_journaux',
         'admin.tresorerie.creer_code_journal'     => 'tresorerie_codes_journaux',
+        'admin.tresorerie.poser_journaux_defaut' => 'tresorerie_codes_journaux',
         'admin.tresorerie.supprimer_code_journal' => 'tresorerie_codes_journaux',
         'admin.banques.creer'                     => 'nouvelle_vente',
 
@@ -162,6 +163,7 @@ class Habilitations
         'admin.comptabilite.enregistrer_reglement'  => 'comptabilite_creances',
         'admin.comptabilite.plan_comptable'         => 'comptabilite_plan_comptable',
         'admin.comptabilite.creer_compte_comptable' => 'comptabilite_plan_comptable',
+        'admin.comptabilite.poser_plan_defaut'      => 'comptabilite_plan_comptable',
         // La balance et le grand livre montrent le résultat de l'entreprise
         // entière : ils relèvent de la comptabilité globale, non d'un écran de
         // caisse.

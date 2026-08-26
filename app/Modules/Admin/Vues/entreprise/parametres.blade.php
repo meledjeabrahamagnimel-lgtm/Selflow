@@ -1298,8 +1298,27 @@
                     <div style="font-size:13px;color:#065f46;line-height:1.7;">
                         <i class="fas fa-circle-check" style="color:#10b981;"></i>
                         <strong>Tout est en place.</strong> Vos écritures partent d'elles-mêmes.
-                        Rien ne vous est demandé ici ; pour délier ce dossier, écrivez au support —
-                        la clé doit être révoquée des deux côtés le même jour.
+                    </div>
+
+                    {{-- L'entreprise apprenait qu'elle avait un dossier comptable
+                         sans savoir où le consulter, ni avec quels identifiants.
+                         Les deux manquaient : l'adresse n'était écrite nulle
+                         part, et rien ne disait que le compte est le même. --}}
+                    <div style="margin-top:14px;padding:12px 14px;background:#fff;border:1px solid #d1fae5;border-radius:8px;font-size:12.5px;line-height:1.7;">
+                        <strong>Vos accès sont les mêmes qu'ici.</strong><br>
+                        Identifiant : <strong>{{ Auth::user()->email }}</strong><br>
+                        Mot de passe : celui de votre compte Selflow.
+                        <div style="margin-top:10px;">
+                            <a href="{{ rtrim(config('selflow.comptaflow_app_url'), '/') }}" target="_blank" rel="noopener"
+                               class="btn btn-primary btn-sm" style="padding:7px 14px;">
+                                <i class="fas fa-arrow-up-right-from-square"></i> Ouvrir ma comptabilité
+                            </a>
+                        </div>
+                    </div>
+
+                    <div style="margin-top:12px;font-size:11.5px;color:var(--text-3);line-height:1.6;">
+                        Pour délier ce dossier, écrivez au support : la clé doit être révoquée
+                        des deux côtés le même jour.
                     </div>
                 @elseif($enAttente)
                     <div style="font-size:13px;color:#92400e;line-height:1.7;">

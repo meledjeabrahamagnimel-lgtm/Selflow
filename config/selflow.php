@@ -18,6 +18,18 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Adresse publique de COMPTAFLOW
+    |--------------------------------------------------------------------------
+    | Celle qu'on donne à l'utilisateur pour aller consulter sa comptabilité.
+    | Distincte de l'API : celle-ci peut pointer sur un hôte interne, alors que
+    | l'adresse ci-dessous doit s'ouvrir dans le navigateur du client. L'écran
+    | de liaison n'en donnait aucune — l'entreprise apprenait qu'elle avait un
+    | dossier comptable sans savoir où le consulter.
+    */
+    'comptaflow_app_url' => env('COMPTAFLOW_APP_URL', 'http://comptaflow.dc-knowing.com/'),
+
+    /*
+    |--------------------------------------------------------------------------
     | Secret partagé API
     |--------------------------------------------------------------------------
     | Clé secrète partagée entre Selflow et COMPTAFLOW pour authentifier

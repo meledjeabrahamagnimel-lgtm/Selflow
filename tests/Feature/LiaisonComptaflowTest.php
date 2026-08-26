@@ -294,6 +294,98 @@ class LiaisonComptaflowTest extends TestCase
         Http::assertNothingSent();
     }
 
+    // ── Les accès : le compte Comptaflow est le compte Selflow ───────
+
+    public function test_l_empreinte_du_mot_de_passe_part_jamais_le_mot_de_passe(): void
+    {
+        LiaisonComptaflowService::demander($this->entreprise, $this->admin);
+        $this->comptaflowRepond();
+
+        LiaisonComptaflowService::valider($this->entreprise);
+
+        // Le compte est le même des deux côtés : même adresse, même mot de
+        // passe. Ce qui voyage est l'empreinte `bcrypt`, telle qu'elle est en
+        // base — personne, ni le superadministrateur ni le réseau ni le
+        // journal, n'a jamais lu le mot de passe.
+        Http::assertSent(function ($requete) {
+            if (!str_contains($requete->url(), '/companies/provision')) {
+                return false;
+            }
+
+            $identite = $requete['entreprise'];
+
+            return $identite['admin_email'] === 'lewis-liaison@dc-knowing.ci'
+                && str_starts_with($identite['admin_password_hash'], '$2y$')
+                && !str_contains($requete->body(), 'secret-de-test');
+        });
+    }
+
+    public function test_aucun_mot_de_passe_n_est_choisi_par_le_superadministrateur(): void
+    {
+        LiaisonComptaflowService::demander($this->entreprise, $this->admin);
+        $this->comptaflowRepond();
+
+        LiaisonComptaflowService::valider($this->entreprise);
+
+        // L'ancienne route `register-enterprise` demandait au
+        // superadministrateur de choisir le mot de passe du compte d'un client,
+        // et le transportait en clair.
+        Http::assertSent(fn ($requete) => !str_contains($requete->url(), '/companies/provision')
+            || !array_key_exists('admin_password', $requete['entreprise'] ?? []));
+    }
+
+    public function test_l_entreprise_lit_ses_acces_et_l_adresse_de_comptaflow(): void
+    {
+        LiaisonComptaflowService::demander($this->entreprise, $this->admin);
+        $this->comptaflowRepond();
+        LiaisonComptaflowService::valider($this->entreprise);
+
+        // Elle apprenait qu'elle avait un dossier comptable sans savoir où le
+        // consulter, ni avec quels identifiants.
+        $this->actingAs($this->admin)->get(route('admin.entreprise.parametres'))->assertOk()
+            ->assertSee('lewis-liaison@dc-knowing.ci', false)
+            ->assertSee(rtrim(config('selflow.comptaflow_app_url'), '/'), false)
+            ->assertSee('celui de votre compte Selflow', false);
+    }
+
+    // ── Le superadministrateur lie sans attendre de demande ──────────
+
+    public function test_le_superadministrateur_peut_lier_sans_demande(): void
+    {
+        // Un client qui souscrit Comptaflow par téléphone n'a pas à cliquer
+        // dans un écran pour que son dossier s'ouvre.
+        $this->assertNull($this->entreprise->comptaflow_demande_statut);
+        $this->comptaflowRepond();
+
+        $this->actingAs($this->superadmin)
+            ->post(route('superadmin.liaisons.valider', $this->entreprise));
+
+        $this->assertTrue($this->entreprise->fresh()->liaisonComptaflowActive());
+    }
+
+    public function test_la_liaison_directe_delivre_la_cle_comme_les_autres(): void
+    {
+        $this->comptaflowRepond();
+
+        $this->actingAs($this->superadmin)
+            ->post(route('superadmin.liaisons.valider', $this->entreprise));
+
+        // Ce n'est pas l'ancien « Lier manuellement », qui faisait coller un
+        // identifiant et une clé sans que rien ne vérifie que ce dossier
+        // appartenait à cette entreprise.
+        $this->assertSame('cptf_live_9f3b7d2a4c81', $this->entreprise->fresh()->comptaflow_sync_key);
+        Http::assertSent(fn ($requete) => str_contains($requete->url(), '/companies/provision'));
+    }
+
+    public function test_l_ecran_du_superadministrateur_propose_de_lier_une_entreprise_sans_demande(): void
+    {
+        $corps = $this->actingAs($this->superadmin)
+            ->get(route('superadmin.liaisons.index'))->assertOk()->getContent();
+
+        $this->assertStringContainsString('Lier maintenant', $corps);
+        $this->assertStringContainsString(rtrim(config('selflow.comptaflow_app_url'), '/'), $corps);
+    }
+
     // ── Le refus ─────────────────────────────────────────────────────
 
     public function test_le_refus_porte_un_motif_que_l_entreprise_lit(): void

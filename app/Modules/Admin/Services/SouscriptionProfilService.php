@@ -208,24 +208,39 @@ class SouscriptionProfilService
     }
 
     /**
-     * Inscrire un compte au plan de l'entreprise s'il n'y figure pas.
+     * Inscrire un compte au plan de l'entreprise.
+     *
+     * L'entreprise reçoit désormais le plan de l'acte uniforme **en entier** à
+     * sa création : le compte d'une famille y figure donc déjà, sous son
+     * intitulé générique — `311100` s'appelle « Marchandises A ».
+     *
+     * Le nom du métier prime, et il faut le poser même si la ligne existe :
+     * « Vivres et alimentation » dit ce que le compte porte, « Marchandises A »
+     * ne dit rien. On ne réécrit que ce que le référentiel a posé lui-même —
+     * un libellé que l'entreprise a modifié à la main n'est jamais touché.
      *
      * @return bool vrai s'il vient d'être créé
      */
     private static function inscrireAuPlan(Entreprise $entreprise, string $numero, ?string $intitule): bool
     {
-        $existe = PlanComptable::where('entreprise_id', $entreprise->id)
-            ->where('numero', $numero)
-            ->exists();
+        $libelle = $intitule ?? Compte::nommer($numero) ?? "Compte {$numero}";
 
-        if ($existe) {
+        $compte = PlanComptable::where('entreprise_id', $entreprise->id)
+            ->where('numero', $numero)
+            ->first();
+
+        if ($compte) {
+            if ($intitule && $compte->libelle === Compte::nommer($numero)) {
+                $compte->update(['libelle' => $intitule]);
+            }
+
             return false;
         }
 
         PlanComptable::create([
             'entreprise_id' => $entreprise->id,
             'numero'        => $numero,
-            'libelle'       => $intitule ?? Compte::nommer($numero) ?? "Compte {$numero}",
+            'libelle'       => $libelle,
         ]);
 
         return true;

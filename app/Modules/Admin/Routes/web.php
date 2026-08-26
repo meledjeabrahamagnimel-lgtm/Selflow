@@ -129,6 +129,10 @@ Route::prefix('admin')
             Route::get('/codes-journaux', [TresorerieControleur::class, 'codesJournaux'])->name('codes_journaux');
             Route::post('/codes-journaux', [TresorerieControleur::class, 'creerCodeJournal'])->name('creer_code_journal');
             Route::delete('/codes-journaux/{code}', [TresorerieControleur::class, 'supprimerCodeJournal'])->name('supprimer_code_journal');
+            // Le trousseau se posait a la creation de l'entreprise, et jamais
+            // plus : une entreprise creee avant qu'un journal soit ajoute au
+            // referentiel ne l'obtenait plus par aucun chemin.
+            Route::post('/codes-journaux/poser-le-defaut', [TresorerieControleur::class, 'poserLesJournauxParDefaut'])->name('poser_journaux_defaut');
         });
 
         // ── Comptabilité ──
@@ -139,6 +143,7 @@ Route::prefix('admin')
             Route::post('/reglement', [\App\Modules\Admin\Controleurs\ComptabiliteControleur::class, 'enregistrerReglement'])->name('enregistrer_reglement');
             Route::get('/plan-comptable', [\App\Modules\Admin\Controleurs\ComptabiliteControleur::class, 'planComptable'])->name('plan_comptable');
             Route::post('/plan-comptable', [\App\Modules\Admin\Controleurs\ComptabiliteControleur::class, 'creerCompteComptable'])->name('creer_compte_comptable');
+            Route::post('/plan-comptable/poser-le-defaut', [\App\Modules\Admin\Controleurs\ComptabiliteControleur::class, 'poserLePlanParDefaut'])->name('poser_plan_defaut');
             Route::post('/ecritures/manuelle', [\App\Modules\Admin\Controleurs\ComptabiliteControleur::class, 'creerEcritureManuelle'])->name('ecriture_manuelle');
 
             // Balance de controle : ce qui permet a un client sans abonnement

@@ -13,6 +13,30 @@ class CodeJournal extends Model
     protected $table = 'codes_journaux';
     protected $fillable = ['entreprise_id', 'type', 'code', 'numero_original', 'intitule', 'compte', 'source', 'archive_le', 'systeme'];
 
+    /** Les types proposés à l'écran. La liste vivait en dur dans le `<select>`. */
+    public const TYPES = ['Vente', 'Achat', 'Caisse', 'Banque', 'Général'];
+
+    /**
+     * Ce journal met-il en jeu un compte de trésorerie ?
+     *
+     * La question décide de l'affichage du champ « Compte comptable », et de
+     * son caractère obligatoire.
+     *
+     * **Deux types, et non un seul.** Le propriétaire a demandé le champ
+     * « uniquement lorsque Banque est sélectionné » ; la caisse pose exactement
+     * le même besoin — c'est son compte 571 que chaque écriture du journal
+     * mouvemente, comme le 521 de la banque. L'exemple affiché sous le champ le
+     * disait déjà : « Ex: 571000, 521000 ». Un journal de caisse sans compte
+     * laisserait la contrepartie de chaque encaissement indéterminée.
+     *
+     * Les ventes, les achats et les opérations diverses n'en portent pas : leur
+     * contrepartie est le tiers de la pièce, et elle change à chaque écriture.
+     */
+    public static function porteUnCompteDeTresorerie(?string $type): bool
+    {
+        return in_array($type, ['Banque', 'Caisse'], true);
+    }
+
     public function entreprise(): BelongsTo
     {
         return $this->belongsTo(Entreprise::class, 'entreprise_id');

@@ -105,8 +105,12 @@
                 {{-- Upload photo rapide --}}
                 <label style="position:absolute; bottom:6px; right:6px; background:rgba(0,0,0,.5); color:#fff; padding:4px 8px; border-radius:8px; font-size:10px; cursor:pointer;" title="Changer la photo">
                     <i class="fas fa-camera"></i>
+                    {{-- Le numéro de ligne partait dans l'adresse — `…/produits/156/photo` —
+                         alors que les adresses de l'application portent l'`uuid` : le
+                         lien de route ne résolvait aucun article et l'envoi tombait en
+                         404 (Not Found — introuvable), sans un mot à l'écran. --}}
                     <input type="file" accept="image/*" style="display:none;"
-                        onchange="uploaderPhoto(this, {{ $p->id }})">
+                        onchange="uploaderPhoto(this, @js(route('admin.produits.photo', $p)))">
                 </label>
             </div>
 
@@ -869,14 +873,14 @@ function filtrerProduits() {
 
 // ─── Upload photo (AJAX) ─────────────────────────────────────────────────────
 
-function uploaderPhoto(input, produitId) {
+function uploaderPhoto(input, adressePhoto) {
     if (!input.files || !input.files[0]) return;
 
     const formData = new FormData();
     formData.append('photo', input.files[0]);
     formData.append('_token', document.querySelector('meta[name="csrf-token"]').content);
 
-    fetch('/admin/produits/' + produitId + '/photo', {
+    fetch(adressePhoto, {
         method: 'POST',
         body: formData,
     })

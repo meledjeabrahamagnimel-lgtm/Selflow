@@ -47,7 +47,13 @@ class ExternalSyncControleur
             'regime_imposition'   => 'nullable|string|max:80',
             'gerant_nom'          => 'nullable|string|max:100',
             'gerant_prenom'       => 'nullable|string|max:150',
-            'admin_password'      => 'required|string|min:8',
+            // Le sens inverse de la liaison : une entreprise qui a Comptaflow
+            // et veut Selflow retrouve **les mêmes accès** — même adresse, même
+            // mot de passe. Comptaflow envoie l'empreinte de son mot de passe,
+            // jamais le mot de passe : l'un des deux suffit, et l'empreinte est
+            // préférable.
+            'admin_password'      => 'required_without:admin_password_hash|nullable|string|min:8',
+            'admin_password_hash' => 'required_without:admin_password|nullable|string|max:255',
             'comptaflow_company_id' => 'nullable|integer',
             'comptaflow_sync_key'   => 'nullable|string|max:100',
         ]);
@@ -120,7 +126,12 @@ class ExternalSyncControleur
                 'nom'           => $request->gerant_nom ?? 'Admin',
                 'prenom'        => $request->gerant_prenom ?? '',
                 'email'         => $request->email,
-                'password'      => Hash::make($request->admin_password),
+                // L'empreinte arrive telle quelle quand Comptaflow l'envoie :
+                // la re-hacher rendrait le compte inaccessible avec le mot de
+                // passe que l'utilisateur connaît déjà.
+                'password'      => $request->filled('admin_password_hash')
+                    ? $request->admin_password_hash
+                    : Hash::make($request->admin_password),
                 'role'          => 'admin',
                 'entreprise_id' => $entreprise->id,
                 'statut'        => 'actif',

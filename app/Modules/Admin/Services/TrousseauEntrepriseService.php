@@ -43,31 +43,49 @@ class TrousseauEntrepriseService
     }
 
     /**
-     * Les comptes que tout profil reçoit : clients, fournisseurs, TVA,
-     * trésorerie, achats, ventes, stocks.
+     * Le plan comptable, **en entier**.
+     *
+     * Il ne l'était pas : l'entreprise recevait les 41 comptes marqués
+     * « communs » — clients, fournisseurs, TVA, trésorerie, achats, ventes,
+     * stocks — et rien d'autre. Les 1 256 comptes de l'acte uniforme restaient
+     * un dictionnaire, servant à nommer une subdivision sans jamais entrer dans
+     * le plan de personne.
+     *
+     * Le compte manquait donc dès qu'on sortait de l'ordinaire : une
+     * immobilisation, un emprunt, une charge de personnel, un impôt autre que
+     * la TVA. Il fallait le créer à la main, en devinant son numéro — et une
+     * imputation sur un compte inventé ne se rattrape pas : elle traverse la
+     * balance, le grand livre et la liasse.
+     *
+     * L'intitulé des comptes communs prime sur celui de l'acte uniforme, et
+     * c'est déjà vrai en base : le référentiel les y écrase à l'ensemencement,
+     * parce que « État, TVA facturée (18 % — régime réel) » dit plus que
+     * « État, TVA facturée ».
      */
     private static function poserComptesCommuns(Entreprise $entreprise): int
     {
-        $crees = 0;
+        $deja = PlanComptable::where('entreprise_id', $entreprise->id)
+            ->pluck('numero')
+            ->flip();
 
-        foreach (Compte::where('commun', true)->orderBy('numero')->get() as $compte) {
-            $existe = PlanComptable::where('entreprise_id', $entreprise->id)
-                ->where('numero', $compte->numero)
-                ->exists();
-
-            if ($existe) {
-                continue;
-            }
-
-            PlanComptable::create([
+        $aPoser = Compte::orderBy('numero')->get()
+            ->reject(fn (Compte $compte) => $deja->has($compte->numero))
+            ->map(fn (Compte $compte) => [
                 'entreprise_id' => $entreprise->id,
                 'numero'        => $compte->numero,
                 'libelle'       => $compte->intitule,
-            ]);
-            $crees++;
+                'created_at'    => now(),
+                'updated_at'    => now(),
+            ])
+            ->all();
+
+        // Une ligne à la fois ferait plus de mille requêtes à chaque création
+        // d'entreprise, et autant à chaque clic sur « Poser le plan complet ».
+        foreach (array_chunk($aPoser, 200) as $lot) {
+            PlanComptable::insert($lot);
         }
 
-        return $crees;
+        return count($aPoser);
     }
 
     /**

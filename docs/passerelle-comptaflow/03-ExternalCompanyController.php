@@ -64,7 +64,11 @@ class ExternalCompanyController extends Controller
             'entreprise.telephone'        => ['nullable', 'string', 'max:30'],
             'entreprise.email'            => ['nullable', 'email', 'max:150'],
             'entreprise.admin_nom'        => ['nullable', 'string', 'max:150'],
+            'entreprise.admin_prenom'     => ['nullable', 'string', 'max:150'],
             'entreprise.admin_email'      => ['nullable', 'email', 'max:150'],
+            // L'empreinte `bcrypt` du mot de passe Selflow. Voir plus bas :
+            // le compte Comptaflow **est** le compte Selflow.
+            'entreprise.admin_password_hash' => ['nullable', 'string', 'max:255'],
             'numerotation_tiers'          => ['nullable', 'string', 'max:20'],
             'longueur_tiers'              => ['nullable', 'integer', 'min:3', 'max:12'],
         ]);
@@ -138,14 +142,30 @@ class ExternalCompanyController extends Controller
 
             // À VÉRIFIER : la création du compte administrateur du dossier.
             //
-            // Selflow ne transmet **pas** de mot de passe, et c'est délibéré :
-            // l'ancienne route `register-enterprise` faisait choisir par le
-            // superadministrateur Selflow le mot de passe du compte d'un
-            // client, et le transportait en clair. Comptaflow crée le compte
-            // sans mot de passe utilisable et envoie son propre lien
-            // d'activation à `admin_email`.
+            // ── Décision du propriétaire : un seul compte pour les deux ──
             //
-            // $this->ouvrirLeCompteAdministrateur($entreprise, $identite);
+            // **Le compte Comptaflow est le compte Selflow** : même adresse,
+            // même mot de passe. L'utilisateur n'en apprend pas un second, et
+            // le jour où il change celui de Selflow, il n'a pas deux endroits
+            // où penser.
+            //
+            // Ce qui arrive n'est pourtant **jamais le mot de passe** : c'est
+            // son empreinte `bcrypt`, dans `admin_password_hash`. Rangez-la
+            // **telle quelle** dans la colonne `password` — ne la re-hachez
+            // pas, le compte deviendrait inaccessible avec le mot de passe que
+            // l'utilisateur connaît. Les deux applications sont sous Laravel,
+            // le format est le même.
+            //
+            // C'est ce qui distingue cette version de l'ancienne route
+            // `register-enterprise`, qui faisait choisir par le
+            // superadministrateur Selflow le mot de passe du compte d'un
+            // client et le transportait en clair.
+            //
+            // Si l'empreinte manque — un appel d'une version antérieure —
+            // créez le compte sans mot de passe utilisable et envoyez votre
+            // propre lien d'activation à `admin_email`.
+            //
+            // $utilisateur->password = $identite['admin_password_hash'] ?? null;
 
             DB::commit();
 

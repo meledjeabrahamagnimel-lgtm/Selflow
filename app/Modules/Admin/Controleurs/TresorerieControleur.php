@@ -9,6 +9,7 @@ use Illuminate\Http\Request;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Validation\Rule;
 use Illuminate\View\View;
 
 class TresorerieControleur
@@ -146,13 +147,55 @@ class TresorerieControleur
         return view('admin::tresorerie.codes_journaux', compact('codes', 'codesComptaflow', 'entreprise'));
     }
 
+    /**
+     * Poser les journaux par défaut.
+     *
+     * Même motif que pour le plan comptable : le trousseau ne se posait qu'à
+     * la création de l'entreprise. Une entreprise créée avant qu'un journal
+     * entre au référentiel — le mobile money, par exemple — ne l'obtenait plus
+     * par aucun chemin.
+     *
+     * La dotation pose aussi le compte de trésorerie de chaque journal créé :
+     * un journal de banque dont le 521 n'existe pas au plan laisserait
+     * l'écriture de règlement sans imputation.
+     */
+    public function poserLesJournauxParDefaut(): RedirectResponse
+    {
+        $entreprise = Auth::user()->entreprise;
+
+        $bilan = \App\Modules\Admin\Services\TrousseauEntrepriseService::doter($entreprise);
+
+        $dit = [];
+        if ($bilan['journaux'] > 0) {
+            $dit[] = "{$bilan['journaux']} journal/journaux ajouté(s)";
+        }
+        if ($bilan['comptes'] > 0) {
+            $dit[] = "{$bilan['comptes']} compte(s) ajouté(s) au plan";
+        }
+
+        return back()->with('succes', $dit
+            ? implode(' et ', $dit) . ". Ce qui existait n'a pas bougé."
+            : 'Vos journaux portent déjà tout ce que le référentiel propose.');
+    }
+
     public function creerCodeJournal(Request $request): RedirectResponse
     {
+        // Le compte de contrepartie n'a de sens que sur un journal de
+        // trésorerie : c'est le 521 de la banque ou le 571 de la caisse, celui
+        // que toute écriture du journal met en jeu. Un journal de ventes ou
+        // d'achats n'en a pas — sa contrepartie est le tiers de la pièce. Le
+        // champ était pourtant exigé pour les cinq types, et il fallait
+        // inventer une valeur pour créer un journal de ventes.
         $request->validate([
-            'type'     => 'required|string|max:255',
+            'type'     => ['required', 'string', Rule::in(CodeJournal::TYPES)],
             'code'     => 'required|string|max:50',
             'intitule' => 'required|string|max:255',
-            'compte'   => 'required|string|max:50',
+            'compte'   => [
+                CodeJournal::porteUnCompteDeTresorerie($request->input('type')) ? 'required' : 'nullable',
+                'string', 'max:50',
+            ],
+        ], [
+            'compte.required' => 'Un journal de trésorerie porte le compte qu\'il mouvemente : 521… pour une banque, 571… pour une caisse.',
         ]);
 
         CodeJournal::create([
@@ -160,7 +203,11 @@ class TresorerieControleur
             'type'          => $request->type,
             'code'          => $request->code,
             'intitule'      => $request->intitule,
-            'compte'        => $request->compte,
+            // Un compte saisi puis le type changé pour « Vente » resterait
+            // sinon collé au journal, invisible à l'écran.
+            'compte'        => CodeJournal::porteUnCompteDeTresorerie($request->type)
+                ? $request->compte
+                : null,
         ]);
 
         return redirect()->back()->with('succes', 'Code journal créé avec succès !');

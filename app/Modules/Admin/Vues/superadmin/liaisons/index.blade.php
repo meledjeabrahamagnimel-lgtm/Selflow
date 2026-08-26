@@ -85,8 +85,17 @@
 <div class="page-header">
     <div>
         <h1><i class="fas fa-link"></i> Liaisons SELFLOW ↔ COMPTAFLOW</h1>
-        <p>Une entreprise demande son dossier comptable, vous validez, Comptaflow délivre la clé.</p>
+        <p>
+            Une entreprise demande son dossier comptable et vous validez — ou vous le lui ouvrez
+            directement. Dans les deux cas, Comptaflow délivre la clé et
+            <strong>ses accès Selflow ouvrent son compte comptable</strong> : même adresse,
+            même mot de passe.
+        </p>
     </div>
+    <a href="{{ rtrim(config('selflow.comptaflow_app_url'), '/') }}" target="_blank" rel="noopener"
+       class="btn btn-outline">
+        <i class="fas fa-arrow-up-right-from-square"></i> Ouvrir Comptaflow
+    </a>
 </div>
 
 {{-- ══ Ce qui attend une décision ══
@@ -293,11 +302,19 @@
                                     </button>
                                 </form>
                             @else
-                                {{-- Rien à faire d'ici : c'est l'entreprise qui
-                                     demande, depuis ses propres paramètres. Un
-                                     bouton « Lier » ici ouvrait un livre à son
-                                     nom sans qu'elle l'ait demandé. --}}
-                                <span style="font-size:11px; color:var(--text-3);">En attente d'une demande</span>
+                                {{-- Le superadministrateur ouvre le dossier de
+                                     sa propre initiative : un client qui
+                                     souscrit Comptaflow par téléphone n'a pas à
+                                     cliquer dans un écran pour l'obtenir.
+                                     La clé reste délivrée par Comptaflow —
+                                     personne ne la saisit. --}}
+                                <form method="POST" action="{{ route('superadmin.liaisons.valider', $ent) }}" style="display:inline;"
+                                      onsubmit="return confirm('Ouvrir un dossier Comptaflow pour « {{ $ent->nom }} » ? Ses accès Selflow y ouvriront le compte.')">
+                                    @csrf
+                                    <button type="submit" class="btn btn-primary btn-sm" style="padding:5px 10px; font-size:11px;">
+                                        <i class="fas fa-plug"></i> Lier maintenant
+                                    </button>
+                                </form>
                             @endif
                         </div>
                     </td>

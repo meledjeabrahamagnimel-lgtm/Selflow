@@ -100,7 +100,10 @@ Elles ne se rediscutent pas sans raison neuve.
 | Formulaire d'inscription | **L'étape 1 ne demande que le nom de l'entreprise.** Trois étapes, dont la dernière est facultative ; l'adresse électronique, qui est l'identifiant de connexion, est demandée avec le responsable. La forme juridique et le domaine d'activité se renseignent depuis l'application — 25/08/2026, propriétaire du projet |
 | Illustration d'article | **Vingt-deux dessins au trait tenus dans le dépôt**, choisis d'après le nom de l'article. Ce ne sont pas des photos et cela ne prétend pas l'être : aller chercher une image du commerce montrerait une marchandise que l'entreprise ne vend pas. La vraie photo passe toujours devant — 25/08/2026 |
 | Clé de liaison Comptaflow | **Délivrée, jamais saisie.** L'entreprise demande, le superadministrateur valide, **Comptaflow génère la clé** et la renvoie. Elle est chiffrée en base, retirée de `$fillable`, et n'apparaît jamais entière à l'écran. C'est elle — et non le secret partagé, qui ne dit pas qui appelle — qui authentifie chaque déversement — 26/08/2026, propriétaire du projet |
-| Mot de passe d'un compte client | **Jamais choisi par le superadministrateur, jamais transmis.** L'application qui ouvre le compte envoie son propre lien d'activation — 26/08/2026 |
+| Accès Selflow et Comptaflow | **Un seul compte pour les deux** : même adresse, même mot de passe, dans les deux sens. Ce qui voyage est l'**empreinte** `bcrypt`, jamais le mot de passe — personne ne le lit, et le superadministrateur n'en choisit aucun — 26/08/2026, propriétaire du projet |
+| Plan comptable par défaut | **Le plan de l'acte uniforme en entier**, et non les 41 comptes usuels. Un compte manquant se créait à la main, son numéro deviné, et l'imputation fausse traversait la balance, le grand livre et la liasse. Deux boutons rejouent la dotation à tout moment — 26/08/2026, propriétaire du projet |
+| Compte d'un journal | **Seuls les journaux de trésorerie en portent un** — le `521` de la banque, le `571` de la caisse. La contrepartie d'une vente ou d'un achat est le tiers de la pièce, et elle change à chaque écriture — 26/08/2026 |
+| Identifiants fiscaux d'un client | **Retirés pour un B2C.** Un particulier n'a ni NCC, ni RCCM, ni régime d'imposition ; les lui demander en les grisant laissait trois champs vides à jamais — 26/08/2026, propriétaire du projet |
 
 
 ---
@@ -2661,6 +2664,144 @@ chaque endroit à contrôler porte un `// À VÉRIFIER`.
 **Tant que le middleware n'est pas en place chez Comptaflow, le secret partagé
 suffit toujours à écrire dans n'importe quel dossier.** La moitié Selflow ferme
 le chemin par le formulaire ; elle ne peut pas fermer celui par l'API.
+
+---
+
+### Lot 16 — Neuf écrans relus par le propriétaire — **TERMINÉ**
+
+#### 16.1 — Trois adresses portaient le numéro de ligne
+
+Deux erreurs 404 (Not Found — introuvable) signalées :
+`POST /admin/produits/156/photo` et `POST /admin/clients/52`.
+
+Même cause, et une troisième occurrence trouvée en cherchant. Trois écrans
+construisaient une adresse en collant `$modele->id` à un chemin. Or les
+adresses de l'application portent l'`uuid` depuis le lot 8.3 — précisément pour
+ne pas publier le nombre de pièces de la plateforme. Le lien de route ne
+résolvait donc aucun modèle :
+
+| Écran | Ce qui tombait |
+|---|---|
+| Fiche article et catalogue | **Changer la photo d'un article** |
+| Liste des clients | **Modifier un client** |
+| Liste des fournisseurs | **Modifier un fournisseur** — personne ne l'avait signalé |
+
+Les trois construisent maintenant leur adresse par le routeur, qui ne peut pas
+se tromper de clé.
+
+#### 16.2 — Le compte comptable était exigé sur les cinq types de journal
+
+Il n'a de sens que sur un journal de **trésorerie** : le `521` de la banque, le
+`571` de la caisse — celui que chaque écriture du journal mouvemente. Un
+journal de ventes ou d'achats n'en a pas : sa contrepartie est le tiers de la
+pièce, et elle change à chaque écriture. **Pour créer un journal de ventes, il
+fallait inventer une valeur.**
+
+Le champ n'apparaît plus que pour Banque et Caisse. Le propriétaire avait
+demandé « uniquement pour Banque » ; la caisse pose le même besoin, et
+l'exemple affiché sous le champ le disait déjà — « Ex: 571000, 521000 ». Un
+journal de caisse sans compte laisserait la contrepartie de chaque
+encaissement indéterminée.
+
+Trouvé en chemin : **la liste des types n'était vérifiée nulle part.** Elle
+vivait en dur dans le `<select>`, et la règle de validation acceptait
+`string|max:255` — n'importe quelle chaîne entrait en base. Elle vit désormais
+sur le modèle, que l'écran et la règle lisent tous deux.
+
+#### 16.3 — On demandait ses identifiants fiscaux à un particulier
+
+NCC, RCCM et régime d'imposition étaient seulement **grisés à 45 % d'opacité**
+pour un B2C : trois champs lisibles, cliquables, saisissables — et vides à
+jamais, puisqu'un particulier n'en a aucun. Sur la fiche la plus souvent
+ouverte de la caisse.
+
+Ils disparaissent pour un B2C, et reviennent pour B2B, B2G et B2F, qui
+désignent tous une personne morale. Le compte comptable, lui, reste : il vaut
+pour tout le monde. Ce qui n'est pas demandé n'est plus envoyé — un NCC saisi
+puis le type basculé sur B2C partait avec le formulaire, et la pièce suivante
+était établie en B2B chez la DGI.
+
+#### 16.4 — Le tableau des clés FNE était coupé, sans barre de défilement
+
+La carte portait `overflow:hidden`. Sur sept colonnes, la fin du tableau — les
+clés, et la colonne qui permet de les poser — **n'était atteignable par aucun
+moyen**, et c'est justement la partie qui sert. La carte laisse défiler, et la
+colonne Actions reste collée à droite.
+
+#### 16.5 — Le plan comptable livré n'était pas un plan
+
+L'entreprise recevait les **41 comptes** marqués « communs ». Les **1 256
+comptes** de l'acte uniforme restaient un dictionnaire du référentiel, servant
+à nommer une subdivision sans jamais entrer dans le plan de personne.
+
+Le compte manquait donc dès qu'on sortait de l'ordinaire — une immobilisation,
+un emprunt, une charge de personnel, un impôt autre que la TVA. Il fallait le
+créer à la main, en devinant son numéro. **Une imputation sur un compte
+inventé ne se rattrape pas** : elle traverse la balance, le grand livre et la
+liasse fiscale.
+
+L'entreprise reçoit maintenant le plan **en entier**, posé par lots de 200
+lignes. L'intitulé contextuel prime toujours : « État, TVA facturée (18 % —
+régime réel) » dit plus que « État, TVA facturée ».
+
+**Ce que ce changement a mis au jour :** la souscription d'un métier inscrivait
+ses comptes de famille *s'ils n'existaient pas*. Le plan complet les posant
+désormais d'avance, `311100` serait resté « Marchandises A » au lieu de
+« Vivres et alimentation ». Le nom du métier prime, et il est maintenant posé
+même sur une ligne existante — mais seulement si elle porte encore l'intitulé
+générique du référentiel : ce que l'entreprise a renommé à la main n'est jamais
+touché.
+
+#### 16.6 — Le trousseau ne se posait qu'une fois
+
+À la création de l'entreprise, et jamais plus. Une entreprise créée avant qu'un
+compte ou un journal entre au référentiel — le mobile money, par exemple — ne
+l'obtenait plus par aucun chemin.
+
+Deux boutons, l'un sur le plan comptable et l'autre sur les codes journaux,
+rejouent la dotation. Rien n'est écrasé : seul ce qui manque est ajouté.
+
+#### 16.7 — Les accès Comptaflow sont les accès Selflow
+
+Décision du propriétaire : **un seul compte pour les deux applications** —
+même adresse, même mot de passe. Dans les deux sens : une entreprise qui a
+Comptaflow et veut Selflow retrouve les siens.
+
+Ce qui voyage n'est pourtant **jamais le mot de passe** : c'est son empreinte
+`bcrypt`, telle qu'elle est en base. Comptaflow la range comme elle arrive, et
+le même mot de passe y ouvre le compte — sans que personne, ni le
+superadministrateur, ni le réseau, ni le journal d'application, ne l'ait jamais
+lu. La route `register-enterprise` de Selflow accepte l'empreinte de la même
+façon, pour le sens inverse.
+
+C'est ce qui distingue cette version de celle d'avant, retirée au lot 15 : la
+route faisait **choisir par le superadministrateur le mot de passe du compte
+d'un client**, et le transportait en clair.
+
+#### 16.8 — Le superadministrateur lie sans attendre de demande
+
+Un client qui souscrit Comptaflow par téléphone n'a pas à cliquer dans un écran
+pour que son dossier s'ouvre. Le bouton « Lier maintenant » provisionne
+directement.
+
+Ce n'est **pas** le retour de l'ancien « Lier manuellement » : la clé continue
+d'être délivrée par Comptaflow, et personne ne la saisit. Seul le déclencheur
+change.
+
+#### 16.9 — L'adresse de Comptaflow, et les identifiants, à l'écran
+
+L'entreprise apprenait qu'elle avait un dossier comptable **sans savoir où le
+consulter, ni avec quels identifiants**. Les deux manquaient. La carte de
+liaison porte maintenant l'adresse — `http://comptaflow.dc-knowing.com/`,
+réglable par `COMPTAFLOW_APP_URL` — son adresse de connexion, et la mention que
+le mot de passe est celui de Selflow.
+
+- `tests/Feature/EcransDuLotSeizeTest.php` — 15 épreuves
+- `tests/Feature/TrousseauALaDemandeTest.php` — 8 épreuves
+- `tests/Feature/LiaisonComptaflowTest.php` — 6 épreuves ajoutées (27 au total)
+
+19 des 23 épreuves nouvelles tombent sans le correctif.
+**996 épreuves, 996 vertes, 4 068 vérifications.**
 
 ---
 

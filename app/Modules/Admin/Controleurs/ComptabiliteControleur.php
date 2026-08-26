@@ -811,6 +811,28 @@ class ComptabiliteControleur
     /**
      * Créer un compte dans le Plan Comptable
      */
+    /**
+     * Poser le plan comptable par défaut, en entier.
+     *
+     * Le trousseau ne se posait qu'à la création de l'entreprise : une
+     * entreprise créée avant qu'un compte entre au référentiel ne l'obtenait
+     * plus par aucun chemin, et devait le saisir à la main en devinant son
+     * numéro. Le bouton rejoue la dotation.
+     *
+     * Rien n'est écrasé : les comptes déjà là gardent leur libellé, y compris
+     * ceux que l'entreprise a renommés. Seul ce qui manque est ajouté.
+     */
+    public function poserLePlanParDefaut(): RedirectResponse
+    {
+        $entreprise = Auth::user()->entreprise;
+
+        $bilan = \App\Modules\Admin\Services\TrousseauEntrepriseService::doter($entreprise);
+
+        return back()->with('succes', $bilan['comptes'] > 0
+            ? "{$bilan['comptes']} compte(s) ajouté(s) au plan. Ce qui existait n'a pas bougé."
+            : 'Votre plan comptable porte déjà tous les comptes du référentiel.');
+    }
+
     public function creerCompteComptable(Request $request): RedirectResponse
     {
         $entreprise = Auth::user()->entreprise;
