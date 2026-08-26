@@ -102,6 +102,8 @@ Elles ne se rediscutent pas sans raison neuve.
 | Clé de liaison Comptaflow | **Délivrée, jamais saisie.** L'entreprise demande, le superadministrateur valide, **Comptaflow génère la clé** et la renvoie. Elle est chiffrée en base, retirée de `$fillable`, et n'apparaît jamais entière à l'écran. C'est elle — et non le secret partagé, qui ne dit pas qui appelle — qui authentifie chaque déversement — 26/08/2026, propriétaire du projet |
 | Accès Selflow et Comptaflow | **Un seul compte pour les deux** : même adresse, même mot de passe, dans les deux sens. Ce qui voyage est l'**empreinte** `bcrypt`, jamais le mot de passe — personne ne le lit, et le superadministrateur n'en choisit aucun. **Pas de lien d'activation** dans le cas normal : il ferait choisir un second mot de passe à qui n'a rien demandé. Il reste le repli quand l'empreinte manque — 26/08/2026, propriétaire du projet |
 | Avis d'ouverture d'un dossier | **Un courriel prévient le titulaire**, avec en-tête, corps et pied. Un compte ne s'ouvre pas au nom de quelqu'un sans qu'il l'apprenne. Il ne porte **ni mot de passe ni clé de liaison** : on dit lequel est le mot de passe, jamais quel il est — 26/08/2026, propriétaire du projet |
+| Divergence des deux mots de passe | **Acceptée et dite**, plutôt que corrigée. Le courriel écrit « au jour de l'ouverture » : changer son mot de passe Selflow ne change pas celui de Comptaflow, et promettre « c'est le même » deviendrait faux sans que rien ne le signale. La propagation par la passerelle reste possible, elle n'est pas retenue — 26/08/2026, propriétaire du projet |
+| Adresse publique de Comptaflow | **`https://comptaflow.dc-knowing.com/`**, réglable par `COMPTAFLOW_APP_URL`. En `https` et non `http` : l'adresse part dans un courriel, vers une page où l'utilisateur saisira son mot de passe — 26/08/2026, propriétaire du projet |
 | Plan comptable par défaut | **Le plan de l'acte uniforme en entier**, et non les 41 comptes usuels. Un compte manquant se créait à la main, son numéro deviné, et l'imputation fausse traversait la balance, le grand livre et la liasse. Deux boutons rejouent la dotation à tout moment — 26/08/2026, propriétaire du projet |
 | Compte d'un journal | **Seuls les journaux de trésorerie en portent un** — le `521` de la banque, le `571` de la caisse. La contrepartie d'une vente ou d'un achat est le tiers de la pièce, et elle change à chaque écriture — 26/08/2026 |
 | Identifiants fiscaux d'un client | **Retirés pour un B2C.** Un particulier n'a ni NCC, ni RCCM, ni régime d'imposition ; les lui demander en les grisant laissait trois champs vides à jamais — 26/08/2026, propriétaire du projet |
@@ -2993,15 +2995,27 @@ Deux épreuves les gardent, une de chaque côté : elles **passent** aujourd'hui
 et **tomberont** le jour de la fermeture, forçant à activer celles qui les
 remplacent, écrites juste en dessous et commentées.
 
-### Le secret partagé et la clé Gemini — **À RÉVOQUER**
+### Le secret partagé et les clés versionnées — **À RÉVOQUER**
 
 `selflow-comptaflow-secret-2026` a circulé en clair et doit être changé dans
-les deux `.env` avant toute mise en service. Et le `.env.example` du dépôt
-**Comptaflow** versionne une clé d'API Gemini en clair : à révoquer chez le
-fournisseur, pas seulement à retirer du fichier — ce qui est entré dans
-l'historique d'un dépôt y reste. Rien d'équivalent côté Selflow : aucun
-fichier d'environnement n'est versionné, et la recherche de secrets écrits en
-dur ne remonte rien.
+les deux `.env` avant toute mise en service.
+
+Le dépôt **Comptaflow** versionne par ailleurs deux secrets en clair : une clé
+d'API Gemini dans `.env.example`, et un `APP_KEY` réel dans `.env.example2`.
+
+Le propriétaire précise que la production tourne sur `.env`, **pas** sur
+`.env.example2` — la clé versionnée n'est donc pas, en principe, celle qui
+chiffre les données. Deux vérifications restent dues avant de s'en satisfaire :
+
+1. **comparer** l'`APP_KEY` du `.env` de production à celle du fichier
+   versionné. Si elles coïncident, elle chiffre la copie de sauvegarde de la
+   clé de liaison, et quiconque a lu le dépôt la déchiffre ;
+2. **retirer les deux fichiers du dépôt** et révoquer la clé Gemini chez le
+   fournisseur. Ce qui est entré dans l'historique d'un dépôt y reste : le
+   retrait du fichier ne retire pas le secret.
+
+Rien d'équivalent côté Selflow : aucun fichier d'environnement n'est versionné,
+et la recherche de secrets écrits en dur ne remonte rien.
 
 ### ~~Taxes supportées à l'achat~~ — **TRANCHÉ ET RETIRÉ au lot 12.1**
 

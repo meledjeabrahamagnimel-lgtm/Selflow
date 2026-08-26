@@ -26,7 +26,12 @@ return [
     | de liaison n'en donnait aucune — l'entreprise apprenait qu'elle avait un
     | dossier comptable sans savoir où le consulter.
     */
-    'comptaflow_app_url' => env('COMPTAFLOW_APP_URL', 'http://comptaflow.dc-knowing.com/'),
+    // `https`, et non `http` : cette adresse part dans un courriel et dans un
+    // lien que l'utilisateur suivra pour y saisir son mot de passe. En clair,
+    // il voyagerait lisible sur le réseau qu'il traverse — et un navigateur
+    // qui suit d'abord `http` laisse la place à une interception avant même la
+    // redirection.
+    'comptaflow_app_url' => env('COMPTAFLOW_APP_URL', 'https://comptaflow.dc-knowing.com/'),
 
     /*
     |--------------------------------------------------------------------------
