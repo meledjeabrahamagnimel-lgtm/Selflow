@@ -225,6 +225,197 @@ class ImportPortailFneTest extends TestCase
         $this->assertSame(5000, $ecarts['sticker_solde_alerte']['portail']);
     }
 
+    public function test_un_releve_identique_au_precedent_n_ecrit_pas_une_seconde_fiche(): void
+    {
+        $this->uneEntreprise(['ncc' => '1864699A']);
+
+        $service = app(ImportPortailFneService::class);
+
+        $this->poser('1864699A_20260821.json', json_encode([
+            'Email'                                   => 'a@b.ci',
+            'Commune'                                 => 'COCODY',
+            "Sticker : solde d'alerte"                => '5000',
+            'Timbre de quittance'                     => true,
+            "Bordereau d'achat de produits agricoles" => true,
+        ], JSON_UNESCAPED_UNICODE));
+
+        $service->importerDossier($this->dossier);
+
+        // Le lendemain, le portail dit la même chose — écrite autrement. Clés
+        // dans un autre ordre, nombre typé plutôt qu'entre guillemets, « * »
+        // là où il n'y avait rien : autant de libertés que le portail prend, et
+        // que l'import accepte depuis toujours.
+        //
+        // L'empreinte du fichier ne peut rien contre ça : les octets diffèrent.
+        // Seule une comparaison du contenu lu voit qu'il n'y a rien de neuf.
+        $this->poser('1864699A_20260822.json', json_encode([
+            "Bordereau d'achat de produits agricoles" => 'true',
+            'Timbre de quittance'                     => true,
+            "Sticker : solde d'alerte"                => 5000,
+            'Commune'                                 => 'COCODY',
+            'Email'                                   => 'a@b.ci',
+            'IDU'                                     => '*',
+        ], JSON_UNESCAPED_UNICODE));
+
+        $rapport = $service->importerDossier($this->dossier);
+
+        $this->assertSame(0, $rapport['importes']);
+        $this->assertSame(1, $rapport['inchanges']);
+
+        // Pas une ligne de plus, nulle part : la ligne existante est confirmée.
+        $this->assertSame(1, PortailFneImport::count());
+        $this->assertSame(1, PortailFneFiche::count());
+
+        $import = PortailFneImport::sole();
+
+        // `date_scraping` dit depuis quand le portail affiche cela ;
+        // `dernier_releve_le` dit qu'on l'a revu hier. Écraser la première
+        // effacerait l'ancienneté du paramétrage.
+        $this->assertSame('21/08/2026', $import->date_scraping->format('d/m/Y'));
+        $this->assertSame('22/08/2026', $import->dernier_releve_le->format('d/m/Y'));
+        $this->assertSame(2, $import->releves);
+        $this->assertSame(PortailFneImport::STATUT_IMPORTE, $import->statut);
+    }
+
+    public function test_une_valeur_qui_change_ouvre_bien_une_nouvelle_fiche(): void
+    {
+        $this->uneEntreprise(['ncc' => '1864699A']);
+
+        $service = app(ImportPortailFneService::class);
+
+        $this->poser('1864699A_20260821.json', json_encode(['Timbre de quittance' => true]));
+        $service->importerDossier($this->dossier);
+
+        // Le timbre de quittance désactivé au portail : c'est précisément ce
+        // qu'on ne doit jamais rater.
+        $this->poser('1864699A_20260822.json', json_encode(['Timbre de quittance' => false]));
+        $rapport = $service->importerDossier($this->dossier);
+
+        $this->assertSame(1, $rapport['importes']);
+        $this->assertSame(0, $rapport['inchanges']);
+        $this->assertSame(2, PortailFneFiche::count());
+    }
+
+    public function test_un_champ_inedit_du_portail_compte_comme_un_changement(): void
+    {
+        $this->uneEntreprise(['ncc' => '1864699A']);
+
+        $service = app(ImportPortailFneService::class);
+
+        $this->poser('1864699A_20260821.json', json_encode(['Email' => 'a@b.ci']));
+        $service->importerDossier($this->dossier);
+
+        // Les quatorze champs suivis n'ont pas bougé, mais le portail en a
+        // ajouté un. Le taire reviendrait à ne le découvrir que le jour où il
+        // sert à quelque chose.
+        $this->poser('1864699A_20260822.json', json_encode([
+            'Email'                => 'a@b.ci',
+            "Régime d'imposition"  => 'RSI',
+        ], JSON_UNESCAPED_UNICODE));
+
+        $rapport = $service->importerDossier($this->dossier);
+
+        $this->assertSame(1, $rapport['importes']);
+        $this->assertSame(2, PortailFneFiche::count());
+    }
+
+    public function test_des_points_inchanges_ne_sont_pas_reecrits(): void
+    {
+        $this->uneEntreprise(['ncc' => '1864699A']);
+
+        $service = app(ImportPortailFneService::class);
+
+        // Les colonnes de date ne sont pas décoratives ici : elles sont les
+        // seules à traverser la base sous une autre forme que celle du relevé
+        // (`Carbon` d'un côté, chaîne sérialisée de l'autre). Un tableur sans
+        // elles laisserait passer une comparaison qui croit tout comparer.
+        $this->poserTableur('1864699A_20260821.xlsx', [
+            ['Nom', 'Outil', 'Statut', "ID de l'établissement", 'Créé à', 'Mise à jour à'],
+            ['FACTURATION SIEGE', 'Application FNE', '1', '42200613-f402-40a8-bd4d-a778bb5b96f0', '2026-07-30T10:38:40.726Z', '2026-07-30T10:38:40.726Z'],
+            ['CAISSE 2', 'Application FNE', '1', '9f3c1a55-0000-4000-8000-aaaaaaaaaaaa', '2026-07-30T10:40:00.000Z', '2026-08-02T09:15:00.000Z'],
+        ]);
+        $service->importerDossier($this->dossier);
+
+        // Les mêmes points, dans un tableur écrit autrement : colonnes
+        // réordonnées, ligne vide en fin de feuille. Le portail se permet cela,
+        // et il réécrit de surcroît `dcterms:created` à chaque export — deux
+        // relevés identiques ne partagent donc jamais leur empreinte.
+        $this->poserTableur('1864699A_20260822.xlsx', [
+            ['Statut', "ID de l'établissement", 'Créé à', 'Nom', 'Mise à jour à', 'Outil'],
+            ['1', '42200613-f402-40a8-bd4d-a778bb5b96f0', '2026-07-30T10:38:40.726Z', 'FACTURATION SIEGE', '2026-07-30T10:38:40.726Z', 'Application FNE'],
+            ['1', '9f3c1a55-0000-4000-8000-aaaaaaaaaaaa', '2026-07-30T10:40:00.000Z', 'CAISSE 2', '2026-08-02T09:15:00.000Z', 'Application FNE'],
+            ['', '', '', '', '', ''],
+        ]);
+        $rapport = $service->importerDossier($this->dossier);
+
+        $this->assertSame(1, $rapport['inchanges']);
+        $this->assertSame(2, PortailFnePointFacturation::count());
+        $this->assertSame(1, PortailFneImport::count());
+        $this->assertSame(2, PortailFneImport::sole()->releves);
+    }
+
+    public function test_un_seul_point_modifie_fait_reecrire_tout_le_jeu(): void
+    {
+        $this->uneEntreprise(['ncc' => '1864699A']);
+
+        $service = app(ImportPortailFneService::class);
+
+        $this->poserTableur('1864699A_20260821.xlsx', [
+            ['Nom', 'Outil', 'Statut', "ID de l'établissement"],
+            ['FACTURATION SIEGE', 'Application FNE', '1', '42200613-f402-40a8-bd4d-a778bb5b96f0'],
+            ['CAISSE 2', 'Application FNE', '1', '9f3c1a55-0000-4000-8000-aaaaaaaaaaaa'],
+        ]);
+        $service->importerDossier($this->dossier);
+
+        // Un seul point fermé. Le relevé est un jeu complet : n'écrire que la
+        // ligne modifiée ferait répondre « le portail ne déclare qu'un point »
+        // à qui demande ce que le portail déclare.
+        $this->poserTableur('1864699A_20260822.xlsx', [
+            ['Nom', 'Outil', 'Statut', "ID de l'établissement"],
+            ['FACTURATION SIEGE', 'Application FNE', '1', '42200613-f402-40a8-bd4d-a778bb5b96f0'],
+            ['CAISSE 2', 'Application FNE', '0', '9f3c1a55-0000-4000-8000-aaaaaaaaaaaa'],
+        ]);
+        $rapport = $service->importerDossier($this->dossier);
+
+        $this->assertSame(1, $rapport['importes']);
+        $this->assertSame(4, PortailFnePointFacturation::count());
+
+        $dernier = PortailFnePointFacturation::whereDate('date_scraping', '2026-08-22')->get();
+
+        $this->assertCount(2, $dernier);
+        $this->assertSame(
+            ['CAISSE 2', 'FACTURATION SIEGE'],
+            $dernier->pluck('nom')->sort()->values()->all()
+        );
+    }
+
+    public function test_une_fiche_orpheline_se_rattache_quand_l_entreprise_arrive(): void
+    {
+        $service = app(ImportPortailFneService::class);
+
+        // Le relevé arrive avant que l'entreprise n'existe dans Selflow.
+        $this->poser('1864699A_20260821.json', json_encode(['Email' => 'a@b.ci']));
+        $service->importerDossier($this->dossier);
+
+        $this->assertNull(PortailFneFiche::sole()->entreprise_id);
+
+        $entreprise = $this->uneEntreprise(['ncc' => '1864699A']);
+
+        // Le relevé suivant ne dit rien de neuf, donc n'écrit pas de fiche.
+        // Sans rattrapage, la fiche resterait orpheline pour toujours et
+        // l'écran des rejets, qui cherche par entreprise, ne la verrait jamais.
+        $this->poser('1864699A_20260822.json', json_encode([
+            'Email' => 'a@b.ci',
+            'IDU'   => '*',
+        ]));
+
+        $rapport = $service->importerDossier($this->dossier);
+
+        $this->assertSame(1, $rapport['inchanges']);
+        $this->assertSame(1, PortailFneFiche::count());
+        $this->assertSame($entreprise->id, PortailFneFiche::sole()->entreprise_id);
+    }
+
     /**
      * @param  array<string, mixed>  $attributs
      */

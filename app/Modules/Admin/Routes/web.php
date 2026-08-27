@@ -184,6 +184,17 @@ Route::prefix('admin')
             // n'était lisible nulle part. `appliquer` renomme un point de vente
             // pour l'aligner sur ce que le portail déclare — jamais un champ
             // fiscal, qui reste montré et non recopié.
+            // ── Factures reçues du portail ──
+            //
+            // Les pièces qu'un fournisseur a certifiées au NCC de l'entreprise.
+            // Rien ici ne crée d'achat ni n'écrit dans les colonnes gelées
+            // d'`achats` : `rattacher` pose un lien vers un achat qui existe
+            // déjà, dans `portail_fne_factures_recues.achat_id`.
+            Route::get('/factures-recues',                   [\App\Modules\Admin\Controleurs\FactureRecueControleur::class, 'index'])->name('factures_recues');
+            Route::post('/factures-recues/{facture}/rattacher', [\App\Modules\Admin\Controleurs\FactureRecueControleur::class, 'rattacher'])->name('factures_recues.rattacher');
+            Route::post('/factures-recues/{facture}/detacher',  [\App\Modules\Admin\Controleurs\FactureRecueControleur::class, 'detacher'])->name('factures_recues.detacher');
+            Route::post('/factures-recues/{facture}/ecarter',   [\App\Modules\Admin\Controleurs\FactureRecueControleur::class, 'ecarter'])->name('factures_recues.ecarter');
+
             Route::get('/rejets',                      [\App\Modules\Admin\Controleurs\RejetFneControleur::class, 'index'])->name('rejets');
             Route::post('/rejets/{rejet}/diagnostiquer',[\App\Modules\Admin\Controleurs\RejetFneControleur::class, 'diagnostiquer'])->name('rejets.diagnostiquer');
             Route::post('/rejets/{rejet}/appliquer',    [\App\Modules\Admin\Controleurs\RejetFneControleur::class, 'appliquer'])->name('rejets.appliquer');

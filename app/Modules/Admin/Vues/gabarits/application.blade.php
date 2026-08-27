@@ -760,6 +760,9 @@
             <a href="{{ route('admin.fne.factures') }}" class="nav-item {{ request()->routeIs('admin.fne.factures') ? 'active' : '' }}">
                 <i class="fas fa-receipt"></i> Factures &amp; Reçus émis/reçus
             </a>
+            <a href="{{ route('admin.fne.factures_recues') }}" class="nav-item {{ request()->routeIs('admin.fne.factures_recues*') ? 'active' : '' }}">
+                <i class="fas fa-inbox"></i> Factures re&ccedil;ues du portail
+            </a>
             <a href="{{ route('admin.fne.stickers') }}" class="nav-item {{ request()->routeIs('admin.fne.stickers') ? 'active' : '' }}">
                 <i class="fas fa-ticket"></i> Gestion des stickers
             </a>

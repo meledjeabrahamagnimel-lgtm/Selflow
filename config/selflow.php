@@ -134,6 +134,39 @@ return [
         | Aucune de ces trois causes ne se corrige toute seule.
         */
         'delai_alerte_heures' => (int) env('PORTAIL_FNE_DELAI_ALERTE_HEURES', 24),
+
+        /*
+        | Le scraper : ce qui va chercher les relevés sur le portail de la DGI.
+        |
+        | Selflow ne dépend toujours pas de lui — il lit un dossier, et ce qui
+        | dépose dans ce dossier ne le regarde pas. Ces réglages ne servent qu'à
+        | le lancer depuis le planificateur déjà en place, plutôt que de créer
+        | une seconde tâche système que personne ne pensera à surveiller.
+        |
+        | `actif` est faux par défaut, et c'est délibéré : sans identifiants.json
+        | rempli, chaque passage échouerait et remplirait le journal d'erreurs
+        | qui ne veulent rien dire. On l'allume quand le scraper est prêt.
+        */
+        'scraper' => [
+            'actif' => filter_var(env('PORTAIL_FNE_SCRAPER_ACTIF', false), FILTER_VALIDATE_BOOL),
+
+            // Chemin absolu de préférence : la tâche planifiée de Windows n'a
+            // pas le PATH d'un terminal ouvert à la main, et « node » seul peut
+            // très bien y être introuvable.
+            'node' => env('PORTAIL_FNE_NODE', 'node'),
+
+            'script' => env('PORTAIL_FNE_SCRAPER_SCRIPT', base_path('SCRAPER-PORTAIL-FNE/fne.js')),
+
+            // Le passage qui sert la file, décalé après le ramassage (:00) et
+            // le rapprochement (:10) : ce qu'il dépose est rangé à l'heure
+            // suivante, et diagnostiqué dix minutes après.
+            'minute_horaire' => (int) env('PORTAIL_FNE_SCRAPER_MINUTE', 40),
+
+            // Le passage complet, qui relève tous les logins connus sans
+            // attendre qu'une pièce soit refusée. La file dit ce qui est
+            // urgent, pas ce qui est permis.
+            'heure_nocturne' => env('PORTAIL_FNE_SCRAPER_HEURE_NUIT', '02:30'),
+        ],
     ],
 
 ];

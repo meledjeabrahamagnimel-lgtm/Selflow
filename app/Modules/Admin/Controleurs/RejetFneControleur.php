@@ -5,7 +5,9 @@ namespace App\Modules\Admin\Controleurs;
 use App\Modules\Admin\Modeles\FneRejet;
 use App\Modules\Admin\Modeles\PortailFneDemande;
 use App\Modules\Admin\Modeles\PortailFneFiche;
+use App\Modules\Admin\Modeles\PortailFneImport;
 use App\Modules\Admin\Services\DiagnosticFneService;
+use Carbon\CarbonImmutable;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\View\View;
@@ -35,35 +37,97 @@ use Illuminate\View\View;
  */
 class RejetFneControleur
 {
+    /**
+     * Le filtre par cause, et la valeur qui désigne les rejets sans cause.
+     *
+     * `NULL` ne se passe pas dans une URL ; les lignes consignées avant que la
+     * colonne existe ont pourtant besoin d'être atteignables, faute de quoi
+     * elles disparaissent de l'écran dès qu'on filtre.
+     */
+    private const CAUSE_NON_CLASSES = 'non-classes';
+
     public function index(): View
     {
         $entreprise = Auth::user()->entreprise;
 
+        $causesConnues = [
+            FneRejet::CAUSE_DGI,
+            FneRejet::CAUSE_RESEAU,
+            FneRejet::CAUSE_LOCALE,
+            self::CAUSE_NON_CLASSES,
+        ];
+
+        // Une valeur inventée dans l'URL ne filtre rien plutôt que de rendre
+        // une liste vide : un écran vide se lit « aucun rejet », ce qui est
+        // exactement le contraire de ce qu'il faut comprendre.
+        $causeActive = in_array(request('cause'), $causesConnues, true)
+            ? request('cause')
+            : null;
+
+        $pourEntreprise = fn () => FneRejet::where('entreprise_id', $entreprise->id);
+
         // Les rejets ouverts d'abord, les classés en dernier. Un `CASE` et non
         // `FIELD()`, qui n'existe que chez MySQL : les épreuves tournent sur
         // SQLite, et une requête qui n'y passe pas n'est jamais éprouvée.
-        $rejets = FneRejet::where('entreprise_id', $entreprise->id)
+        $rejets = $pourEntreprise()
+            ->when($causeActive === self::CAUSE_NON_CLASSES, fn ($q) => $q->whereNull('cause'))
+            ->when(
+                $causeActive !== null && $causeActive !== self::CAUSE_NON_CLASSES,
+                fn ($q) => $q->where('cause', $causeActive)
+            )
             ->orderByRaw("CASE statut WHEN 'ouvert' THEN 0 WHEN 'diagnostique' THEN 1 ELSE 2 END")
             ->orderByDesc('created_at')
-            ->paginate(25);
+            ->paginate(25)
+            // Sans quoi la page 2 revient sur la liste entière, et l'on croit
+            // que le filtre a lâché.
+            ->withQueryString();
+
+        // Un seul passage plutôt qu'une requête par cause. `COALESCE` et non
+        // une clé nulle : en PHP, un index `null` devient `''` et la ligne des
+        // non-classés se perdrait en silence.
+        $parCause = $pourEntreprise()
+            ->selectRaw('COALESCE(cause, ?) as cause, COUNT(*) as total', [self::CAUSE_NON_CLASSES])
+            ->groupBy('cause')
+            ->pluck('total', 'cause');
 
         $compte = fn (string $statut) => FneRejet::where('entreprise_id', $entreprise->id)
             ->where('statut', $statut)
             ->count();
 
-        // Le dernier relevé sert deux fois : à dater ce que l'écran montre, et
-        // à porter les écarts de fiche, qui ne sont la cause d'aucun rejet mais
-        // que celui qui répare une facture a intérêt à voir.
+        // La dernière fiche porte les écarts de paramétrage, qui ne sont la
+        // cause d'aucun rejet mais que celui qui répare une facture a intérêt
+        // à voir.
         $fiche = PortailFneFiche::where('entreprise_id', $entreprise->id)
             ->orderByDesc('date_scraping')
             ->orderByDesc('id')
             ->first();
 
+        // Elle ne date plus l'écran pour autant. Depuis qu'un relevé identique
+        // au précédent n'écrit plus de fiche, sa date est celle du dernier
+        // *changement* du portail, pas celle du dernier passage. Les confondre
+        // afficherait « relevé du 15/08 » un 27/08 sur un scraper qui tourne
+        // parfaitement — et ferait chercher une panne là où il n'y en a pas.
+        $dernierPassage = PortailFneImport::where('entreprise_id', $entreprise->id)
+            ->where('statut', PortailFneImport::STATUT_IMPORTE)
+            ->max('dernier_releve_le');
+
         return view('admin::fne.rejets', [
             'entreprise'  => $entreprise,
             'rejets'      => $rejets,
-            'fiche'       => $fiche,
-            'ecartsFiche' => $fiche?->ecartsAvecEntreprise() ?? [],
+            'causeActive' => $causeActive,
+            // L'ordre des onglets est celui de l'urgence : ce que la DGI a
+            // refusé d'abord, ce qui n'est jamais parti ensuite, ce qui n'a
+            // même pas quitté Selflow en dernier.
+            'filtresCause' => [
+                FneRejet::CAUSE_DGI      => ['libelle' => 'Refus DGI',        'total' => $parCause[FneRejet::CAUSE_DGI] ?? 0],
+                FneRejet::CAUSE_RESEAU   => ['libelle' => 'Réseau',           'total' => $parCause[FneRejet::CAUSE_RESEAU] ?? 0],
+                FneRejet::CAUSE_LOCALE   => ['libelle' => 'Bloqué ici',       'total' => $parCause[FneRejet::CAUSE_LOCALE] ?? 0],
+                self::CAUSE_NON_CLASSES  => ['libelle' => 'Cause inconnue',   'total' => $parCause[self::CAUSE_NON_CLASSES] ?? 0],
+            ],
+            'totalRejets' => $parCause->sum(),
+            'fiche'          => $fiche,
+            'dernierPassage' => $dernierPassage ? CarbonImmutable::parse($dernierPassage) : null,
+            'ecartsFiche'    => $fiche?->ecartsAvecEntreprise() ?? [],
             'demandes'    => PortailFneDemande::where('entreprise_id', $entreprise->id)
                 ->where('statut', PortailFneDemande::STATUT_EN_ATTENTE)
                 ->orderBy('created_at')
@@ -83,11 +147,24 @@ class RejetFneControleur
     {
         $this->verifierAppartenance($rejet);
 
+        // La DGI n'a jamais examiné la pièce : il n'y a rien à comparer au
+        // portail, et le rapprochement ne rendrait qu'une conclusion vide.
+        // Le rejouer déguiserait un incident de transport en écart de données.
+        if ($rejet->estReseau()) {
+            return back()->with('erreur', "Cette pièce n'a pas été refusée par la DGI : la plateforme "
+                . "n'a pas répondu. Il n'y a rien à rapprocher du portail — la pièce est à renvoyer.");
+        }
+
         $diagnostic = $service->diagnostiquer($rejet);
 
         if ($diagnostic['releve'] === null) {
+            // Le message annonçait qu'une demande venait d'être déposée. Rien
+            // ne la dépose ici : la demande est ouverte à la consignation du
+            // rejet, par `FneRejet::consigner()`, et elle l'est déjà ou ne le
+            // sera pas. Une interface qui annonce un geste qu'elle n'a pas
+            // fait se paie au moment où l'on attend le résultat.
             return back()->with('erreur', "Aucun relevé du portail n'est disponible pour cette entreprise. "
-                . 'Une demande a été déposée ; le rapprochement se fera dès son arrivée.');
+                . 'Le rapprochement se fera dès qu\'un relevé sera arrivé dans le dossier d\'import.');
         }
 
         $rejet->update([

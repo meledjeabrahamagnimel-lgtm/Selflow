@@ -173,6 +173,179 @@ un constat, pas une décision.**
 
 ---
 
+## Le scraper livré — `fne.js`
+
+Il est arrivé le 26/08/2026 et vit dans ce dossier. Playwright pilote Chromium,
+se connecte au portail, relève la page Paramétrage et dépose les deux fichiers.
+
+### Installation, une fois
+
+Déjà faite sur ce poste — `node_modules`, Chromium, `.env` et
+`identifiants.json` sont en place. Ce qui suit ne sert qu'à repartir d'un clone
+frais, ou sur une autre machine :
+
+```bash
+cd SCRAPER-PORTAIL-FNE
+npm install
+npx playwright install chromium
+cp .env.exemple .env                       # FNE_URL y est déjà
+cp identifiants.exemple.json identifiants.json
+```
+
+`identifiants.json` **existe déjà** sur ce poste, prérempli avec les NCC trouvés
+en base. Il n'y a rien à créer ni à relancer : ouvrir le fichier, écrire un mot
+de passe entre les guillemets, enregistrer. Le passage suivant le prend.
+
+```json
+{
+  "1864699A": "le-mot-de-passe",
+  "1234567K": ""
+}
+```
+
+**Un mot de passe vide vaut « pas encore rempli », pas « en panne ».** Le
+passage nocturne ignore ces comptes en le disant sur une ligne, sans échouer :
+un journal qui crie tous les soirs pour une situation normale cesse d'être lu.
+Le passage qui sert la file, lui, reste bruyant — là, une pièce refusée attend
+vraiment son relevé.
+
+**Les clés commençant par `_` sont des notes, pas des logins.** Sans ce tri,
+`--tous` prenait le `_lisez-moi` du modèle pour un compte et allait tenter de
+s'y connecter sur le portail de la DGI.
+
+**Il est ignoré par git, et c'est délibéré.** Selflow ne transmet que des
+logins ; il n'a pas à connaître ces accès, et ils n'ont pas à voyager avec le
+dépôt. Le `.env` du scraper l'est aussi. Un login sans mot de passe est signalé
+et sa demande reste ouverte — jamais tenté avec un mot de passe approchant.
+
+### Lancer
+
+```bash
+node fne.js                        # tous les logins de la file Selflow
+node fne.js --tous                 # tous les logins d'identifiants.json (passage de nuit)
+node fne.js 1864699A               # ce login, mot de passe pris dans le magasin
+node fne.js 1864699A <motDePasse>  # ce login, sans passer par le magasin
+```
+
+Sans argument, le scraper appelle lui-même `php artisan portail-fne:demandes
+--json` depuis la racine du projet. Une file vide n'ouvre même pas le
+navigateur. Le dossier de dépôt est lu dans le `.env` de Selflow
+(`PORTAIL_FNE_DOSSIER_IMPORT`) : rien à recopier, rien à tenir en double.
+
+### Ce qui le fait échouer bruyamment
+
+Un scraper muet est pire qu'un scraper absent : il sert la demande avec une
+fiche vide, et le relevé se lit comme un succès. Trois garde-fous :
+
+- **moins de quatre champs reconnus sur la page Paramétrage** — le portail a
+  changé de structure. Rien n'est déposé, la demande reste ouverte ;
+- **un login qui échoue n'arrête pas les autres**, et chaque échec laisse une
+  capture d'écran dans `erreurs/` ;
+- **la file illisible remonte la cause** (base injoignable, commande inconnue)
+  au lieu d'un « ça a raté » — et jamais comme une file vide.
+
+Un contexte de navigateur neuf est ouvert par login : deux entreprises ne
+partagent jamais une session.
+
+### La clé d'API n'est jamais relevée
+
+Le portail l'affiche en clair dans un champ texte ordinaire, sur cette même
+page. L'écarter par le type du champ ne suffit pas — elle est écartée par son
+libellé. Le fichier déposé est lu, archivé en base (`contenu_brut`) et
+conservé : ce qui y entre y reste.
+
+### Le lancement automatique
+
+Le scraper est accroché au planificateur de Selflow, dans `routes/console.php`.
+Pas de seconde tâche Windows : celle qui existe — « Selflow - planificateur »,
+un `php artisan schedule:run` chaque minute — suffit, et tout finit dans le même
+journal, `storage/logs/portail-fne.log`.
+
+| Quand | Quoi | Pourquoi cette heure |
+|---|---|---|
+| Toutes les heures, **minute 40** | `node fne.js` | sert la file ; ce qu'il dépose est rangé à :00 puis diagnostiqué à :10 |
+| **02:30**, chaque nuit | `node fne.js --tous` | tient les fiches à jour sans attendre un rejet |
+
+Le cycle complet se lit ainsi : un rejet à 15:05 ouvre une demande, le scraper
+la sert à 15:40, `portail-fne:importer` range le fichier à 16:00, et
+`fne:diagnostiquer-rejets` rapproche à 16:10.
+
+**Toutes les heures et non toutes les dix minutes.** Quand la file est vide — le
+cas ordinaire — le passage s'arrête sans même ouvrir le navigateur, et ne coûte
+rien. Mais quand elle ne l'est pas, il ouvre une session sur le portail de la
+DGI : y retourner six fois par heure avec un mot de passe éventuellement faux
+est le meilleur moyen de faire bloquer le compte.
+
+**Les deux passages tournent en arrière-plan** (`runInBackground`) : un relevé
+prend des dizaines de secondes, et sans cela la minute du planificateur resterait
+occupée pendant que tout le reste attend. Le verrou expire au bout de 30 minutes
+(2 h pour le passage nocturne), sans quoi un navigateur resté planté empêcherait
+tous les passages suivants.
+
+#### L'allumer
+
+Dans le `.env` de **Selflow**, pas celui du scraper :
+
+```ini
+PORTAIL_FNE_SCRAPER_ACTIF=true
+PORTAIL_FNE_NODE="C:/Program Files/nodejs/node.exe"
+PORTAIL_FNE_SCRAPER_MINUTE=40
+PORTAIL_FNE_SCRAPER_HEURE_NUIT=02:30
+```
+
+Puis `php artisan schedule:list` : les deux lignes doivent y figurer.
+
+**Il est éteint par défaut**, et c'est délibéré : sans `identifiants.json`
+rempli, chaque passage échouerait, et un journal plein d'erreurs sans objet
+cesse d'être lu.
+
+#### Deux chemins absolus, et une raison à chacun
+
+- **`PORTAIL_FNE_NODE`** : la tâche planifiée de Windows n'a pas le PATH d'un
+  terminal ouvert à la main. `node` tout court marche à l'essai et échoue une
+  fois planifié — le pire des deux mondes.
+- **`PHP_BINAIRE`**, dans le `.env` du scraper : même raison, puisque le scraper
+  appelle lui-même `php artisan portail-fne:demandes --json`. Le lanceur VBS de
+  la tâche Windows porte déjà le chemin absolu de PHP, pour la même cause.
+
+**En barres obliques (`C:/…`) et non en barres inverses.** phpdotenv interprète
+les échappements dans une valeur entre guillemets : `"C:\Program Files\nodejs\…"`
+y perdrait son `n`, transformé en saut de ligne.
+
+Vérification : la commande doit passer même sans aucun environnement.
+
+```bash
+env -i "C:/Program Files/nodejs/node.exe" "…/SCRAPER-PORTAIL-FNE/fne.js"
+```
+
+#### Si le scraper tourne sur une autre machine
+
+Alors le planificateur de Selflow ne peut rien lancer, et `portail-fne:demandes`
+n'est pas non plus à portée. Deux réglages :
+
+- une tâche planifiée sur cette machine, qui appelle `node fne.js` aux mêmes
+  heures ;
+- `URL_SERVER` renseigné pour l'envoi HTTP, puisque le dossier d'import n'est
+  pas local.
+
+Le contrat, lui, ne change pas : deux fichiers, la bonne nomenclature, et
+Selflow lit son dossier.
+
+### Vérifier l'extraction sans toucher au portail
+
+```bash
+node verifier-extraction.js
+```
+
+Dix-huit vérifications sur une page factice qui reproduit les pièges de la
+vraie : libellés portés par un `label[for]`, par un `label` englobant, par un
+`aria-label` ou par un simple voisin ; libellés sans accents ni casse ;
+apostrophe typographique ; interrupteur ARIA au lieu d'une case à cocher ; clé
+d'API en clair ; liste de pagination. C'est la mémoire de ce qui a été constaté
+une fois — au même titre que `FnePayloadTest` pour la conformité FNE.
+
+---
+
 ## Vérifier que tout est branché
 
 ```bash
@@ -187,5 +360,19 @@ php artisan portail-fne:importer --fichier="chemin/vers/1864699A_20260821.json"
 php artisan fne:diagnostiquer-rejets
 ```
 
-Un fichier déjà lu ressort en « déjà lu » : c'est le signe que l'empreinte
-fonctionne, pas une erreur.
+Deux statuts qui ne sont pas des erreurs :
+
+- **« déjà lu »** — ce fichier-là a déjà été importé. C'est l'empreinte SHA-256
+  qui le dit, et c'est ce qui rend le dossier relisible en entier sans
+  précaution.
+- **« inchangé »** — le fichier est neuf, mais son contenu est identique au
+  dernier relevé. Rien n'est écrit en base, sauf la ligne qui prouve que le
+  portail a bien été regardé ce jour-là.
+
+Le second existe parce que l'empreinte ne suffit pas : le tableur du portail
+embarque un horodatage de génération, et deux exports identiques diffèrent donc
+octet pour octet. C'est le **contenu lu** qui est comparé.
+
+Conséquence pour qui écrit un scraper : **ne jamais mettre d'horodatage de
+génération dans un fichier déposé.** Ce serait annuler la seule chose qui
+distingue un portail qui a bougé d'un portail qui dort.

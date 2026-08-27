@@ -113,6 +113,21 @@ class NormaliserFactureFne implements ShouldQueue
             } else {
                 Log::warning("NormaliserFactureFne: Réponse non-success pour Vente #{$this->vente->id}", $fneResult);
 
+                // La DGI n'a rien examiné : c'est le transport qui a manqué, pas
+                // la pièce. FneService attrape lui-même l'exception réseau et
+                // rend `success: false` — le job n'y voyait donc qu'un refus
+                // métier, ne relançait pas, et les trois tentatives déclarées
+                // plus haut ne servaient jamais. On relance, sans rien
+                // consigner : un rejet par tentative pour une seule coupure
+                // remplirait l'écran de trois refus qui n'en font qu'un.
+                if (FneRejet::classer($fneResult) === FneRejet::CAUSE_RESEAU
+                    && $this->attempts() < $this->tries) {
+                    throw new \RuntimeException(
+                        "Plateforme FNE injoignable pour Vente #{$this->vente->id} : "
+                        . ($fneResult['message'] ?? 'sans message')
+                    );
+                }
+
                 // Le message détaillé assemblé par FneService::messageRejet() — champ
                 // fautif, valeur envoyée, raison de la DGI — s’arrêtait ici, dans un
                 // fichier de log que personne ne relit. Un rejet survenu la nuit

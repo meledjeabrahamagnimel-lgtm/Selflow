@@ -72,6 +72,19 @@ class NormaliserAchatBapaJob implements ShouldQueue
             } else {
                 Log::warning("NormaliserAchatBapaJob: Réponse non-success pour Achat #{$this->achat->id}", $fneResult);
 
+                // La DGI n'a rien examiné : le transport a manqué, pas le
+                // bordereau. On relance plutôt que de consigner un refus qui
+                // n'en est pas un — et qui ouvrirait un relevé du portail
+                // sans objet. Voir NormaliserFactureFne, même raisonnement.
+                if (\App\Modules\Admin\Modeles\FneRejet::classer($fneResult)
+                        === \App\Modules\Admin\Modeles\FneRejet::CAUSE_RESEAU
+                    && $this->attempts() < $this->tries) {
+                    throw new \RuntimeException(
+                        "Plateforme FNE injoignable pour Achat #{$this->achat->id} : "
+                        . ($fneResult['message'] ?? 'sans message')
+                    );
+                }
+
                 // Le rejet laissait une ligne de log et rien d'autre. Consigné,
                 // il devient rapprochable du relevé du portail.
                 \App\Modules\Admin\Modeles\FneRejet::consigner($this->achat, $fneResult);

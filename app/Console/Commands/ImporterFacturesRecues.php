@@ -2,29 +2,29 @@
 
 namespace App\Console\Commands;
 
-use App\Modules\Admin\Services\ImportPortailFneService;
+use App\Modules\Admin\Services\ImportFacturesRecuesService;
 use Illuminate\Console\Command;
 
 /**
- * Recueille les relevés du portail FNE et les range en base.
+ * Range les factures reçues relevées au portail FNE.
  *
- * Usage :
- *   php artisan portail-fne:importer                       (le dossier configuré)
- *   php artisan portail-fne:importer --dossier=C:/…/k      (un autre dossier)
- *   php artisan portail-fne:importer --fichier=C:/…/x.json (un seul relevé)
+ *   php artisan portail-fne:importer-achats
+ *   php artisan portail-fne:importer-achats --dossier=C:/…/achats
+ *   php artisan portail-fne:importer-achats --fichier=C:/…/1864699A_20260827.json
  *
- * La commande est rejouable : un fichier déjà lu est reconnu à son empreinte et
- * passé. Rien n'est déplacé ni supprimé dans le dossier d'origine.
+ * Séparée de `portail-fne:importer`, qui range les fiches et les points : les
+ * deux chaînes lisent des dossiers différents et n'ont aucune raison de tomber
+ * ensemble le jour où l'une d'elles casse.
  */
-class ImporterPortailFne extends Command
+class ImporterFacturesRecues extends Command
 {
-    protected $signature = 'portail-fne:importer
-                            {--dossier= : Dossier à parcourir (défaut : selflow.portail_fne.dossier_import)}
-                            {--fichier= : Un seul fichier à lire, au lieu du dossier}';
+    protected $signature = 'portail-fne:importer-achats
+                            {--dossier= : Un autre dossier que celui configuré}
+                            {--fichier= : Un seul relevé}';
 
-    protected $description = "Lit les relevés du portail FNE (<login>_<date>.json et .xlsx) et les enregistre.";
+    protected $description = 'Range les factures reçues relevées au portail FNE.';
 
-    public function handle(ImportPortailFneService $service): int
+    public function handle(ImportFacturesRecuesService $service): int
     {
         if ($fichier = $this->option('fichier')) {
             $resultat = $service->importerFichier($fichier);
@@ -38,7 +38,10 @@ class ImporterPortailFne extends Command
         $this->line("Dossier : {$rapport['dossier']}");
 
         if ($rapport['details'] === []) {
-            $this->warn('Aucun fichier .json ou .xlsx à lire.');
+            // Silence volontaire plutôt qu'avertissement : tant que le scraper
+            // d'achats n'a pas tourné, le dossier est vide et le dire chaque
+            // heure ferait un journal qu'on cesse de lire.
+            $this->line('Aucun relevé de factures reçues à lire.');
 
             return self::SUCCESS;
         }
@@ -63,7 +66,7 @@ class ImporterPortailFne extends Command
     private function afficherLignes(array $details): void
     {
         $this->table(
-            ['Fichier', 'Statut', 'Lignes', 'Message'],
+            ['Fichier', 'Statut', 'Factures', 'Message'],
             array_map(fn (array $d) => [
                 $d['fichier'],
                 match ($d['statut']) {

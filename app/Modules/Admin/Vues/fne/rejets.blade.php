@@ -37,6 +37,32 @@
     .et-diagnostique { background:#fffbeb; color:#92400e; }
     .et-resolu       { background:#ecfdf5; color:#065f46; }
 
+    /* La cause : pourquoi la pièce n'est pas passée. Volontairement plus
+       discrète que le statut — le statut dit ce qu'il reste à faire, la cause
+       dit seulement où chercher. */
+    .cause { padding:3px 9px; border-radius:6px; font-size:10px; font-weight:700;
+             text-transform:uppercase; letter-spacing:.3px; white-space:nowrap; }
+    .cause-dgi    { background:#fef2f2; color:#991b1b; border:1px solid #fecaca; }
+    .cause-reseau { background:#f1f5f9; color:#475569; border:1px solid #e2e8f0; }
+    .cause-locale { background:#eff6ff; color:#1d4ed8; border:1px solid #bfdbfe; }
+    .cause-vide   { background:transparent; color:var(--text-3); border:1px dashed var(--border); }
+
+    .filtres-cause { display:flex; gap:8px; flex-wrap:wrap; margin-bottom:18px; }
+    .filtre-pill {
+        display:inline-flex; align-items:center; gap:7px; padding:7px 14px;
+        border:1px solid var(--border); border-radius:20px; background:var(--surface, #fff);
+        font-size:12px; font-weight:600; color:var(--text-2); text-decoration:none;
+        transition:all .15s;
+    }
+    .filtre-pill:hover  { border-color:#94a3b8; color:var(--text-1); }
+    .filtre-pill.active { background:var(--text-1); border-color:var(--text-1); color:#fff; }
+    .filtre-pill .n {
+        font-size:11px; font-weight:800; padding:1px 7px; border-radius:20px;
+        background:rgba(100,116,139,.14);
+    }
+    .filtre-pill.active .n { background:rgba(255,255,255,.22); }
+    .filtre-pill.vide   { opacity:.45; }
+
     .champ { border-left:3px solid var(--border); padding:2px 0 2px 14px; margin-bottom:14px; }
     .champ.ecart        { border-left-color:#E53E3E; }
     .champ.concordant   { border-left-color:#10b981; }
@@ -87,6 +113,7 @@
     <a href="{{ route('admin.fne.gestion') }}"   class="fne-tab"><i class="fas fa-chart-bar"></i> Gestion</a>
     <a href="{{ route('admin.fne.situation') }}" class="fne-tab"><i class="fas fa-balance-scale"></i> Situation</a>
     <a href="{{ route('admin.fne.factures') }}"  class="fne-tab"><i class="fas fa-file-invoice"></i> Factures</a>
+    <a href="{{ route('admin.fne.factures_recues') }}" class="fne-tab"><i class="fas fa-inbox"></i> Factures reçues</a>
     <a href="{{ route('admin.fne.stickers') }}"  class="fne-tab"><i class="fas fa-stamp"></i> Stickers</a>
     <a href="{{ route('admin.fne.rejets') }}"    class="fne-tab active"><i class="fas fa-triangle-exclamation"></i> Rejets
         @if($kpis['ouverts'] > 0)
@@ -114,11 +141,66 @@
     </div>
 </div>
 
+{{-- Filtre par cause.
+
+     Un rejet réseau et un refus de la DGI se ressemblaient à l'écran : même
+     étiquette « À traiter », même bouton « Rapprocher ». Or l'un se répare en
+     renvoyant la pièce, l'autre en corrigeant une donnée déclarée au portail.
+     Les mélanger, c'est chercher un écart de paramétrage là où il n'y a eu
+     qu'une coupure. --}}
+<div class="filtres-cause">
+    <a href="{{ route('admin.fne.rejets') }}"
+       class="filtre-pill {{ $causeActive === null ? 'active' : '' }}">
+        Toutes <span class="n">{{ $totalRejets }}</span>
+    </a>
+    @foreach($filtresCause as $cle => $filtre)
+        {{-- Une cause sans aucun rejet reste cliquable mais s'efface : sa
+             présence dit qu'elle existe, son effacement qu'elle est vide. --}}
+        <a href="{{ route('admin.fne.rejets', ['cause' => $cle]) }}"
+           class="filtre-pill {{ $causeActive === $cle ? 'active' : '' }} {{ $filtre['total'] === 0 ? 'vide' : '' }}">
+            {{ $filtre['libelle'] }} <span class="n">{{ $filtre['total'] }}</span>
+        </a>
+    @endforeach
+</div>
+
+@if($causeActive === 'reseau' && $filtresCause['reseau']['total'] > 0)
+<div style="display:flex;gap:12px;padding:14px 18px;background:#f8fafc;border:1px solid var(--border);border-radius:10px;margin-bottom:20px;color:var(--text-2);font-size:13px;line-height:1.6;">
+    <i class="fas fa-plug" style="font-size:16px;margin-top:2px;color:#64748b;"></i>
+    <div>
+        <strong style="color:var(--text-1);">Ces pièces n'ont pas été refusées : la plateforme n'a pas répondu.</strong>
+        Elles sont parties trois fois, à trente secondes d'intervalle, sans obtenir de verdict —
+        réseau coupé, délai dépassé, ou panne du côté de la DGI. Il n'y a rien à rapprocher du
+        portail : <strong>la pièce est simplement à renvoyer</strong> depuis l'écran des factures.
+    </div>
+</div>
+@endif
+
+@if($causeActive === 'locale' && $filtresCause['locale']['total'] > 0)
+<div style="display:flex;gap:12px;padding:14px 18px;background:#eff6ff;border:1px solid #bfdbfe;border-radius:10px;margin-bottom:20px;color:#1e40af;font-size:13px;line-height:1.6;">
+    <i class="fas fa-screwdriver-wrench" style="font-size:16px;margin-top:2px;"></i>
+    <div>
+        <strong>Ces pièces ne sont jamais parties : Selflow a refusé de les envoyer.</strong>
+        Clé API absente, avoir sans facture d'origine, ou taux de TVA qu'aucun code FNE ne
+        représente. Le défaut est ici, pas au portail — et c'est voulu : transmise telle quelle,
+        une ligne à 5 % serait taxée à 18 % par la plateforme, et la facture certifiée afficherait
+        un montant différent du vôtre.
+    </div>
+</div>
+@endif
+
 {{-- État du relevé --}}
 <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;font-size:12px;color:var(--text-3);margin-bottom:20px;">
     <i class="fas fa-cloud-arrow-down"></i>
     @if($fiche)
-        Dernier relevé du portail : <strong style="color:var(--text-1);">{{ $fiche->date_scraping?->format('d/m/Y') ?? '—' }}</strong>
+        {{-- Deux dates, et non une : le passage dit que le scraper fonctionne,
+             le changement dit ce que le portail a fait. Un relevé identique au
+             précédent n'écrit plus de fiche, donc la seconde peut être bien
+             plus ancienne que la première sans que rien n'aille mal. --}}
+        Dernier relevé du portail :
+        <strong style="color:var(--text-1);">{{ $dernierPassage?->format('d/m/Y') ?? $fiche->date_scraping?->format('d/m/Y') ?? '—' }}</strong>
+        @if($dernierPassage && $fiche->date_scraping && $fiche->date_scraping->lt($dernierPassage))
+            <span style="color:var(--text-3);">— inchangé depuis le {{ $fiche->date_scraping->format('d/m/Y') }}</span>
+        @endif
     @else
         <span style="color:#92400e;">Aucun relevé du portail pour cette entreprise — le rapprochement ne peut rien comparer.</span>
     @endif
@@ -163,17 +245,39 @@
         <span class="etiquette et-{{ $rejet->statut }}">
             {{ ['ouvert' => 'À traiter', 'diagnostique' => 'Rapprochée', 'resolu' => 'Classée'][$rejet->statut] ?? $rejet->statut }}
         </span>
+        @php
+            $causesLisibles = [
+                'dgi'    => ['Refus DGI',      'cause-dgi'],
+                'reseau' => ['Réseau',         'cause-reseau'],
+                'locale' => ['Bloqué ici',     'cause-locale'],
+            ];
+            [$causeTexte, $causeClasse] = $causesLisibles[$rejet->cause] ?? ['Cause inconnue', 'cause-vide'];
+        @endphp
+        <span class="cause {{ $causeClasse }}"
+              title="{{ [
+                  'dgi'    => 'La plateforme a examiné la pièce et l\'a refusée. Le relevé du portail sert à comprendre pourquoi.',
+                  'reseau' => 'La plateforme n\'a pas répondu : la pièce n\'a jamais été examinée. Rien à rapprocher, la pièce est à renvoyer.',
+                  'locale' => 'Selflow a refusé d\'envoyer la pièce. Le défaut est ici, pas au portail.',
+              ][$rejet->cause] ?? 'Rejet consigné avant que la cause ne soit distinguée.' }}">
+            {{ $causeTexte }}
+        </span>
         <span style="font-size:12px;color:var(--text-3);">
             {{ $rejet->piece_type === 'achat' ? 'Bordereau d\'achat' : 'Facture' }}
             · refusée le {{ $rejet->created_at?->format('d/m/Y à H:i') }}
         </span>
         <div style="margin-left:auto;" class="actions">
+            {{-- Pas de rapprochement quand la DGI n'a rien examiné : il n'y a
+                 aucun verdict à comparer au portail. Le bouton est retiré
+                 plutôt que grisé — un bouton grisé se clique quand même, et
+                 laisse croire qu'il manque un droit. --}}
+            @if($rejet->cause !== 'reseau')
             <form method="POST" action="{{ route('admin.fne.rejets.diagnostiquer', $rejet) }}">
                 @csrf
                 <button type="submit" class="btn" style="font-size:12px;">
                     <i class="fas fa-rotate"></i> Rapprocher
                 </button>
             </form>
+            @endif
             @if($rejet->statut !== 'resolu')
             <form method="POST" action="{{ route('admin.fne.rejets.resoudre', $rejet) }}">
                 @csrf
@@ -251,8 +355,19 @@
 @empty
 <div class="card" style="text-align:center;padding:56px;color:var(--text-3);">
     <i class="fas fa-circle-check" style="font-size:44px;display:block;margin-bottom:14px;opacity:.2;"></i>
-    Aucune pièce refusée par la plateforme.<br>
-    <small>Les refus apparaissent ici dès qu'ils surviennent, avec ce que le portail déclare en face.</small>
+    @if($causeActive !== null)
+        {{-- Sans cette distinction, un filtre sur une cause vide affiche
+             « aucune pièce refusée » alors qu'il y en a peut-être vingt sous
+             une autre cause. Un écran vide se lit comme une bonne nouvelle. --}}
+        Aucun rejet pour cette cause.<br>
+        <small>
+            {{ $totalRejets }} rejet(s) au total —
+            <a href="{{ route('admin.fne.rejets') }}" style="text-decoration:underline;">voir toutes les causes</a>.
+        </small>
+    @else
+        Aucune pièce refusée par la plateforme.<br>
+        <small>Les refus apparaissent ici dès qu'ils surviennent, avec ce que le portail déclare en face.</small>
+    @endif
 </div>
 @endforelse
 

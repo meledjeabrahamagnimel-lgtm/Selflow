@@ -31,20 +31,25 @@ class PortailFneImport extends Model
         'type',
         'fichier_nom',
         'fichier_empreinte',
+        'contenu_empreinte',
         'donnees_brutes',
         'statut',
         'message',
         'lignes_importees',
         'importe_at',
+        'dernier_releve_le',
+        'releves',
     ];
 
     protected function casts(): array
     {
         return [
-            'date_scraping'    => 'date',
-            'donnees_brutes'   => 'array',
-            'lignes_importees' => 'integer',
-            'importe_at'       => 'datetime',
+            'date_scraping'     => 'date',
+            'donnees_brutes'    => 'array',
+            'lignes_importees'  => 'integer',
+            'importe_at'        => 'datetime',
+            'dernier_releve_le' => 'date',
+            'releves'           => 'integer',
         ];
     }
 

@@ -1725,7 +1725,7 @@ sont en base réelle, et les deux commandes répondent.
 
 **Reste à recevoir :** le script du scraper lui-même. Il n'a qu'à lire
 `portail-fne:demandes --json` et déposer ses fichiers ; tout le reste est
-branché.
+branché. — **Reçu le 26/08/2026, voir le lot 12.**
 
 ### Lot 11 — L'écran des pièces refusées — **TERMINÉ**
 
@@ -1826,6 +1826,629 @@ entre-temps. C'est même le cas où personne ne regarde.
 
 Trois épreuves de plus, vérifiées par mutation : l'ancien comportement rétabli,
 le rafraîchissement tombe.
+
+### Lot 12 — Le scraper du portail — **TERMINÉ, ÉPROUVÉ SUR LE PORTAIL LE 27/08/2026**
+
+Le script qui manquait depuis le lot 10 est arrivé. Il vient d'un script
+d'automatisation écrit à part (`Documents/scraping/fne.js`), qui faisait déjà
+l'essentiel : Playwright, connexion, page Paramétrage, export Excel, et la
+bonne nomenclature `<login>_<AAAAMMJJ>`. Il vit désormais dans
+`SCRAPER-PORTAIL-FNE/`, branché sur la file et sur le dossier d'import.
+
+| Périmètre | Fichier |
+|---|---|
+| Le scraper | `SCRAPER-PORTAIL-FNE/fne.js` |
+| Vérification hors portail | `SCRAPER-PORTAIL-FNE/verifier-extraction.js` — 18 contrôles |
+| Accès aux portails | `SCRAPER-PORTAIL-FNE/identifiants.json` — **ignoré par git** |
+| Configuration | `SCRAPER-PORTAIL-FNE/.env`, modèle dans `.env.exemple` |
+| Mode d'emploi | `CONSIGNES-POUR-LE-SCRAPER.md`, section « Le scraper livré » |
+
+**Six écarts corrigés entre le script d'origine et le contrat.**
+
+- **Il ne lisait pas la file.** Il prenait un login en argument. Il appelle
+  maintenant `php artisan portail-fne:demandes --json` depuis la racine du
+  projet, et boucle. Une file vide n'ouvre même pas le navigateur.
+- **Il déposait par HTTP vers `URL_SERVER`, qui n'existe pas.** Selflow n'a
+  aucune route d'upload : il lit un dossier. Le dépôt local est devenu le mode
+  normal, `PORTAIL_FNE_DOSSIER_IMPORT` étant lu dans le `.env` du projet —
+  rien à recopier. L'envoi HTTP reste possible pour le jour où le scraper
+  tournera ailleurs que sur le poste de Selflow.
+- **La clé d'API partait dans le fichier.** Son en-tête promettait qu'elle
+  n'était « jamais consignée », mais le filtre n'écartait que les champs de
+  type `password` — or le portail la rend dans un champ texte ordinaire. Le
+  fichier déposé est lu, archivé en `contenu_brut` et conservé : ce qui y entre
+  y reste. Elle est désormais écartée par son libellé.
+- **Les interrupteurs et les listes déroulantes n'étaient pas lus** :
+  l'extraction ne regardait que `input` et `textarea`. « Timbre de quittance »
+  et « Bordereau d'achat de produits agricoles » commandent le comportement
+  fiscal ; les manquer revenait à relever une fiche muette sur l'essentiel.
+  Piège rencontré à la vérification : un `<button role="switch">` porte
+  `type="submit"` par défaut et se faisait écarter comme un bouton ordinaire.
+  **Le rôle prime maintenant sur le type.**
+- **Les libellés tombent sur les clés du référentiel.** Le portail écrit ce
+  qu'il veut ; la comparaison se fait sans accents, sans casse et sans
+  ponctuation, puis la clé canonique est réécrite au caractère près. Vérifié :
+  les quatorze clés produites correspondent exactement, ordre compris, à
+  `ImportPortailFneService::CHAMPS_FICHE`. Un libellé inconnu n'est pas perdu —
+  il part tel quel et Selflow le range dans `champs_inconnus`.
+- **Un échec ne se lit plus comme un succès.** En dessous de quatre champs
+  reconnus, rien n'est déposé et la demande reste ouverte : sans ce garde-fou,
+  une page changée aurait produit une fiche de quatorze `null`, servi la
+  demande, et affiché quatorze écarts au rapprochement. Un login qui échoue
+  n'arrête pas les autres et laisse une capture dans `erreurs/`. Une file
+  illisible remonte sa cause — « base injoignable » — au lieu de passer pour
+  une file vide.
+
+**Un contexte de navigateur neuf par login.** Deux entreprises ne partagent
+jamais une session : ranger le relevé de l'une chez l'autre ne se répare pas.
+
+**Ce que le scraper ne fait toujours pas**, et c'est le contrat : il ne ferme
+aucune demande, ne déplace rien, ne touche à aucune table. Une demande n'est
+servie que lorsque `portail-fne:importer` range réellement un fichier portant
+ce login.
+
+**Les mots de passe vivent dans `identifiants.json`, côté scraper.** Selflow ne
+transmet que des logins — c'est écrit dans les consignes et ce n'est pas une
+commodité : mettre des mots de passe de portail en clair dans la base, ou les
+faire sortir d'une commande artisan, aurait étendu la surface d'un cran pour
+rien. Le fichier est ignoré par git, comme le `.env` du scraper.
+
+#### Le lancement automatique — posé le 26/08/2026
+
+Accroché au planificateur déjà en place (`routes/console.php`), et non à une
+seconde tâche Windows que personne ne penserait à surveiller. Tout finit dans
+`storage/logs/portail-fne.log`, avec le ramassage et le rapprochement.
+
+| Quand | Quoi |
+|---|---|
+| Toutes les heures, minute 40 | `node fne.js` — sert la file |
+| 02:30 chaque nuit | `node fne.js --tous` — tient les fiches à jour |
+
+Le cycle : un rejet à 15:05 ouvre une demande, le scraper la sert à 15:40,
+`portail-fne:importer` range à 16:00, `fne:diagnostiquer-rejets` rapproche à
+16:10.
+
+- **Toutes les heures et non toutes les dix minutes.** File vide — le cas
+  ordinaire — le passage s'arrête sans ouvrir le navigateur et ne coûte rien.
+  File pleine, il ouvre une session sur le portail de la DGI : y retourner six
+  fois par heure avec un mot de passe éventuellement faux ferait bloquer le
+  compte.
+- **`runInBackground`**, sans quoi la minute du planificateur reste occupée
+  pendant les dizaines de secondes d'un relevé. Verrou expirant à 30 min (2 h la
+  nuit) : un navigateur planté ne doit pas condamner tous les passages suivants.
+- **Allumé sur ce poste** (`PORTAIL_FNE_SCRAPER_ACTIF=true`), après vérification
+  que le drapeau était trop prudent : sans `identifiants.json`, les deux
+  passages sortent en code 0 sur une seule ligne — « rien à relever » — et non
+  en erreur. Le journal ne se remplit donc pas pour rien, et le mot de passe
+  manquant n'est signalé qu'au moment où une demande le réclame vraiment. Le
+  drapeau reste à `false` dans la configuration par défaut, pour un poste où le
+  scraper n'existe pas.
+- **Deux chemins absolus, en barres obliques.** Le lanceur VBS de la tâche
+  Windows portait déjà le chemin absolu de PHP : son environnement n'a pas le
+  PATH d'un terminal. `PORTAIL_FNE_NODE` et `PHP_BINAIRE` suivent la même
+  logique — `node` ou `php` tout court marche à l'essai et échoue une fois
+  planifié, le pire des deux mondes. Barres obliques parce que phpdotenv
+  interprète les échappements entre guillemets : `"C:\Program Files\nodejs\…"`
+  y perdrait son `n`.
+
+**Vérifié de bout en bout**, et pas seulement listé :
+
+- avec un environnement entièrement vide (`env -i`), le scraper trouve PHP, lit
+  la file et rend « rien à relever » — c'est exactement la commande que le
+  planificateur exécute ;
+- `schedule:list` montre les deux lignes quand le drapeau est levé, rien quand
+  il ne l'est pas ;
+- `schedule:test` a lancé la tâche **par le planificateur**, en arrière-plan, et
+  sa sortie est arrivée dans `storage/logs/portail-fne.log`, à la suite du
+  ramassage et du rapprochement. La chaîne entière tourne.
+
+**Il n'est pas figé sur une entreprise.** `portail-fne:demandes` n'est filtré par
+aucune entreprise : le NCC de n'importe laquelle entre dans la file dès qu'une
+de ses pièces est refusée. Éprouvé sur quatre logins d'un coup — chacun avec son
+contexte de navigateur, son échec propre et sa capture nommée à son login,
+aucun n'ayant bloqué les autres.
+
+**Une entreprise sans NCC ne peut pas être relevée — tranché, sans suite.**
+`FneRejet::consigner()` pose `login = entreprise->ncc`, et
+`PortailFneDemande::pour()` rend `null` sur un login vide : un rejet d'une
+entreprise sans NCC n'ouvre aucune demande, et rien ne le signale. Six des douze
+entreprises en base sont dans ce cas. **Le propriétaire a répondu le 26/08/2026 :
+toutes les entreprises actuellement en base sont des jeux d'essai, supprimés
+après le développement.** Le trou est donc sans objet sur les données réelles —
+en production, une entreprise sans NCC ne peut de toute façon rien normaliser.
+Aucune correction n'est faite. Si le cas devait se présenter un jour, deux
+issues : signaler à l'écran des rejets, ou refuser la normalisation en amont
+avec `CAUSE_LOCALE`.
+
+**Conséquence pour `identifiants.json` :** il ne porte que `1864699A`, le seul
+compte dont un relevé réel existe. Y inscrire les NCC d'essai aurait fait ouvrir
+chaque nuit des sessions vouées à échouer sur des comptes qui n'existent pas au
+portail — et disparaîtront de la base.
+
+**Ce qui reste ouvert :** le scraper reste extérieur à Selflow. Ces deux lignes
+de planification sont une commodité, pas une dépendance — les débrancher ne
+casse rien, les fichiers arriveront autrement ou n'arriveront pas, et une
+demande qui traîne le dira.
+
+**Reste à faire :** un premier passage réel sur le portail. Playwright et
+Chromium sont installés, `verifier-extraction.js` passe, les clés correspondent,
+la file répond et la commande planifiée fonctionne à vide. Ce qui n'est pas
+prouvé, c'est la navigation dans le portail lui-même depuis ce dossier — il y
+faut `identifiants.json` et le mot de passe de `1864699A`.
+
+### Lot 13 — Distinguer un refus de la DGI d'une coupure réseau — **POSÉ, MIGRATION À APPLIQUER**
+
+Le propriétaire a décrit le parcours attendu : on lance la normalisation ; si
+elle passe, la facture est normalisée ; sinon le scraper va vérifier au portail
+— **mais avant cela, on regarde si ce n'est pas simplement un souci réseau.**
+Cette dernière étape n'existait pas.
+
+`FneRejet::consigner()` traitait **tout** `success: false` comme un refus de la
+DGI et ouvrait une demande de relevé. Or `FneService` rend `success: false`
+pour cinq causes sans rapport :
+
+| Message rendu | La DGI a-t-elle examiné la pièce ? |
+|---|---|
+| `Exception lors de l'appel API FNE : …` (`FneService.php:276`, BAPA `:414`) | non — transport |
+| `… a échoué (HTTP 5xx) : …` | non — panne de leur côté |
+| `… la réponse de l'API est incomplète` (`:257`) | non — répondu sans verdict |
+| `aucune clé API FNE active`, `Normalisation refusée`, `Impossible de normaliser` (`:50, :79, :630`) | non — rien n'est parti |
+| `… a échoué (HTTP 4xx) : …` avec `errors` | **oui** |
+
+Une coupure de trente secondes ouvrait donc une demande : le scraper partait
+sur le portail, relevait quatorze champs, et le rapprochement comparait ce
+qu'aucune DGI n'avait mis en cause. Une file d'alertes sans objet cesse d'être
+lue — et c'est ainsi qu'on rate le vrai rejet.
+
+**Second défaut, dans le même endroit.** Les jobs déclarent `tries = 3` et
+`backoff = 30`, mais `FneService` attrape lui-même l'exception réseau et rend
+`success: false` au lieu de la relancer. Le job n'y voyait qu'un refus métier,
+ne relançait pas, et **la mécanique de réessai ne servait jamais** — précisément
+dans le seul cas où elle aurait servi.
+
+| Périmètre | Fichier |
+|---|---|
+| Classification | `FneRejet::classer()`, constantes `CAUSE_DGI` / `CAUSE_RESEAU` / `CAUSE_LOCALE` |
+| Colonne | `2026_08_26_000001_cause_des_rejets_fne` — `fne_rejets.cause`, indexée |
+| Réessai | `NormaliserFactureFne`, `NormaliserAchatBapaJob` |
+| Tests | `tests/Unit/FneRejetCauseTest.php` — 10 tests, **sans base de données** |
+
+**`FneService` n'est pas touché** — la règle d'or tient. La classification lit
+ce que le service rend, elle ne change pas ce qu'il envoie. Le prix de ce choix
+est qu'elle s'appuie sur le texte des messages : le test fige donc les six
+formulations réelles, copiées depuis le service. Si l'une change, le test tombe
+au lieu que la classification retombe en silence sur « la DGI a refusé ».
+
+**En cas de doute, c'est `CAUSE_DGI`.** Un relevé de trop fait travailler le
+scraper pour rien ; un relevé manquant laisse une facture refusée sans
+explication, et c'est le plus cher des deux.
+
+**Le réessai ne consigne rien tant qu'il reste des tentatives.** Trois rejets
+pour une seule coupure rempliraient l'écran de trois refus qui n'en font qu'un ;
+seule la dernière tentative laisse une trace, avec `cause = 'reseau'` et sans
+demande de relevé.
+
+**Les lignes déjà en base restent à `cause = NULL`.** Elles ont été consignées
+avant que la distinction existe ; leur prêter une cause après coup serait
+inventer un constat.
+
+#### Le filtre par cause, à l'écran — ajouté le 26/08/2026
+
+Un rejet réseau et un refus de la DGI se ressemblaient à l'écran : même
+étiquette « À traiter », même bouton « Rapprocher ». On cherchait un écart de
+paramétrage là où il n'y avait eu qu'une connexion perdue.
+
+| Ce qui change | Où |
+|---|---|
+| Quatre onglets — Toutes, Refus DGI, Réseau, Bloqué ici, Cause inconnue | `RejetFneControleur::index()` |
+| Une pastille de cause sur chaque rejet, avec son explication en infobulle | `Vues/fne/rejets.blade.php` |
+| Un bandeau qui dit quoi faire, par cause | idem |
+| Tests | `tests/Feature/FiltreCauseRejetsFneTest.php` — 9 tests |
+
+Cinq choix qui viennent d'un défaut réel, et non d'un goût :
+
+- **une cause inventée dans l'URL ne filtre rien**, au lieu de rendre une liste
+  vide. Un écran vide se lit « aucun rejet », soit exactement le contraire de
+  ce qu'il faut comprendre ;
+- **le vide filtré et le vide réel ne disent pas la même chose.** « Aucun rejet
+  pour cette cause — 12 au total » n'est pas « aucune pièce refusée » ;
+- **la pagination emporte le filtre** (`withQueryString`), sans quoi la page 2
+  revient sur la liste entière et l'on croit que le filtre a lâché ;
+- **les rejets sans cause restent atteignables** par un onglet dédié. Les
+  lignes d'avant la migration ont `cause = NULL` ; sans entrée qui les désigne,
+  elles disparaissaient dès qu'on filtrait ;
+- **le bouton « Rapprocher » est retiré des rejets réseau**, et la route les
+  refuse aussi — un navigateur poste ce qu'il veut. Rapprocher une pièce que la
+  DGI n'a jamais lue déguiserait un incident de transport en écart de données.
+
+**Un mensonge d'interface corrigé au passage.** Quand aucun relevé n'était
+disponible, l'écran répondait « Une demande a été déposée ; le rapprochement se
+fera dès son arrivée ». **Rien ne la déposait sur ce chemin** : la demande naît
+à la consignation du rejet, dans `FneRejet::consigner()`, et elle existe déjà ou
+n'existera pas. Vrai par accident pour un refus DGI, faux pour tout le reste.
+Une interface qui annonce un geste qu'elle n'a pas fait se paie au moment où
+l'on attend le résultat.
+
+**Épreuves :** 9 tests neufs, et les 115 tests du périmètre FNE — `FnePayloadTest`
+compris — repassent. Sur le lot complet : 757 tests verts sur 758. L'échec
+restant, `TableauDeBordGeneralTest`, est **antérieur et sans rapport** :
+`AdminControleur.php:266` emploie `CONCAT`, que SQLite ne connaît pas, alors que
+les épreuves tournent sur SQLite en mémoire. À corriger un jour, dans un autre
+lot. Le lot complet demande aussi `-d memory_limit=512M` : à 128 Mo,
+`ImportPortailFneTest` épuise la mémoire en écrivant son tableur.
+
+**Migration appliquée** le 26/08/2026 : `fne_rejets.cause` est en base réelle.
+
+Deux points laissés en l'état
+et à trancher : `BatchNormalisationJob` consigne toujours sans classer (un
+`throw` avorterait le lot entier), et le chemin synchrone de
+`FneDashboardControleur` rend déjà l'erreur à l'écran. Ni l'un ni l'autre
+n'ouvre de fausse demande — `consigner()` classe désormais dans tous les cas —
+mais ni l'un ni l'autre ne réessaie.
+
+### Lot 14 — Surveiller le portail, et non plus seulement le lire — **TERMINÉ**
+
+Deux comparaisons existaient. `PortailFneFiche::ecartsAvecEntreprise()` répond à
+« le portail et Selflow disent-ils la même chose ? ».
+`fne:diagnostiquer-rejets` répond à « pourquoi cette pièce a-t-elle été
+refusée ? ». **Aucune ne répondait à « quelqu'un a-t-il touché au portail depuis
+hier ? »** — un timbre de quittance désactivé un mardi soir n'apparaissait donc
+nulle part, jusqu'au jour où une facture était refusée, et l'on cherchait alors
+ce qui avait bougé sans savoir quand.
+
+| Périmètre | Fichier |
+|---|---|
+| Écarts d'un relevé au précédent | `PortailFneFiche::precedente()`, `::ecartsAvecPrecedente()`, `CHAMPS_SUIVIS` |
+| Points apparus, disparus, modifiés | `PortailFnePointFacturation::changementsDepuisLePrecedent()` |
+| Commande | `portail-fne:changements [--login=] [--silencieux]` |
+| Planification | toutes les heures, minute 15, `--silencieux` |
+| Tests | `tests/Feature/ChangementsPortailFneTest.php` — 11 tests |
+
+**La comparaison porte sur le contenu, jamais sur l'empreinte du fichier.**
+Le tableur du portail embarque un horodatage de génération — vérifié dans le
+relevé réel : `dcterms:created` vaut `2026-08-20T09:26:26Z` pour un fichier
+téléchargé le 21/08. Deux exports identiques peuvent donc différer octet pour
+octet, et se fier aux octets annoncerait un changement chaque nuit. Un test
+fige ce point : les empreintes des deux relevés y sont volontairement
+différentes, et rien n'est signalé quand le contenu est le même.
+
+Cinq décisions, chacune contre un faux signal :
+
+- **un premier relevé n'annonce rien.** Sinon chaque entreprise afficherait
+  quatorze changements le jour de son arrivée, et le signal deviendrait bruit ;
+- **`null` et `''` ne se signalent pas l'un l'autre** — le portail dit « rien »
+  de deux façons ;
+- **un champ qui passe à vide compte pourtant comme un changement**, à la
+  différence du rapprochement avec l'entreprise : ici les deux valeurs viennent
+  du même portail lu par le même scraper, et une valeur qui disparaît est soit
+  un changement réel, soit un défaut d'extraction — les deux méritent d'être
+  vus ;
+- **l'identité d'un point est son `etablissement_id`**, pas son nom : un point
+  renommé reste le même point. Le voir comme une disparition suivie d'une
+  apparition noierait le renommage — or c'est la cause du rejet le plus
+  fréquent, « le nom du point de vente doit être déclaré à l'identique » ;
+- **`--silencieux` au passage planifié.** Un journal qui répète chaque heure
+  « aucun changement » cesse d'être lu, et c'est le jour où il dit quelque chose
+  qu'on ne le lira pas.
+
+**Les trois champs fiscaux sont nommés à part.** Quand `timbre_quittance`,
+`bapa` ou `sticker_solde_alerte` bougent au portail, le rapport le dit
+explicitement — et ne recopie rien. Un test vérifie que l'entreprise ressort
+inchangée, octet pour octet, après le passage. C'est la règle d'or : **un
+constat, pas une décision.**
+
+Éprouvé sur un cas réel simulé — déménagement de commune, timbre de quittance
+désactivé, point de facturation renommé — puis la base rendue à son état
+d'origine (2 imports, 1 fiche, 1 point).
+
+**Le cycle horaire complet :**
+
+| Minute | Quoi |
+|---|---|
+| :00 | `portail-fne:importer` — range les fichiers déposés |
+| :10 | `fne:diagnostiquer-rejets` — rapproche les pièces refusées |
+| :15 | `portail-fne:changements --silencieux` — dit ce que le portail a changé |
+| :40 | le scraper — sert la file |
+| 02:30 | le scraper, passage complet |
+
+### Lot 15 — Le relevé ne s'enregistre plus quand il ne dit rien — **TERMINÉ**
+
+**Le premier relevé réel a eu lieu le 27/08/2026**, et il est passé du premier
+coup : connexion, navigation, 14/14 champs reconnus, export du tableur. Le JSON
+déposé est **identique octet pour octet** à celui posé à la main le 21/08 —
+le scraper reproduit exactement le fichier de référence. Le lot 12 passe donc
+de « premier relevé réel à faire » à éprouvé.
+
+Ce relevé a mis en évidence ce que ce lot corrige.
+
+#### Ce qui n'allait pas
+
+Chaque passage écrivait une fiche et un jeu de points, **que le portail ait
+bougé ou non**. L'empreinte SHA-256 du fichier ne pouvait rien y faire : le
+tableur du portail embarque un horodatage de génération (`dcterms:created`), et
+deux exports identiques diffèrent donc octet pour octet. Vérifié en
+décompressant les deux : seul `docProps/core.xml` change, toutes les feuilles
+de données sont identiques.
+
+La conséquence coûteuse n'était pas la taille de la table. C'est que
+`DiagnosticFneService::diagnosticEstAJour()` compare l'identifiant de la
+dernière fiche : **une fiche neuve, fût-elle identique au mot près, périmait
+chaque nuit tous les diagnostics de rejets**, rejoués pour aboutir au même
+constat.
+
+#### Ce qui a été fait
+
+La comparaison porte sur le **contenu lu**, jamais sur les octets — le même
+principe que `changementsDepuisLePrecedent()`, qui l'avait déjà tranché pour
+les points.
+
+Un relevé qui redit ce que la base sait déjà **ne crée plus aucune ligne, nulle
+part** — pas même une ligne d'import. La ligne existante est *confirmée* :
+`dernier_releve_le` avance, `releves` monte d'une unité.
+
+| Table | Règle |
+|---|---|
+| `portail_fne_imports` | une ligne par **contenu**, pas par passage. Un relevé identique confirme la ligne existante |
+| `portail_fne_fiches` | écrite seulement quand le contenu change |
+| `portail_fne_points_facturation` | **tout le jeu ou rien**. N'écrire que le point modifié ferait répondre « le portail ne déclare qu'un point de vente » là où il y en a cinq |
+
+**Trois dates à ne pas confondre** sur une ligne d'import :
+
+| Colonne | Ce qu'elle dit |
+|---|---|
+| `date_scraping` | depuis quel relevé le portail affiche **ce** contenu |
+| `dernier_releve_le` | quand on l'a vu pour la dernière fois |
+| `created_at` | quand Selflow l'a rangé |
+
+Qui veut savoir si le scraper tourne encore lit `dernier_releve_le`. Qui veut
+savoir depuis quand un paramétrage est en place lit `date_scraping`. Écraser la
+seconde effacerait l'ancienneté du paramétrage, qui est justement ce qu'on
+cherche quand une pièce est refusée.
+
+`releves` ne monte **qu'au changement de date de relevé** : le dossier d'import
+est relu toutes les heures, et compter chaque relecture ferait dire à ce
+compteur le nombre de passages du planificateur plutôt que le nombre de relevés.
+
+La comparaison se fait sur l'empreinte du contenu **canonicalisé**
+(`empreinteDuContenu()`), pas sur les octets : `"5000"` ou `5000`, `"*"` ou
+`null`, `true` ou `"true"`, colonnes du tableur réordonnées, ligne vide en fin
+de feuille — autant de libertés que le portail s'autorise et qui ne sont pas
+des changements. Un champ **inédit**, lui, en est un.
+
+Elle porte sur le **dernier** relevé du login, jamais sur n'importe lequel : un
+portail qui passe de A à B puis revient à A a changé deux fois, et rattacher ce
+troisième relevé à la ligne A d'origine laisserait B comme état le plus récent
+en base — c'est-à-dire un état que le portail n'affiche plus.
+
+Trois conséquences traitées avec :
+
+- **La date d'une fiche n'est plus celle du dernier passage**, mais celle du
+  dernier *changement*. L'écran des rejets lit désormais `portail_fne_imports`
+  pour dater le relevé, sinon il afficherait « relevé du 15/08 » un 27/08 sur
+  un scraper qui tourne parfaitement.
+- **`portail-fne:changements --silencieux`** ne rapporte que si le dernier
+  changement est celui du dernier passage. Sans ce filtre, le passage planifié
+  annoncerait chaque heure une nouvelle vieille de trois semaines — et le
+  drapeau, qui existe pour qu'un journal reste lisible, ne servirait plus à
+  rien. Lancée à la main, la commande continue de montrer le dernier changement
+  connu quelle que soit sa date.
+- **Une fiche orpheline se rattache après coup.** Un relevé arrivé avant que
+  l'entreprise n'existe portait un `entreprise_id` nul, et le rattachement se
+  faisait tout seul au relevé suivant. Ne plus rien écrire l'aurait laissée
+  orpheline pour toujours.
+
+| Périmètre | Fichier |
+|---|---|
+| L'empreinte du contenu | `ImportPortailFneService::empreinteDuContenu()`, `ficheCanonique()`, `pointsCanoniques()` |
+| La confirmation sans écriture | `ImportPortailFneService::dernierReleveDeMemeContenu()`, `confirmerLeReleve()` |
+| Les colonnes et la reprise | `2026_08_27_000001_relever_sans_redire` — reprise des lignes déjà en base et repli des doublons |
+| Les deux dates | `RejetFneControleur`, `Vues/fne/rejets.blade.php` |
+| Le silence du planificateur | `ChangementsPortailFne::changementDuDernierPassage()` |
+| Tests | `ImportPortailFneTest` — 6 nouveaux, 13 au total |
+
+**Éprouvé sur le portail réel le 27/08.** Trois relevés d'affilée : la base
+n'a pas gagné une ligne, et `releves` est passé à 3 sur la ligne du 21/08. La
+migration a replié les doublons laissés par la version précédente — 4 lignes
+d'import ramenées à 2, un seul jeu de points.
+
+#### Ce que seul l'essai réel a trouvé
+
+La première version comparait les points stockés via `attributesToArray()`, qui
+rend les dates sous leur forme sérialisée (« 2026-07-30T10:38:40.000000Z ») là
+où un relevé frais porte des objets `Carbon`. Les deux ne pouvaient jamais être
+égaux : **un tableur identique revenait indéfiniment comme un changement.**
+
+Les tests ne l'ont pas vu, parce que leurs tableurs n'avaient aucune colonne de
+date — les deux côtés valaient `null`, et la comparaison croyait tout comparer.
+C'est le relevé du 27/08 sur le vrai portail qui l'a montré, en ressortant
+« importé » là où « inchangé » était attendu.
+
+Les valeurs sont désormais relues par accesseur, et `Créé à` / `Mise à jour à`
+figurent dans les tableurs de test — vérifié en réintroduisant le défaut : le
+test échoue.
+
+#### Trois constats à part, non corrigés
+
+- **`php artisan test` s'arrête à 423 tests sur 775** — mémoire épuisée dans
+  `zipstream-php` pendant `ImportPortailFneTest`, et le rapport annonce
+  « passed » quand même. Reproduit avant comme après ce lot, donc antérieur.
+  Contournement : `php -d memory_limit=1G vendor/bin/phpunit` passe la suite
+  entière — 775 tests, 774 verts.
+- **`TableauDeBordGeneralTest` échoue** : `CONCAT` n'existe pas en SQLite. Le
+  tableau de bord marche sous MySQL, le test ne peut pas le vérifier. Sans
+  rapport avec ce lot.
+- **Les noms des points de vente s'affichent en double** dans le diagnostic
+  quand deux relevés tombent le même jour : `DiagnosticFneService` déduplique
+  les identifiants d'établissement (`array_unique`) mais pas les noms.
+  Cosmétique.
+
+### Lot 16 — Le relevé des factures reçues — **CHAÎNE COMPLÈTE, EN ATTENTE DE DONNÉES**
+
+`SCRAPER-PORTAIL-FNE/achats.js`. `fne.js` n'a pas été touché : seule sa liste
+d'exports a été complétée, pour que la connexion — qui porte l'attente
+d'hydratation Next.js — ne soit pas recopiée. `verifier-extraction.js` continue
+de passer ses 17 contrôles, ce qui le prouve.
+
+#### Ce que la reconnaissance a trouvé, le 27/08/2026
+
+Un mode `--reconnaissance` explore le portail et écrit un rapport, au lieu
+d'exiger un aller-retour à la main dans les outils de développement. Il a rendu
+tout ce qui manquait :
+
+| | |
+|---|---|
+| Page | `/fr/invoice-management?type=received` (et `?type=issued` pour les pièces émises) |
+| Liste | `GET /ws/invoices?page=&perPage=&fromDate=&toDate=&sortBy=-date&listing=received&complete=true` |
+| Enveloppe | `{ data: [...], page, perPage, total }` |
+| Totaux | `GET /ws/invoices/details?…&listing=received` — les KPI du tableau de bord, pas la liste |
+
+**L'API est celle que Selflow connaît déjà** : `http://54.247.95.108/ws`, la
+même base que `FNE_API_URL_SANDBOX`. À vérifier un jour : la clé d'API de
+l'entreprise ouvre-t-elle `/ws/invoices` ? Si oui, le navigateur devient inutile
+pour ce relevé.
+
+#### Le moule d'un enregistrement
+
+Relevé sur les pièces **émises** (112 en base) faute de pièce reçue :
+
+| Champ | Ce qu'il porte |
+|---|---|
+| `reference` | le numéro FNE — `B1864699A26000000016` |
+| `token` | le code de vérification, celui du QR |
+| `type` / `subtype` | `invoice` / `purchase_slip`, `normal`, `refund`, `proforma` |
+| `isRne`, `rne` | la distinction reçu / facture, que Selflow connaît déjà |
+| `date` | ISO |
+| `amount`, `vatAmount`, `fiscalStamp`, `discount`, `totalBeforeTaxes`, `totalTaxes`, `totalAfterTaxes`, `totalCustomTaxes`, `totalDue` | des **nombres**, pas des libellés formatés |
+| `items[]` | **le détail des lignes** — un achat pourra donc mouvementer un stock |
+| `company{}` | l'entreprise émettrice, avec son `declarantNumber` |
+| `clientNcc`, `clientCompanyName` | la contrepartie |
+| `customTaxes[]` | les taxes personnalisées |
+
+#### Ce qui a été appris en chemin
+
+- **Le clic sur un menu Next.js rend la main avant la navigation.** Le premier
+  essai a relevé le tableau de bord en croyant relever les factures. La
+  navigation se fait désormais par URL, le menu ne servant que de repli.
+- **`page.request` ne porte pas le jeton.** Le portail l'envoie en en-tête
+  `Authorization`, posé par son JavaScript ; rejouer un appel sans lui rend 401.
+  Il est capté au vol sur un appel que la page fait elle-même, **vit en mémoire
+  et n'est écrit nulle part** — ni journal, ni fichier déposé, ni rapport.
+
+#### Le dépôt
+
+`storage/app/portail-fne/achats/<login>_<AAAAMMJJ>.json` — un **sous-dossier**,
+et non un suffixe : la découpe du nom se fait au dernier `_`, qu'un login peut
+contenir. L'import actuel ne lit que la racine du dossier : il ignore ces
+fichiers, et la chaîne éprouvée n'est pas perturbée.
+
+Aucun horodatage de génération dans le fichier, conformément à la leçon du lot 15.
+
+#### Où ça en est
+
+**Le relevé fonctionne.** Mais `DC-KNOWING CGA` n'a **aucune facture reçue** —
+`total: 0` sur toute la fenêtre 2024-2026. Le fichier déposé porte donc
+`factures: []`. Ce n'est pas une panne : l'API répond 200 avec un total franc.
+
+#### Le côté Selflow
+
+| Périmètre | Fichier |
+|---|---|
+| Les tables | `2026_08_27_000002_factures_recues_du_portail` — `portail_fne_factures_recues` et ses lignes |
+| Les modèles | `PortailFneFactureRecue`, `PortailFneFactureRecueLigne` |
+| L'import | `ImportFacturesRecuesService` — à côté de `ImportPortailFneService`, jamais dedans |
+| La commande | `portail-fne:importer-achats`, planifiée à la minute **05** |
+| Tests | `ImportFacturesRecuesTest` — 10 cas, bâtis sur la forme **réelle** de l'API |
+
+**Une facture est un fait, pas un état.** C'est la différence de fond avec les
+fiches d'entreprise, que le même dossier historise à chaque relevé. Une fiche est
+une photographie qu'on reprend pour voir ce qui a bougé ; une facture est émise,
+certifiée, et ne change plus. L'unicité porte donc sur `(login, reference)` — le
+numéro FNE — et un second relevé **met à jour** au lieu de dupliquer. La ligne
+d'import, elle, suit la même règle qu'au lot 15 : contenu identique, aucune
+ligne créée, la précédente est confirmée.
+
+**Table à part, jamais les colonnes d'`achats`.** `achats.numero_fne`,
+`achats.normalise`, `achats.fne_*` veulent dire « Selflow a émis cette pièce et
+la DGI l'a certifiée » — le cas du bordereau agricole. Une facture reçue a été
+certifiée par le fournisseur. Y écrire ferait mentir Selflow sur ce qu'il a émis,
+devant un contrôle.
+
+**Aucun achat n'est créé, aucune écriture produite, aucun fournisseur inventé.**
+Le rapprochement se propose (`rapprochementPropose()`), il ne s'applique pas :
+il rend le fournisseur probable — retrouvé par **NCC**, jamais par le nom —,
+l'achat candidat, et l'**écart TTC** s'il y en a un. Cet écart est ce qui vaut
+de l'argent. Un test le verrouille : `test_le_releve_ne_cree_aucun_achat`.
+
+Trois précautions qui viennent de fautes déjà commises ailleurs dans le projet :
+
+- `tvaDeductible()` rend **faux** pour un `purchase_slip` et pour un RNE. Un
+  bordereau constate un achat auprès d'un non-assujetti : il ne facture aucune
+  TVA, et la déduire serait l'erreur que `ventilationAchat` a déjà corrigée.
+- Les taxes d'une ligne sont conservées **brutes**. Rien ne garantit que le
+  portail parle le langage de `Produit::CODES_TVA` ; deviner un code à partir
+  d'un montant reviendrait à inventer une information fiscale.
+- Une pièce **sans numéro FNE** est écartée et journalisée : sans identité, elle
+  ne pourrait ni être reconnue au relevé suivant, ni détecter un doublon.
+
+#### Ce qu'il manque encore
+
+- **Des données.** `DC-KNOWING CGA` n'a aucune facture reçue. La chaîne tourne
+  à vide et le dit : `0 facture(s)`, aucune erreur.
+- **Le scraper n'est pas planifié.** `achats.js` se lance à la main. L'accrocher
+  au planificateur avant d'avoir vu une seule facture réelle ferait tourner un
+  navigateur chaque heure pour rien.
+#### L'écran
+
+`admin/fne/factures-recues`, sixième onglet de la barre FNE et entrée du menu
+latéral. Quatre filtres — **à rapprocher**, **rapprochées**, **fournisseur
+inconnu**, **écartées** — et par pièce : l'émetteur avec son NCC, les montants,
+la mention **déductible / non déductible**, et le détail des lignes.
+
+Le rapprochement est **calculé à l'affichage**, jamais stocké : un fournisseur
+créé ce matin doit être vu ce matin, sans attendre le relevé de la nuit.
+
+Trois gestes, et aucun ne crée quoi que ce soit :
+
+| Geste | Ce qu'il fait |
+|---|---|
+| **Rattacher** | pose `portail_fne_factures_recues.achat_id` vers un achat **déjà saisi**. Sans achat en face, il refuse et le dit — il n'en fabrique pas |
+| **Détacher** | défait le lien, la pièce retourne à rapprocher |
+| **Écarter** | range la pièce sans la supprimer : le portail la redéposera au prochain relevé, et une pièce écartée qui revient chaque jour finirait par masquer celles qui comptent |
+
+**L'écart de montant est ce qui vaut de l'argent.** L'achat saisi dit 11 000, la
+DGI détient 11 800 : l'écran le montre et le conserve dans
+`note_rapprochement`. Personne ne le voyait avant.
+
+Rien n'est écrit dans les colonnes gelées d'`achats` — un test le vérifie
+explicitement (`assertNull($achat->numero_fne)`).
+
+`EcranFacturesRecuesTest` — 7 cas, dont l'isolation entre entreprises : une
+pièce fiscale lue par le mauvais client ne se répare pas.
+
+#### Ce qu'il manque encore
+
+- **Des données.** `DC-KNOWING CGA` n'a aucune facture reçue. La chaîne tourne
+  à vide et le dit : `0 facture(s)`, aucune erreur.
+- **Le scraper n'est pas planifié.** `achats.js` se lance à la main. L'accrocher
+  au planificateur avant d'avoir vu une seule facture réelle ferait tourner un
+  navigateur chaque heure pour rien.
+
+#### Une trouvaille, laissée telle quelle
+
+`FneControleur` existe depuis le lot I et porte exactement cette intention —
+*« Recherche de documents fiscaux ENTRANTS »*. **Aucun écran ne l'appelle** :
+`fne.rechercher` et `fne.attacher` sont des routes orphelines. Et son code porte
+trois défauts, non corrigés parce qu'ils traversent le périmètre gelé :
+
+1. l'URL `GET /api/v1/documents/{ref}` est **inventée** — le docblock l'avoue
+   (« une supposition raisonnable »). La vraie est `/ws/invoices` ;
+2. le repli d'URL en dur porte encore `https://fne-sandbox.dgi.gouv.ci`, l'hôte
+   inexistant que le lot 9 avait corrigé dans `config/selflow.php` ;
+3. `attacherFneAchat` écrit dans `achats.numero_fne` — colonne gelée signifiant
+   « Selflow a émis et la DGI a certifié ». Y mettre la référence d'un
+   fournisseur ferait mentir Selflow devant un contrôle.
+
+Le nouvel écran ne passe par aucun de ces chemins.
 
 ## 5 bis. La numérotation des comptes — tranché
 

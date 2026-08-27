@@ -33,6 +33,34 @@ class FneRejet extends Model
     public const STATUT_DIAGNOSTIQUE = 'diagnostique';
     public const STATUT_RESOLU       = 'resolu';
 
+    /**
+     * Pourquoi la pièce n'est pas passée. Trois causes, et une seule appelle un
+     * relevé du portail.
+     *
+     * `FneService` rend `success: false` pour des raisons qui n'ont rien de
+     * commun : la DGI a refusé la pièce, la DGI n'a jamais reçu la pièce, ou
+     * Selflow a refusé de l'envoyer. Les confondre revenait à envoyer le
+     * scraper sur le portail parce qu'une connexion avait sauté, et à comparer
+     * quatorze champs qu'aucune DGI n'avait mis en cause.
+     */
+    public const CAUSE_DGI    = 'dgi';     // examinée et refusée : un relevé sert
+    public const CAUSE_RESEAU = 'reseau';  // jamais examinée : réseau, délai, plateforme HS
+    public const CAUSE_LOCALE = 'locale';  // jamais envoyée : Selflow a refusé avant l'appel
+
+    /**
+     * Les refus que Selflow prononce lui-même, avant tout appel — clé API
+     * absente, avoir sans facture d'origine, taux de TVA hors barème DGI.
+     *
+     * Reconnus par des fragments sans apostrophe ni accent variable : ces
+     * messages sont assemblés dans `FneService`, qui est gelé, et une
+     * comparaison trop serrée casserait au premier ajustement de formulation.
+     */
+    private const REFUS_LOCAUX = [
+        'aucune clé API FNE active',
+        'Normalisation refusée',
+        'Impossible de normaliser',
+    ];
+
     protected $fillable = [
         'entreprise_id',
         'piece_type',
@@ -41,6 +69,7 @@ class FneRejet extends Model
         'login',
         'message',
         'champs',
+        'cause',
         'statut',
         'diagnostic',
     ];
@@ -81,6 +110,58 @@ class FneRejet extends Model
      * @param  array<string, mixed>   $resultat  Le retour de `normaliserFacture()`
      *                                           ou `normaliserAchatBapa()`.
      */
+    /**
+     * Pourquoi la pièce n'est pas passée, à partir de ce que `FneService` rend.
+     *
+     * La lecture se fait sur le message, faute de mieux : le service est gelé
+     * et ne porte aucun code de cause. Ce n'est pas idéal, c'est vérifiable —
+     * `FneRejetCauseTest` fige les six formulations que `FneService` produit
+     * réellement, et un message qui changerait ferait tomber le test au lieu
+     * de retomber en silence sur « la DGI a refusé ».
+     *
+     * En cas de doute, la réponse est `CAUSE_DGI` : ouvrir un relevé de trop
+     * fait travailler le scraper pour rien ; en manquer un laisse une facture
+     * refusée sans explication.
+     */
+    public static function classer(array $resultat): string
+    {
+        $message = (string) ($resultat['message'] ?? '');
+
+        // 1. Rien n'est parti. Le défaut est ici, pas sur le portail.
+        foreach (self::REFUS_LOCAUX as $marqueur) {
+            if (str_contains($message, $marqueur)) {
+                return self::CAUSE_LOCALE;
+            }
+        }
+
+        // 2. L'appel n'a pas abouti : délai dépassé, DNS, connexion refusée.
+        //    FneService attrape l'exception de transport et la rend en message
+        //    (`FneService.php:276`, et sa jumelle BAPA `:414`).
+        if (str_contains($message, "Exception lors de l'appel API FNE")) {
+            return self::CAUSE_RESEAU;
+        }
+
+        // 3. La plateforme a répondu, mais pas un verdict : une panne de son
+        //    côté (5xx) ou un corps qu'on n'a pas su lire. Dans les deux cas
+        //    elle n'a pas examiné la pièce, et le portail n'a rien à en dire.
+        if (preg_match('/\(HTTP (\d{3})\)/', $message, $trouve) && (int) $trouve[1] >= 500) {
+            return self::CAUSE_RESEAU;
+        }
+
+        if (str_contains($message, "la réponse de l'API est incomplète")) {
+            return self::CAUSE_RESEAU;
+        }
+
+        // 4. Reste le cas qui compte : la DGI a lu la pièce et l'a refusée.
+        return self::CAUSE_DGI;
+    }
+
+    /** La DGI n'a jamais examiné la pièce : il n'y a rien à relever, il y a à réessayer. */
+    public function estReseau(): bool
+    {
+        return $this->cause === self::CAUSE_RESEAU;
+    }
+
     public static function consigner($piece, array $resultat): ?self
     {
         if (($resultat['success'] ?? false) === true) {
@@ -92,6 +173,7 @@ class FneRejet extends Model
             // se joint par le point de vente, comme le fait FneService pour
             // bâtir son payload (`FneService.php:28`).
             $entreprise = $piece->pointDeVente?->entreprise;
+            $cause = self::classer($resultat);
 
             $rejet = self::create([
                 'entreprise_id' => $entreprise?->id,
@@ -101,10 +183,16 @@ class FneRejet extends Model
                 'login'         => $entreprise?->ncc,
                 'message'       => $resultat['message'] ?? null,
                 'champs'        => self::champsRejetes($resultat),
+                'cause'         => $cause,
                 'statut'        => self::STATUT_OUVERT,
             ]);
 
-            if ($rejet->login) {
+            // Le relevé n'est ouvert que si la DGI a réellement examiné la
+            // pièce. Une coupure réseau ouvrait jusqu'ici une demande : le
+            // scraper partait sur le portail, relevait quatorze champs, et le
+            // rapprochement comparait ce qu'aucune DGI n'avait mis en cause.
+            // Une file qui se remplit d'alertes sans objet cesse d'être lue.
+            if ($cause === self::CAUSE_DGI && $rejet->login) {
                 PortailFneDemande::pour(
                     $rejet->login,
                     trim(sprintf(
