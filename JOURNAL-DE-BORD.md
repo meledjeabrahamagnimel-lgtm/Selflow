@@ -3030,6 +3030,48 @@ le dit et ne casse rien.
 
 ---
 
+### Lot 20 — Choisir la facture d'origine d'un avoir — **TERMINÉ**
+
+Signalé par le propriétaire, console du navigateur à l'appui :
+
+```
+GET /admin/ventes/facture-details/169  →  404 (Not Found — introuvable)
+SyntaxError: Unexpected token '<', "<!DOCTYPE "... is not valid JSON
+```
+
+Le second message découle du premier : le script lisait la réponse en JSON et
+recevait la page d'erreur en HTML. **Choisir une facture d'origine ne faisait
+rien** — aucun message à l'écran, la modale restait vide, et seule la console
+en disait quelque chose.
+
+La liste déroulante rendait `$f->id`, le numéro de ligne, quand les adresses
+de l'application portent l'`uuid` depuis le lot 8.3. Et si la requête avait
+abouti, l'envoi du formulaire aurait échoué au coup d'après : `parent_id` est
+validé `['required', 'uuid', …]`.
+
+**Pourquoi le défaut avait survécu.** Le même écran porte **deux** façons de
+choisir la pièce — une liste déroulante et un champ de recherche. Le champ de
+recherche avait été corrigé, et le commentaire de son contrôleur décrit
+exactement ce défaut ; la liste était restée au numéro de ligne. **Une moitié
+réparée cachait l'autre.**
+
+**Le même défaut existait sur l'avoir d'achat**, où personne ne l'avait
+rencontré. Corrigé aussi.
+
+C'est la troisième occurrence de la même famille — après la photo d'article,
+la fiche client et la fiche fournisseur au lot 16. L'épreuve
+`test_le_numero_de_ligne_ne_resout_aucune_facture` fixe la raison plutôt que
+le symptôme : ce n'est pas la route qu'il faut assouplir, c'est l'écran qui
+doit donner l'identifiant public.
+
+- `tests/Feature/AvoirChoixDeLaPieceTest.php` — 6 épreuves, **2 tombent** sans
+  le correctif (les 4 autres décrivent un comportement déjà juste, dont le
+  refus de traverser les entreprises)
+
+**1 040 épreuves, 1 040 vertes, 4 152 vérifications.**
+
+---
+
 ## 5 bis. La numérotation des comptes — tranché
 
 Le classeur subdivisait certaines racines sur des positions que l'acte uniforme
