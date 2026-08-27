@@ -4,6 +4,7 @@ namespace App\Modules\Admin\Controleurs;
 
 use App\Modules\Admin\Modeles\Entreprise;
 use App\Modules\Admin\Modeles\PointDeVente;
+use App\Modules\Admin\Modeles\Referentiel\Categorie;
 use App\Modules\Authentification\Modeles\Utilisateur;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -12,6 +13,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
+use Illuminate\Validation\Rule;
 use App\Modules\Admin\Services\TrousseauEntrepriseService;
 
 class SuperadminControleur
@@ -124,20 +126,54 @@ class SuperadminControleur
             'gerant_nom'              => ['nullable', 'string', 'max:100'],
             'gerant_prenom'           => ['nullable', 'string', 'max:150'],
             'gerant_fonction'         => ['nullable', 'string', 'max:150'],
-            'email'                   => ['nullable', 'email', 'max:150'],
+
+            // ── Le responsable, et son mot de passe ──
+            //
+            // Cet écran créait une entreprise **et personne pour s'y
+            // connecter** : aucun `Utilisateur` n'était enregistré, et le
+            // formulaire ne demandait pas même un mot de passe. Toute
+            // entreprise créée par le superadministrateur était donc
+            // inutilisable, sans que rien ne le signale — il fallait ensuite
+            // lui fabriquer un compte à la main.
+            'email'                   => ['required', 'email', 'max:150', 'unique:utilisateurs,email'],
+            'gerant_password'         => ['required', 'string', 'min:8', 'confirmed'],
+
             'telephone'               => ['nullable', 'string', 'max:30'],
             'adresse'                 => ['nullable', 'string', 'max:255'],
             'rccm'                    => ['nullable', 'string', 'max:100'],
             'ncc'                     => ['nullable', 'string', 'size:8', 'regex:/^[A-Z0-9]{7}[A-Z]$/'],
             'compte_contribuable'     => ['nullable', 'string', 'max:100'],
-            'regime_imposition'       => ['nullable', 'string', 'max:80'],
+            'centre_impots'           => ['nullable', 'string', 'max:100'],
+            // Le régime n'est pas une étiquette : `deduireCodeTva()` le compare
+            // aux régimes d'exonération légale pour choisir entre TVAC et TVAD.
+            // La règle acceptait ici n'importe quelle chaîne de 80 caractères,
+            // et l'écran proposait cinq intitulés que rien ne reconnaît.
+            'regime_imposition'       => ['nullable', 'string', Rule::in(Entreprise::regimesAcceptesPour())],
             'quota_points_de_vente'   => ['required', 'integer', 'min:1'],
             'plan_abonnement'         => ['required', 'string'],
-            'secteur_activite'        => ['required', 'array'],
-            'secteur_activite.*'      => ['required', 'string', 'in:Commercial,Industriel,Services,Agricole,Artisanat,BTP / Construction,Restauration / Hôtellerie,Santé,Transport / Logistique,Technologies / Numérique,Éducation / Formation,Autre'],
-            'modules_actifs'          => ['required', 'array'],
-            // Champs COMPTAFLOW conditionnels
-            'comptaflow_password'     => [$request->boolean('creer_compte_comptaflow') ? 'required' : 'nullable', 'string', 'min:8', 'confirmed'],
+
+            // Le domaine et la situation fiscale sont des étapes facultatives,
+            // ici comme à l'inscription : elles se complètent aussi bien une
+            // fois dans l'application. Voir EtapesCreation.
+            'secteur_activite'        => ['nullable', 'array'],
+            'secteur_activite.*'      => ['string', Rule::in(Categorie::domaines())],
+            'modules_actifs'          => ['nullable', 'array'],
+
+            // ── L'accès à l'espace FNE, si l'entreprise en a déjà un ──
+            'possede_compte_fne'      => ['nullable', 'in:0,1'],
+            'fne_ncc'                 => ['nullable', 'string', 'size:8', 'regex:/^[A-Z0-9]{7}[A-Z]$/'],
+            'fne_mot_de_passe'        => ['nullable', 'string', 'max:255'],
+
+            // Le mot de passe du compte Comptaflow etait demande ici : le
+            // superadministrateur choisissait celui d'un client, et il partait
+            // en clair dans le corps de la requete. Comptaflow envoie son
+            // propre lien d'activation au responsable.
+        ], [
+            'email.required'           => "L'adresse du responsable est obligatoire : c'est avec elle qu'il se connectera.",
+            'email.unique'             => 'Cette adresse est déjà utilisée par un autre compte.',
+            'gerant_password.required' => "Sans mot de passe, le responsable ne pourra pas entrer dans son espace.",
+            'gerant_password.min'      => 'Le mot de passe doit contenir au moins 8 caractères.',
+            'gerant_password.confirmed'=> 'La confirmation du mot de passe ne correspond pas.',
         ]);
 
         // Tous les modules sont activés par défaut — l'admin peut en désactiver dans les paramètres
@@ -158,11 +194,17 @@ class SuperadminControleur
             'rccm'                   => $request->rccm,
             'ncc'                    => $request->ncc,
             'compte_contribuable'    => $request->compte_contribuable,
+            'centre_impots'          => $request->centre_impots,
             'regime_imposition'      => $request->regime_imposition,
             'quota_points_de_vente'  => $request->quota_points_de_vente,
             'plan_abonnement'        => $request->plan_abonnement,
-            'secteur_activite'       => $request->secteur_activite,
+            'secteur_activite'       => $request->secteur_activite ?? [],
             'modules_actifs'         => $modules,
+            // Trois états : la question peut n'avoir pas encore été posée,
+            // l'étape étant facultative.
+            'possede_compte_fne'     => $request->filled('possede_compte_fne')
+                ? $request->input('possede_compte_fne') === '1'
+                : null,
         ]);
 
         // Sans plan comptable ni journal, la premiere vente s'impute sur des
@@ -171,64 +213,69 @@ class SuperadminControleur
         // l'archivera.
         TrousseauEntrepriseService::doter($entreprise);
 
-        // Création automatique du Siège comme point de vente par défaut
-        PointDeVente::create([
-            'entreprise_id' => $entreprise->id,
-            'nom'           => 'Siège',
-            'ville'         => $request->adresse ? explode(',', $request->adresse)[0] : 'Abidjan',
-            'commune'       => 'Plateau',
-            'responsable'   => 'Responsable Général',
-            'telephone'     => $request->telephone,
-            'statut'        => 'Ouvert',
+        // ── Le responsable, sans qui l'entreprise n'est atteignable par
+        //    personne ──
+        //
+        // Cet écran ne créait aucun compte : l'entreprise naissait sans
+        // administrateur, et il fallait ensuite lui en fabriquer un à la
+        // main. `doit_changer_password` est posé parce que le mot de passe
+        // vient d'un tiers — le superadministrateur — et non de son
+        // propriétaire : il doit être remplacé à la première connexion.
+        Utilisateur::create([
+            'entreprise_id'         => $entreprise->id,
+            'nom'                   => $request->gerant_nom ?: 'Responsable',
+            'prenom'                => $request->gerant_prenom ?: '',
+            'email'                 => $request->email,
+            'password'              => \Illuminate\Support\Facades\Hash::make($request->gerant_password),
+            'role'                  => 'admin',
+            'fonction'              => $request->gerant_fonction ?: 'Gérant',
+            'statut'                => 'actif',
+            'doit_changer_password' => true,
         ]);
 
+        // L'acces a l'espace FNE, si l'entreprise en a deja un : chiffre au
+        // repos, jamais rendu a l'ecran, efface une fois le parametrage releve.
+        \App\Modules\Admin\Services\AccesFneService::enregistrer(
+            $entreprise, $request->fne_ncc, $request->fne_mot_de_passe
+        );
+
+        // Un point de vente « Siège » se créait ici d'office, ville devinée en
+        // coupant l'adresse à la première virgule, commune « Plateau »,
+        // responsable « Responsable Général ». Trois informations inventées.
+        //
+        // **Le nom du point de vente est ce que la plateforme de la DGI
+        // reçoit**, et elle refuse la facture s'il ne correspond à aucun site
+        // déclaré sur l'espace FNE. Le créer d'office, c'est décider à la place
+        // de l'entreprise du nom sous lequel ses pièces seront certifiées — et
+        // celui-là, « Siège », a toutes les chances de ne pas être le sien.
+        //
+        // L'entreprise crée son premier point de vente elle-même ; tant qu'elle
+        // ne l'a pas fait, l'écran le lui réclame et la caisse reste fermée.
+
         // ── Liaison COMPTAFLOW (si case cochée) ──
+        //
+        // Ce bloc tirait `Str::random(40)` et déclarait cette valeur « clé de
+        // synchronisation » : Selflow inventait donc une clé que Comptaflow
+        // devait accepter sur parole. Et il demandait au superadministrateur
+        // de **choisir le mot de passe** du compte du client, qu'il envoyait
+        // en clair dans le corps de la requête.
+        //
+        // Le provisionnement est passé au service : Comptaflow ouvre le
+        // dossier, génère la clé, la renvoie, et envoie lui-même son lien
+        // d'activation au responsable.
         $messageSupplement = '';
-        if ($request->boolean('creer_compte_comptaflow') && $request->filled('comptaflow_password')) {
-            try {
-                $syncKey = Str::random(40);
-                $comptaflowUrl = config('selflow.comptaflow_api_url', 'http://127.0.0.1:8002');
+        if ($request->boolean('creer_compte_comptaflow')) {
+            $resultat = \App\Modules\Admin\Services\LiaisonComptaflowService::valider($entreprise);
 
-                $response = Http::timeout(15)->post($comptaflowUrl . '/api/external/register-enterprise', [
-                    'secret'         => config('selflow.comptaflow_api_secret'),
-                    'company_name'   => $entreprise->nom,
-                    'activity'       => implode(', ', $entreprise->secteur_activite ?? ['Commercial']),
-                    'juridique_form' => $entreprise->forme_juridique ?? 'SARL',
-                    'adresse'        => $entreprise->adresse,
-                    'city'           => $entreprise->adresse ? explode(',', $entreprise->adresse)[0] : 'Abidjan',
-                    'country'        => 'Côte d\'Ivoire',
-                    'phone_number'   => $entreprise->telephone,
-                    'email_adresse'  => $entreprise->email,
-                    'ncc'            => $entreprise->ncc,
-                    'rccm'           => $entreprise->rccm,
-                    'compte_contribuable' => $entreprise->compte_contribuable,
-                    'regime'         => $entreprise->regime_imposition,
-                    'admin_nom'      => $entreprise->gerant_nom,
-                    'admin_prenom'   => $entreprise->gerant_prenom,
-                    'admin_password' => $request->comptaflow_password,
-                    'selflow_company_id' => $entreprise->id,
-                    'selflow_sync_key'   => $syncKey,
-                ]);
-
-                if ($response->successful() && $response->json('success')) {
-                    $entreprise->update([
-                        'comptaflow_company_id' => $response->json('company_id'),
-                        'comptaflow_sync_key'   => $syncKey,
-                        'comptaflow_sync_status' => 'active',
-                        'comptaflow_last_sync_at' => now(),
-                    ]);
-                    $messageSupplement = ' Le compte COMPTAFLOW a été créé et lié avec succès.';
-                } else {
-                    $messageSupplement = ' ⚠️ Avertissement : L\'entreprise Selflow a été créée, mais la création du compte COMPTAFLOW a échoué (' . ($response->json('message') ?? 'Erreur inconnue') . ').';
-                    Log::warning('COMPTAFLOW register-enterprise failed', ['response' => $response->json()]);
-                }
-            } catch (\Exception $e) {
-                $messageSupplement = ' ⚠️ Avertissement : Impossible de contacter COMPTAFLOW (' . $e->getMessage() . ').';
-                Log::error('COMPTAFLOW register-enterprise exception', ['error' => $e->getMessage()]);
-            }
+            $messageSupplement = $resultat['success']
+                ? ' Le dossier Comptaflow a été ouvert et la liaison établie. ' . $resultat['message']
+                : ' ⚠️ L\'entreprise Selflow est créée, mais le dossier Comptaflow n\'a pas pu être ouvert : ' . $resultat['message'];
         }
 
-        return redirect()->route('superadmin.entreprises')->with('succes', 'Entreprise et son point de vente "Siège" créés avec succès.' . $messageSupplement);
+        return redirect()->route('superadmin.entreprises')->with('succes',
+            'Entreprise créée, avec son point de vente « Siège » et le compte de son responsable ('
+            . $entreprise->email . '). Il devra changer son mot de passe à la première connexion.'
+            . $messageSupplement);
     }
 
     /**
@@ -252,7 +299,7 @@ class SuperadminControleur
             'quota_points_de_vente'   => ['required', 'integer', 'min:1'],
             'plan_abonnement'         => ['required', 'string'],
             'secteur_activite'        => ['required', 'array'],
-            'secteur_activite.*'      => ['required', 'string', 'in:Commercial,Industriel,Services,Agricole,Artisanat,BTP / Construction,Restauration / Hôtellerie,Santé,Transport / Logistique,Technologies / Numérique,Éducation / Formation,Autre'],
+            'secteur_activite.*'      => ['required', 'string', Rule::in(Categorie::domaines())],
             'modules_actifs'          => ['required', 'array'],
         ]);
 
@@ -485,23 +532,42 @@ class SuperadminControleur
         ];
     }
 
-    /** Définition des 12 secteurs d'activité */
+    /**
+     * Les domaines d'activité, tels que le référentiel les nomme.
+     *
+     * L'écran « secteurs ↔ modules » range sa configuration **par nom de
+     * domaine**. Douze noms écrits en dur vivaient ici, qui n'étaient ceux
+     * d'aucune catégorie du référentiel : la configuration se classait donc
+     * sous des clés — « Commercial », « Agricole » — qu'aucune entreprise ne
+     * portait, et elle ne servait jamais.
+     *
+     * L'apparence reste locale : un domaine que la table ci-dessous ne connaît
+     * pas reçoit une pastille neutre plutôt que rien.
+     */
     public static function tousLesSecteurs(): array
     {
-        return [
-            'Commercial'         => ['icone' => 'fa-tag',           'couleur' => '#3b82f6'],
-            'Industriel'         => ['icone' => 'fa-industry',      'couleur' => '#6366f1'],
-            'Services'           => ['icone' => 'fa-handshake',     'couleur' => '#10b981'],
-            'Agricole'           => ['icone' => 'fa-seedling',      'couleur' => '#84cc16'],
-            'Artisanat'          => ['icone' => 'fa-hammer',        'couleur' => '#f59e0b'],
-            'BTP / Construction' => ['icone' => 'fa-helmet-safety', 'couleur' => '#f97316'],
-            'Restauration / Hôtellerie' => ['icone' => 'fa-utensils', 'couleur' => '#ef4444'],
-            'Santé'              => ['icone' => 'fa-stethoscope',   'couleur' => '#ec4899'],
-            'Transport / Logistique'    => ['icone' => 'fa-truck',  'couleur' => '#8b5cf6'],
-            'Technologies / Numérique'  => ['icone' => 'fa-microchip', 'couleur' => '#06b6d4'],
-            'Éducation / Formation'     => ['icone' => 'fa-graduation-cap', 'couleur' => '#0ea5e9'],
-            'Autre'              => ['icone' => 'fa-circle-dot',    'couleur' => '#94a3b8'],
+        $apparences = [
+            'Commerce'              => ['icone' => 'fa-tag',             'couleur' => '#3b82f6'],
+            'E-commerce'            => ['icone' => 'fa-cart-shopping',   'couleur' => '#6366f1'],
+            'Production'            => ['icone' => 'fa-industry',        'couleur' => '#8b5cf6'],
+            'Agriculture-Élevage'   => ['icone' => 'fa-seedling',        'couleur' => '#84cc16'],
+            'Services'              => ['icone' => 'fa-handshake',       'couleur' => '#10b981'],
+            'Restauration'          => ['icone' => 'fa-utensils',        'couleur' => '#ef4444'],
+            'BTP-Travaux'           => ['icone' => 'fa-helmet-safety',   'couleur' => '#f97316'],
+            'Location'              => ['icone' => 'fa-key',             'couleur' => '#f59e0b'],
+            'Éducation'             => ['icone' => 'fa-graduation-cap',  'couleur' => '#0ea5e9'],
+            'Professions libérales' => ['icone' => 'fa-briefcase',       'couleur' => '#14b8a6'],
+            'Santé'                 => ['icone' => 'fa-stethoscope',     'couleur' => '#ec4899'],
+            'ONG-Associations'      => ['icone' => 'fa-hand-holding-heart', 'couleur' => '#a855f7'],
         ];
+
+        $secteurs = [];
+        foreach (\App\Modules\Admin\Modeles\Referentiel\Categorie::domaines() as $nom) {
+            $secteurs[$nom] = $apparences[$nom]
+                ?? ['icone' => 'fa-circle-dot', 'couleur' => '#94a3b8'];
+        }
+
+        return $secteurs;
     }
 
     /** Chemin du fichier de config JSON */

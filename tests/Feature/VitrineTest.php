@@ -32,6 +32,15 @@ class VitrineTest extends TestCase
     {
         parent::setUp();
 
+        // La migration pose le contenu par défaut de la page d'accueil, pour
+        // qu'une installation déjà en service l'obtienne par `migrate` sans
+        // avoir à relancer `db:seed`. Ces épreuves, elles, décrivent une
+        // vitrine que l'on remplit soi-même : elles repartent d'une page nue,
+        // sans quoi leurs propres sections entreraient en collision avec
+        // celles du semeur.
+        VitrineCarte::query()->delete();
+        VitrineSection::query()->delete();
+
         $this->superadmin = Utilisateur::create([
             'nom' => 'Plateforme', 'prenom' => 'Super', 'email' => 'super-vitrine@selflow.ci',
             'password' => bcrypt('secret-de-test'), 'role' => 'superadmin', 'entreprise_id' => null,

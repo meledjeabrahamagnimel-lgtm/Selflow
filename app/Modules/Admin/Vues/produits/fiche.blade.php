@@ -38,7 +38,7 @@
         <div style="background:var(--bg3); position:relative; display:flex; align-items:center; justify-content:center;">
             <img id="img-produit-principal" src="{{ $produit->photo_url }}" alt="{{ $produit->nom }}"
                 style="width:100%; height:220px; object-fit:cover;"
-                onerror="this.src='{{ asset('images/placeholder-produit.png') }}'">
+                onerror="this.src='{{ $produit->illustration() }}'">
 
             {{-- Badge statut archivé --}}
             @if($produit->statut === 'archive')
@@ -50,7 +50,14 @@
             {{-- Bouton upload photo --}}
             <label style="position:absolute; bottom:10px; right:10px; background:rgba(0,0,0,.55); color:#fff; padding:6px 12px; border-radius:10px; font-size:11px; cursor:pointer; backdrop-filter:blur(4px);" title="Changer la photo">
                 <i class="fas fa-camera"></i> Photo
-                <input type="file" accept="image/*" style="display:none;" onchange="uploaderPhotoPrincipal(this, {{ $produit->id }})">
+                {{-- Le numéro de ligne partait dans l'adresse — `…/produits/156/photo` —
+                     alors que les adresses de l'application portent l'`uuid` : le
+                     lien de route ne résolvait aucun article et l'envoi tombait en
+                     404 (Not Found — introuvable), sans un mot à l'écran. On passe
+                     l'adresse construite par le routeur, qui ne peut pas se tromper
+                     de clé. --}}
+                <input type="file" accept="image/*" style="display:none;"
+                    onchange="uploaderPhotoPrincipal(this, @js(route('admin.produits.photo', $produit)))">
             </label>
         </div>
 
@@ -435,12 +442,12 @@
 
 <script>
 // ─── Upload photo principal ───────────────────────────────────────────────────
-function uploaderPhotoPrincipal(input, produitId) {
+function uploaderPhotoPrincipal(input, adressePhoto) {
     if (!input.files || !input.files[0]) return;
     const formData = new FormData();
     formData.append('photo', input.files[0]);
     formData.append('_token', document.querySelector('meta[name="csrf-token"]').content);
-    fetch('/admin/produits/' + produitId + '/photo', { method: 'POST', body: formData })
+    fetch(adressePhoto, { method: 'POST', body: formData })
         .then(r => r.json())
         .then(data => {
             if (data.success) {

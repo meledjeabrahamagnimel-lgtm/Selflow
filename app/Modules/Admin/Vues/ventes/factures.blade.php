@@ -658,8 +658,21 @@ function telechargerDirectement(url) {
                     <label style="font-weight: 700; font-size: 13px; display: block; margin-bottom: 6px; color: #334155;">Choisir la facture de doit d'origine *</label>
                     <select id="selectFactureAvoir" onchange="if(this.value) { selectionnerFacturePourAvoir(this.value); } else { masquerDetailsFactureAvoir(); }" class="form-control" style="width: 100%; padding: 10px; border: 1px solid #cbd5e1; border-radius: 8px; font-weight: 600; color: #0f172a; background: #fff;">
                         <option value="">-- Sélectionner une facture --</option>
+                        {{-- L'`uuid`, et non le numéro de ligne : c'est lui que
+                             portent les adresses de l'application. La liste
+                             déroulante rendait `$f->id`, le script le remettait
+                             dans `…/facture-details/169`, et la route — qui
+                             résout par `uuid` — répondait 404 (Not Found —
+                             introuvable). Le script lisait cette réponse en
+                             JSON et recevait la page d'erreur en HTML, d'où
+                             « Unexpected token '<' » : **choisir une facture
+                             d'origine ne faisait rien**, et la console seule le
+                             disait.
+
+                             Le champ de recherche voisin, lui, était déjà
+                             corrigé — c'est ce qui a laissé le défaut ici. --}}
                         @foreach($facturesDispo as $f)
-                            <option value="{{ $f->id }}">{{ $f->numero_facture }} - {{ $f->client?->nom ?? 'Client de passage' }} ({{ number_format($f->montant_ttc, 0, ',', ' ') }} F)</option>
+                            <option value="{{ $f->uuid }}">{{ $f->numero_facture }} - {{ $f->client?->nom ?? 'Client de passage' }} ({{ number_format($f->montant_ttc, 0, ',', ' ') }} F)</option>
                         @endforeach
                     </select>
                 </div>

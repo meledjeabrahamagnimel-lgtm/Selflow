@@ -32,7 +32,12 @@ class AchatControleur
     {
         $entreprise  = Auth::user()->entreprise;
         $fournisseurs = Fournisseur::obtenirFournisseursPrioritaires($entreprise->id);
-        $produits     = Produit::where('entreprise_id', $entreprise->id)->orderBy('nom')->get();
+        // Un article rangé ne se rachète pas : le formulaire d'achat le
+        // proposait encore, le filtre ne vivant que sur le catalogue.
+        $produits     = Produit::where('entreprise_id', $entreprise->id)
+            ->selectionnables()
+            ->orderBy('nom')
+            ->get();
         // Repli sur un point de vente EXISTANT plutot que sur un « Siege » cree
         // a la volee : un point de vente inconnu de la plateforme FNE fait
         // rejeter toute normalisation avec « Point of sale is invalid », et
@@ -215,8 +220,12 @@ class AchatControleur
                 'numero_rne'                 => $request->boolean('est_rne') ? trim($request->input('numero_rne')) : null,
             ]);
 
-            // Taxes sur le total TTC (champ `customTaxes` de la FNE)
-            self::enregistrerTaxesSurTtc($achat, $request->input('taxes_ttc', []), $montantTtc);
+            // `enregistrerTaxesSurTtc()` etait appelee ici. Elle ecrivait dans
+            // `achat_taxes`, que rien ne relisait : ni le payload du bordereau
+            // d'achat -- qui ne transmet aucune taxe, et dont la conformite est
+            // gelee --, ni la comptabilite, ni le document imprime. La taxe
+            // saisie gonflait le total a l'ecran sans entrer dans aucun montant
+            // enregistre. Table et bloc de saisie retires le 24/08/2026.
 
             foreach ($request->articles as $article) {
                 $produit = !empty($article['produit_id']) ? Produit::lockForUpdate()->find($article['produit_id']) : null;
@@ -475,7 +484,7 @@ class AchatControleur
     public function imprimer(Achat $achat): View
     {
         $this->autoriserAcces($achat);
-        $achat->load(['fournisseur', 'pointDeVente.entreprise', 'details.produit', 'details.taxes', 'taxesPersonnalisees']);
+        $achat->load(['fournisseur', 'pointDeVente.entreprise', 'details.produit']);
         $dejaPaye = \App\Modules\Admin\Modeles\TresorerieJournal::where('reference_document', $achat->numero_facture)->sum('montant_sortie');
         return view('admin::factures.achat', compact('achat', 'dejaPaye'));
     }
@@ -791,7 +800,11 @@ class AchatControleur
         $factures = $query->latest()->limit(10)->get()->map(function($f) {
             $fournNom = $f->fournisseur ? $f->fournisseur->nom : 'Fournisseur inconnu';
             return [
-                'id' => $f->id,
+                // L'identifiant public, celui que les adresses portent. Le
+                // numérique partait ici et revenait dans une adresse qui
+                // attend un uuid : 404 (Not Found — introuvable), puis une
+                // page HTML lue comme du JSON.
+                'id' => $f->uuid,
                 'text' => "{$f->numero_facture} - {$fournNom} (" . number_format($f->montant_ttc, 0, ',', ' ') . " XOF)"
             ];
         });
@@ -805,7 +818,7 @@ class AchatControleur
         $achat->load(['details.produit', 'fournisseur']);
 
         return response()->json([
-            'id' => $achat->id,
+            'id' => $achat->uuid,
             'numero_facture' => $achat->numero_facture,
             'fournisseur_nom' => $achat->fournisseur ? $achat->fournisseur->nom : 'Fournisseur inconnu',
             'montant_ttc' => $achat->montant_ttc,
@@ -828,12 +841,14 @@ class AchatControleur
     public function creerAvoirNouveau(Request $request): RedirectResponse
     {
         $request->validate([
-            'parent_id' => ['required', Appartenance::a('achats', 'id')],
+            // La pièce d'origine est désignée par son identifiant public,
+            // celui que l'écran a reçu. Le numérique n'est plus publié.
+            'parent_id' => ['required', 'uuid', Appartenance::a('achats', 'uuid')],
             'raison'    => ['required', 'string', 'max:255'],
             'items'     => ['required', 'array'],
         ]);
 
-        $parent = Achat::findOrFail($request->parent_id);
+        $parent = Achat::where('uuid', $request->parent_id)->firstOrFail();
         $this->autoriserAcces($parent);
         abort_if($parent->type_facture === 'avoir', 400, "Impossible de générer un avoir sur un avoir.");
 

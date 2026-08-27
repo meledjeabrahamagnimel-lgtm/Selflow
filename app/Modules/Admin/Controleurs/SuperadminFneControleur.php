@@ -43,6 +43,16 @@ class SuperadminFneControleur extends Controller
                     'statut_label' => $cred?->statutLabel() ?? 'Non connecté',
                     'cle_test_masquee'   => $cred ? FneCredential::masquer($cred->cle_test) : '—',
                     'cle_reelle_masquee' => $cred ? FneCredential::masquer($cred->cle_reelle) : '—',
+
+                    // Ce que l'entreprise a fourni de son côté. C'est tout ce
+                    // qu'on lui demande — la configuration, elle, se fait ici.
+                    // Sans ces deux colonnes, le superadministrateur devait
+                    // ouvrir les paramètres de chaque entreprise pour savoir
+                    // laquelle avait déjà un compte et à laquelle il manquait
+                    // de quoi en ouvrir un.
+                    'possede_compte_fne'      => $e->possede_compte_fne,
+                    'informations_manquantes' => $e->informationsFneManquantes(),
+                    'timbre_quittance'        => (bool) $e->timbre_quittance,
                 ];
             });
 
@@ -263,5 +273,38 @@ class SuperadminFneControleur extends Controller
         $cred->save();
 
         return back()->with('success', 'Notes mises à jour.');
+    }
+
+    /**
+     * Reporter l'option de timbre de quittance de l'espace FNE de l'entreprise.
+     *
+     * **Ce réglage vivait dans les paramètres de l'entreprise, sous une
+     * étiquette « informatif » qui promettait qu'il ne changeait aucun
+     * montant.** C'était faux. Il décide si le droit de timbre — barème de
+     * l'article 873 du CGI — est réclamé au client sur les règlements en
+     * espèces : il entre dans le net à payer imprimé sur la facture, dans le
+     * débit du compte client et dans la dette envers l'État. Coché à tort, il
+     * faisait payer au client un droit que la plateforme ne retenait pas.
+     *
+     * Il rejoint donc la configuration de la plateforme, qui appartient au
+     * superadministrateur — comme les clés. L'entreprise ne fournit que des
+     * informations ; c'est le superadministrateur qui les reporte, au moment
+     * où il configure la clé et où il a l'espace FNE sous les yeux.
+     *
+     * L'API ne communique pas ce réglage : il ne peut être que constaté.
+     */
+    public function basculerTimbre(Request $request, Entreprise $entreprise): RedirectResponse
+    {
+        $request->validate(['timbre_quittance' => ['required', 'in:0,1']]);
+
+        $actif = $request->input('timbre_quittance') === '1';
+
+        $entreprise->update(['timbre_quittance' => $actif]);
+
+        return back()->with('success', sprintf(
+            'Timbre de quittance %s pour %s.',
+            $actif ? 'activé' : 'désactivé',
+            $entreprise->nom
+        ));
     }
 }

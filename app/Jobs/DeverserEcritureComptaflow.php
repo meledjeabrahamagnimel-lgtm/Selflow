@@ -89,7 +89,11 @@ class DeverserEcritureComptaflow implements ShouldQueue
         ];
 
         try {
-            $response = Http::timeout(8)->post($comptaflowUrl . '/api/external/ecritures/deverser', [
+            // La clé du dossier dit à Comptaflow quelle entreprise appelle.
+            // Le secret partagé ne le dit pas : il est le même pour toutes.
+            $response = Http::timeout(8)->withHeaders(
+                \App\Modules\Admin\Services\LiaisonComptaflowService::enTete($entreprise)
+            )->post($comptaflowUrl . '/api/external/ecritures/deverser', [
                 'secret'             => $secret,
                 'selflow_company_id' => $entreprise->id,
                 'ecritures'          => [$ecritureData],

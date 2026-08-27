@@ -68,15 +68,6 @@
         .regime-info { display:none; position:absolute; top:100%; left:0; right:0; z-index:10; background:#1e293b; color:#e2e8f0; font-size:11px; line-height:1.5; padding:10px 12px; border-radius:8px; margin-top:4px; box-shadow:0 8px 24px rgba(0,0,0,.2); }
         select:focus + .regime-info { display:block; }
 
-        /* Secteurs d'activité */
-        .secteurs-grille { display:grid; grid-template-columns:repeat(2, 1fr); gap:8px; }
-        .secteur-case { display:flex; align-items:center; gap:8px; padding:9px 12px; border:1.5px solid #E5E7EB; border-radius:8px; cursor:pointer; transition:all .12s; user-select:none; }
-        .secteur-case:hover { border-color:#93c5fd; background:#eff6ff; }
-        .secteur-case input[type=checkbox] { width:15px; height:15px; accent-color:#002B5C; flex-shrink:0; }
-        .secteur-case span { font-size:12.5px; color:#374151; font-weight:500; }
-        .secteur-case input:checked ~ span { color:#002B5C; font-weight:600; }
-        .secteur-case:has(input:checked) { border-color:#002B5C; background:#eff6ff; }
-
         /* Force mot de passe */
         .force-mdp { margin-top:5px; }
         .force-barres { display:flex; gap:4px; margin-bottom:3px; }
@@ -88,6 +79,37 @@
         .conditions-rangee input[type=checkbox] { width:17px; height:17px; accent-color:#002B5C; flex-shrink:0; margin-top:2px; }
         .conditions-rangee span { font-size:12.5px; color:#6B7280; line-height:1.5; }
         .conditions-rangee a { color:#002B5C; font-weight:600; text-decoration:none; }
+
+        /* Le parcours en etapes.
+           `.etape` est deja pris par le panneau de gauche : les pas du
+           formulaire s'appellent `.pas`, sans quoi ils heriteraient d'un
+           `display:flex` qui mettrait les champs cote a cote. */
+        .pas[hidden] { display:none; }
+        .pas-tete { margin-bottom:16px; }
+        .pas-rang { font-size:10.5px; font-weight:700; text-transform:uppercase; letter-spacing:.6px; color:#9CA3AF; margin-bottom:6px; }
+        .pas-tete h2 { font-size:18px; font-weight:800; color:#111827; margin-bottom:4px; }
+        .pas-tete p { font-size:12.5px; color:#6B7280; line-height:1.6; }
+
+        .jauge { height:4px; background:#F3F4F6; border-radius:2px; margin:22px 0 16px; overflow:hidden; }
+        .jauge-barre { height:100%; background:#002B5C; border-radius:2px; width:25%; transition:width .25s ease; }
+
+        .navigation { display:flex; flex-direction:column; gap:10px; }
+        .navigation .btn-inscription { margin:0; }
+        .btn-secondaire { width:100%; padding:12px; border-radius:10px; background:#fff; color:#374151;
+            font-size:13.5px; font-weight:600; border:1.5px solid #E5E7EB; cursor:pointer;
+            font-family:inherit; display:flex; align-items:center; justify-content:center; gap:8px; transition:all .15s; }
+        .btn-secondaire:hover { border-color:#002B5C; color:#002B5C; }
+        .btn-secondaire[hidden], .btn-inscription[hidden], .btn-passer[hidden] { display:none; }
+        /* Il etait un lien souligne, gris clair, de douze pixels, sous le
+           bouton principal : personne ne le voyait. C'est pourtant la sortie
+           de l'inscription — les etapes qui suivent sont facultatives. */
+        .btn-passer { width:100%; padding:12px; border-radius:10px; cursor:pointer;
+            font-family:inherit; font-size:13.5px; font-weight:600;
+            color:#002B5C; background:#EFF6FF; border:1.5px solid #BFDBFE;
+            display:flex; align-items:center; justify-content:center; gap:8px;
+            transition:all .15s; }
+        .btn-passer:hover { background:#DBEAFE; border-color:#002B5C; }
+        .btn-passer small { display:block; font-weight:400; font-size:11px; color:#6B7280; }
 
         /* Boutons */
         .btn-inscription { width:100%; padding:13px; border-radius:10px; background:#002B5C; color:#fff; font-size:14px; font-weight:700; border:none; cursor:pointer; transition:all .15s; font-family:inherit; display:flex; align-items:center; justify-content:center; gap:8px; }
@@ -154,7 +176,22 @@
             <form method="POST" action="{{ route('inscription.traitement') }}" id="form-inscription" novalidate>
                 @csrf
 
-                {{-- ──── Section ENTREPRISE ──── --}}
+
+                {{-- ══ Étape 1 — L'entreprise ══
+
+                     Un seul champ. La forme juridique, l'adresse électronique
+                     et le téléphone vivaient ici : on demandait quatre choses
+                     pour créer une entreprise dont une seule est indispensable,
+                     et l'adresse électronique — qui est l'identifiant de
+                     connexion — était réclamée une étape avant qu'on sache qui
+                     se connecte. Elle a rejoint le responsable ; la forme
+                     juridique se renseigne depuis les paramètres. --}}
+                <section class="pas" data-pas="1">
+                    <div class="pas-tete">
+                        <div class="pas-rang">Étape 1 sur 3</div>
+                        <h2>L'entreprise</h2>
+                        <p>Son nom. C'est tout ce qu'il faut pour commencer.</p>
+                    </div>
                 <div class="section-label"><i class="ti ti-building"></i> Votre entreprise</div>
 
                 <div class="champ">
@@ -163,102 +200,22 @@
                         placeholder="Ex: SARL Mon Commerce CI"
                         value="{{ old('nom_entreprise') }}" required autofocus
                         class="{{ $errors->has('nom_entreprise') ? 'erreur' : '' }}">
+                    <small style="display:block;margin-top:6px;font-size:11.5px;color:#9CA3AF;line-height:1.55;">
+                        Le nom sous lequel vous facturez. Vous pourrez le corriger
+                        depuis vos paramètres.
+                    </small>
                 </div>
 
-                <div class="rangee-2">
-                    <div class="champ" style="margin-bottom:0">
-                        <label for="forme_juridique">Forme juridique</label>
-                        <select id="forme_juridique" name="forme_juridique">
-                            <option value="">— Choisir —</option>
-                            @foreach(['Entreprise individuelle','SARL','SA','SAS','SNC','GIE','Coopérative','Association'] as $fj)
-                                <option value="{{ $fj }}" {{ old('forme_juridique') == $fj ? 'selected' : '' }}>{{ $fj }}</option>
-                            @endforeach
-                        </select>
-                    </div>
-                    <div class="champ" style="margin-bottom:0">
-                        <label for="regime_imposition">Régime d'imposition <span class="req">*</span></label>
-                        <div class="regime-option-wrap">
-                            <select id="regime_imposition" name="regime_imposition" required
-                                class="{{ $errors->has('regime_imposition') ? 'erreur' : '' }}">
-                                <option value="">— Choisir —</option>
-                                <option value="TEE" {{ old('regime_imposition') == 'TEE' ? 'selected' : '' }}>TEE — Taxe de l'Entreprenant</option>
-                                <option value="RNE" {{ old('regime_imposition') == 'RNE' ? 'selected' : '' }}>RNE — Régime Normal de l'Entreprenant</option>
-                                <option value="RSI" {{ old('regime_imposition') == 'RSI' ? 'selected' : '' }}>RSI — Régime Simplifié d'Imposition</option>
-                                <option value="RNI" {{ old('regime_imposition') == 'RNI' ? 'selected' : '' }}>RNI — Régime Normal d'Imposition</option>
-                            </select>
-                            <div class="regime-info" id="regime-info-box">
-                                Sélectionnez votre régime pour voir sa définition.
-                            </div>
-                        </div>
-                    </div>
-                </div>
+                </section>
 
-                <div class="champ" style="margin-top:12px;">
-                    <label for="adresse">Adresse physique / Siège social</label>
-                    <input type="text" id="adresse" name="adresse"
-                        placeholder="Ex: Cocody Cité des Cadres, Abidjan"
-                        value="{{ old('adresse') }}">
-                </div>
 
-                <div class="rangee-2">
-                    <div class="champ" style="margin-bottom:0">
-                        <label for="rccm">N° RCCM <small>(ex: CI-ABJ-2021-B-12345)</small></label>
-                        <input type="text" id="rccm" name="rccm"
-                            placeholder="CI-ABJ-2021-B-12345"
-                            value="{{ old('rccm') }}">
+                {{-- ══ Étape 2 — Le responsable ══ --}}
+                <section class="pas" data-pas="2" hidden>
+                    <div class="pas-tete">
+                        <div class="pas-rang">Étape 2 sur 3</div>
+                        <h2>Le responsable et son accès</h2>
+                        <p>Qui administrera l'espace, avec quelle adresse et quel mot de passe.</p>
                     </div>
-                    <div class="champ" style="margin-bottom:0">
-                        <label for="compte_contribuable">N° CC / NCC <small>(Compte Contribuable)</small></label>
-                        <input type="text" id="compte_contribuable" name="compte_contribuable"
-                            placeholder="Ex: 1864699 A"
-                            value="{{ old('compte_contribuable') }}">
-                    </div>
-                </div>
-
-                <div class="rangee-2" style="margin-top:12px;">
-                    <div class="champ" style="margin-bottom:0">
-                        <label for="email">Email professionnel <span class="req">*</span></label>
-                        <input type="email" id="email" name="email"
-                            placeholder="vous@entreprise.com"
-                            value="{{ old('email') }}" required autocomplete="email"
-                            class="{{ $errors->has('email') ? 'erreur' : '' }}">
-                    </div>
-                    <div class="champ" style="margin-bottom:0">
-                        <label for="telephone">Téléphone</label>
-                        <input type="tel" id="telephone" name="telephone"
-                            placeholder="+225 07 00 00 00"
-                            value="{{ old('telephone') }}">
-                    </div>
-                </div>
-
-                {{-- Secteurs d'activité --}}
-                <div class="section-label" style="margin-top:16px;"><i class="ti ti-category"></i> Secteurs d'activité <small style="font-size:10px;font-weight:400;text-transform:none;letter-spacing:0;margin-left:4px;">(cochez tous ceux qui s'appliquent)</small></div>
-                <div class="secteurs-grille">
-                    @php
-                        $secteurs = [
-                            'Commercial'     => 'ti-shopping-cart',
-                            'Industriel'     => 'ti-building-factory-2',
-                            'Services'       => 'ti-briefcase',
-                            'Agro-industrie' => 'ti-plant',
-                            'Technologie'    => 'ti-cpu',
-                            'Finance'        => 'ti-coin',
-                            'BTP'            => 'ti-crane',
-                            'Santé'          => 'ti-heart-plus',
-                            'Éducation'      => 'ti-school',
-                            'Transport'      => 'ti-truck',
-                        ];
-                        $oldSecteurs = old('secteurs_activite', []);
-                    @endphp
-                    @foreach($secteurs as $nom => $icone)
-                        <label class="secteur-case">
-                            <input type="checkbox" name="secteurs_activite[]" value="{{ $nom }}"
-                                {{ in_array($nom, $oldSecteurs) ? 'checked' : '' }}>
-                            <i class="ti {{ $icone }}" style="font-size:14px;color:#002B5C;flex-shrink:0;"></i>
-                            <span>{{ $nom }}</span>
-                        </label>
-                    @endforeach
-                </div>
-
                 {{-- ──── Section IDENTITÉ ──── --}}
                 <div class="section-label" style="margin-top:18px;"><i class="ti ti-user"></i> Votre identité (Gérant / Admin)</div>
 
@@ -279,22 +236,37 @@
                     </div>
                 </div>
 
+                <div class="champ" style="margin-top:12px;">
+                    <label for="fonction_gerant">Fonction / Titre</label>
+                    <input type="text" id="fonction_gerant" name="fonction_gerant"
+                        placeholder="Ex: Gérant, DG, PDG, Directeur"
+                        value="{{ old('fonction_gerant') }}">
+                </div>
+
+                {{-- L'adresse et le téléphone étaient demandés à l'étape
+                     précédente, sous le nom de l'entreprise. Or l'adresse est
+                     l'identifiant de connexion : elle appartient à qui ouvre
+                     l'accès. Un second numéro, « Téléphone personnel », vivait
+                     ici : il était validé et **jamais enregistré**, ni sur
+                     l'entreprise ni sur l'utilisateur. Il est retiré plutôt que
+                     branché — un seul numéro suffit à joindre le responsable. --}}
                 <div class="rangee-2" style="margin-top:12px;">
                     <div class="champ" style="margin-bottom:0">
-                        <label for="fonction_gerant">Fonction / Titre</label>
-                        <input type="text" id="fonction_gerant" name="fonction_gerant"
-                            placeholder="Ex: Gérant, DG, PDG, Directeur"
-                            value="{{ old('fonction_gerant') }}">
+                        <label for="email">Email professionnel <span class="req">*</span>
+                            <small>c'est votre identifiant de connexion</small></label>
+                        <input type="email" id="email" name="email"
+                            placeholder="vous@entreprise.com"
+                            value="{{ old('email') }}" required autocomplete="email"
+                            class="{{ $errors->has('email') ? 'erreur' : '' }}">
                     </div>
                     <div class="champ" style="margin-bottom:0">
-                        <label for="telephone_gerant">Téléphone personnel</label>
-                        <input type="tel" id="telephone_gerant" name="telephone_gerant"
+                        <label for="telephone">Téléphone</label>
+                        <input type="tel" id="telephone" name="telephone"
                             placeholder="+225 07 00 00 00"
-                            value="{{ old('telephone_gerant') }}">
+                            value="{{ old('telephone') }}">
                     </div>
                 </div>
 
-                {{-- ──── Section SÉCURITÉ ──── --}}
                 <div class="section-label" style="margin-top:18px;"><i class="ti ti-lock"></i> Sécurité du compte</div>
 
                 <div class="champ">
@@ -334,12 +306,74 @@
                     <span>J'accepte les <a href="{{ route('contact.info') }}#conditions" target="_blank">Conditions d'utilisation</a> et la <a href="{{ route('contact.info') }}#politique" target="_blank">Politique de confidentialité</a> de Selflow.</span>
                 </label>
 
-                <button type="submit" class="btn-inscription" id="btn-soumettre">
-                    <i class="ti ti-user-plus"></i>
-                    Créer mon compte gratuitement
-                </button>
+                </section>
+
+
+                {{-- ══ Étape 3 — La facture normalisée ══ --}}
+                <section class="pas" data-pas="3" hidden>
+                    <div class="pas-tete">
+                        <div class="pas-rang">Étape 3 sur 3 · facultative</div>
+                        <h2>La facture normalisée</h2>
+                        <p>Avez-vous déjà un compte auprès de la DGI ? Vous pourrez y revenir plus tard.</p>
+                    </div>
+                    @include('admin::partiels.compte-fne', ['prefixeId' => 'insc'])
+                </section>
+
+
+                {{-- L'étape 4 posait le domaine d'activité par une grille de
+                     cases à cocher. C'était l'ancien mécanisme, retiré des
+                     paramètres au lot 13 : le domaine se choisit désormais à la
+                     première étape du parcours de configuration, avec les
+                     métiers qui en découlent, leurs rayons et leurs articles.
+                     Le garder ici faisait poser la même question par deux
+                     écrans qui ne se parlaient pas — on pouvait déclarer
+                     « Santé » à l'inscription et souscrire « Boulangerie »
+                     ensuite, sans que rien ne le signale.
+
+                     Le parcours s'ouvre de lui-même à la première visite. --}}
+
+                {{-- La barre de progression et les deux boutons.
+
+                     Le formulaire faisait vingt champs d'un seul tenant : on
+                     le remplit mal, ou pas. Il se parcourt maintenant étape
+                     par étape, et **les deux dernières sont facultatives** —
+                     l'entreprise a besoin d'un nom et d'un responsable qui
+                     puisse se connecter, le reste se complète aussi bien une
+                     fois dans l'application. --}}
+                <div class="jauge"><div class="jauge-barre" id="jauge-barre"></div></div>
+
+                <div class="navigation">
+                    <button type="button" class="btn-secondaire" id="btn-precedent" hidden>
+                        <i class="ti ti-arrow-left"></i> Retour
+                    </button>
+
+                    <button type="button" class="btn-inscription" id="btn-suivant">
+                        Suivant <i class="ti ti-arrow-right"></i>
+                    </button>
+
+                    <button type="submit" class="btn-inscription" id="btn-soumettre" hidden>
+                        <i class="ti ti-check"></i> Créer mon compte
+                    </button>
+
+                    <button type="submit" class="btn-passer" id="btn-passer" hidden
+                            title="Les étapes restantes se complètent depuis vos paramètres">
+                        <i class="ti ti-player-skip-forward"></i>
+                        Terminer sans remplir la suite
+                    </button>
+                    <p id="note-passer" hidden
+                       style="text-align:center;font-size:11.5px;color:#9CA3AF;line-height:1.55;margin-top:-2px;">
+                        Votre espace est créé tout de suite. La facture normalisée
+                        se règle ensuite depuis vos paramètres.
+                    </p>
+                </div>
+
             </form>
 
+            {{-- S'inscrire par Google remplace le formulaire ; passé le
+                 responsable, il n'y a plus rien à remplacer — proposer la
+                 bascule ferait perdre ce qui vient d'être saisi. Le bloc ne
+                 vaut donc que pour les deux premières étapes. --}}
+            <div id="bloc-google">
             <div class="separateur">ou</div>
 
             <a href="{{ route('auth.google') }}" class="btn-google" id="btn-google-inscription">
@@ -351,6 +385,7 @@
                 </svg>
                 S'inscrire avec Google
             </a>
+            </div>
 
             <div class="lien-connexion">
                 Déjà un compte ?
@@ -363,19 +398,118 @@
 </div>
 
 <script>
-// ── Régimes ivoiriens — définitions ──
-const regimesDefs = {
-    TEE: "Taxe de l'Entreprenant (TEE) : pour les auto-entrepreneurs et très petites entreprises. CA annuel < 50 millions FCFA. Taux fixe annuel. Pas d'obligation TVA.",
-    RNE: "Régime Normal de l'Entreprenant (RNE) : pour les PME. CA entre 50M et 200M FCFA. Impôt sur le bénéfice. Comptabilité simplifiée.",
-    RSI: "Régime Simplifié d'Imposition (RSI) : pour les entreprises moyennes. CA entre 200M et 500M FCFA. TVA sur option. Comptabilité standard.",
-    RNI: "Régime Normal d'Imposition (RNI) : pour les grandes entreprises. CA > 500M FCFA. TVA obligatoire (18%). Comptabilité complète SYSCOHADA.",
-};
+// ══════════════════════════════════════════════════════════════════
+// Le parcours en étapes
+// ══════════════════════════════════════════════════════════════════
+//
+// Le formulaire faisait vingt champs d'un seul tenant. On le parcourt
+// maintenant pas à pas, et **les deux dernières étapes sont facultatives** :
+// l'entreprise a besoin d'un nom et d'un responsable qui puisse se connecter,
+// le reste se complète aussi bien depuis les paramètres.
+//
+// La navigation est côté navigateur, et le formulaire part en une seule fois :
+// les champs des étapes non visitées voyagent vides, ce qui est exactement ce
+// qu'on veut dire — « pas encore renseigné ».
+(function () {
+    var form      = document.getElementById('form-inscription');
+    var pas       = Array.prototype.slice.call(form.querySelectorAll('[data-pas]'));
+    var barre     = document.getElementById('jauge-barre');
+    var precedent = document.getElementById('btn-precedent');
+    var suivant   = document.getElementById('btn-suivant');
+    var soumettre = document.getElementById('btn-soumettre');
+    var passer    = document.getElementById('btn-passer');
+    var notePasser = document.getElementById('note-passer');
+    var google    = document.getElementById('bloc-google');
 
-document.getElementById('regime_imposition').addEventListener('change', function() {
-    const box = document.getElementById('regime-info-box');
-    box.textContent = regimesDefs[this.value] || 'Sélectionnez votre régime pour voir sa définition.';
-    box.style.display = this.value ? 'block' : 'none';
-});
+    // Au-delà, s'inscrire par Google effacerait ce qui vient d'être saisi.
+    var DERNIERE_AVEC_GOOGLE = 2;
+
+    // Les deux premières étapes ne se sautent pas.
+    var DERNIERE_OBLIGATOIRE = 2;
+
+    var courant = 1;
+
+    function afficher(n) {
+        courant = n;
+
+        pas.forEach(function (section) {
+            section.hidden = Number(section.dataset.pas) !== n;
+        });
+
+        precedent.hidden = n === 1;
+        suivant.hidden   = n === pas.length;
+        soumettre.hidden = n !== pas.length;
+
+        // On ne propose de terminer sans la suite qu'une fois le nécessaire
+        // fourni : plus tôt, le bouton créerait un compte inutilisable.
+        passer.hidden = n < DERNIERE_OBLIGATOIRE || n === pas.length;
+        if (notePasser) notePasser.hidden = passer.hidden;
+
+        if (google) google.hidden = n > DERNIERE_AVEC_GOOGLE;
+
+        barre.style.width = Math.round((n / pas.length) * 100) + '%';
+
+        var premier = pas[n - 1].querySelector('input:not([type=hidden]):not([type=radio]), select');
+        if (premier) premier.focus({ preventScroll: true });
+
+        form.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+
+    /**
+     * Les champs obligatoires de l'étape courante, et rien d'autre.
+     *
+     * `checkValidity()` sur le formulaire entier signalerait des champs
+     * invisibles, que le navigateur refuse de pointer : l'utilisateur verrait
+     * le formulaire refuser de continuer sans savoir pourquoi.
+     */
+    function etapeValide() {
+        var champs = pas[courant - 1].querySelectorAll('[required]');
+
+        for (var i = 0; i < champs.length; i++) {
+            if (!champs[i].checkValidity()) {
+                champs[i].reportValidity();
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    suivant.addEventListener('click', function () {
+        if (etapeValide()) afficher(courant + 1);
+    });
+
+    precedent.addEventListener('click', function () {
+        afficher(courant - 1);
+    });
+
+    // Entrée valide l'étape plutôt que le formulaire : sans cela, une saisie
+    // au clavier créerait le compte depuis l'étape 1, en sautant le
+    // responsable — donc sans personne pour se connecter.
+    form.addEventListener('keydown', function (evenement) {
+        if (evenement.key === 'Enter' && evenement.target.tagName !== 'TEXTAREA'
+            && courant < pas.length) {
+            evenement.preventDefault();
+            suivant.click();
+        }
+    });
+
+    // Une erreur renvoyée par le serveur ramène sur la première étape qui la
+    // porte : sinon le message s'afficherait dans une section masquée.
+    var premiereErreur = form.querySelector('.erreur, [class*="erreur"]');
+    if (premiereErreur) {
+        var section = premiereErreur.closest('[data-pas]');
+        afficher(section ? Number(section.dataset.pas) : 1);
+    } else {
+        afficher(1);
+    }
+})();
+
+// ── Régimes ivoiriens — définitions ──
+// Les définitions des régimes vivaient ici, pour quatre régimes sur six, et
+// l'écran du superadministrateur n'en affichait aucune. Elles sont désormais
+// sur le modèle, lues par `admin::partiels.compte-fne` — là où le régime est
+// demandé.
 
 // ── Afficher/masquer mot de passe ──
 document.getElementById('toggle-password').addEventListener('click', function() {

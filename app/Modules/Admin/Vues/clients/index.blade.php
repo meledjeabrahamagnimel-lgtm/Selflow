@@ -125,7 +125,11 @@
                         <td style="color:var(--text-3);">{{ $c->created_at->format('d/m/Y') }}</td>
                         <td style="display:flex; gap:6px; flex-wrap:wrap;">
                             <button class="btn btn-outline btn-sm btn-modifier-client"
-                                data-id="{{ $c->id }}"
+                                {{-- L'adresse de la fiche, construite par le routeur : le numéro de
+     ligne partait seul — `POST /admin/clients/52` — alors que les
+     adresses portent l'`uuid`, et l'enregistrement tombait en 404
+     (Not Found — introuvable). --}}
+                                data-action="{{ route('admin.clients.modifier', $c) }}"
                                 data-nom="{{ $c->nom }}"
                                 data-type="{{ $c->type_facturation }}"
                                 data-telephone="{{ $c->telephone }}"
@@ -254,7 +258,11 @@
                             <td style="color:var(--text-3);">{{ $c->created_at->format('d/m/Y') }}</td>
                             <td>
                                 <button class="btn btn-outline btn-sm btn-modifier-client"
-                                    data-id="{{ $c->id }}"
+                                    {{-- L'adresse de la fiche, construite par le routeur : le numéro de
+     ligne partait seul — `POST /admin/clients/52` — alors que les
+     adresses portent l'`uuid`, et l'enregistrement tombait en 404
+     (Not Found — introuvable). --}}
+                                data-action="{{ route('admin.clients.modifier', $c) }}"
                                     data-nom="{{ $c->nom }}"
                                     data-telephone="{{ $c->telephone }}"
                                     data-email="{{ $c->email }}"
@@ -320,6 +328,15 @@
                         <i class="fas fa-file-invoice" style="margin-right:6px;"></i>Informations fiscales &amp; comptables
                     </div>
                     <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+                        {{-- NCC, RCCM et régime d'imposition sont les
+                             identifiants d'une **entreprise**. Un particulier
+                             n'en a aucun, et on les lui demandait quand même :
+                             trois champs qu'il ne pouvait que laisser vides, sur
+                             la fiche la plus fréquemment ouverte de la caisse.
+                             `display:contents` les retire sans casser la grille
+                             — le compte comptable, lui, reste : il vaut pour
+                             tout le monde. --}}
+                        <div id="new_bloc_fiscal" style="display:contents;">
                         <div class="form-group" style="margin-bottom:0;" id="new_ncc_group">
                             <label class="form-label" id="new_ncc_label">NCC (Nº Compte Contribuable)</label>
                             <input type="text" name="ncc" id="new_ncc_input" class="form-control" placeholder="Ex: 2302178R">
@@ -338,6 +355,7 @@
                                 <option value="RNI">RNI (Régime Normal d'Imposition)</option>
                                 <option value="Exonéré">Exonéré</option>
                             </select>
+                        </div>
                         </div>
                         <div class="form-group" style="margin-bottom:0;">
                             <label class="form-label">Compte comptable général collective</label>
@@ -415,6 +433,9 @@
                         <i class="fas fa-file-invoice" style="margin-right:6px;"></i>Informations fiscales &amp; comptables
                     </div>
                     <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+                        {{-- Comme au formulaire de création : un particulier n'a
+                             ni NCC, ni RCCM, ni régime d'imposition. --}}
+                        <div id="edit_bloc_fiscal" style="display:contents;">
                         <div class="form-group" style="margin-bottom:0;" id="edit_ncc_group">
                             <label class="form-label" id="edit_ncc_label">NCC (Nº Compte Contribuable)</label>
                             <input type="text" name="ncc" id="edit_ncc" class="form-control" placeholder="Ex: 2302178R">
@@ -433,6 +454,7 @@
                                 <option value="RNI">RNI (Régime Normal d'Imposition)</option>
                                 <option value="Exonéré">Exonéré</option>
                             </select>
+                        </div>
                         </div>
                         <div class="form-group" style="margin-bottom:0;">
                             <label class="form-label">Compte comptable général collective</label>
@@ -498,27 +520,62 @@ function switchVue(mode) {
     }
 }
 
-// ── NCC show/hide selon type de facturation ──
+// ── Les identifiants fiscaux suivent le type de facturation ──
+//
+// Ils étaient seulement grisés à 45 % d'opacité pour un particulier : trois
+// champs lisibles, cliquables, saisissables — et vides à jamais, puisqu'un
+// particulier n'a ni NCC, ni RCCM, ni régime d'imposition. Sur la fiche la
+// plus souvent ouverte de la caisse, c'était trois lignes de bruit à chaque
+// nouveau client.
+//
+// Ils disparaissent pour un B2C, et reviennent pour tous les autres — B2B,
+// B2G, B2F désignent tous une personne morale.
 function toggleNccClient(prefix) {
     const select   = document.getElementById(prefix + '_type_facturation') || document.getElementById('edit_type_facturation') || document.getElementById('new_type_facturation');
-    const nccGroup = document.getElementById(prefix === 'new' ? 'new_ncc_group' : 'edit_ncc_group');
+    const bloc     = document.getElementById(prefix === 'new' ? 'new_bloc_fiscal' : 'edit_bloc_fiscal');
     const nccLabel = document.getElementById(prefix === 'new' ? 'new_ncc_label' : 'edit_ncc_label');
     const nccInput = document.getElementById(prefix === 'new' ? 'new_ncc_input' : 'edit_ncc');
-    if (!select || !nccGroup) return;
-    const isB2B = select.value === 'B2B';
-    nccGroup.style.opacity = isB2B ? '1' : '0.45';
+    const nccGroup = document.getElementById(prefix === 'new' ? 'new_ncc_group' : 'edit_ncc_group');
+    if (!select) return;
+
+    const estB2C = select.value === 'B2C';
+    const estB2B = select.value === 'B2B';
+
+    if (bloc) bloc.style.display = estB2C ? 'none' : 'contents';
+
+    // Ce qui n'est pas demandé n'est pas envoyé : un NCC saisi puis le type
+    // basculé sur B2C partirait sinon avec le formulaire, et la pièce
+    // suivante serait établie en B2B chez la DGI.
+    if (estB2C) {
+        ['ncc', 'rccm'].forEach(function (nom) {
+            const champ = (bloc || document).querySelector('[name="' + nom + '"]');
+            if (champ) champ.value = '';
+        });
+        const regime = (bloc || document).querySelector('[name="regime_imposition"]');
+        if (regime) regime.value = '';
+    }
+
+    if (nccGroup) nccGroup.style.opacity = '1';
     if (nccLabel) {
-        nccLabel.innerHTML = isB2B
+        nccLabel.innerHTML = estB2B
             ? 'NCC (Nº Compte Contribuable) <span style="color:#E53E3E">*</span>'
             : 'NCC (Nº Compte Contribuable)';
     }
     if (nccInput) {
-        nccInput.required = isB2B;
-        if (!isB2B) nccInput.value = '';
-        nccInput.placeholder = isB2B ? 'Obligatoire pour B2B — Ex: 2302178R' : 'Ex: 2302178R (facultatif)';
-        nccInput.style.border = isB2B ? '1.5px solid #E53E3E' : '';
+        // `required` sur un champ caché bloque l'envoi sans rien afficher : le
+        // navigateur refuse de pointer un champ qu'il ne peut pas montrer.
+        nccInput.required = estB2B && !estB2C;
+        nccInput.placeholder = estB2B ? 'Obligatoire pour B2B — Ex: 2302178R' : 'Ex: 2302178R (facultatif)';
+        nccInput.style.border = estB2B ? '1.5px solid #E53E3E' : '';
     }
 }
+
+// Au chargement : le formulaire de création ouvre sans type choisi, et les
+// trois champs fiscaux s'affichaient alors comme si l'on facturait une
+// entreprise.
+document.addEventListener('DOMContentLoaded', function () {
+    if (document.getElementById('new_type_facturation')) toggleNccClient('new');
+});
 
 // Boutons Modifier via data-* attributes (pas de json_encode dans onclick)
 document.querySelectorAll('.btn-modifier-client').forEach(function(btn) {
@@ -530,7 +587,7 @@ document.querySelectorAll('.btn-modifier-client').forEach(function(btn) {
         if (!modal || !form) return;
 
         // URL d'action du formulaire
-        form.action = '/admin/clients/' + data.id;
+        form.action = data.action;
 
         // Remplir les champs
         document.getElementById('edit_nom').value             = data.nom     || '';

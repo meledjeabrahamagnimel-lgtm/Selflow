@@ -15,6 +15,7 @@ use App\Modules\Admin\Modeles\CodeJournal;
 use App\Modules\Admin\Modeles\BonLivraison;
 use App\Modules\Admin\Modeles\B2bNegotiation;
 use App\Modules\Admin\Modeles\Entreprise;
+use App\Modules\Admin\Modeles\PointDeVente;
 use App\Modules\Admin\Traits\GereLesChampsFne;
 use App\Modules\Admin\Traits\JournaliseActions;
 use Illuminate\Http\RedirectResponse;
@@ -36,19 +37,22 @@ class VenteControleur
         $entreprise = Auth::user()->entreprise;
         $pointDeVenteId = Auth::user()->estCaissier()
             ? Auth::user()->point_de_vente_id
-            : (session('point_de_vente_actif_id') 
-                ?? Auth::user()->point_de_vente_id 
-                ?? (\App\Modules\Admin\Modeles\PointDeVente::firstOrCreate([
-                    'entreprise_id' => $entreprise->id,
-                    'nom'           => 'Siège',
-                ], [
-                    'ville'         => 'Abidjan',
-                    'commune'       => 'Cocody',
-                    'responsable'   => 'Superviseur',
-                    'statut'        => 'Ouvert',
-                ]))->id);
+            // La caisse creait un point de vente « Siege » a Abidjan, commune
+            // Cocody, responsable « Superviseur », des qu'aucun n'etait actif.
+            // Trois informations inventees — et le nom du point de vente est ce
+            // que la plateforme de la DGI recoit : elle refuse la piece s'il ne
+            // correspond a aucun site declare sur l'espace FNE. On ouvrait donc
+            // en silence un magasin qui n'existe nulle part, et la premiere
+            // facture partait a son nom.
+            : (session('point_de_vente_actif_id')
+                ?? Auth::user()->pointDeVenteDOuverture()
+                ?? PointDeVente::where('entreprise_id', $entreprise->id)->orderBy('nom')->value('id'));
         $clients        = Client::obtenirClientsPrioritaires($entreprise->id);
+        // Archiver un article, c'est dire qu'on ne le vend plus. La caisse le
+        // proposait quand même : le filtre ne vivait que sur l'écran du
+        // catalogue.
         $produits       = Produit::where('entreprise_id', $entreprise->id)
+            ->selectionnables()
             ->with('taxes')
             ->orderBy('nom')
             ->get();
@@ -64,17 +68,16 @@ class VenteControleur
         $entreprise = Auth::user()->entreprise;
         $pointDeVenteId = Auth::user()->estCaissier()
             ? Auth::user()->point_de_vente_id
-            : (session('point_de_vente_actif_id') 
-                ?? Auth::user()->point_de_vente_id 
-                ?? (\App\Modules\Admin\Modeles\PointDeVente::firstOrCreate([
-                    'entreprise_id' => $entreprise->id,
-                    'nom'           => 'Siège',
-                ], [
-                    'ville'         => 'Abidjan',
-                    'commune'       => 'Cocody',
-                    'responsable'   => 'Superviseur',
-                    'statut'        => 'Ouvert',
-                ]))->id);
+            // La caisse creait un point de vente « Siege » a Abidjan, commune
+            // Cocody, responsable « Superviseur », des qu'aucun n'etait actif.
+            // Trois informations inventees — et le nom du point de vente est ce
+            // que la plateforme de la DGI recoit : elle refuse la piece s'il ne
+            // correspond a aucun site declare sur l'espace FNE. On ouvrait donc
+            // en silence un magasin qui n'existe nulle part, et la premiere
+            // facture partait a son nom.
+            : (session('point_de_vente_actif_id')
+                ?? Auth::user()->pointDeVenteDOuverture()
+                ?? PointDeVente::where('entreprise_id', $entreprise->id)->orderBy('nom')->value('id'));
 
         $request->validate(array_merge([
             'client_id'      => ['nullable', 'integer', Appartenance::a('clients', 'id')],
@@ -639,12 +642,21 @@ class VenteControleur
 
         $entreprise = Auth::user()->entreprise;
         $clients    = Client::obtenirClientsPrioritaires($entreprise->id);
-        $produits   = Produit::where('entreprise_id', $entreprise->id)->orderBy('nom')->get();
-        $categories = $produits->pluck('categorie')->unique()->sort()->values();
-        $banques    = CodeJournal::where('type', 'Banque')->where('entreprise_id', $entreprise->id)->orderBy('intitule')->get();
-
         // Load details with products
         $vente->load(['details.produit', 'client']);
+
+        // Le catalogue n'offre plus que ce qui se vend encore — mais un devis
+        // établi avant l'archivage porte peut-être un article rangé depuis. Le
+        // taire ici retirerait la ligne du formulaire, donc de la pièce, à la
+        // première modification. Les articles déjà portés restent proposés.
+        $dejaPortes = $vente->details->pluck('produit_id')->filter()->all();
+
+        $produits   = Produit::where('entreprise_id', $entreprise->id)
+            ->where(fn ($q) => $q->selectionnables()->orWhereIn('id', $dejaPortes))
+            ->orderBy('nom')
+            ->get();
+        $categories = $produits->pluck('categorie')->unique()->sort()->values();
+        $banques    = CodeJournal::where('type', 'Banque')->where('entreprise_id', $entreprise->id)->orderBy('intitule')->get();
 
         return view('admin::ventes.modifier', compact('vente', 'clients', 'produits', 'categories', 'banques'));
     }
@@ -1589,7 +1601,13 @@ class VenteControleur
         $factures = $query->latest()->limit(10)->get()->map(function($f) {
             $clientNom = $f->client ? $f->client->nom : 'Client de passage';
             return [
-                'id' => $f->id,
+                // L'identifiant public, celui que les adresses portent depuis
+                // que les URL ne montrent plus les identifiants de base. Le
+                // numérique était renvoyé ici, et l'écran le remettait ensuite
+                // dans une adresse qui attend un uuid : la requête tombait sur
+                // un 404 (Not Found — introuvable), et le script, qui lisait la
+                // réponse en JSON, recevait la page d'erreur en HTML.
+                'id'   => $f->uuid,
                 'text' => "{$f->numero_facture} - {$clientNom} (" . number_format($f->montant_ttc, 0, ',', ' ') . " XOF)"
             ];
         });
@@ -1607,7 +1625,10 @@ class VenteControleur
         $dejaCredite = self::quantitesDejaCreditees($vente);
 
         return response()->json([
-            'id' => $vente->id,
+            // L'identifiant public : c'est lui que le formulaire d'avoir
+            // renvoie ensuite comme pièce d'origine. Rendre le numérique le
+            // publiait dans une page, et le formulaire le refusait.
+            'id' => $vente->uuid,
             'numero_facture' => $vente->numero_facture,
             'client_nom' => $vente->client ? $vente->client->nom : 'Client de passage',
             'montant_ttc' => $vente->montant_ttc,
@@ -1752,12 +1773,15 @@ class VenteControleur
     public function creerAvoirNouveau(Request $request): RedirectResponse
     {
         $request->validate([
-            'parent_id' => ['required', Appartenance::a('ventes', 'id')],
+            // La pièce d'origine est désignée par son identifiant public, celui
+            // que l'écran a reçu et que les adresses portent. Le numérique était
+            // attendu ici : il n'est plus publié nulle part.
+            'parent_id' => ['required', 'uuid', Appartenance::a('ventes', 'uuid')],
             'raison'    => ['required', 'string', 'max:255'],
             'items'     => ['required', 'array'],
         ]);
 
-        $parent = Vente::findOrFail($request->parent_id);
+        $parent = Vente::where('uuid', $request->parent_id)->firstOrFail();
         abort_unless($parent->pointDeVente->entreprise_id === Auth::user()->entreprise_id, 404);
         abort_if($parent->type_facture === 'avoir', 400, "Impossible de générer un avoir sur une facture d'avoir.");
 

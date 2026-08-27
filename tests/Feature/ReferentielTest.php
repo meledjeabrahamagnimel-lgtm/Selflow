@@ -36,9 +36,9 @@ class ReferentielTest extends TestCase
         $this->assertSame(197, Famille::count());
         $this->assertSame(616, Article::count());
         $this->assertSame(10,  TypeArticle::count());
-        // 1 256 comptes OHADA, dont les 34 communs qui les recouvrent.
+        // 1 256 comptes OHADA, dont les 41 communs qui les recouvrent.
         $this->assertSame(1256, Compte::count());
-        $this->assertSame(34,   Compte::where('commun', true)->count());
+        $this->assertSame(41,   Compte::where('commun', true)->count());
     }
 
     public function test_les_comptes_sont_tous_sur_six_chiffres(): void

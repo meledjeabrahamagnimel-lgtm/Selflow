@@ -11,10 +11,20 @@ return new class extends Migration
      */
     public function up(): void
     {
+        // Le retrait de l'unicité globale est conditionnel : une base qui ne
+        // porte pas cet index arrêterait tout le déploiement derrière elle.
+        // Voir `2026_08_09_000003`, qui a bloqué une mise en ligne le 27 août
+        // pour cette raison exacte, sur une colonne au lieu d'un index.
+        $unicite = collect(Schema::getIndexes('plan_comptable'))
+            ->contains(fn ($i) => ($i['name'] ?? null) === 'plan_comptable_numero_unique');
+
+        if ($unicite) {
+            Schema::table('plan_comptable', function (Blueprint $table) {
+                $table->dropUnique('plan_comptable_numero_unique');
+            });
+        }
+
         Schema::table('plan_comptable', function (Blueprint $table) {
-            // Drop unique constraint on global 'numero'
-            $table->dropUnique('plan_comptable_numero_unique');
-            
             // Add nullable 'entreprise_id'
             $table->unsignedBigInteger('entreprise_id')->nullable()->after('id')->index();
             

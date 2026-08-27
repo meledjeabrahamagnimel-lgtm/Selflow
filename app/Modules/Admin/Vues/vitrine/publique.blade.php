@@ -645,6 +645,24 @@
                 <i class="fas fa-user-plus"></i> Créer un compte
             </a>
         </div>
+
+        {{-- Le visiteur ordinaire n'a rien à faire de cette information ; celui
+             qui peut y remédier, si. Deux environnements affichaient des pages
+             différentes sans que personne sache pourquoi : le contenu n'avait
+             été posé que sur l'un des deux. --}}
+        @auth
+            @if(auth()->user()->estSuperAdmin())
+                <p style="margin-top:22px;font-size:12.5px;color:#94a3b8;line-height:1.7;">
+                    <i class="fas fa-circle-info"></i>
+                    Aucune section n'est publiée sur cette installation.
+                    <a href="{{ route('superadmin.vitrine.index') }}" style="color:#2563eb;font-weight:600;">
+                        Ouvrir la gestion de la page d'accueil
+                    </a>
+                    — ou relancer <code>php artisan migrate</code>, qui pose le
+                    contenu par défaut sans rien écraser.
+                </p>
+            @endif
+        @endauth
     </div>
 @endforelse
 

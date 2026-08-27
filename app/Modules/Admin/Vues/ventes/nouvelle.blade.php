@@ -13,7 +13,54 @@
         border-radius: 10px; padding: 14px; cursor: pointer;
         transition: all .15s; text-align: center;
         user-select: none;
+        /* La photo de l'article se pose derriere la carte : il faut donc un
+           reperage local, et de quoi couper ce qui deborde des angles. */
+        position: relative; overflow: hidden; isolation: isolate;
+        /* De quoi voir l'image. Posee sur toutes les cartes et non sur les
+           seules illustrees, pour que la grille garde des hauteurs egales. */
+        min-height: 138px;
+        display: flex; flex-direction: column; justify-content: flex-end;
     }
+    /* La photo elle-meme. Elle n'est posee que sur les articles qui en ont une
+       vraiment : l'image d'attente couvrirait toutes les autres cartes d'un
+       meme gris, ce qui n'apprendrait rien et brouillerait le texte. */
+    .produit-card.avec-photo::before {
+        content: ''; position: absolute; inset: 0; z-index: 0;
+        background-image: var(--fond-produit);
+        background-size: cover; background-position: center;
+        /* Elle etait a .45, sous un voile a .88 : il n'en restait presque rien,
+           et l'ecran paraissait n'avoir pas change. On reconnait un article a
+           sa photo ou on ne la met pas. */
+        opacity: 1; transition: opacity .15s;
+    }
+    /* Le voile. Il est pris sur le fond de la carte, non ecrit en dur : le
+       texte reste lisible en theme clair comme en theme sombre. Le haut reste
+       degage — c'est la qu'on reconnait l'article ; le bas devient opaque, la
+       ou se trouvent le nom, le prix et le stock. */
+    .produit-card.avec-photo::after {
+        content: ''; position: absolute; inset: 0; z-index: 1;
+        background: linear-gradient(to bottom,
+                    rgba(0,0,0,0) 0%, rgba(0,0,0,0) 30%,
+                    var(--bg3) 64%, var(--bg3) 100%);
+        opacity: .94; pointer-events: none;
+    }
+    .produit-card.avec-photo:hover::after { opacity: .86; }
+
+    /* L'article sans photo. La carte etait vide : trente rectangles gris ou
+       seul le texte distinguait un sac de riz d'une prestation de conseil.
+       Le dessin ne remplit pas la carte comme une photo — il se tient au
+       fond a droite, en filigrane, la ou aucun texte ne passe. */
+    .produit-card.avec-dessin::before {
+        content: ''; position: absolute; z-index: 0;
+        right: -6px; top: 6px; width: 62px; height: 62px;
+        background-image: var(--dessin-produit);
+        background-size: contain; background-repeat: no-repeat;
+        background-position: center;
+        opacity: .5; transition: opacity .15s;
+    }
+    .produit-card.avec-dessin:hover::before { opacity: .8; }
+    /* Sans cela, le texte passerait sous le voile. */
+    .produit-card > * { position: relative; z-index: 2; }
     .produit-card:hover { border-color: var(--primary); background: rgba(99,102,241,.08); transform: translateY(-2px); }
     .produit-card.out-of-stock { opacity: .65; border-color: rgba(239,68,68,.3); }
     .produit-card.out-of-stock:hover { border-color: var(--warning); background: rgba(245,158,11,.08); }
@@ -162,10 +209,17 @@
                 {{-- Grille produits --}}
                 <div class="produit-grid" id="grilleProduits">
                     @foreach($produits as $produit)
-                    <div class="produit-card {{ $produit->stock_actuel <= 0 ? 'out-of-stock' : '' }}"
+                    @php $suitLeStock = $produit->estStockable(); @endphp
+                    @php $photo = $produit->photoReelle(); @endphp
+                    {{-- Une vraie photo tient tout le fond ; a defaut, le dessin
+                         de la nature de l'article se pose en filigrane. Les deux
+                         ne cohabitent pas : la photo dit deja tout. --}}
+                    <div class="produit-card {{ $suitLeStock && $produit->stock_actuel <= 0 ? 'out-of-stock' : '' }} {{ $photo ? 'avec-photo' : 'avec-dessin' }}"
+                         style="{{ $photo ? '--fond-produit: url(\'' . $photo . '\');' : '--dessin-produit: url(\'' . $produit->illustration() . '\');' }}"
                          data-id="{{ $produit->id }}"
                          data-nom="{{ $produit->nom }}"
                          data-prix="{{ $produit->prix_vente }}"
+                         data-stockable="{{ $suitLeStock ? '1' : '0' }}"
                          data-stock="{{ $produit->stock_actuel }}"
                          data-stock-min="{{ $produit->stock_minimum }}"
                          data-cat="{{ $produit->categorie }}"
@@ -177,8 +231,12 @@
                         <div class="produit-cat">{{ $produit->categorie }}</div>
                         <div class="produit-nom">{{ $produit->nom }}</div>
                         <div class="produit-prix">{{ number_format($produit->prix_vente, 0, ',', ' ') }} F</div>
-                        <div class="produit-stock" style="{{ $produit->stock_actuel <= 0 ? 'color:var(--danger);font-weight:700;' : '' }}">
-                            @if($produit->stock_actuel <= 0)
+                        {{-- Un service n'a pas de stock : il ne peut pas etre en
+                             rupture. On dit ce qu'il est, pas ce qui lui manque. --}}
+                        <div class="produit-stock" style="{{ $suitLeStock && $produit->stock_actuel <= 0 ? 'color:var(--danger);font-weight:700;' : '' }}">
+                            @if(!$suitLeStock)
+                                {{ $produit->type === 'service' ? 'Service' : 'Sans gestion de stock' }}
+                            @elseif($produit->stock_actuel <= 0)
                                 Rupture de stock
                             @else
                                 Stock : {{ $produit->stock_actuel }} {{ $produit->unite ?? 'unités' }}
@@ -304,12 +362,31 @@
                                 Passé ce terme, les prix indiqués ne vous engagent plus. Trente jours par défaut.
                             </small>
                         </div>
-                        <div id="avertissementRne" style="display:none; margin-top:8px; padding:10px 12px; background:#fffbeb; border:1px solid #fcd34d; border-radius:8px; font-size:11px; color:#92400e; line-height:1.5;">
-                            <i class="fas fa-triangle-exclamation"></i>
-                            <strong>Normalisation RNE en attente.</strong>
-                            Le reçu sera enregistré et imprimable, mais sa certification auprès de la DGI
-                            reste suspendue tant que la FNE n'a pas fourni les champs de mappage du reçu
-                            normalisé électronique. Il pourra être normalisé rétroactivement.
+                        {{-- Cet encadré annonçait une certification « suspendue
+                             tant que la FNE n'a pas fourni les champs de mappage
+                             du reçu normalisé électronique ». C'était vrai avant
+                             la refonte du reçu : depuis, le reçu emprunte la
+                             porte de la facture — mêmes champs, même envoi,
+                             même sticker —, et rien ne le retient. Le texte est
+                             resté, et disait à l'utilisateur que ses reçus
+                             n'étaient pas certifiés alors qu'ils l'étaient. --}}
+                        <div id="noteRecu" style="display:none; margin-top:8px; padding:10px 12px; background:#eff6ff; border:1px solid #bfdbfe; border-radius:8px; font-size:11px; color:#1e40af; line-height:1.5;">
+                            <i class="fas fa-circle-info"></i>
+                            <strong>Le reçu se certifie comme une facture.</strong>
+                            Même envoi à la DGI, même code QR, même sticker consommé —
+                            seule la nature du document change.
+                            @php
+                                // `null` vaut « automatique » : c'était le seul
+                                // comportement avant que le réglage existe.
+                                $recuAuto = $entrepriseCourante?->normalisation_auto_recus ?? true;
+                            @endphp
+                            @if($recuAuto)
+                                Il part à la certification dès son émission.
+                            @else
+                                La normalisation automatique des reçus est décochée dans vos
+                                paramètres : celui-ci s'enregistrera sans être certifié, et
+                                vous pourrez le normaliser depuis la liste des ventes.
+                            @endif
                         </div>
                     </div>
 
@@ -608,10 +685,9 @@ function selectionnerEtapeVente(btn) {
     const montantPayeInput = document.getElementById('montantPayeInput');
 
     // Le reçu est bien enregistré comme tel : il ne bascule pas en facture.
-    // Sa certification RNE reste en revanche suspendue tant que la FNE n'a pas
-    // communiqué les champs de mappage du reçu normalisé électronique.
-    const avertissement = document.getElementById('avertissementRne');
-    if (avertissement) avertissement.style.display = estRecu ? 'block' : 'none';
+    // Sa certification suit celle de la facture — voir `#noteRecu`.
+    const noteRecu = document.getElementById('noteRecu');
+    if (noteRecu) noteRecu.style.display = estRecu ? 'block' : 'none';
 
     // Seules les offres ont un terme : une facture engage des son emission.
     const blocValidite = document.getElementById('blocValidite');
@@ -621,7 +697,7 @@ function selectionnerEtapeVente(btn) {
 
     if (estRecu) {
         blocPaiement.style.display = 'block';
-        infoEtape.textContent = 'Reçu encaissé — normalisation RNE en attente des champs de mappage FNE';
+        infoEtape.textContent = 'Reçu encaissé — certifié auprès de la DGI comme une facture';
         labelBtn.textContent = 'Valider et émettre le reçu';
         montantPayeInput.removeAttribute('disabled');
     } else if (etape === 'Facture') {
@@ -896,6 +972,9 @@ function ajouterAuPanier(card) {
     const prix      = parseFloat(card.dataset.prix);
     const stock     = parseInt(card.dataset.stock);
     const stock_min = parseInt(card.dataset.stockMin || 5);
+    // Un service ne suit aucun stock : lui opposer une rupture n'a pas de sens,
+    // et le serveur ne le decremente pas davantage.
+    const suitLeStock = card.dataset.stockable !== '0';
     const unite     = card.dataset.unite || 'Unité';
     const tva       = parseFloat(card.dataset.tva || 18);
     // Remise par defaut du produit, reprise telle quelle sur la ligne
@@ -906,7 +985,7 @@ function ajouterAuPanier(card) {
 
     if (panier[id]) {
         const nouvelleQte = panier[id].qte + 1;
-        if (nouvelleQte > stock) {
+        if (suitLeStock && nouvelleQte > stock) {
             ouvrirModalRupture(id, nouvelleQte);
         } else {
             panier[id].qte++;
@@ -915,10 +994,10 @@ function ajouterAuPanier(card) {
             renderPanier();
         }
     } else {
-        if (stock <= 0) {
+        if (suitLeStock && stock <= 0) {
             ouvrirModalRuptureVirtual(id, nom, prix, stock, stock_min, unite, tva, remise, taxesProduit);
         } else {
-            panier[id] = { nom, prix, qte: 1, stock, stock_minimum: stock_min, unite: unite, tva, remise_taux: remise, taxes: taxesProduit, isVirtual: false };
+            panier[id] = { nom, prix, qte: 1, stock, stock_minimum: stock_min, unite: unite, tva, remise_taux: remise, taxes: taxesProduit, isVirtual: false, suitLeStock };
             verifierLimiteMinimale(panier[id]);
             savePanier();
             renderPanier();
@@ -926,11 +1005,18 @@ function ajouterAuPanier(card) {
     }
 }
 
+// Un panier restaure depuis le navigateur peut dater d'avant l'ajout de la
+// cle : dans le doute on suppose que l'article suit le stock, ce qui est le
+// comportement d'avant.
+function articleSuitLeStock(item) {
+    return item.suitLeStock !== false;
+}
+
 function changerQte(id, delta) {
     if (!panier[id]) return;
     const item = panier[id];
 
-    if (item.isVirtual) {
+    if (item.isVirtual || !articleSuitLeStock(item)) {
         item.qte += delta;
         if (item.qte <= 0) {
             delete panier[id];
@@ -965,7 +1051,7 @@ function saisirQte(id, val) {
     const item = panier[id];
     if (!item) return;
 
-    if (item.isVirtual) {
+    if (item.isVirtual || !articleSuitLeStock(item)) {
         item.qte = q;
         savePanier();
         renderPanier();
@@ -1027,6 +1113,7 @@ function fermerModalRupture() {
 }
 
 function verifierLimiteMinimale(item) {
+    if (!articleSuitLeStock(item)) return;
     const stockRestant = item.stock - item.qte;
     if (stockRestant <= item.stock_minimum) {
         afficherAlerteStockMin(item.nom, item.stock_minimum);
@@ -1200,12 +1287,15 @@ function saisirUnite(id, val) {
  */
 const CODES_TVA_DGI = {!! json_encode(\App\Modules\Admin\Modeles\Produit::CODES_TVA) !!};
 const REGIME_ENTREPRISE = {!! json_encode(Auth::user()->entreprise->regime_imposition ?? null) !!};
-const REGIMES_EXONERATION_LEGALE = ['TEE', 'RNE'];
+// La constante gelee du modele, et non une copie : celle qui vivait ici
+// valait ['TEE', 'RNE'] quand le serveur retient TEE, TCE et RME. L'ecran
+// annoncait donc un code TVA que le payload ne transmettait pas.
+const REGIMES_EXONERATION_LEGALE = {!! json_encode(\App\Modules\Admin\Modeles\Produit::REGIMES_EXONERATION_LEGALE) !!};
 
 /**
  * Meme regle que Produit::deduireCodeTva() cote serveur : a 0 %, seul le
  * regime distingue l'exoneration conventionnelle (TVAC) de l'exoneration
- * legale (TVAD, reservee aux regimes TEE et RNE).
+ * legale (TVAD, reservee aux regimes que la DGI enumere).
  */
 function deduireCodeTvaDgi(taux) {
     const t = Math.round(parseFloat(taux || 0) * 100) / 100;

@@ -70,9 +70,22 @@ class ComptabiliteService
 
     /**
      * Point d'entrée unique pour la facturation d'une vente.
-     * Décide automatiquement s'il s'agit d'une vente comptant (aucune ligne
-     * 411) ou d'une vente à crédit / partiellement réglée (411 pour le
-     * solde non couvert immédiatement).
+     *
+     * **Toute vente passe par le compte client**, qu'elle soit réglée au
+     * comptant ou à crédit. Deux faits distincts se sont produits — une
+     * créance est née, puis elle a été éteinte — et les confondre en une
+     * seule opération « caisse contre produits » coûte trois choses :
+     *
+     * - le compte du client ne bouge jamais sur ses achats comptant, donc son
+     *   relevé ne dit pas ce qu'il a acheté, seulement ce qu'il doit encore ;
+     * - le tiers n'est transmis à Comptaflow sur aucune vente comptant, et
+     *   l'écriture y retombe sur le seul compte collectif ;
+     * - le journal des ventes ne contient pas les ventes comptant, alors que
+     *   c'est lui qui justifie le chiffre d'affaires en cas de contrôle.
+     *
+     * L'écriture de facturation porte donc, au débit, le **net à payer** —
+     * TTC fiscal, taxes parafiscales et droit de timbre compris — et le
+     * règlement, s'il y en a un, fait l'objet d'une seconde opération.
      */
     public static function genererEcrituresVente(
         Vente $vente,
@@ -86,58 +99,34 @@ class ComptabiliteService
         $pdvId = $vente->point_de_vente_id;
         $date = $date ?? ($vente->date_vente ? $vente->date_vente->toDateString() : now()->toDateString());
         $refDoc = $vente->numero_facture;
-        // Les taxes parafiscales collectees pour l'Etat s'ajoutent au TTC
-        // fiscal : c'est ce total qui entre en caisse.
+
+        // Ce que le client règle réellement : le TTC fiscal, augmente des
+        // taxes parafiscales collectees pour l'Etat et du droit de timbre de
+        // quittance. `montant_ttc` reste le TTC au sens fiscal — c'est lui qui
+        // sert au payload FNE, et il ne doit pas etre confondu avec la somme
+        // encaissee.
         $autresTaxes = (float) ($vente->montant_autres_taxes ?? 0);
-        $ttc = (float) $vente->montant_ttc + $autresTaxes;
-        $montantPaye = max(0, min($montantPaye, $ttc));
+        $timbre      = round((float) $vente->timbre_quittance, 2);
+        $netAPayer   = (float) $vente->montant_ttc + $autresTaxes + $timbre;
+        $montantPaye = max(0, min($montantPaye, $netAPayer));
 
         $codeJournalVente = self::codeJournal($entrepriseId, 'Vente', 'VTE');
-        [$compteFinancier, $codeJournalFinancier] = self::compteEtJournalFinancier($entrepriseId, $modePaiement);
 
         $ventilation = self::ventilationVente($vente);
-        $libelleGeneral = self::libelleGeneralVente($ventilation);
+
+        // Le libellé ne se construit plus en dur : il vient du gabarit de
+        // l'entreprise, dont le défaut reproduit exactement l'ancien texte.
+        $jetons = self::jetonsVente($vente, $refDoc, $codeJournalVente, $date, $ventilation);
+        $libelleGeneral = LibelleEcritureService::operation($entrepriseId, 'FactureVente', $jetons);
 
         DB::transaction(function () use (
-            $vente, $entrepriseId, $pdvId, $date, $refDoc, $ttc, $montantPaye,
-            $codeJournalVente, $compteFinancier, $codeJournalFinancier,
-            $ventilation, $libelleGeneral, $modePaiement, $autresTaxes
+            $vente, $entrepriseId, $pdvId, $date, $refDoc, $netAPayer, $montantPaye,
+            $codeJournalVente, $ventilation, $libelleGeneral, $jetons, $modePaiement,
+            $autresTaxes, $timbre, $moyenBancaire, $referencePaiement
         ) {
-            $estPaiementIntegralImmediat = $montantPaye >= $ttc && $ttc > 0;
-
-            if ($estPaiementIntegralImmediat) {
-                // ── Vente comptant : UNE SEULE opération, aucune ligne 411 ──
-                // NB : le journal Caisse/Banque n'est utilisé QUE pour la ligne
-                // financière ; les lignes Produit(s)/TVA portent le journal Vente.
-                $operation = Operation::creer(
-                    $entrepriseId, $pdvId, $date, 'VenteComptant',
-                    $codeJournalFinancier, $refDoc, $libelleGeneral . ' (comptant)'
-                );
-
-                self::ligne($operation, $entrepriseId, $pdvId, $date, $refDoc, $codeJournalFinancier,
-                    $refDoc . ' / Vente comptant', $compteFinancier, null, null, $ttc, 0);
-
-                foreach ($ventilation['comptes'] as $compte => $detailCompte) {
-                    [$libelleDetail, $description] = self::libelleEtDescriptionDetailCompte(
-                        $compte, $detailCompte['produits'], self::TABLE_SYSCOHADA_VENTE, 'Vente suivant détail'
-                    );
-                    self::ligne($operation, $entrepriseId, $pdvId, $date, $refDoc, $codeJournalVente,
-                        $refDoc . ' / ' . $libelleDetail, null, $compte, null, 0, $detailCompte['montant'], $description);
-                }
-                if ($ventilation['tva'] > 0) {
-                    self::ligne($operation, $entrepriseId, $pdvId, $date, $refDoc, $codeJournalVente,
-                        $refDoc . ' / TVA Collectée Vente', null, config('selflow.plan_comptable_defaut.tva_collectee'), null, 0, $ventilation['tva']);
-                }
-                if ($autresTaxes > 0) {
-                    self::ligne($operation, $entrepriseId, $pdvId, $date, $refDoc, $codeJournalVente,
-                        $refDoc . ' / Taxes collectées pour l\'État', null, config('selflow.plan_comptable_defaut.taxes_collectees'), null, 0, $autresTaxes);
-                }
-
-                $operation->cloturerEquilibre();
-                return;
-            }
-
-            // ── Vente à crédit (totale ou partielle) : passage obligatoire par le 411 ──
+            $libelle = fn (string $role) => LibelleEcritureService::ligne(
+                $entrepriseId, 'FactureVente', $role, $jetons
+            );
             $compteClientGeneral = $vente->client?->compte_comptable ?? config('selflow.plan_comptable_defaut.client_collectif');
             $compteClientTiers = self::tiersClient($vente->client, $entrepriseId);
 
@@ -147,28 +136,39 @@ class ComptabiliteService
             );
 
             self::ligne($opFacture, $entrepriseId, $pdvId, $date, $refDoc, $codeJournalVente,
-                $refDoc . ' / Facturation Vente', $compteClientGeneral, null, $compteClientTiers, $ttc, 0);
+                $libelle('Facturation Vente'), $compteClientGeneral, null, $compteClientTiers, $netAPayer, 0);
 
             foreach ($ventilation['comptes'] as $compte => $detailCompte) {
                 [$libelleDetail, $description] = self::libelleEtDescriptionDetailCompte(
                     $compte, $detailCompte['produits'], self::TABLE_SYSCOHADA_VENTE, 'Vente suivant détail'
                 );
                 self::ligne($opFacture, $entrepriseId, $pdvId, $date, $refDoc, $codeJournalVente,
-                    $refDoc . ' / ' . $libelleDetail, null, $compte, null, 0, $detailCompte['montant'], $description);
+                    $libelle($libelleDetail), null, $compte, null, 0, $detailCompte['montant'], $description);
             }
-            if ($ventilation['tva'] > 0) {
+
+            foreach ($ventilation['tva'] as $compteTva => $montantTva) {
                 self::ligne($opFacture, $entrepriseId, $pdvId, $date, $refDoc, $codeJournalVente,
-                    $refDoc . ' / TVA Collectée Vente', null, config('selflow.plan_comptable_defaut.tva_collectee'), null, 0, $ventilation['tva']);
+                    $libelle('TVA Collectée Vente'), null, $compteTva, null, 0, $montantTva);
             }
+
             if ($autresTaxes > 0) {
                 self::ligne($opFacture, $entrepriseId, $pdvId, $date, $refDoc, $codeJournalVente,
-                    $refDoc . ' / Taxes collectées pour l\'État', null, config('selflow.plan_comptable_defaut.taxes_collectees'), null, 0, $autresTaxes);
+                    $libelle('Taxes collectées pour l\'État'), null, config('selflow.plan_comptable_defaut.taxes_collectees'), null, 0, $autresTaxes);
             }
+
+            if ($timbre > 0) {
+                self::ligne($opFacture, $entrepriseId, $pdvId, $date, $refDoc, $codeJournalVente,
+                    $libelle('Droit de timbre de quittance'), null, config('selflow.plan_comptable_defaut.timbre_quittance'), null, 0, $timbre);
+            }
+
             $opFacture->cloturerEquilibre();
 
-            // ── Règlement partiel encaissé immédiatement (solde restant à crédit) ──
+            // ── Le règlement, s'il y en a un : opération distincte ──
             if ($montantPaye > 0) {
-                self::genererEcritureReglementVente($vente, $montantPaye, $modePaiement, $date, null, null, 'Acompte à la facturation');
+                self::genererEcritureReglementVente(
+                    $vente, $montantPaye, $modePaiement, $date, $moyenBancaire, $referencePaiement,
+                    $montantPaye >= $netAPayer ? 'Règlement à la facturation' : 'Acompte à la facturation'
+                );
             }
         });
     }
@@ -202,15 +202,29 @@ class ComptabiliteService
 
         [$libelleProduits, $descriptionProduits] = self::libelleEtDescriptionProduits($vente->loadMissing('details.produit')->details);
         $refPaiement = $referencePaiement ?? $vente->reference_paiement;
-        $libellePaiement = 'Rglt/' . $refDoc . ($refPaiement ? '/' . $refPaiement : '') . '/Vente ' . $libelleProduits;
+
+        // `array_merge` et non `+` : l'union de tableaux garde la valeur de
+        // gauche sur une clé déjà présente, et `reference` y vaut `null`. La
+        // référence du règlement n'aurait jamais atteint le libellé.
+        $jetons = array_merge(
+            self::jetonsVente($vente, $refDoc, $codeJournal, $date),
+            ['produits' => $libelleProduits, 'reference' => $refPaiement],
+        );
+        $libellePaiement = LibelleEcritureService::ligne($entrepriseId, 'ReglementVente', '', $jetons);
+
+        // `$contexte` prime quand il est donné : « Acompte à la facturation »
+        // dit quelque chose qu'aucun jeton ne saurait produire — le règlement
+        // ne solde pas la pièce.
+        $libelleOperation = $contexte
+            ?? LibelleEcritureService::operation($entrepriseId, 'ReglementVente', $jetons);
 
         DB::transaction(function () use (
             $entrepriseId, $pdvId, $date, $refDoc, $codeJournal, $compteFinancier,
-            $compteClientGeneral, $compteClientTiers, $libellePaiement, $descriptionProduits, $montant, $contexte
+            $compteClientGeneral, $compteClientTiers, $libellePaiement, $descriptionProduits, $montant, $libelleOperation
         ) {
             $operation = Operation::creer(
                 $entrepriseId, $pdvId, $date, 'ReglementVente',
-                $codeJournal, $refDoc, $contexte ?? 'Règlement client'
+                $codeJournal, $refDoc, $libelleOperation
             );
 
             self::ligne($operation, $entrepriseId, $pdvId, $date, $refDoc, $codeJournal,
@@ -236,7 +250,14 @@ class ComptabiliteService
 
     /**
      * Point d'entrée unique pour la facturation d'un achat.
-     * Symétrique de genererEcrituresVente().
+     * Symétrique de genererEcrituresVente(), y compris dans sa forme :
+     *
+     *   1. une opération de facturation au journal des achats, qui crédite
+     *      TOUJOURS le compte du fournisseur du montant dû ;
+     *   2. une opération de règlement distincte, s'il y a décaissement.
+     *
+     * L'achat comptant écrivait auparavant une seule opération, « caisse contre
+     * charges », sans aucune ligne 401.
      */
     public static function genererEcrituresAchat(
         Achat $achat,
@@ -253,48 +274,29 @@ class ComptabiliteService
         $ttc = (float) $achat->montant_ttc;
         $montantPaye = max(0, min($montantPaye, $ttc));
 
+        // Le compte et le journal financiers sont désormais résolus par
+        // `genererEcritureReglementAchat()`, qui porte seul le décaissement.
         $codeJournalAchat = self::codeJournal($entrepriseId, 'Achat', 'ACH');
-        [$compteFinancier, $codeJournalFinancier] = self::compteEtJournalFinancier($entrepriseId, $modePaiement);
 
         $ventilation = self::ventilationAchat($achat);
-        $libelleGeneral = self::libelleGeneralAchat($ventilation);
+
+        $jetons = self::jetonsAchat($achat, $refDoc, $codeJournalAchat, $date, $ventilation);
+        $libelleGeneral = LibelleEcritureService::operation($entrepriseId, 'FactureAchat', $jetons);
 
         DB::transaction(function () use (
             $achat, $entrepriseId, $pdvId, $date, $refDoc, $ttc, $montantPaye,
-            $codeJournalAchat, $compteFinancier, $codeJournalFinancier,
-            $ventilation, $libelleGeneral, $modePaiement
+            $codeJournalAchat, $ventilation, $libelleGeneral, $jetons, $modePaiement,
+            $moyenBancaire, $referencePaiement
         ) {
-            $estPaiementIntegralImmediat = $montantPaye >= $ttc && $ttc > 0;
-
-            if ($estPaiementIntegralImmediat) {
-                // ── Achat comptant : UNE SEULE opération, aucune ligne 401 ──
-                // NB : même correctif que la vente comptant — le journal
-                // Caisse/Banque n'est utilisé QUE pour la ligne financière.
-                $operation = Operation::creer(
-                    $entrepriseId, $pdvId, $date, 'AchatComptant',
-                    $codeJournalFinancier, $refDoc, $libelleGeneral . ' (comptant)'
-                );
-
-                foreach ($ventilation['comptes'] as $compte => $detailCompte) {
-                    [$libelleDetail, $description] = self::libelleEtDescriptionDetailCompte(
-                        $compte, $detailCompte['produits'], self::TABLE_SYSCOHADA_ACHAT, 'Achat suivant détail'
-                    );
-                    self::ligne($operation, $entrepriseId, $pdvId, $date, $refDoc, $codeJournalAchat,
-                        $refDoc . ' / ' . $libelleDetail, $compte, null, null, $detailCompte['montant'], 0, $description);
-                }
-                if ($ventilation['tva'] > 0) {
-                    self::ligne($operation, $entrepriseId, $pdvId, $date, $refDoc, $codeJournalAchat,
-                        $refDoc . ' / TVA Déductible Achat', config('selflow.plan_comptable_defaut.tva_deductible'), null, null, $ventilation['tva'], 0);
-                }
-
-                self::ligne($operation, $entrepriseId, $pdvId, $date, $refDoc, $codeJournalFinancier,
-                    $refDoc . ' / Achat comptant', null, $compteFinancier, null, 0, $ttc);
-
-                $operation->cloturerEquilibre();
-                return;
-            }
-
-            // ── Achat à crédit (total ou partiel) : passage obligatoire par le 401 ──
+            $libelle = fn (string $role) => LibelleEcritureService::ligne(
+                $entrepriseId, 'FactureAchat', $role, $jetons
+            );
+            // ── La facturation passe TOUJOURS par le compte du fournisseur ──
+            // L'achat comptant écrivait « caisse contre charges », sans aucune
+            // ligne 401 : le compte du fournisseur ne bougeait jamais sur ce
+            // qu'on lui payait au comptant, son numéro de tiers n'était
+            // transmis à Comptaflow sur aucun de ces achats, et le journal des
+            // achats ne les contenait pas.
             $compteFournisseurGeneral = $achat->fournisseur?->compte_comptable ?? config('selflow.plan_comptable_defaut.fournisseur_collectif');
             $compteFournisseurTiers = self::tiersFournisseur($achat->fournisseur, $entrepriseId);
 
@@ -308,20 +310,25 @@ class ComptabiliteService
                     $compte, $detailCompte['produits'], self::TABLE_SYSCOHADA_ACHAT, 'Achat suivant détail'
                 );
                 self::ligne($opFacture, $entrepriseId, $pdvId, $date, $refDoc, $codeJournalAchat,
-                    $refDoc . ' / ' . $libelleDetail, $compte, null, null, $detailCompte['montant'], 0, $description);
+                    $libelle($libelleDetail), $compte, null, null, $detailCompte['montant'], 0, $description);
             }
-            if ($ventilation['tva'] > 0) {
+
+            foreach ($ventilation['tva'] as $compteTva => $montantTva) {
                 self::ligne($opFacture, $entrepriseId, $pdvId, $date, $refDoc, $codeJournalAchat,
-                    $refDoc . ' / TVA Déductible Achat', config('selflow.plan_comptable_defaut.tva_deductible'), null, null, $ventilation['tva'], 0);
+                    $libelle('TVA Déductible Achat'), $compteTva, null, null, $montantTva, 0);
             }
 
             self::ligne($opFacture, $entrepriseId, $pdvId, $date, $refDoc, $codeJournalAchat,
-                $refDoc . ' / Facturation Achat', null, $compteFournisseurGeneral, $compteFournisseurTiers, 0, $ttc);
+                $libelle('Facturation Achat'), null, $compteFournisseurGeneral, $compteFournisseurTiers, 0, $ttc);
 
             $opFacture->cloturerEquilibre();
 
+            // ── Le règlement, s'il y en a un : opération distincte ──
             if ($montantPaye > 0) {
-                self::genererEcritureReglementAchat($achat, $montantPaye, $modePaiement, $date, null, null, 'Acompte à la facturation');
+                self::genererEcritureReglementAchat(
+                    $achat, $montantPaye, $modePaiement, $date, $moyenBancaire, $referencePaiement,
+                    $montantPaye >= $ttc ? 'Règlement à la facturation' : 'Acompte à la facturation'
+                );
             }
         });
     }
@@ -355,15 +362,26 @@ class ComptabiliteService
 
         [$libelleProduits, $descriptionProduits] = self::libelleEtDescriptionProduits($achat->loadMissing('details.produit')->details);
         $refPaiement = $referencePaiement ?? $achat->reference_paiement;
-        $libellePaiement = 'Rglt/' . $refDoc . ($refPaiement ? '/' . $refPaiement : '') . '/Achat ' . $libelleProduits;
+
+        // `array_merge` et non `+` : l'union de tableaux garde la valeur de
+        // gauche sur une clé déjà présente, et `reference` y vaut `null`. La
+        // référence du règlement n'aurait jamais atteint le libellé.
+        $jetons = array_merge(
+            self::jetonsAchat($achat, $refDoc, $codeJournal, $date),
+            ['produits' => $libelleProduits, 'reference' => $refPaiement],
+        );
+        $libellePaiement = LibelleEcritureService::ligne($entrepriseId, 'ReglementAchat', '', $jetons);
+
+        $libelleOperation = $contexte
+            ?? LibelleEcritureService::operation($entrepriseId, 'ReglementAchat', $jetons);
 
         DB::transaction(function () use (
             $entrepriseId, $pdvId, $date, $refDoc, $codeJournal, $compteFinancier,
-            $compteFournisseurGeneral, $compteFournisseurTiers, $libellePaiement, $descriptionProduits, $montant, $contexte
+            $compteFournisseurGeneral, $compteFournisseurTiers, $libellePaiement, $descriptionProduits, $montant, $libelleOperation
         ) {
             $operation = Operation::creer(
                 $entrepriseId, $pdvId, $date, 'ReglementAchat',
-                $codeJournal, $refDoc, $contexte ?? 'Règlement fournisseur'
+                $codeJournal, $refDoc, $libelleOperation
             );
 
             self::ligne($operation, $entrepriseId, $pdvId, $date, $refDoc, $codeJournal,
@@ -427,30 +445,36 @@ class ComptabiliteService
         $compteClientTiers = self::tiersClient($avoir->client, $entrepriseId);
 
         $ventilation = self::ventilationVente($avoir);
+        $jetons = self::jetonsVente($avoir, $refDoc, $codeJournal, $date, $ventilation);
+        $libelleGeneral = LibelleEcritureService::operation($entrepriseId, 'AvoirVente', $jetons);
 
         DB::transaction(function () use (
             $entrepriseId, $pdvId, $date, $refDoc, $codeJournal,
-            $compteClientGeneral, $compteClientTiers, $ventilation, $avoir
+            $compteClientGeneral, $compteClientTiers, $ventilation, $avoir, $jetons, $libelleGeneral
         ) {
+            $libelle = fn (string $role) => LibelleEcritureService::ligne(
+                $entrepriseId, 'AvoirVente', $role, $jetons
+            );
+
             $operation = Operation::creer(
                 $entrepriseId, $pdvId, $date, 'AvoirVente',
-                $codeJournal, $refDoc, 'Avoir client'
+                $codeJournal, $refDoc, $libelleGeneral
             );
 
             self::ligne($operation, $entrepriseId, $pdvId, $date, $refDoc, $codeJournal,
-                $refDoc . ' / Facturation Avoir Client', null, $compteClientGeneral, $compteClientTiers, 0, $avoir->montant_ttc);
+                $libelle('Facturation Avoir Client'), null, $compteClientGeneral, $compteClientTiers, 0, $avoir->montant_ttc);
 
             foreach ($ventilation['comptes'] as $compte => $detailCompte) {
                 [$libelleDetail, $description] = self::libelleEtDescriptionDetailCompte(
                     $compte, $detailCompte['produits'], self::TABLE_SYSCOHADA_VENTE, 'Avoir Vente'
                 );
                 self::ligne($operation, $entrepriseId, $pdvId, $date, $refDoc, $codeJournal,
-                    $refDoc . ' / ' . $libelleDetail, $compte, null, null, $detailCompte['montant'], 0, $description);
+                    $libelle($libelleDetail), $compte, null, null, $detailCompte['montant'], 0, $description);
             }
 
-            if ($ventilation['tva'] > 0) {
+            foreach ($ventilation['tva'] as $compteTva => $montantTva) {
                 self::ligne($operation, $entrepriseId, $pdvId, $date, $refDoc, $codeJournal,
-                    $refDoc . ' / Annulation TVA Collectée', config('selflow.plan_comptable_defaut.tva_collectee'), null, null, $ventilation['tva'], 0);
+                    $libelle('Annulation TVA Collectée'), $compteTva, null, null, $montantTva, 0);
             }
 
             $operation->cloturerEquilibre();
@@ -473,30 +497,39 @@ class ComptabiliteService
         $compteFournisseurTiers = self::tiersFournisseur($avoir->fournisseur, $entrepriseId);
 
         $ventilation = self::ventilationAchat($avoir);
+        $jetons = self::jetonsAchat($avoir, $refDoc, $codeJournal, $date, $ventilation);
+        $libelleGeneral = LibelleEcritureService::operation($entrepriseId, 'AvoirAchat', $jetons);
 
         DB::transaction(function () use (
             $entrepriseId, $pdvId, $date, $refDoc, $codeJournal,
-            $compteFournisseurGeneral, $compteFournisseurTiers, $ventilation, $avoir
+            $compteFournisseurGeneral, $compteFournisseurTiers, $ventilation, $avoir, $jetons, $libelleGeneral
         ) {
+            $libelle = fn (string $role) => LibelleEcritureService::ligne(
+                $entrepriseId, 'AvoirAchat', $role, $jetons
+            );
+
             $operation = Operation::creer(
                 $entrepriseId, $pdvId, $date, 'AvoirAchat',
-                $codeJournal, $refDoc, 'Avoir fournisseur'
+                $codeJournal, $refDoc, $libelleGeneral
             );
 
             self::ligne($operation, $entrepriseId, $pdvId, $date, $refDoc, $codeJournal,
-                $refDoc . ' / Facturation Avoir Fournisseur', $compteFournisseurGeneral, null, $compteFournisseurTiers, $avoir->montant_ttc, 0);
+                $libelle('Facturation Avoir Fournisseur'), $compteFournisseurGeneral, null, $compteFournisseurTiers, $avoir->montant_ttc, 0);
 
             foreach ($ventilation['comptes'] as $compte => $detailCompte) {
                 [$libelleDetail, $description] = self::libelleEtDescriptionDetailCompte(
                     $compte, $detailCompte['produits'], self::TABLE_SYSCOHADA_ACHAT, 'Avoir Achat'
                 );
                 self::ligne($operation, $entrepriseId, $pdvId, $date, $refDoc, $codeJournal,
-                    $refDoc . ' / ' . $libelleDetail, null, $compte, null, 0, $detailCompte['montant'], $description);
+                    $libelle($libelleDetail), null, $compte, null, 0, $detailCompte['montant'], $description);
             }
 
-            if ($ventilation['tva'] > 0) {
+            // L'avoir annule la TVA sur les mêmes comptes que la facture : sans
+            // cela, une charge de service verrait sa TVA débitée en 4454 et
+            // recréditée en 4452, et les deux comptes dériveraient.
+            foreach ($ventilation['tva'] as $compteTva => $montantTva) {
                 self::ligne($operation, $entrepriseId, $pdvId, $date, $refDoc, $codeJournal,
-                    $refDoc . ' / Annulation TVA Déductible', null, config('selflow.plan_comptable_defaut.tva_deductible'), null, 0, $ventilation['tva']);
+                    $libelle('Annulation TVA Déductible'), null, $compteTva, null, 0, $montantTva);
             }
 
             $operation->cloturerEquilibre();
@@ -665,10 +698,56 @@ class ComptabiliteService
     }
 
     /**
+     * Le compte de TVA collectée qui correspond à un compte de produit.
+     *
+     * SYSCOHADA range la TVA facturée selon ce qui a été vendu : la
+     * marchandise et le produit fini en 4431, la prestation de services en
+     * 4432, les travaux en 4433. La déclaration reprend cette distinction ;
+     * tout verser en 4431 la rendait fausse pour une entreprise mixte — un
+     * garage qui vend des pièces et facture de la main-d'œuvre, par exemple.
+     */
+    private static function compteTvaCollectee(string $compteProduit): string
+    {
+        return match (substr($compteProduit, 0, 3)) {
+            '705'   => config('selflow.plan_comptable_defaut.tva_collectee_travaux'),
+            '706'   => config('selflow.plan_comptable_defaut.tva_collectee_services'),
+            default => config('selflow.plan_comptable_defaut.tva_collectee'),
+        };
+    }
+
+    /**
+     * Le compte de TVA déductible qui correspond à un compte de charge.
+     *
+     * Symétrique de `compteTvaCollectee()`, et faux de la même façon : tout
+     * partait en 4452, « TVA récupérable sur achats », y compris la TVA d'un
+     * loyer, d'honoraires ou d'un billet de transport. SYSCOHADA distingue :
+     *
+     *   445100  sur immobilisations        (comptes 2x)
+     *   445200  sur achats                 (comptes 60x)
+     *   445300  sur transports             (comptes 61x)
+     *   445400  sur services extérieurs et autres charges  (62x, 63x, 64x…)
+     *
+     * L'état de TVA déductible reprend cette ventilation. Une entreprise qui
+     * n'achète que des marchandises ne voyait pas la différence ; un cabinet,
+     * dont l'essentiel des charges est en 62 et 63, la voyait entièrement.
+     */
+    private static function compteTvaDeductible(string $compteCharge): string
+    {
+        return match (substr($compteCharge, 0, 2)) {
+            '60'    => config('selflow.plan_comptable_defaut.tva_deductible'),
+            '61'    => config('selflow.plan_comptable_defaut.tva_deductible_transport'),
+            '20', '21', '22', '23', '24' => config('selflow.plan_comptable_defaut.tva_deductible_immobilisations'),
+            default => config('selflow.plan_comptable_defaut.tva_deductible_services'),
+        };
+    }
+
+    /**
      * Ventile les lignes d'une vente par compte de produit, avec application
-     * de la remise globale au prorata, calcule la TVA totale, et conserve la
-     * liste des produits par compte (nécessaire pour les libellés intelligents).
-     * @return array{comptes: array<string, array{montant: float, produits: array<string>}>, tva: float}
+     * de la remise globale au prorata, ventile la TVA par compte de collecte,
+     * et conserve la liste des produits par compte (nécessaire pour les
+     * libellés intelligents).
+     *
+     * @return array{comptes: array<string, array{montant: float, produits: array<string>}>, tva: array<string, float>}
      */
     private static function ventilationVente(Vente $vente): array
     {
@@ -681,6 +760,7 @@ class ComptabiliteService
             : 0;
 
         $comptes = [];
+        $tva = [];
         foreach ($vente->details as $detail) {
             // La remise de ligne s'applique avant la remise globale : c'est
             // l'ordre retenu à la saisie et celui du récapitulatif de la FNE.
@@ -689,12 +769,13 @@ class ComptabiliteService
             if ($pourcentageRemise > 0) {
                 $ht = $ht - ($ht * $pourcentageRemise);
             }
+            // Chaine article -> rayon -> defaut : le rayon manquait, et
+            // un article cree apres la souscription tombait sur le
+            // compte generique 701000. La balance d'un magasin qui a
+            // reparti ses rayons n'avait alors qu'une ligne de ventes.
+            $compte = ImputationService::compteVente($detail->produit);
+
             if ($ht > 0) {
-                // Chaine article -> rayon -> defaut : le rayon manquait, et
-                // un article cree apres la souscription tombait sur le
-                // compte generique 701000. La balance d'un magasin qui a
-                // reparti ses rayons n'avait alors qu'une ligne de ventes.
-                $compte = ImputationService::compteVente($detail->produit);
                 if (!isset($comptes[$compte])) {
                     $comptes[$compte] = ['montant' => 0, 'produits' => []];
                 }
@@ -702,15 +783,61 @@ class ComptabiliteService
                 $nom = $detail->libelle_virtuel ?? $detail->produit?->nom;
                 if ($nom) $comptes[$compte]['produits'][] = $nom;
             }
+
+            $tvaLigne = (float) ($detail->montant_tva ?? 0);
+            if ($tvaLigne > 0) {
+                $compteTva = self::compteTvaCollectee($compte);
+                $tva[$compteTva] = ($tva[$compteTva] ?? 0) + $tvaLigne;
+            }
         }
 
-        return ['comptes' => $comptes, 'tva' => (float) ($vente->montant_tva ?? 0)];
+        return ['comptes' => $comptes, 'tva' => self::accorderTva($tva, (float) ($vente->montant_tva ?? 0))];
     }
 
     /**
-     * Ventile les lignes d'un achat par compte de produit, recalcule la TVA
-     * totale ligne par ligne, et conserve la liste des produits par compte.
-     * @return array{comptes: array<string, array{montant: float, produits: array<string>}>, tva: float}
+     * Fait coïncider la TVA ventilée ligne à ligne avec le total porté par la
+     * pièce.
+     *
+     * `montant_tva` est ce que la facture annonce et ce que le payload FNE
+     * transmet : c'est lui qui fait foi. La somme des lignes peut s'en écarter
+     * de quelques centimes — arrondis, remise globale répartie au prorata — et
+     * un écart de deux francs suffit à déséquilibrer l'opération, donc à faire
+     * échouer sa clôture. L'écart est reporté sur le compte le plus chargé,
+     * là où il est proportionnellement le plus faible.
+     *
+     * @param  array<string, float>  $ventilee
+     * @return array<string, float>
+     */
+    private static function accorderTva(array $ventilee, float $total, ?string $compteDeRepli = null): array
+    {
+        $total = round($total, 2);
+
+        if ($total <= 0) {
+            return [];
+        }
+
+        if ($ventilee === []) {
+            // Aucune ligne ne porte de TVA alors que la pièce en annonce :
+            // le total part au compte générique, à défaut de savoir mieux.
+            return [$compteDeRepli ?? config('selflow.plan_comptable_defaut.tva_collectee') => $total];
+        }
+
+        $ventilee = array_map(fn ($m) => round($m, 2), $ventilee);
+        $ecart = round($total - array_sum($ventilee), 2);
+
+        if (abs($ecart) >= 0.01) {
+            arsort($ventilee);
+            $principal = array_key_first($ventilee);
+            $ventilee[$principal] = round($ventilee[$principal] + $ecart, 2);
+        }
+
+        return array_filter($ventilee, fn ($m) => $m > 0);
+    }
+
+    /**
+     * Ventile les lignes d'un achat par compte de charge, ventile la TVA par
+     * compte de déduction, et conserve la liste des produits par compte.
+     * @return array{comptes: array<string, array{montant: float, produits: array<string>}>, tva: array<string, float>}
      */
     private static function ventilationAchat(Achat $achat): array
     {
@@ -726,7 +853,7 @@ class ComptabiliteService
         $sansTva = $achat->type_facture === 'bapa';
 
         $comptes = [];
-        $totalTva = 0;
+        $tva = [];
         foreach ($achat->details as $detail) {
             $remiseLigne = (float) ($detail->remise_taux ?? 0);
             $ht = $detail->quantite * $detail->prix_unitaire * (1 - $remiseLigne / 100);
@@ -741,7 +868,11 @@ class ComptabiliteService
 
                 $tauxTva = $sansTva ? 0 : ($detail->produit?->taux_tva ?? 0);
                 if ($tauxTva > 0) {
-                    $totalTva += round($ht * ($tauxTva / 100), 2);
+                    // La TVA déductible suit la nature de la charge, comme la
+                    // collectée suit la nature du produit : voir
+                    // `compteTvaDeductible()`.
+                    $compteTva = self::compteTvaDeductible($compte);
+                    $tva[$compteTva] = ($tva[$compteTva] ?? 0) + round($ht * ($tauxTva / 100), 2);
                 }
             }
         }
@@ -749,9 +880,16 @@ class ComptabiliteService
         // Le repli sur `montant_tva` ne doit pas rattraper ce que l'on vient
         // d'ecarter : un bordereau dont la piece porterait une TVA — saisie a
         // tort, ou heritee d'une conversion — la verrait revenir ici.
-        $tva = $sansTva ? 0.0 : ($totalTva > 0 ? $totalTva : (float) ($achat->montant_tva ?? 0));
+        $total = $sansTva ? 0.0 : (array_sum($tva) > 0 ? array_sum($tva) : (float) ($achat->montant_tva ?? 0));
 
-        return ['comptes' => $comptes, 'tva' => $tva];
+        return [
+            'comptes' => $comptes,
+            'tva'     => self::accorderTva(
+                $sansTva ? [] : $tva,
+                $total,
+                config('selflow.plan_comptable_defaut.tva_deductible')
+            ),
+        ];
     }
 
     /**
@@ -786,6 +924,65 @@ class ComptabiliteService
     private static function libelleGeneralVente(array $ventilation): string
     {
         return self::libelleGeneralDepuisComptes(array_keys($ventilation['comptes']), self::TABLE_SYSCOHADA_VENTE, 'Vente de marchandises et services');
+    }
+
+    /**
+     * Les jetons d'une pièce de vente, tels que le gabarit de l'entreprise les
+     * attend. `{produits}` et `{reference}` ne sont posés ici que si la
+     * ventilation est fournie — le règlement les remplace par les siens, qui
+     * portent la liste complète des articles et la référence du paiement.
+     *
+     * @param  array{comptes: array<string, array{montant: float, produits: array<int, string>}>, tva: array<string, float>}|null  $ventilation
+     * @return array<string, string|null>
+     */
+    private static function jetonsVente(Vente $vente, ?string $refDoc, string $codeJournal, string $date, ?array $ventilation = null): array
+    {
+        [$produits] = self::libelleEtDescriptionProduits($vente->loadMissing('details.produit')->details);
+
+        return [
+            'piece'          => $refDoc,
+            'tiers'          => $vente->client?->nom,
+            'produits'       => $produits,
+            'point_de_vente' => $vente->pointDeVente?->nom,
+            'date'           => self::dateLisible($date),
+            'nature'         => $ventilation ? self::libelleGeneralVente($ventilation) : null,
+            'journal'        => $codeJournal,
+            'reference'      => null,
+        ];
+    }
+
+    /**
+     * @param  array{comptes: array<string, array{montant: float, produits: array<int, string>}>, tva: array<string, float>}|null  $ventilation
+     * @return array<string, string|null>
+     */
+    private static function jetonsAchat(Achat $achat, ?string $refDoc, string $codeJournal, string $date, ?array $ventilation = null): array
+    {
+        [$produits] = self::libelleEtDescriptionProduits($achat->loadMissing('details.produit')->details);
+
+        return [
+            'piece'          => $refDoc,
+            'tiers'          => $achat->fournisseur?->nom,
+            'produits'       => $produits,
+            'point_de_vente' => $achat->pointDeVente?->nom,
+            'date'           => self::dateLisible($date),
+            'nature'         => $ventilation ? self::libelleGeneralAchat($ventilation) : null,
+            'journal'        => $codeJournal,
+            'reference'      => null,
+        ];
+    }
+
+    /**
+     * Une date d'écriture est stockée en aaaa-mm-jj ; personne ne lit un
+     * journal dans ce format. Une valeur illisible est rendue telle quelle
+     * plutôt que d'interrompre l'enregistrement d'une vente pour un libellé.
+     */
+    private static function dateLisible(string $date): string
+    {
+        try {
+            return \Illuminate\Support\Carbon::parse($date)->format('d/m/Y');
+        } catch (\Throwable) {
+            return $date;
+        }
     }
 
     private static function libelleGeneralAchat(array $ventilation): string
@@ -832,200 +1029,20 @@ class ComptabiliteService
         return [count($noms) . ' articles...', implode(', ', $noms)];
     }
 
+
     // ─────────────────────────────────────────────────────────────────
-    // SYNCHRONISATION COMPTAFLOW
+    // COMPTAFLOW
     // ─────────────────────────────────────────────────────────────────
+    //
+    // `synchroniserDepuisComptaflow()` vivait ici. Elle appelait Comptaflow,
+    // **recevait** son plan comptable, ses codes journaux et ses tiers, les
+    // recopiait dans Selflow, puis **supprimait** toute ligne Selflow marquée
+    // `source = comptaflow` absente de la réponse.
+    //
+    // C'était le contraire de l'architecture voulue : Selflow ne se construit
+    // pas sur Comptaflow, il y déverse. Une entreprise dont le comptable
+    // n'avait pas encore rempli son plan se retrouvait dépouillée du sien.
+    //
+    // Le déversement vit désormais dans `DeversementReferentielService`.
 
-    /**
-     * Synchronise le plan comptable, les codes journaux et les tiers depuis COMPTAFLOW.
-     *
-     * @param \App\Modules\Admin\Modeles\Entreprise $entreprise
-     * @return array
-     */
-    public static function synchroniserDepuisComptaflow($entreprise): array
-    {
-        if (empty($entreprise->comptaflow_sync_key)) {
-            return ['success' => false, 'message' => "La clé de synchronisation n'est pas configurée."];
-        }
-
-        try {
-            $comptaflowUrl = config('selflow.comptaflow_api_url', 'http://127.0.0.1:8000');
-            $secret = config('selflow.comptaflow_api_secret');
-
-            $clients = \App\Modules\Admin\Modeles\Client::where('entreprise_id', $entreprise->id)
-                ->select('id', 'nom', 'email', 'telephone', 'adresse')
-                ->get()
-                ->toArray();
-
-            $fournisseurs = \App\Modules\Admin\Modeles\Fournisseur::where('entreprise_id', $entreprise->id)
-                ->select('id', 'nom', 'email', 'telephone', 'adresse')
-                ->get()
-                ->toArray();
-
-            $response = \Illuminate\Support\Facades\Http::timeout(25)->post($comptaflowUrl . '/api/external/link-company', [
-                'secret'             => $secret,
-                'selflow_sync_key'   => $entreprise->comptaflow_sync_key,
-                'selflow_company_id' => $entreprise->id,
-                'clients'            => $clients,
-                'fournisseurs'       => $fournisseurs,
-            ]);
-
-            if ($response->successful() && $response->json('success')) {
-                $comptaflowCompanyId = $response->json('company_id');
-                $entreprise->update([
-                    'comptaflow_company_id'   => $comptaflowCompanyId,
-                    'comptaflow_sync_status'  => 'active',
-                    'comptaflow_last_sync_at' => now(),
-                ]);
-
-                // 1. Plan comptable
-                $plan = $response->json('plan_comptable', []);
-                $importedAccountNumbers = [];
-                foreach ($plan as $acc) {
-                    $num = $acc['numero_de_compte'];
-                    $importedAccountNumbers[] = $num;
-                    \App\Modules\Admin\Modeles\PlanComptable::updateOrCreate(
-                        [
-                            'entreprise_id' => $entreprise->id,
-                            'numero'        => $num,
-                        ],
-                        [
-                            'libelle'         => $acc['intitule'],
-                            'numero_original' => $acc['numero_original'] ?? null,
-                            'source'          => 'comptaflow',
-                        ]
-                    );
-                }
-                \App\Modules\Admin\Modeles\PlanComptable::where('entreprise_id', $entreprise->id)
-                    ->where('source', 'comptaflow')
-                    ->whereNotIn('numero', $importedAccountNumbers)
-                    ->delete();
-
-                // 2. Codes journaux
-                $journaux = $response->json('codes_journaux', []);
-                $importedJournalCodes = [];
-                foreach ($journaux as $cj) {
-                    $code = $cj['code_journal'];
-                    $importedJournalCodes[] = $code;
-                    \App\Modules\Admin\Modeles\CodeJournal::updateOrCreate(
-                        [
-                            'entreprise_id' => $entreprise->id,
-                            'code'          => $code,
-                        ],
-                        [
-                            'intitule'        => $cj['intitule'],
-                            'type'            => $cj['type'] === 'Trésorerie' ? 'Trésorerie' : ($cj['type'] === 'Achats' ? 'Achat' : ($cj['type'] === 'Ventes' ? 'Vente' : 'Autre')),
-                            'compte'          => $cj['compte_numero'] ?? '471000',
-                            'numero_original' => $cj['numero_original'] ?? null,
-                            'source'          => 'comptaflow',
-                        ]
-                    );
-                }
-                \App\Modules\Admin\Modeles\CodeJournal::where('entreprise_id', $entreprise->id)
-                    ->where('source', 'comptaflow')
-                    ->whereNotIn('code', $importedJournalCodes)
-                    ->delete();
-
-                // 3. Tiers — Filtrage par préfixe numérique (comme COMPTAFLOW le fait lui-même)
-                $tiers = $response->json('tiers', []);
-                $nbClients = 0;
-                $nbFournisseurs = 0;
-                $importedClientTiersNumbers = [];
-                $importedFournisseurTiersNumbers = [];
-
-                foreach ($tiers as $t) {
-                    $numTiers    = trim($t['numero_de_tiers'] ?? '');
-                    $typeTier    = $t['type_de_tiers'] ?? '';
-                    $numOriginal = $t['numero_original'] ?? null;
-                    $intitule    = trim($t['intitule'] ?? '');
-
-                    if (empty($numTiers) || empty($intitule)) continue;
-
-                    $isClient     = str_starts_with($numTiers, '41');
-                    $isFournisseur = str_starts_with($numTiers, '40');
-
-                    if (!$isClient && !$isFournisseur) continue;
-
-                    $isSelflowLinked = in_array($typeTier, ['client', 'fournisseur'])
-                                    && $numOriginal !== null
-                                    && $numOriginal !== ''
-                                    && is_numeric($numOriginal)
-                                    && (int)$numOriginal > 0;
-
-                    if ($isClient) {
-                        if ($isSelflowLinked) {
-                            \App\Modules\Admin\Modeles\Client::where('id', (int)$numOriginal)
-                                ->where('entreprise_id', $entreprise->id)
-                                ->whereIn('source', ['local', null])
-                                ->update([
-                                    'numero_tiers'    => $numTiers,
-                                    'numero_original' => $numOriginal,
-                                ]);
-                        } else {
-                            \App\Modules\Admin\Modeles\Client::updateOrCreate(
-                                [
-                                    'entreprise_id' => $entreprise->id,
-                                    'numero_tiers'  => $numTiers,
-                                ],
-                                [
-                                    'nom'              => ucwords(strtolower($intitule)),
-                                    'source'           => 'comptaflow',
-                                    'compte_comptable' => config('selflow.plan_comptable_defaut.client_collectif'),
-                                    'numero_original'  => $numOriginal,
-                                ]
-                            );
-                            $nbClients++;
-                            $importedClientTiersNumbers[] = $numTiers;
-                        }
-                    } elseif ($isFournisseur) {
-                        if ($isSelflowLinked) {
-                            \App\Modules\Admin\Modeles\Fournisseur::where('id', (int)$numOriginal)
-                                ->where('entreprise_id', $entreprise->id)
-                                ->whereIn('source', ['local', null])
-                                ->update([
-                                    'numero_tiers'    => $numTiers,
-                                    'numero_original' => $numOriginal,
-                                ]);
-                        } else {
-                            \App\Modules\Admin\Modeles\Fournisseur::updateOrCreate(
-                                [
-                                    'entreprise_id' => $entreprise->id,
-                                    'numero_tiers'  => $numTiers,
-                                ],
-                                [
-                                    'nom'              => ucwords(strtolower($intitule)),
-                                    'source'           => 'comptaflow',
-                                    'compte_comptable' => config('selflow.plan_comptable_defaut.fournisseur_collectif'),
-                                    'numero_original'  => $numOriginal,
-                                ]
-                            );
-                            $nbFournisseurs++;
-                            $importedFournisseurTiersNumbers[] = $numTiers;
-                        }
-                    }
-                }
-
-                \App\Modules\Admin\Modeles\Client::where('entreprise_id', $entreprise->id)
-                    ->where('source', 'comptaflow')
-                    ->whereNotIn('numero_tiers', $importedClientTiersNumbers)
-                    ->delete();
-
-                \App\Modules\Admin\Modeles\Fournisseur::where('entreprise_id', $entreprise->id)
-                    ->where('source', 'comptaflow')
-                    ->whereNotIn('numero_tiers', $importedFournisseurTiersNumbers)
-                    ->delete();
-
-                return [
-                    'success' => true,
-                    'message' => "Synchronisation effectuée avec succès ! ({$nbClients} client(s) et {$nbFournisseurs} fournisseur(s) COMPTAFLOW importés)",
-                ];
-
-            }
-
-            return ['success' => false, 'message' => $response->json('message') ?? 'Clé de synchronisation invalide.'];
-        } catch (\Exception $e) {
-            \Illuminate\Support\Facades\Log::error('Erreur synchronisation depuis COMPTAFLOW: ' . $e->getMessage());
-            return ['success' => false, 'message' => 'Erreur de connexion : ' . $e->getMessage()];
-        }
-    }
 }

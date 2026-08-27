@@ -66,10 +66,24 @@ return new class extends Migration
             // Ignorer silencieusement si la table n'a pas encore de données lors d'un fresh install
         }
 
-        // Supprimer les colonnes obsolètes de la table produits
-        Schema::table('produits', function (Blueprint $table) {
-            $table->dropColumn(['stock_actuel', 'stock_minimum']);
-        });
+        // Supprimer les colonnes obsolètes de la table produits.
+        //
+        // Le retrait est conditionnel, et ce n'est pas une précaution de style :
+        // `2026_08_09_000003` a bloqué un déploiement en 1091 (Can't DROP
+        // COLUMN) parce qu'il retirait sans condition des colonnes que la base
+        // de production n'avait jamais eues. Une migration décrit un état — ces
+        // colonnes ne doivent plus être là —, pas un geste à exécuter coûte que
+        // coûte.
+        $obsoletes = array_values(array_filter(
+            ['stock_actuel', 'stock_minimum'],
+            fn ($colonne) => Schema::hasColumn('produits', $colonne)
+        ));
+
+        if ($obsoletes !== []) {
+            Schema::table('produits', function (Blueprint $table) use ($obsoletes) {
+                $table->dropColumn($obsoletes);
+            });
+        }
     }
 
     /**

@@ -151,6 +151,7 @@ class Habilitations
         'admin.tresorerie.journal'                => 'tresorerie_journal',
         'admin.tresorerie.codes_journaux'         => 'tresorerie_codes_journaux',
         'admin.tresorerie.creer_code_journal'     => 'tresorerie_codes_journaux',
+        'admin.tresorerie.poser_journaux_defaut' => 'tresorerie_codes_journaux',
         'admin.tresorerie.supprimer_code_journal' => 'tresorerie_codes_journaux',
         'admin.banques.creer'                     => 'nouvelle_vente',
 
@@ -162,6 +163,7 @@ class Habilitations
         'admin.comptabilite.enregistrer_reglement'  => 'comptabilite_creances',
         'admin.comptabilite.plan_comptable'         => 'comptabilite_plan_comptable',
         'admin.comptabilite.creer_compte_comptable' => 'comptabilite_plan_comptable',
+        'admin.comptabilite.poser_plan_defaut'      => 'comptabilite_plan_comptable',
         // La balance et le grand livre montrent le résultat de l'entreprise
         // entière : ils relèvent de la comptabilité globale, non d'un écran de
         // caisse.
@@ -172,6 +174,15 @@ class Habilitations
         'admin.comptabilite.delettrer'        => 'comptabilite_creances',
         // Une écriture manuelle écrit directement au grand livre.
         'admin.comptabilite.ecriture_manuelle' => 'comptabilite_globale',
+        // Les gabarits de libellé décident de ce que **toutes** les écritures
+        // futures porteront au journal : c'est un réglage de comptabilité, pas
+        // un écran de consultation.
+        'admin.comptabilite.libelles'             => 'comptabilite_globale',
+        'admin.comptabilite.libelles.enregistrer' => 'comptabilite_globale',
+        'admin.comptabilite.libelles.apercu'      => 'comptabilite_globale',
+        // La ventilation analytique compare les sites entre eux : elle montre
+        // le résultat de l'entreprise entière, site par site.
+        'admin.comptabilite.analytique' => 'comptabilite_globale',
 
         // ── Immobilisations ──
         // Le parc et son amortissement portent l'actif du bilan et une charge
@@ -263,7 +274,7 @@ class Habilitations
         'admin.entreprise.periodes.creer'         => 'comptabilite_globale',
         'admin.entreprise.periodes.cloturer'      => 'comptabilite_globale',
         'admin.entreprise.fne.tester_connexion'   => 'gestion_pdv',
-        'admin.entreprise.comptaflow.sync'        => 'comptabilite_globale',
+        'admin.entreprise.comptaflow.demander'    => 'comptabilite_globale',
         'admin.entreprise.comptaflow.sync_real'   => 'comptabilite_globale',
 
         // ── FNE ──
@@ -312,6 +323,7 @@ class Habilitations
         'admin.visite.terminer'       => 'Fermer la visite guidée.',
         'admin.visite.reprendre'      => 'Rouvrir la visite guidée.',
         'admin.visite.rejouer'        => 'Rejouer la visite guidée.',
+        'admin.produits.photo.voir'   => 'La photo d\'un article de son entreprise, servie quand `public/storage` n\'est pas posé. Le caissier voit ces images sur son écran de vente sans tenir le catalogue : exiger `catalogue_produits` rendrait 403 (Forbidden — accès interdit) sur chaque carte. Le contrôleur vérifie l\'appartenance à l\'entreprise, et l\'image ne dit rien que la carte ne montre déjà.',
     ];
 
     /**

@@ -32,8 +32,36 @@
   "intitule": "État, TVA facturée (18 % — régime réel)"
  },
  {
+  "numero": "443200",
+  "intitule": "État, TVA facturée sur prestations de services"
+ },
+ {
+  "numero": "443300",
+  "intitule": "État, TVA facturée sur travaux"
+ },
+ {
+  "numero": "447000",
+  "intitule": "État, autres impôts et taxes collectés (AIRSI, GRA, DTD…)"
+ },
+ {
+  "numero": "447800",
+  "intitule": "État, autres impôts et contributions (droit de timbre de quittance)"
+ },
+ {
+  "numero": "445100",
+  "intitule": "État, TVA récupérable sur immobilisations"
+ },
+ {
   "numero": "445200",
   "intitule": "État, TVA récupérable sur achats"
+ },
+ {
+  "numero": "445300",
+  "intitule": "État, TVA récupérable sur transports"
+ },
+ {
+  "numero": "445400",
+  "intitule": "État, TVA récupérable sur services extérieurs et autres charges"
  },
  {
   "numero": "521000",

@@ -129,6 +129,10 @@ Route::prefix('admin')
             Route::get('/codes-journaux', [TresorerieControleur::class, 'codesJournaux'])->name('codes_journaux');
             Route::post('/codes-journaux', [TresorerieControleur::class, 'creerCodeJournal'])->name('creer_code_journal');
             Route::delete('/codes-journaux/{code}', [TresorerieControleur::class, 'supprimerCodeJournal'])->name('supprimer_code_journal');
+            // Le trousseau se posait a la creation de l'entreprise, et jamais
+            // plus : une entreprise creee avant qu'un journal soit ajoute au
+            // referentiel ne l'obtenait plus par aucun chemin.
+            Route::post('/codes-journaux/poser-le-defaut', [TresorerieControleur::class, 'poserLesJournauxParDefaut'])->name('poser_journaux_defaut');
         });
 
         // ── Comptabilité ──
@@ -139,6 +143,7 @@ Route::prefix('admin')
             Route::post('/reglement', [\App\Modules\Admin\Controleurs\ComptabiliteControleur::class, 'enregistrerReglement'])->name('enregistrer_reglement');
             Route::get('/plan-comptable', [\App\Modules\Admin\Controleurs\ComptabiliteControleur::class, 'planComptable'])->name('plan_comptable');
             Route::post('/plan-comptable', [\App\Modules\Admin\Controleurs\ComptabiliteControleur::class, 'creerCompteComptable'])->name('creer_compte_comptable');
+            Route::post('/plan-comptable/poser-le-defaut', [\App\Modules\Admin\Controleurs\ComptabiliteControleur::class, 'poserLePlanParDefaut'])->name('poser_plan_defaut');
             Route::post('/ecritures/manuelle', [\App\Modules\Admin\Controleurs\ComptabiliteControleur::class, 'creerEcritureManuelle'])->name('ecriture_manuelle');
 
             // Balance de controle : ce qui permet a un client sans abonnement
@@ -148,6 +153,16 @@ Route::prefix('admin')
             // Grand livre : la balance dit combien un compte a bouge, le grand
             // livre dit pourquoi.
             Route::get('/grand-livre', [\App\Modules\Admin\Controleurs\ComptabiliteControleur::class, 'grandLivre'])->name('grand_livre');
+
+            // Le resultat site par site : l'axe analytique que l'application
+            // renseigne reellement.
+            Route::get('/analytique', [\App\Modules\Admin\Controleurs\ComptabiliteControleur::class, 'analytique'])->name('analytique');
+
+            // Les libelles d'ecriture : ce que le journal dit d'une operation,
+            // au lieu de repeter l'intitule du compte mouvemente.
+            Route::get('/libelles',  [\App\Modules\Admin\Controleurs\ModeleLibelleControleur::class, 'index'])->name('libelles');
+            Route::put('/libelles',  [\App\Modules\Admin\Controleurs\ModeleLibelleControleur::class, 'enregistrer'])->name('libelles.enregistrer');
+            Route::post('/libelles/apercu', [\App\Modules\Admin\Controleurs\ModeleLibelleControleur::class, 'apercu'])->name('libelles.apercu');
 
             // Lettrage : rapprocher une facture du reglement qui la solde.
             Route::get('/lettrage',  [\App\Modules\Admin\Controleurs\ComptabiliteControleur::class, 'lettrage'])->name('lettrage');
@@ -242,6 +257,9 @@ Route::prefix('admin')
             Route::patch('/{produit}/archiver',      [ProduitControleur::class, 'archiver'])->name('archiver');
             Route::patch('/{produit}/description',   [ProduitControleur::class, 'description'])->name('description');
             Route::post('/{produit}/photo',          [ProduitControleur::class, 'uploaderPhoto'])->name('photo');
+            // Le recours quand `public/storage` n'est pas posé — voir
+            // `Produit::photoReelle()`.
+            Route::get('/{produit}/photo',           [ProduitControleur::class, 'voirPhoto'])->name('photo.voir');
             Route::post('/{produit}/details',        [ProduitControleur::class, 'ajouterDetails'])->name('details.ajouter');
             Route::delete('/details/{detail}',       [ProduitControleur::class, 'supprimerDetail'])->name('details.supprimer');
         });
@@ -334,7 +352,10 @@ Route::prefix('admin')
         // la DGI, puis Comptaflow. Les marteler use un quota qui n'est pas le
         // nôtre.
         Route::post('/entreprise/fne/tester-connexion', [EntrepriseControleur::class, 'testerConnexionFne'])->middleware('throttle:plateforme')->name('entreprise.fne.tester_connexion');
-        Route::post('/entreprise/comptaflow/sync-simulation', [EntrepriseControleur::class, 'simulerSyncComptaflow'])->middleware('throttle:plateforme')->name('entreprise.comptaflow.sync');
+        // `sync-simulation` annoncait une synchronisation reussie sans qu'aucun
+        // appel ne parte. Elle est remplacee par la demande de dossier, qui
+        // n'annonce que ce qu'elle fait.
+        Route::post('/entreprise/comptaflow/demander', [EntrepriseControleur::class, 'demanderComptaflow'])->middleware('throttle:plateforme')->name('entreprise.comptaflow.demander');
         Route::post('/entreprise/comptaflow/sync', [EntrepriseControleur::class, 'synchroniserComptaflow'])->middleware('throttle:plateforme')->name('entreprise.comptaflow.sync_real');
         Route::post('/entreprise/onboarding/entreprise-nom', [EntrepriseControleur::class, 'enregistrerNomOnboarding'])->name('onboarding.entreprise_nom');
 
@@ -413,10 +434,19 @@ Route::prefix('superadmin')
         // ── Liaisons SELFLOW ↔ COMPTAFLOW ──
         Route::prefix('liaisons')->name('liaisons.')->group(function () {
             Route::get('/',                                    [SuperadminLiaisonControleur::class, 'index'])->name('index');
-            Route::post('/lier',                               [SuperadminLiaisonControleur::class, 'lier'])->name('lier');
+            // `lier` pointait sur une methode absente du controleur — le
+            // formulaire tombait en 500 depuis un renommage. `creerComptaflow`
+            // demandait au superadministrateur de choisir le mot de passe du
+            // compte d'un client. Les deux chemins sont remplaces par une file
+            // de demandes : la cle est delivree par Comptaflow, jamais saisie.
+            Route::post('/{entreprise}/valider',               [SuperadminLiaisonControleur::class, 'validerDemande'])->middleware('throttle:plateforme')->name('valider');
+            Route::post('/{entreprise}/refuser',               [SuperadminLiaisonControleur::class, 'refuserDemande'])->name('refuser');
+            // Le renouvellement a la main, sans attendre le premier du mois :
+            // un prestataire qui part, un journal retrouve sur un poste
+            // partage, un doute. Limite : c'est un appel a Comptaflow.
+            Route::post('/{entreprise}/renouveler-cle',        [SuperadminLiaisonControleur::class, 'renouvelerLaCle'])->middleware('throttle:plateforme')->name('renouveler_cle');
             Route::delete('/{entreprise}/delierEntreprise',    [SuperadminLiaisonControleur::class, 'delierEntreprise'])->name('delierEntreprise');
-            Route::post('/creer-comptaflow',                   [SuperadminLiaisonControleur::class, 'creerComptaflow'])->name('creerComptaflow');
-            Route::post('/{entreprise}/verifier',              [SuperadminLiaisonControleur::class, 'verifierLiaison'])->name('verifier');
+            Route::post('/{entreprise}/verifier',              [SuperadminLiaisonControleur::class, 'verifierLiaison'])->middleware('throttle:plateforme')->name('verifier');
         });
 
         // ── Gestion des clés FNE (DGI) ──
@@ -427,6 +457,9 @@ Route::prefix('superadmin')
             Route::post('/{entreprise}/voir-cle',                 [\App\Modules\Admin\Controleurs\SuperadminFneControleur::class, 'voirCle'])->name('voir_cle');
             Route::delete('/{entreprise}/cle',                    [\App\Modules\Admin\Controleurs\SuperadminFneControleur::class, 'supprimerCle'])->name('supprimer_cle');
             Route::post('/{entreprise}/notes',                    [\App\Modules\Admin\Controleurs\SuperadminFneControleur::class, 'mettreAJourNotes'])->name('notes');
+            // Le timbre de quittance est un réglage de la plateforme, non un
+            // choix de l'entreprise : il se reporte ici, avec les clés.
+            Route::post('/{entreprise}/timbre',                   [\App\Modules\Admin\Controleurs\SuperadminFneControleur::class, 'basculerTimbre'])->name('timbre');
         });
 
         // ── Vitrine publique (contenu de la page de presentation) ──

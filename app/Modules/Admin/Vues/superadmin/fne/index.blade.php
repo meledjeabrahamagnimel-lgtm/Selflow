@@ -85,15 +85,28 @@
     </div>
 </div>
 
-<div class="content-card" style="background:#fff; border:1px solid var(--border); border-radius:14px; overflow:hidden;">
-    <table style="width:100%; border-collapse:collapse;">
+{{-- La carte portait `overflow:hidden` : sur sept colonnes, la fin du tableau
+     — les clés, et la colonne Actions qui permet de les poser — était coupée à
+     droite **sans barre de défilement**. Il n'existait aucun moyen de
+     l'atteindre, et c'est justement la partie qui sert.
+
+     La carte laisse maintenant défiler, et la colonne Actions reste collée à
+     droite : sur un écran étroit on fait défiler pour lire les clés, sans
+     jamais perdre les boutons. --}}
+<div class="content-card" style="background:#fff; border:1px solid var(--border); border-radius:14px; overflow-x:auto;">
+    <table style="width:100%; min-width:1080px; border-collapse:collapse;">
         <thead style="background:#f8fafc; border-bottom:1px solid var(--border);">
             <tr>
                 <th style="text-align:left; padding:12px 14px; font-size:12px; text-transform:uppercase; color:var(--text-3);">Entreprise</th>
                 <th style="text-align:left; padding:12px 14px; font-size:12px; text-transform:uppercase; color:var(--text-3);">Statut</th>
                 <th style="text-align:left; padding:12px 14px; font-size:12px; text-transform:uppercase; color:var(--text-3);">Clé de test</th>
                 <th style="text-align:left; padding:12px 14px; font-size:12px; text-transform:uppercase; color:var(--text-3);">Clé réelle</th>
-                <th style="text-align:right; padding:12px 14px; font-size:12px; text-transform:uppercase; color:var(--text-3);">Actions</th>
+                {{-- Ce que l'entreprise a fourni de son côté : c'est tout ce
+                     qu'on lui demande, la configuration se fait ici. --}}
+                <th style="text-align:left; padding:12px 14px; font-size:12px; text-transform:uppercase; color:var(--text-3);">Compte FNE</th>
+                <th style="text-align:left; padding:12px 14px; font-size:12px; text-transform:uppercase; color:var(--text-3);">Timbre</th>
+                {{-- Collée à droite : on fait défiler pour lire les clés sans perdre les boutons. --}}
+                <th style="text-align:right; padding:12px 14px; font-size:12px; text-transform:uppercase; color:var(--text-3); position:sticky; right:0; background:#f8fafc; box-shadow:-6px 0 8px -6px rgba(0,0,0,.15);">Actions</th>
             </tr>
         </thead>
         <tbody>
@@ -126,7 +139,45 @@
                         <span style="color:var(--text-3); font-size:12px;">Non renseignée</span>
                     @endif
                 </td>
-                <td style="text-align:right;">
+                <td>
+                    @if($row['possede_compte_fne'] === true)
+                        <span style="font-size:12px; font-weight:600; color:var(--success);">
+                            <i class="fas fa-circle-check"></i> Déclaré
+                        </span>
+                    @elseif($row['possede_compte_fne'] === false)
+                        <span style="font-size:12px; font-weight:600; color:#b45309;">
+                            <i class="fas fa-circle-plus"></i> À ouvrir
+                        </span>
+                    @else
+                        <span style="font-size:12px; color:var(--text-3);">
+                            <i class="fas fa-circle-question"></i> Pas répondu
+                        </span>
+                    @endif
+                    <div style="font-size:11px; color:{{ $row['informations_manquantes'] > 0 ? '#b45309' : 'var(--text-3)' }}; margin-top:2px;">
+                        @if($row['informations_manquantes'] > 0)
+                            {{ $row['informations_manquantes'] }} information(s) manquante(s)
+                        @else
+                            Informations complètes
+                        @endif
+                    </div>
+                </td>
+                <td>
+                    {{-- Ce réglage vivait dans les paramètres de l'entreprise,
+                         sous une étiquette « informatif » qui promettait qu'il
+                         ne changeait aucun montant. Il décide en réalité si le
+                         droit de timbre est réclamé au client. --}}
+                    <form method="POST" action="{{ route('superadmin.fne.timbre', $row['entreprise']) }}" style="margin:0;">
+                        @csrf
+                        <input type="hidden" name="timbre_quittance" value="{{ $row['timbre_quittance'] ? '0' : '1' }}">
+                        <button type="submit" class="btn btn-outline"
+                                style="font-size:11.5px; padding:5px 9px; white-space:nowrap; color:{{ $row['timbre_quittance'] ? 'var(--success)' : 'var(--text-3)' }};"
+                                title="Reporter l'option cochée sur l'espace FNE de l'entreprise">
+                            <i class="fas {{ $row['timbre_quittance'] ? 'fa-toggle-on' : 'fa-toggle-off' }}"></i>
+                            {{ $row['timbre_quittance'] ? 'Appliqué' : 'Non appliqué' }}
+                        </button>
+                    </form>
+                </td>
+                <td style="text-align:right; position:sticky; right:0; background:#fff; box-shadow:-6px 0 8px -6px rgba(0,0,0,.15);">
                     <button class="btn btn-outline" style="font-size:12px; padding:6px 10px;"
                             onclick="ouvrirModalGestion({{ $row['entreprise']->id }}, @js($row['entreprise']->nom))">
                         <i class="fas fa-gear"></i> Gérer
@@ -134,7 +185,7 @@
                 </td>
             </tr>
             @empty
-            <tr><td colspan="5" style="padding:30px; text-align:center; color:var(--text-3);">Aucune entreprise.</td></tr>
+            <tr><td colspan="7" style="padding:30px; text-align:center; color:var(--text-3);">Aucune entreprise.</td></tr>
             @endforelse
         </tbody>
     </table>

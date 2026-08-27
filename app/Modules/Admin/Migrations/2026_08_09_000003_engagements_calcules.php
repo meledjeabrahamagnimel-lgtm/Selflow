@@ -30,13 +30,51 @@ use Illuminate\Support\Facades\Schema;
  * une valeur déduite ne dérive pas.
  *
  * Voir `Produit::quantiteCommandee()` et `Produit::quantiteAReceptionner()`.
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * Pourquoi le retrait est conditionnel
+ * ─────────────────────────────────────────────────────────────────────────
+ *
+ * Cette migration a échoué en production le 27 août 2026 :
+ *
+ *     SQLSTATE[42000] 1091 Can't DROP COLUMN `quantite_commandee`;
+ *     check that it exists
+ *
+ * Les deux colonnes n'ont jamais existé sur ce serveur. Elles ont été
+ * **ajoutées à `2026_06_05_000004_creer_table_produits` le 20 juillet**, soit
+ * quarante-cinq jours après la date de cette migration — donc longtemps après
+ * qu'elle eut été appliquée en production. Une migration déjà jouée ne se
+ * rejoue pas : modifier son fichier ne change rien à la base qui l'a passée.
+ * Le serveur a gardé un `produits` sans ces colonnes, pendant qu'en local
+ * chaque `migrate:fresh` les recréait — d'où une suite verte et un
+ * déploiement bloqué.
+ *
+ * Le même écart s'était produit sur `entreprises` : `secteur_activite` et
+ * `modules_actifs` ont été ajoutés au même endroit, le même jour, et
+ * `2026_07_20_133019_add_missing_columns_to_entreprises` a été écrite pour
+ * rattraper les bases qui ne les avaient pas. Ici, le rattrapage n'a pas de
+ * sens — ces colonnes doivent disparaître, pas revenir.
+ *
+ * Ce que la migration veut est un état, non un geste : ces colonnes ne doivent
+ * plus être là. Là où elles n'ont jamais été, il n'y a rien à faire.
  */
 return new class extends Migration
 {
+    private const COLONNES = ['quantite_commandee', 'quantite_a_receptionner'];
+
     public function up(): void
     {
-        Schema::table('produits', function (Blueprint $table) {
-            $table->dropColumn(['quantite_commandee', 'quantite_a_receptionner']);
+        $presentes = array_values(array_filter(
+            self::COLONNES,
+            fn ($colonne) => Schema::hasColumn('produits', $colonne)
+        ));
+
+        if ($presentes === []) {
+            return;
+        }
+
+        Schema::table('produits', function (Blueprint $table) use ($presentes) {
+            $table->dropColumn($presentes);
         });
     }
 

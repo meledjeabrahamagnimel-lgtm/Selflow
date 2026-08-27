@@ -47,7 +47,13 @@ class ExternalSyncControleur
             'regime_imposition'   => 'nullable|string|max:80',
             'gerant_nom'          => 'nullable|string|max:100',
             'gerant_prenom'       => 'nullable|string|max:150',
-            'admin_password'      => 'required|string|min:8',
+            // Le sens inverse de la liaison : une entreprise qui a Comptaflow
+            // et veut Selflow retrouve **les mêmes accès** — même adresse, même
+            // mot de passe. Comptaflow envoie l'empreinte de son mot de passe,
+            // jamais le mot de passe : l'un des deux suffit, et l'empreinte est
+            // préférable.
+            'admin_password'      => 'required_without:admin_password_hash|nullable|string|min:8',
+            'admin_password_hash' => 'required_without:admin_password|nullable|string|max:255',
             'comptaflow_company_id' => 'nullable|integer',
             'comptaflow_sync_key'   => 'nullable|string|max:100',
         ]);
@@ -85,13 +91,29 @@ class ExternalSyncControleur
                 'regime_imposition'      => $request->regime_imposition,
                 'quota_points_de_vente'  => 5,
                 'plan_abonnement'        => 'Pro',
-                'secteur_activite'       => ['Commercial'],
+                // Comptaflow ne connaît pas le domaine d'activité : le poser au
+                // hasard le figerait sur une valeur fausse que personne ne
+                // penserait à corriger. « Autre » dit ce qu'il en est, et
+                // l'entreprise choisit son vrai domaine à la souscription.
+                'secteur_activite'       => [\App\Modules\Admin\Modeles\Referentiel\Categorie::AUTRE],
                 'modules_actifs'         => ['principal', 'ventes', 'achats', 'stock', 'tiers', 'produits', 'rapports', 'b2b', 'fne'],
                 'comptaflow_company_id'  => $request->comptaflow_company_id,
-                'comptaflow_sync_key'    => $request->comptaflow_sync_key,
                 'comptaflow_sync_status' => 'active',
                 'comptaflow_last_sync_at' => now(),
+                'comptaflow_liee_le'     => now(),
+                'comptaflow_cle_indice'  => $request->comptaflow_sync_key
+                    ? substr((string) $request->comptaflow_sync_key, -4)
+                    : null,
             ]);
+
+            // La clé n'est pas `$fillable` : elle ne doit jamais entrer par un
+            // tableau de requête. Ici, l'appel vient de Comptaflow lui-même,
+            // authentifié par le secret serveur, et c'est lui qui l'a générée.
+            // On la pose donc explicitement, hors de l'affectation en masse.
+            if ($request->filled('comptaflow_sync_key')) {
+                $entreprise->comptaflow_sync_key = $request->comptaflow_sync_key;
+                $entreprise->save();
+            }
 
             // Sans plan comptable ni journal, la premiere vente s'impute sur des
             // comptes inventes a la volee. L'entreprise recoit donc de quoi
@@ -104,22 +126,25 @@ class ExternalSyncControleur
                 'nom'           => $request->gerant_nom ?? 'Admin',
                 'prenom'        => $request->gerant_prenom ?? '',
                 'email'         => $request->email,
-                'password'      => Hash::make($request->admin_password),
+                // L'empreinte arrive telle quelle quand Comptaflow l'envoie :
+                // la re-hacher rendrait le compte inaccessible avec le mot de
+                // passe que l'utilisateur connaît déjà.
+                'password'      => $request->filled('admin_password_hash')
+                    ? $request->admin_password_hash
+                    : Hash::make($request->admin_password),
                 'role'          => 'admin',
                 'entreprise_id' => $entreprise->id,
                 'statut'        => 'actif',
             ]);
 
-            // 3. Créer le point de vente Siège par défaut
-            PointDeVente::create([
-                'entreprise_id' => $entreprise->id,
-                'nom'           => 'Siège',
-                'ville'         => $request->adresse ? explode(',', $request->adresse)[0] : 'Abidjan',
-                'commune'       => 'Plateau',
-                'responsable'   => ($request->gerant_nom ?? 'Admin') . ' ' . ($request->gerant_prenom ?? ''),
-                'telephone'     => $request->telephone,
-                'statut'        => 'Ouvert',
-            ]);
+            // Un point de vente « Siège » se créait ici, ville devinée en
+            // coupant l'adresse à la première virgule et commune « Plateau ».
+            // **Le nom du point de vente est ce que la plateforme de la DGI
+            // reçoit** : elle refuse la facture s'il ne correspond à aucun site
+            // déclaré sur l'espace FNE. Le créer d'office décidait à la place
+            // de l'entreprise du nom sous lequel ses pièces seraient
+            // certifiées. Elle crée le sien, et l'écran le lui réclame tant
+            // qu'elle ne l'a pas fait.
 
             DB::commit();
 
@@ -162,6 +187,15 @@ class ExternalSyncControleur
 
         if ($validator->fails()) {
             return response()->json(['success' => false, 'message' => 'Données invalides.', 'errors' => $validator->errors()], 422);
+        }
+
+        [$porteuse, $refus] = self::entrepriseDeLaCle($request);
+        if ($refus) {
+            return $refus;
+        }
+
+        if ($refus = self::refusDEcritureCroisee($request, $porteuse, (int) $request->selflow_company_id)) {
+            return $refus;
         }
 
         $entreprise = Entreprise::find($request->selflow_company_id);
@@ -207,29 +241,36 @@ class ExternalSyncControleur
             return response()->json(['success' => false, 'message' => 'Accès non autorisé.'], 401);
         }
 
-        $entreprises = Entreprise::with(['utilisateurs' => function ($q) {
-            $q->where('role', 'admin')->orderBy('created_at')->limit(1);
-        }])->get()->map(function ($e) {
-            $admin = $e->utilisateurs->first();
-            return [
-                'id'                   => $e->id,
-                'uuid' => $e->uuid,
-                'nom'                  => $e->nom,
-                'email'                => $e->email,
-                'telephone'            => $e->telephone,
-                'adresse'              => $e->adresse,
-                'rccm'                 => $e->rccm,
-                'ncc'                  => $e->ncc,
-                'regime_imposition'    => $e->regime_imposition,
-                'gerant_nom'           => $e->gerant_nom,
-                'gerant_prenom'        => $e->gerant_prenom,
-                'compte_contribuable'  => $e->compte_contribuable,
-                'created_at'           => $e->created_at ? $e->created_at->format('d/m/Y') : null,
-                'admin_email'          => $admin ? $admin->email : null,
-                'is_linked'            => !empty($e->comptaflow_company_id),
-                'comptaflow_status'    => $e->comptaflow_sync_status ?? 'inactive',
-            ];
-        });
+        [$porteuse, $refus] = self::entrepriseDeLaCle($request);
+        if ($refus) {
+            return $refus;
+        }
+
+        // La liste rendait **toutes** les entreprises de la plateforme avec
+        // leur adresse, leur NCC, leur RCCM, le nom de leur gérant et
+        // l'adresse électronique de leur administrateur. Un seul secret volé
+        // livrait donc l'annuaire complet des clients — et les adresses des
+        // comptes les plus puissants de chaque entreprise, de quoi monter un
+        // hameçonnage crédible.
+        //
+        // Cette route sert à **rapprocher** les dossiers, pas à les décrire :
+        // le nom et l'identifiant y suffisent. Le détail se demande par
+        // `company-info`, qui exige la clé du dossier.
+        $requete = Entreprise::query();
+
+        // Une clé désigne une entreprise : elle ne donne à voir que celle-là.
+        if ($porteuse) {
+            $requete->whereKey($porteuse->id);
+        }
+
+        $entreprises = $requete->orderBy('nom')->get()->map(fn ($e) => [
+            'id'                => $e->id,
+            'uuid'              => $e->uuid,
+            'nom'               => $e->nom,
+            'created_at'        => $e->created_at?->format('d/m/Y'),
+            'is_linked'         => !empty($e->comptaflow_company_id),
+            'comptaflow_status' => $e->comptaflow_sync_status ?? 'inactive',
+        ]);
 
         return response()->json([
             'success'     => true,
@@ -247,6 +288,18 @@ class ExternalSyncControleur
 
         if (!self::secretValide($providedSecret)) {
             return response()->json(['success' => false, 'message' => 'Accès non autorisé.'], 401);
+        }
+
+        [$porteuse, $refusCle] = self::entrepriseDeLaCle($request);
+        if ($refusCle) {
+            return $refusCle;
+        }
+
+        // La fiche d'un tiers porte son téléphone, son adresse et son NCC :
+        // c'est le carnet d'adresses commercial de l'entreprise. Le secret
+        // partagé, le même pour toutes, ouvrait celui de n'importe laquelle.
+        if ($refusCle = self::refusDEcritureCroisee($request, $porteuse, (int) $request->input('selflow_company_id'))) {
+            return $refusCle;
         }
 
         $entrepriseId   = $request->input('selflow_company_id');
@@ -368,5 +421,101 @@ class ExternalSyncControleur
         }
 
         return hash_equals((string) $attendu, (string) $fourni);
+    }
+
+    /**
+     * L'entreprise que la clé de l'en-tête désigne, et le refus s'il y a lieu.
+     *
+     * ─────────────────────────────────────────────────────────────────────
+     * Ce que le secret partagé ne dit pas
+     * ─────────────────────────────────────────────────────────────────────
+     *
+     * Il est le même pour toutes les entreprises, il est détenu par le
+     * serveur, et il **ne dit pas qui appelle**. Ces quatre points d'entrée
+     * n'avaient que lui : quiconque l'obtenait lisait la fiche de n'importe
+     * quelle entreprise, la liste de ses tiers avec leurs coordonnées, et
+     * **l'annuaire complet de la plateforme** — noms, adresses électroniques
+     * des administrateurs, NCC, RCCM.
+     *
+     * La clé du dossier, elle, désigne une entreprise et une seule. Quand elle
+     * accompagne l'appel, la réponse est bornée à cette entreprise.
+     *
+     * ─────────────────────────────────────────────────────────────────────
+     * 401 et 403 ne disent pas la même chose
+     * ─────────────────────────────────────────────────────────────────────
+     *
+     * Clé inconnue ou révoquée : **401 (Unauthorized — non authentifié)**,
+     * l'appelant n'est pas reconnu. Clé valide mais qui désigne une autre
+     * entreprise que celle demandée : **403 (Forbidden — accès interdit)**,
+     * l'appelant est connu et lit chez quelqu'un d'autre. Les confondre
+     * rendrait le journal illisible — et c'est la seconde qu'on veut voir
+     * arriver.
+     *
+     * @return array{0: ?Entreprise, 1: ?JsonResponse}
+     */
+    private static function entrepriseDeLaCle(Request $request): array
+    {
+        $cle = $request->header('X-Company-Key');
+
+        if (blank($cle)) {
+            // ═══ TOLÉRANCE DE TRANSITION ═══
+            //
+            // Tant que Comptaflow n'envoie pas l'en-tête, l'appel passe sur le
+            // seul secret partagé. **Tant que ce retour existe, un secret volé
+            // suffit à lire chez n'importe qui** — c'est la porte que ce lot
+            // referme, et elle n'est pas encore fermée. À retirer en même temps
+            // que la tolérance jumelle du middleware `cle.entreprise` de
+            // Comptaflow : les deux vont par paire.
+            return [null, null];
+        }
+
+        // La clé est chiffrée en base : on ne peut pas la chercher par une
+        // clause `where`. Le nombre d'entreprises liées reste petit, et
+        // l'alternative — un haché en colonne — vaudra le jour où ce ne sera
+        // plus vrai.
+        $entreprise = Entreprise::whereNotNull('comptaflow_sync_key')
+            ->get()
+            ->first(fn (Entreprise $e) => filled($e->comptaflow_sync_key)
+                && hash_equals((string) $e->comptaflow_sync_key, (string) $cle));
+
+        if (!$entreprise) {
+            Log::warning('ExternalSync Selflow : clé de liaison inconnue', ['ip' => $request->ip()]);
+
+            return [null, response()->json([
+                'success' => false,
+                'message' => 'Clé de liaison inconnue.',
+            ], 401)];
+        }
+
+        if ($entreprise->comptaflow_revoquee_le !== null) {
+            return [null, response()->json([
+                'success' => false,
+                'message' => 'Clé de liaison révoquée le '
+                    . $entreprise->comptaflow_revoquee_le->format('d/m/Y') . '.',
+            ], 401)];
+        }
+
+        return [$entreprise, null];
+    }
+
+    /**
+     * La clé présentée autorise-t-elle à parler de cette entreprise-là ?
+     */
+    private static function refusDEcritureCroisee(Request $request, ?Entreprise $porteuse, int $demandee): ?JsonResponse
+    {
+        if (!$porteuse || $porteuse->id === $demandee) {
+            return null;
+        }
+
+        Log::warning('ExternalSync Selflow : lecture croisée refusée', [
+            'cle_entreprise'    => $porteuse->id,
+            'corps_entreprise'  => $demandee,
+            'ip'                => $request->ip(),
+        ]);
+
+        return response()->json([
+            'success' => false,
+            'message' => "La clé de liaison ne désigne pas l'entreprise demandée.",
+        ], 403);
     }
 }

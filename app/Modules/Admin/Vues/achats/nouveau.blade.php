@@ -235,8 +235,11 @@
                     <div style="display:flex;justify-content:space-between;font-size:13px;color:#dc2626;padding:4px 0;">
                         <span>Montant de la remise sur le total HT</span><span id="totRemise">0 F</span>
                     </div>
+                    {{-- La TVA manquait au pave, et le total affiche valait
+                         le seul HT net : sur un achat a 18 %, l'ecran
+                         annoncait 18 % de moins que la piece enregistree. --}}
                     <div style="display:flex;justify-content:space-between;font-size:13px;color:var(--text-2);padding:4px 0;">
-                        <span>Autres taxes</span><span id="totAutresTaxes">0 F</span>
+                        <span>TVA</span><span id="totTva">0 F</span>
                     </div>
                     <div class="total-row" style="display:flex;justify-content:space-between;font-size:17px;font-weight:800;color:var(--text);padding:8px 0 4px;">
                         <span>Total</span><span id="totTtc">0 F</span>
@@ -265,16 +268,14 @@
                                maxlength="64" value="{{ old('numero_rne') }}" placeholder="N&deg; du recu normalise d'origine">
                     </div>
 
-                    <div style="margin-top:12px;">
-                        <div style="font-size:12px; font-weight:700; color:var(--text-2); margin-bottom:8px;">
-                            <i class="fas fa-percent" style="color:var(--primary);"></i> Taxes sur total TTC
-                        </div>
-                        <div id="taxesTtcConteneur" style="display:flex; flex-direction:column; gap:8px;"></div>
-                        <button type="button" class="btn btn-outline btn-sm" onclick="ajouterTaxeTtc()"
-                                style="width:100%; justify-content:center; margin-top:8px; border-style:dashed; font-size:12px;">
-                            <i class="fas fa-plus"></i> Ajouter une taxe
-                        </button>
-                    </div>
+                    {{-- Le bloc << Taxes sur total TTC >> vivait ici. Il est
+                         retire -- decision du proprietaire, 24/08/2026. Il
+                         ecrivait dans `achat_taxes`, que rien ne relisait : ni
+                         le payload du bordereau d'achat, qui ne transmet aucune
+                         taxe et dont la conformite est gelee, ni la
+                         comptabilite, ni le document imprime. La taxe saisie
+                         gonflait le total a l'ecran et n'entrait dans aucun
+                         montant enregistre. --}}
                 </div>
 
                 <div style="display:flex; flex-direction:column; gap:8px; margin-top:12px;">
@@ -338,10 +339,17 @@ const produits = {!! json_encode($produits->map(function($p) {
         'id' => $p->id,
         'nom' => $p->nom,
         'prix' => $p->prix_achat,
+        // Le taux du catalogue : c'est celui que le serveur applique, et
+        // l'ecran doit annoncer le meme total que la piece enregistree.
+        'tva' => (float) ($p->taux_tva ?? 0),
         'ref' => $p->reference
     ];
 })->toArray()) !!};
 let idx = 0;
+// Declare ici, et non pres de `toggleBapa()` : `recalculer()` le lit pour
+// savoir s'il doit compter la TVA, et une declaration plus bas dans le script
+// le laisserait dans sa zone morte si le pave se calculait avant.
+let bapaActive = false;
 
 function savePanier() {
     const panierItems = [];
@@ -388,7 +396,7 @@ function loadPanier() {
 
 function ajouterLigne(prefill = null) {
     const container = document.getElementById('lignesAchat');
-    const opts = produits.map(p => `<option value="${p.id}" data-prix="${p.prix}">${p.nom} (${p.ref})</option>`).join('');
+    const opts = produits.map(p => `<option value="${p.id}" data-prix="${p.prix}" data-tva="${p.tva}">${p.nom} (${p.ref})</option>`).join('');
     const div = document.createElement('div');
     div.className = 'ligne'; div.dataset.idx = idx;
     
@@ -484,44 +492,6 @@ function supprimerLigne(i) {
     savePanier();
 }
 
-// --- Taxes sur total TTC (champ `customTaxes` de la FNE) -------------------
-
-function ajouterTaxeTtc(nom, taux) {
-    const conteneur = document.getElementById('taxesTtcConteneur');
-    if (!conteneur) return;
-
-    const index = conteneur.children.length;
-    const ligne = document.createElement('div');
-    ligne.style.cssText = 'display:flex; gap:6px; align-items:center;';
-    ligne.innerHTML = `
-        <input type="text" name="taxes_ttc[${index}][nom]" class="form-control"
-               placeholder="Nom (ex : DTD)" maxlength="100" value="${nom ? String(nom).replace(/"/g, '&quot;') : ''}"
-               style="flex:2; height:28px; font-size:12px;">
-        <input type="number" name="taxes_ttc[${index}][taux]" class="form-control"
-               placeholder="Taxe (%)" min="0.01" max="100" step="0.01" value="${taux !== undefined ? taux : ''}"
-               oninput="recalculer()" style="flex:1; height:28px; font-size:12px;">
-        <span class="montant-taxe-ttc" style="flex:1; font-size:12px; font-weight:700; text-align:right; white-space:nowrap;">0 F</span>
-        <button type="button" class="btn-remove-ligne" title="Supprimer cette taxe" onclick="supprimerTaxeTtc(this)">
-            <i class="fas fa-trash"></i>
-        </button>
-    `;
-    conteneur.appendChild(ligne);
-    recalculer();
-}
-
-function supprimerTaxeTtc(bouton) {
-    bouton.closest('div').remove();
-
-    const conteneur = document.getElementById('taxesTtcConteneur');
-    Array.from(conteneur.children).forEach((ligne, index) => {
-        const champs = ligne.querySelectorAll('input');
-        if (champs[0]) champs[0].name = `taxes_ttc[${index}][nom]`;
-        if (champs[1]) champs[1].name = `taxes_ttc[${index}][taux]`;
-    });
-
-    recalculer();
-}
-
 function basculerChampRne() {
     const coche = document.getElementById('estRneCheckbox').checked;
     const bloc  = document.getElementById('champRneContainer');
@@ -537,12 +507,26 @@ function basculerChampRne() {
  * globale sur le total HT, puis taxes sur le total.
  */
 function recalculer() {
-    let ht = 0;
+    let ht  = 0;
+    let tva = 0;
+
     document.querySelectorAll('.ligne').forEach(l => {
         const q  = parseFloat(l.querySelector('.qte-inp').value) || 0;
         const p  = parseFloat(l.querySelector('.prix-inp').value) || 0;
         const r  = Math.min(Math.max(parseFloat(l.querySelector('.remise-inp')?.value) || 0, 0), 100);
-        ht += q * p * (1 - r / 100);
+        const htLigne = q * p * (1 - r / 100);
+        ht += htLigne;
+
+        // Le serveur n'applique la TVA que sur une ligne rattachee a un
+        // article du catalogue, et jamais sur un bordereau d'achat : le tiers
+        // n'y facture aucune taxe. L'ecran suit la meme regle, sans quoi il
+        // annoncerait un total que la piece enregistree ne porte pas.
+        const sel = l.querySelector('.produit-sel');
+        const opt = sel && sel.value ? sel.options[sel.selectedIndex] : null;
+        const taux = opt ? parseFloat(opt.dataset.tva) || 0 : 0;
+        if (!bapaActive && taux > 0) {
+            tva += Math.round(htLigne * taux / 100 * 100) / 100;
+        }
     });
 
     const fmt = n => new Intl.NumberFormat('fr-FR').format(Math.round(n)) + ' F';
@@ -552,16 +536,12 @@ function recalculer() {
     const montantRemise = ht * (remiseTaux / 100);
     const htNet = Math.max(0, ht - montantRemise);
 
-    let totalAutresTaxes = 0;
-    document.querySelectorAll('#taxesTtcConteneur > div').forEach(ligne => {
-        const taux = parseFloat(ligne.querySelectorAll('input')[1]?.value) || 0;
-        const montant = Math.min(Math.max(taux, 0), 100) / 100 * htNet;
-        totalAutresTaxes += montant;
-        const affichage = ligne.querySelector('.montant-taxe-ttc');
-        if (affichage) affichage.textContent = fmt(montant);
-    });
+    // La remise globale reduit la TVA dans la meme proportion : c'est ce que
+    // fait le serveur, au meme endroit du calcul.
+    const ratio = ht > 0 ? htNet / ht : 0;
+    const tvaNette = Math.round(tva * ratio * 100) / 100;
 
-    const total = htNet + totalAutresTaxes;
+    const total = htNet + tvaNette;
 
     const devise = document.getElementById('deviseInput').value;
     const taux = parseFloat(document.getElementById('tauxChangeDisplayInput').value) || 0;
@@ -575,8 +555,8 @@ function recalculer() {
     if (elHt) elHt.textContent = fmt(ht);
     const elRemise = document.getElementById('totRemise');
     if (elRemise) elRemise.textContent = fmt(montantRemise);
-    const elTaxes = document.getElementById('totAutresTaxes');
-    if (elTaxes) elTaxes.textContent = fmt(totalAutresTaxes);
+    const elTva = document.getElementById('totTva');
+    if (elTva) elTva.textContent = fmt(tvaNette);
 
     document.getElementById('totTtc').textContent = totalText;
     const noItems = document.querySelectorAll('.ligne').length === 0;
@@ -609,7 +589,6 @@ function selectionnerEtape(btn) {
 
 // Lot F : bascule affichage bloc facture physique & BAPA
 let facturePhysiqueActive = false;
-let bapaActive = false;
 
 function toggleFacturePhysique() {
     facturePhysiqueActive = !facturePhysiqueActive;
@@ -637,6 +616,9 @@ function toggleFacturePhysique() {
 
 function toggleBapa() {
     bapaActive = !bapaActive;
+    // Un bordereau d'achat ne porte aucune TVA : le pave doit le montrer des
+    // la bascule, pas au prochain changement de quantite.
+    recalculer();
     if (bapaActive) {
         facturePhysiqueActive = false;
         document.getElementById('btnFacturePhysique').style.display = 'none';

@@ -81,7 +81,14 @@ class AdminControleur
         $solde = $qTreso->sum(DB::raw('montant_entree - montant_sortie'));
 
         // ── Alertes stock ─────────────────────────────────────────────────────
+        // `stockables()` : une fiche de stock peut exister pour un article qui
+        // n'en gere pas — l'ecran de creation en pose une pour tout le monde.
+        // Sans ce filtre, un service traine dans les alertes de rupture.
+        // Un article archivé ne se réapprovisionne pas : le porter en rupture
+        // pousserait à commander ce qu'on a décidé de ne plus vendre.
         $produitsEnAlerte = Produit::where('entreprise_id', $entreprise->id)
+            ->stockables()
+            ->selectionnables()
             ->whereHas('stocks', function($q) use ($pointDeVenteId) {
                 if ($pointDeVenteId) {
                     $q->where('point_de_vente_id', $pointDeVenteId);
@@ -202,7 +209,14 @@ class AdminControleur
             : 0;
 
         // ── Alertes stock ─────────────────────────────────────────────────────
+        // `stockables()` : une fiche de stock peut exister pour un article qui
+        // n'en gere pas — l'ecran de creation en pose une pour tout le monde.
+        // Sans ce filtre, un service traine dans les alertes de rupture.
+        // Un article archivé ne se réapprovisionne pas : le porter en rupture
+        // pousserait à commander ce qu'on a décidé de ne plus vendre.
         $produitsEnAlerte = Produit::where('entreprise_id', $entreprise->id)
+            ->stockables()
+            ->selectionnables()
             ->whereHas('stocks', function($q) use ($pointDeVenteId) {
                 if ($pointDeVenteId) {
                     $q->where('point_de_vente_id', $pointDeVenteId);

@@ -56,11 +56,36 @@ class Produit extends Model
     ];
 
     /**
+     * L'état rendu par `etatStock()` pour un article qui n'a pas de stock du
+     * tout. Il n'est ni « Rupture », ni « Normal » : la question ne se pose pas.
+     */
+    public const ETAT_SANS_STOCK = 'Sans stock';
+
+    /**
      * Indique si ce produit gère un stock physique.
      */
     public function estStockable(): bool
     {
         return in_array($this->type, self::TYPES_STOCKABLES);
+    }
+
+    /**
+     * Le même renseignement, lisible depuis une vue ou sérialisé en JSON sans
+     * avoir à appeler la méthode. Les écrans de vente en ont besoin sur chaque
+     * carte produit.
+     */
+    public function getEstStockableAttribute(): bool
+    {
+        return $this->estStockable();
+    }
+
+    /**
+     * Restreint une requête aux seuls articles qui ont un stock. Les écrans de
+     * stock listaient tout le catalogue, services compris.
+     */
+    public function scopeStockables($query)
+    {
+        return $query->whereIn('type', self::TYPES_STOCKABLES);
     }
 
     /**
@@ -271,19 +296,127 @@ class Produit extends Model
         return $query->where('statut', 'archive');
     }
 
+    /**
+     * Les articles qu'on peut porter sur une pièce à établir.
+     *
+     * Archiver un article, c'est dire « je ne le vends plus ». Le mot n'avait
+     * pourtant d'effet que sur l'écran du catalogue : la caisse, l'achat, la
+     * production, la consignation et le B2B continuaient de le proposer, et
+     * l'utilisateur le retrouvait sur une facture après l'avoir rangé.
+     *
+     * Un seul nom pour la règle, et non `actifs()` répété à dix endroits :
+     * quand une raison de plus d'écarter un article apparaîtra — un article
+     * périmé, un article suspendu —, elle se posera ici.
+     */
+    public function scopeSelectionnables($query)
+    {
+        return $query->where('statut', 'actif');
+    }
+
+    /**
+     * Les articles qu'un écran de stock doit montrer.
+     *
+     * Un article archivé qui porte encore de la marchandise n'a pas quitté le
+     * magasin. Le taire ferait tomber la valeur de l'inventaire sans que rien
+     * ne l'explique, et la quantité resterait dans les écritures : on
+     * afficherait un stock qui ne vaut plus ce que la comptabilité en dit.
+     * Il reste donc visible tant qu'il n'est pas à zéro.
+     */
+    public function scopeVisiblesEnStock($query)
+    {
+        return $query->where(function ($q) {
+            $q->where('statut', 'actif')
+              ->orWhereHas('stocks', fn ($s) => $s->where('quantite_disponible', '>', 0));
+        });
+    }
+
     // ─── Accessor Photo ──────────────────────────────────────────────────────
 
     public function getPhotoUrlAttribute(): string
     {
-        if ($this->photo) {
-            if (str_starts_with($this->photo, 'http://') || str_starts_with($this->photo, 'https://')) {
-                return $this->photo;
-            }
-            if (\Illuminate\Support\Facades\Storage::disk('public')->exists($this->photo)) {
-                return asset('storage/' . $this->photo);
-            }
+        // L'image d'attente était un sac gris, le même sous chaque article :
+        // trente cartes identiques où seul le texte distinguait un sac de riz
+        // d'une prestation de conseil. À défaut de photo, on montre au moins
+        // de quelle nature d'article il s'agit.
+        return $this->photoReelle() ?? $this->illustration();
+    }
+
+    /**
+     * Le dessin qui tient lieu d'image quand l'article n'a pas de photo.
+     *
+     * Ce n'est pas une photo et cela ne prétend pas l'être — voir
+     * `IllustrationArticleService`.
+     */
+    public function illustration(): string
+    {
+        return \App\Modules\Admin\Services\IllustrationArticleService::pour($this);
+    }
+
+    /**
+     * L'adresse de la photo **réelle** de l'article, ou `null` s'il n'en a pas.
+     *
+     * `photo_url` rend toujours quelque chose — l'image d'attente au besoin —
+     * et c'est ce qu'il faut pour une vignette : une case vide serait pire.
+     * Mais la carte de l'écran de vente affiche l'image **en arrière-plan** :
+     * y poser l'image d'attente couvrirait toutes les cartes d'un même
+     * placeholder gris, ce qui n'apprendrait rien et brouillerait le texte.
+     * L'appelant doit donc pouvoir distinguer les deux cas.
+     */
+    public function photoReelle(): ?string
+    {
+        if (!$this->photo) {
+            return null;
         }
-        return asset('images/placeholder-produit.png');
+
+        if (str_starts_with($this->photo, 'http://') || str_starts_with($this->photo, 'https://')) {
+            return $this->photo;
+        }
+
+        if (!\Illuminate\Support\Facades\Storage::disk('public')->exists($this->photo)) {
+            return null;
+        }
+
+        // `asset('storage/…')` ne vaut que si `public/storage` existe — le lien
+        // que pose `php artisan storage:link`. Sans lui, le fichier est bien là
+        // sur le disque, `exists()` répond oui, et l'adresse rendue tombe en
+        // 404 (Not Found — introuvable). La vignette d'un article ne le montrait
+        // pas : son `onerror` basculait sur l'image d'attente, et l'écran
+        // paraissait normal. Le fond de carte, lui, n'a pas d'`onerror` : une
+        // image de fond introuvable ne laisse rien, sans un mot. C'est
+        // exactement ce qui a été constaté — le fond posé au lot 12.4 restait
+        // invisible pendant que la liste des articles semblait aller bien.
+        //
+        // On sert donc par la route quand le lien manque. Elle passe par PHP,
+        // donc elle coûte plus cher : on ne l'emprunte que faute de mieux.
+        return self::lienDeStockagePose()
+            ? asset('storage/' . $this->photo)
+            : route('admin.produits.photo.voir', $this);
+    }
+
+    /**
+     * Le lien `public/storage` est-il en place ?
+     *
+     * Retenu pour la durée de la requête : l'écran de vente pose la question
+     * une fois par article, et un accès disque par carte n'apprendrait rien de
+     * neuf.
+     */
+    private static ?bool $lienDeStockage = null;
+
+    private static function lienDeStockagePose(): bool
+    {
+        return self::$lienDeStockage ??= file_exists(public_path('storage'));
+    }
+
+    /**
+     * Oublier ce qu'on croit savoir du lien de stockage.
+     *
+     * La réponse est retenue pour la durée de la requête ; les épreuves, elles,
+     * posent et retirent le lien dans un même processus. Sans cette porte, la
+     * première d'entre elles fixerait la réponse pour toutes les suivantes.
+     */
+    public static function oublierLeLienDeStockage(): void
+    {
+        self::$lienDeStockage = null;
     }
 
     // ─── Helpers Phase 1 ─────────────────────────────────────────────────────
@@ -652,9 +785,19 @@ class Produit extends Model
 
     /**
      * Détermine l'état du stock de l'article.
+     *
+     * Un service ou un consommable non stockable n'a pas de stock : il ne peut
+     * donc pas être en rupture. L'écran de vente affichait pourtant « Rupture
+     * de stock » sous chaque prestation, et ouvrait une alerte à chaque ligne —
+     * un cabinet, qui ne vend que des services, voyait son catalogue entier en
+     * rouge et une modale par article. Le contrôle serveur, lui, écartait déjà
+     * ces articles : rien n'était jamais bloqué, mais rien ne le disait.
      */
     public function etatStock(): string
     {
+        if (!$this->estStockable()) {
+            return self::ETAT_SANS_STOCK;
+        }
         if ($this->stock_actuel <= 0) {
             return 'Rupture';
         }

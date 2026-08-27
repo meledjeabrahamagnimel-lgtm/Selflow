@@ -6,7 +6,7 @@
 <style>
     .liaison-grid {
         display: grid;
-        grid-template-columns: 1fr 1fr;
+        grid-template-columns: 1fr 1fr 1fr;
         gap: 24px;
         margin-bottom: 32px;
     }
@@ -37,6 +37,7 @@
     .badge-active   { background: #ecfdf5; color: #065f46; }
     .badge-inactive { background: #f1f5f9; color: #64748b; }
     .badge-error    { background: #fef2f2; color: #991b1b; }
+    .badge-attente  { background: #fffbeb; color: #92400e; }
 
     .direction-arrow {
         display: inline-flex; align-items: center; gap: 4px;
@@ -46,6 +47,12 @@
     .arrow-icon { font-size: 10px; }
 
     .ent-row td { vertical-align: middle; padding: 12px 14px; }
+
+    .demande-carte {
+        border: 1px solid #fcd34d; background: #fffbeb; border-radius: 12px;
+        padding: 16px 18px; display: flex; gap: 18px; align-items: flex-start;
+        flex-wrap: wrap; margin-bottom: 12px;
+    }
 
     .modal-overlay { display:none; position:fixed; inset:0; background:rgba(0,0,0,.45); z-index:9999; align-items:center; justify-content:center; }
     .modal-box     { background:#fff; border-radius:16px; max-width:540px; width:100%; box-shadow:0 20px 60px rgba(0,0,0,.15); overflow:hidden; }
@@ -68,32 +75,111 @@
     <i class="fas fa-exclamation-circle" style="font-size:18px;"></i> {{ session('error') }}
 </div>
 @endif
+@error('motif')
+<div style="background:#fef2f2; border:1px solid #fca5a5; border-radius:10px; padding:14px 18px; margin-bottom:20px; color:#991b1b; font-weight:600;">
+    {{ $message }}
+</div>
+@enderror
 
 {{-- En-tête --}}
 <div class="page-header">
     <div>
         <h1><i class="fas fa-link"></i> Liaisons SELFLOW ↔ COMPTAFLOW</h1>
-        <p>Gérez les connexions inter-applications entre Selflow et COMPTAFLOW.</p>
+        <p>
+            Une entreprise demande son dossier comptable et vous validez — ou vous le lui ouvrez
+            directement. Dans les deux cas, Comptaflow délivre la clé et
+            <strong>ses accès Selflow ouvrent son compte comptable</strong> : même adresse,
+            même mot de passe.
+        </p>
     </div>
-    <div style="display:flex; gap:10px;">
-        <button class="btn btn-primary" onclick="document.getElementById('modalLierManuellement').style.display='flex'">
-            <i class="fas fa-plug"></i> Lier manuellement
-        </button>
-        <button class="btn btn-outline" onclick="document.getElementById('modalCreerComptaflow').style.display='flex'">
-            <i class="fas fa-plus-circle"></i> Créer compte COMPTAFLOW
-        </button>
-    </div>
+    <a href="{{ rtrim(config('selflow.comptaflow_app_url'), '/') }}" target="_blank" rel="noopener"
+       class="btn btn-outline">
+        <i class="fas fa-arrow-up-right-from-square"></i> Ouvrir Comptaflow
+    </a>
 </div>
+
+{{-- ══ Ce qui attend une décision ══
+
+     Deux boutons ouvraient ici deux fenêtres qui n'existent plus.
+
+     « Lier manuellement » demandait de coller un identifiant Comptaflow et une
+     clé, sans que rien ne vérifie que ce dossier appartenait à cette
+     entreprise — et sa route pointait sur une méthode absente du contrôleur,
+     si bien qu'elle tombait en 500 (Internal Server Error — erreur du serveur)
+     depuis un renommage que personne n'avait remarqué.
+
+     « Créer compte COMPTAFLOW » demandait au superadministrateur de **choisir
+     le mot de passe** du compte d'un client, et le transmettait en clair.
+
+     Il n'y a plus qu'un geste : valider, ou refuser en disant pourquoi. --}}
+@if($demandes->isNotEmpty())
+<div class="card" style="margin-bottom:28px; padding:20px 22px; border-left:4px solid #f59e0b;">
+    <h3 style="font-size:15px; font-weight:700; margin:0 0 14px;">
+        <i class="fas fa-hourglass-half" style="color:#d97706;"></i>
+        {{ $demandes->count() }} demande(s) de dossier comptable en attente
+    </h3>
+
+    @foreach($demandes as $dem)
+        @php $adminDem = $dem->utilisateurs->first(); @endphp
+        <div class="demande-carte">
+            <div style="flex:1; min-width:260px;">
+                <div style="font-weight:700; font-size:14px; color:var(--text-1);">{{ $dem->nom }}</div>
+                <div style="font-size:12px; color:var(--text-2); margin-top:4px; line-height:1.6;">
+                    {{ $dem->forme_juridique ?: '— forme juridique non renseignée —' }} ·
+                    NCC {{ $dem->ncc ?: '—' }} ·
+                    RCCM {{ $dem->rccm ?: '—' }} ·
+                    Régime {{ $dem->regime_imposition ?: '—' }}
+                    <br>
+                    Demandée le {{ $dem->comptaflow_demande_le?->format('d/m/Y à H:i') ?? '—' }}
+                    @if($adminDem) · {{ $adminDem->prenom }} {{ $adminDem->nom }} ({{ $adminDem->email }}) @endif
+                </div>
+                {{-- Un livre va s'ouvrir au nom de quelqu'un : ce qui manque à
+                     son identité fiscale se voit avant, pas après. --}}
+                @php
+                    $manque = collect(['NCC' => $dem->ncc, 'RCCM' => $dem->rccm, 'Régime' => $dem->regime_imposition])
+                        ->filter(fn ($v) => blank($v))->keys();
+                @endphp
+                @if($manque->isNotEmpty())
+                    <div style="font-size:12px; color:#991b1b; font-weight:600; margin-top:6px;">
+                        <i class="fas fa-triangle-exclamation"></i>
+                        Identité fiscale incomplète : {{ $manque->implode(', ') }}.
+                    </div>
+                @endif
+            </div>
+            <div style="display:flex; gap:8px; align-items:center;">
+                <form method="POST" action="{{ route('superadmin.liaisons.valider', $dem) }}" style="margin:0;"
+                      onsubmit="return confirm('Ouvrir un dossier Comptaflow pour « {{ $dem->nom }} » ?')">
+                    @csrf
+                    <button type="submit" class="btn btn-primary btn-sm" style="padding:7px 14px;">
+                        <i class="fas fa-check"></i> Valider
+                    </button>
+                </form>
+                <button type="button" class="btn btn-outline btn-sm" style="padding:7px 14px;"
+                        {{-- L'`uuid`, et non le numéro de ligne : c'est lui que
+                             portent les adresses, et le numéro dirait combien
+                             d'entreprises la plateforme compte. --}}
+                        onclick="ouvrirRefus(@js($dem->uuid), @js($dem->nom))">
+                    <i class="fas fa-xmark"></i> Refuser
+                </button>
+            </div>
+        </div>
+    @endforeach
+</div>
+@endif
 
 {{-- KPIs --}}
 @php
-    $liees    = $entreprises->whereNotNull('comptaflow_company_id')->count();
-    $nonLiees = $entreprises->whereNull('comptaflow_company_id')->count();
+    $liees    = $entreprises->filter(fn ($e) => $e->liaisonComptaflowActive())->count();
+    $nonLiees = $entreprises->count() - $liees;
 @endphp
 <div class="liaison-grid">
     <div class="stat-card">
         <div class="stat-icon" style="background:#ecfdf5; color:#10b981;"><i class="fas fa-link"></i></div>
         <div><div class="stat-val">{{ $liees }}</div><div class="stat-lbl">Entreprises liées à COMPTAFLOW</div></div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-icon" style="background:#fffbeb; color:#d97706;"><i class="fas fa-hourglass-half"></i></div>
+        <div><div class="stat-val">{{ $demandes->count() }}</div><div class="stat-lbl">Demandes en attente</div></div>
     </div>
     <div class="stat-card">
         <div class="stat-icon" style="background:#f1f5f9; color:#64748b;"><i class="fas fa-unlink"></i></div>
@@ -115,7 +201,8 @@
                     <th>ID Selflow</th>
                     <th>ID COMPTAFLOW</th>
                     <th>Statut liaison</th>
-                    <th>Dernière sync</th>
+                    <th>Clé</th>
+                    <th>Dernier déversement</th>
                     <th>Admin</th>
                     <th style="text-align:center;">Actions</th>
                 </tr>
@@ -124,8 +211,7 @@
                 @foreach($entreprises as $ent)
                 @php
                     $admin = $ent->utilisateurs->first();
-                    $estLiee = !empty($ent->comptaflow_company_id);
-                    $syncStatus = $ent->comptaflow_sync_status;
+                    $estLiee = $ent->liaisonComptaflowActive();
                 @endphp
                 <tr class="ent-row">
                     <td>
@@ -141,7 +227,7 @@
                         </span>
                     </td>
                     <td>
-                        @if($estLiee)
+                        @if($ent->comptaflow_company_id)
                             <span style="background:#dbeafe; color:#1d4ed8; padding:3px 8px; border-radius:6px; font-family:monospace; font-weight:700; font-size:12px;">
                                 #{{ $ent->comptaflow_company_id }}
                             </span>
@@ -151,31 +237,49 @@
                     </td>
                     <td>
                         @if($estLiee)
-                            @if($syncStatus === 'active')
-                                <span class="liaison-badge badge-active">
-                                    <i class="fas fa-circle" style="font-size:7px;"></i> Active
-                                </span>
-                                <span class="direction-arrow">
-                                    <i class="fas fa-arrows-left-right arrow-icon"></i> selflow ↔ comptaflow
-                                </span>
-                            @elseif($syncStatus === 'error')
-                                <span class="liaison-badge badge-error">
-                                    <i class="fas fa-exclamation-triangle" style="font-size:9px;"></i> Erreur
-                                </span>
-                            @else
-                                <span class="liaison-badge badge-inactive">
-                                    <i class="fas fa-pause-circle" style="font-size:9px;"></i> {{ $syncStatus ?? 'Inconnue' }}
-                                </span>
-                            @endif
+                            <span class="liaison-badge badge-active">
+                                <i class="fas fa-circle" style="font-size:7px;"></i> Active
+                            </span>
+                            <span class="direction-arrow">
+                                <i class="fas fa-arrow-right arrow-icon"></i> selflow déverse
+                            </span>
+                        @elseif($ent->demandeComptaflowEnAttente())
+                            <span class="liaison-badge badge-attente">
+                                <i class="fas fa-hourglass-half" style="font-size:9px;"></i> Demande en attente
+                            </span>
+                        @elseif($ent->comptaflow_demande_statut === \App\Modules\Admin\Modeles\Entreprise::DEMANDE_REFUSEE)
+                            <span class="liaison-badge badge-error" title="{{ $ent->comptaflow_refus_motif }}">
+                                <i class="fas fa-xmark" style="font-size:9px;"></i> Refusée
+                            </span>
                         @else
                             <span class="liaison-badge badge-inactive">
                                 <i class="fas fa-unlink" style="font-size:9px;"></i> Non liée
                             </span>
                         @endif
                     </td>
+                    {{-- Quatre caractères : de quoi distinguer deux liaisons,
+                         pas de quoi s'en servir. Aucun écran n'affiche jamais
+                         une clé entière, ni ne permet de la copier. --}}
+                    <td style="font-family:monospace; font-size:12px; color:var(--text-2);">
+                        {{ $ent->indiceCleComptaflow() ?? '—' }}
+                        @if($estLiee)
+                            @php
+                                $tournee = $ent->comptaflow_cle_tournee_le ?? $ent->comptaflow_liee_le;
+                                $enRetard = $tournee && $tournee->lte(now()->subDays(\App\Modules\Admin\Services\LiaisonComptaflowService::JOURS_AVANT_ROTATION));
+                            @endphp
+                            <div style="font-family:inherit; font-size:10.5px; color:{{ $enRetard ? '#b45309' : 'var(--text-3)' }}; margin-top:3px;">
+                                {{ $enRetard ? 'à renouveler — ' : '' }}{{ $tournee?->format('d/m/Y') ?? '—' }}
+                            </div>
+                            @if($ent->comptaflow_rotation_echouee_le)
+                                <div style="font-family:inherit; font-size:10.5px; color:#991b1b; margin-top:2px;">
+                                    dernier essai en échec le {{ $ent->comptaflow_rotation_echouee_le->format('d/m') }}
+                                </div>
+                            @endif
+                        @endif
+                    </td>
                     <td style="font-size:12px; color:var(--text-2);">
                         @if($ent->comptaflow_last_sync_at)
-                            {{ \Carbon\Carbon::parse($ent->comptaflow_last_sync_at)->format('d/m/Y H:i') }}
+                            {{ $ent->comptaflow_last_sync_at->format('d/m/Y H:i') }}
                         @else
                             <span style="color:var(--text-3);">—</span>
                         @endif
@@ -191,32 +295,50 @@
                     <td style="text-align:center; white-space:nowrap;">
                         <div style="display:flex; gap:6px; justify-content:center; flex-wrap:wrap;">
                             @if($estLiee)
-                                {{-- Vérifier --}}
                                 <form method="POST" action="{{ route('superadmin.liaisons.verifier', $ent) }}" style="display:inline;">
                                     @csrf
-                                    <button type="submit" class="btn btn-outline btn-sm" title="Vérifier la liaison" style="padding:5px 8px;">
+                                    <button type="submit" class="btn btn-outline btn-sm" title="Vérifier la liaison auprès de Comptaflow" style="padding:5px 8px;">
                                         <i class="fas fa-satellite-dish"></i>
                                     </button>
                                 </form>
-                                {{-- Délier --}}
+                                {{-- Sans attendre le premier du mois. Ne coupe
+                                     rien : l'ancienne clé reste en place tant
+                                     que la nouvelle n'est pas en main. --}}
+                                <form method="POST" action="{{ route('superadmin.liaisons.renouveler_cle', $ent) }}" style="display:inline;"
+                                      onsubmit="return confirm('Renouveler la clé de « {{ $ent->nom }} » ? L\'ancienne cessera de valoir.')">
+                                    @csrf
+                                    <button type="submit" class="btn btn-outline btn-sm" title="Renouveler la clé maintenant" style="padding:5px 8px;">
+                                        <i class="fas fa-key"></i>
+                                    </button>
+                                </form>
                                 <form method="POST" action="{{ route('superadmin.liaisons.delierEntreprise', $ent) }}"
-                                    onsubmit="return confirm('Délier «{{ $ent->nom }}» de COMPTAFLOW ?')" style="display:inline;">
+                                    onsubmit="return confirm('Délier « {{ $ent->nom }} » ? La clé sera révoquée chez Comptaflow.')" style="display:inline;">
                                     @csrf @method('DELETE')
-                                    <button type="submit" class="btn btn-danger btn-sm" title="Supprimer la liaison" style="padding:5px 8px;">
+                                    <button type="submit" class="btn btn-danger btn-sm" title="Révoquer la clé et supprimer la liaison" style="padding:5px 8px;">
                                         <i class="fas fa-unlink"></i>
                                     </button>
                                 </form>
+                            @elseif($ent->demandeComptaflowEnAttente())
+                                <form method="POST" action="{{ route('superadmin.liaisons.valider', $ent) }}" style="display:inline;">
+                                    @csrf
+                                    <button type="submit" class="btn btn-primary btn-sm" style="padding:5px 10px; font-size:11px;">
+                                        <i class="fas fa-check"></i> Valider
+                                    </button>
+                                </form>
                             @else
-                                <button type="button" class="btn btn-primary btn-sm"
-                                    onclick="ouvrirLierPour({{ $ent->id }}, @js($ent->nom))"
-                                    style="padding:5px 10px; font-size:11px;">
-                                    <i class="fas fa-plug"></i> Lier
-                                </button>
-                                <button type="button" class="btn btn-outline btn-sm"
-                                    onclick="ouvrirCreerPour({{ $ent->id }}, @js($ent->nom))"
-                                    style="padding:5px 10px; font-size:11px;">
-                                    <i class="fas fa-plus"></i> Créer CPTF
-                                </button>
+                                {{-- Le superadministrateur ouvre le dossier de
+                                     sa propre initiative : un client qui
+                                     souscrit Comptaflow par téléphone n'a pas à
+                                     cliquer dans un écran pour l'obtenir.
+                                     La clé reste délivrée par Comptaflow —
+                                     personne ne la saisit. --}}
+                                <form method="POST" action="{{ route('superadmin.liaisons.valider', $ent) }}" style="display:inline;"
+                                      onsubmit="return confirm('Ouvrir un dossier Comptaflow pour « {{ $ent->nom }} » ? Ses accès Selflow y ouvriront le compte.')">
+                                    @csrf
+                                    <button type="submit" class="btn btn-primary btn-sm" style="padding:5px 10px; font-size:11px;">
+                                        <i class="fas fa-plug"></i> Lier maintenant
+                                    </button>
+                                </form>
                             @endif
                         </div>
                     </td>
@@ -227,144 +349,63 @@
     </div>
 </div>
 
-{{-- ═══════════════════════════════════════════════════════════ --}}
-{{-- MODAL : Lier manuellement                                    --}}
-{{-- ═══════════════════════════════════════════════════════════ --}}
-<div class="modal-overlay" id="modalLierManuellement">
-    <div class="modal-box">
-        <div class="modal-header">
-            <h3 style="font-size:15px; font-weight:700; margin:0;"><i class="fas fa-plug" style="color:var(--primary)"></i> Lier une entreprise à COMPTAFLOW</h3>
-            <button onclick="document.getElementById('modalLierManuellement').style.display='none'" style="background:none;border:none;font-size:22px;cursor:pointer;color:var(--text-3);">&times;</button>
-        </div>
-        <form method="POST" action="{{ route('superadmin.liaisons.lier') }}" style="margin:0;">
-            @csrf
-            <div class="modal-body">
-                <div style="background:#eff6ff; border:1px solid #bfdbfe; border-radius:8px; padding:12px 14px; margin-bottom:18px; font-size:13px; color:#1d4ed8;">
-                    <i class="fas fa-info-circle"></i>
-                    Entrez l'<strong>ID COMPTAFLOW</strong> et la <strong>clé de synchronisation</strong> générée côté COMPTAFLOW.
-                </div>
-
-                <div class="form-group" style="margin-bottom:16px;">
-                    <label class="form-label">Entreprise Selflow <span style="color:var(--danger)">*</span></label>
-                    <select name="entreprise_id" id="select-entreprise-lier" class="form-control" required>
-                        <option value="">— Sélectionner une entreprise —</option>
-                        @foreach($entreprises as $ent)
-                            <option value="{{ $ent->id }}" {{ $ent->comptaflow_company_id ? 'disabled' : '' }}>
-                                #{{ $ent->id }} — {{ $ent->nom }} {{ $ent->comptaflow_company_id ? '(déjà liée)' : '' }}
-                            </option>
-                        @endforeach
-                    </select>
-                </div>
-
-                <div style="display:grid; grid-template-columns:1fr 1fr; gap:14px; margin-bottom:16px;">
-                    <div class="form-group">
-                        <label class="form-label">ID COMPTAFLOW <span style="color:var(--danger)">*</span></label>
-                        <input type="number" name="comptaflow_company_id" class="form-control" required min="1" placeholder="Ex: 5">
-                    </div>
-                    <div class="form-group">
-                        <label class="form-label">Clé de synchronisation <span style="color:var(--danger)">*</span></label>
-                        <input type="text" name="comptaflow_sync_key" class="form-control" required placeholder="Ex: sf_abc123xyz">
-                    </div>
-                </div>
-            </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-outline" onclick="document.getElementById('modalLierManuellement').style.display='none'">Annuler</button>
-                <button type="submit" class="btn btn-primary"><i class="fas fa-save"></i> Enregistrer la liaison</button>
-            </div>
-        </form>
+@if(!empty($comptaflowCompanies))
+<div class="card" style="margin-top:24px; padding:18px 20px;">
+    <h3 style="font-size:14px; font-weight:700; margin:0 0 10px;">
+        <i class="fas fa-book"></i> Dossiers connus de Comptaflow
+    </h3>
+    <div style="font-size:12px; color:var(--text-3); line-height:1.6;">
+        {{ count($comptaflowCompanies) }} dossier(s) répondent côté Comptaflow. Cette liste sert
+        au rapprochement à l'œil ; aucune liaison ne s'ouvre depuis ici.
     </div>
 </div>
+@endif
 
 {{-- ═══════════════════════════════════════════════════════════ --}}
-{{-- MODAL : Créer compte COMPTAFLOW depuis Selflow               --}}
+{{-- MODAL : refuser une demande, avec un motif                  --}}
+{{-- Un refus muet laisserait l'entreprise redemander sans fin.  --}}
 {{-- ═══════════════════════════════════════════════════════════ --}}
-<div class="modal-overlay" id="modalCreerComptaflow">
-    <div class="modal-box" style="max-width:580px;">
+<div class="modal-overlay" id="modalRefus">
+    <div class="modal-box">
         <div class="modal-header">
-            <h3 style="font-size:15px; font-weight:700; margin:0;"><i class="fas fa-plus-circle" style="color:var(--primary)"></i> Créer un compte COMPTAFLOW</h3>
-            <button onclick="document.getElementById('modalCreerComptaflow').style.display='none'" style="background:none;border:none;font-size:22px;cursor:pointer;color:var(--text-3);">&times;</button>
+            <h3 style="font-size:15px; font-weight:700; margin:0;">
+                <i class="fas fa-xmark" style="color:var(--danger)"></i>
+                Refuser la demande de <span id="refus-nom"></span>
+            </h3>
+            <button type="button" onclick="document.getElementById('modalRefus').style.display='none'"
+                    style="background:none;border:none;font-size:22px;cursor:pointer;color:var(--text-3);">&times;</button>
         </div>
-        <form method="POST" action="{{ route('superadmin.liaisons.creerComptaflow') }}" style="margin:0;">
+        <form method="POST" id="form-refus" action="" style="margin:0;">
             @csrf
             <div class="modal-body">
-                <div style="background:#f0fdf4; border:1px solid #86efac; border-radius:8px; padding:12px 14px; margin-bottom:18px; font-size:13px; color:#166534;">
-                    <i class="fas fa-magic"></i>
-                    Les informations de l'entreprise (nom, RCCM, NCC, adresse, admin) seront automatiquement envoyées à COMPTAFLOW.
-                    Seul le mot de passe est à définir.
-                </div>
-
-                <div class="form-group" style="margin-bottom:16px;">
-                    <label class="form-label">Entreprise Selflow <span style="color:var(--danger)">*</span></label>
-                    <select name="entreprise_id" id="select-entreprise-creer" class="form-control" required onchange="afficherInfosEntreprise(this)">
-                        <option value="">— Sélectionner une entreprise non liée —</option>
-                        @foreach($entreprises->whereNull('comptaflow_company_id') as $ent)
-                            <option value="{{ $ent->id }}"
-                                data-nom="{{ $ent->nom }}"
-                                data-rccm="{{ $ent->rccm ?? '—' }}"
-                                data-ncc="{{ $ent->ncc ?? '—' }}"
-                                data-email="{{ optional($ent->utilisateurs->first())->email ?? '—' }}"
-                                data-admin="{{ optional($ent->utilisateurs->first())->prenom }} {{ optional($ent->utilisateurs->first())->nom }}">
-                                #{{ $ent->id }} — {{ $ent->nom }}
-                            </option>
-                        @endforeach
-                    </select>
-                </div>
-
-                {{-- Infos auto-affichées --}}
-                <div id="infos-entreprise-creer" style="display:none; background:var(--bg); border:1px solid var(--border); border-radius:8px; padding:14px; margin-bottom:16px; font-size:13px;">
-                    <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px;">
-                        <div><span style="color:var(--text-3); font-size:11px; font-weight:700;">ENTREPRISE</span><br><strong id="iev-nom">—</strong></div>
-                        <div><span style="color:var(--text-3); font-size:11px; font-weight:700;">ADMIN</span><br><strong id="iev-admin">—</strong></div>
-                        <div><span style="color:var(--text-3); font-size:11px; font-weight:700;">RCCM</span><br><span id="iev-rccm" style="font-family:monospace;">—</span></div>
-                        <div><span style="color:var(--text-3); font-size:11px; font-weight:700;">NCC</span><br><span id="iev-ncc" style="font-family:monospace;">—</span></div>
-                        <div style="grid-column:1/-1;"><span style="color:var(--text-3); font-size:11px; font-weight:700;">EMAIL ADMIN</span><br><span id="iev-email">—</span></div>
-                    </div>
-                </div>
-
-                <div class="form-group">
-                    <label class="form-label">Mot de passe COMPTAFLOW <span style="color:var(--danger)">*</span></label>
-                    <input type="password" name="mot_de_passe" class="form-control" required minlength="8" placeholder="Min. 8 caractères">
-                    <small style="color:var(--text-3); font-size:11px;">Ce mot de passe sera utilisé pour la connexion à COMPTAFLOW.</small>
+                <div class="form-group" style="margin-bottom:0;">
+                    <label class="form-label">Motif <span style="color:var(--danger)">*</span></label>
+                    <textarea name="motif" class="form-control" rows="3" required maxlength="255"
+                              placeholder="Ex : le NCC déclaré ne correspond à aucune entreprise connue de la DGI."></textarea>
+                    <small style="color:var(--text-3); font-size:11px;">
+                        L'entreprise ne verra que ce texte, dans ses paramètres.
+                    </small>
                 </div>
             </div>
             <div class="modal-footer">
-                <button type="button" class="btn btn-outline" onclick="document.getElementById('modalCreerComptaflow').style.display='none'">Annuler</button>
-                <button type="submit" class="btn btn-primary"><i class="fas fa-rocket"></i> Créer et lier</button>
+                <button type="button" class="btn btn-outline" onclick="document.getElementById('modalRefus').style.display='none'">Annuler</button>
+                <button type="submit" class="btn btn-danger"><i class="fas fa-xmark"></i> Refuser</button>
             </div>
         </form>
     </div>
 </div>
 
 <script>
-function ouvrirLierPour(id, nom) {
-    const sel = document.getElementById('select-entreprise-lier');
-    sel.value = id;
-    document.getElementById('modalLierManuellement').style.display = 'flex';
-}
+    var GABARIT_REFUS = "{{ route('superadmin.liaisons.refuser', ['entreprise' => '__ID__']) }}";
 
-function ouvrirCreerPour(id, nom) {
-    const sel = document.getElementById('select-entreprise-creer');
-    sel.value = id;
-    afficherInfosEntreprise(sel);
-    document.getElementById('modalCreerComptaflow').style.display = 'flex';
-}
+    function ouvrirRefus(id, nom) {
+        document.getElementById('refus-nom').textContent = nom;
+        document.getElementById('form-refus').action = GABARIT_REFUS.replace('__ID__', id);
+        document.getElementById('modalRefus').style.display = 'flex';
+    }
 
-function afficherInfosEntreprise(sel) {
-    const opt = sel.selectedOptions[0];
-    const box = document.getElementById('infos-entreprise-creer');
-    if (!opt || !opt.value) { box.style.display = 'none'; return; }
-
-    document.getElementById('iev-nom').textContent   = opt.dataset.nom   || '—';
-    document.getElementById('iev-admin').textContent = opt.dataset.admin || '—';
-    document.getElementById('iev-rccm').textContent  = opt.dataset.rccm  || '—';
-    document.getElementById('iev-ncc').textContent   = opt.dataset.ncc   || '—';
-    document.getElementById('iev-email').textContent = opt.dataset.email  || '—';
-    box.style.display = 'block';
-}
-
-// Fermer modal en cliquant dehors
-document.querySelectorAll('.modal-overlay').forEach(m => {
-    m.addEventListener('click', e => { if (e.target === m) m.style.display = 'none'; });
-});
+    document.querySelectorAll('.modal-overlay').forEach(function (m) {
+        m.addEventListener('click', function (e) { if (e.target === m) m.style.display = 'none'; });
+    });
 </script>
 @endsection

@@ -126,7 +126,10 @@
                         <td style="color:var(--text-3);">{{ $f->created_at->format('d/m/Y') }}</td>
                         <td style="display:flex; gap:6px; flex-wrap:wrap;">
                             <button class="btn btn-outline btn-sm btn-modifier-fournisseur"
-                                data-id="{{ $f->id }}"
+                                {{-- Même défaut que sur la fiche client : le numéro de ligne partait
+     seul dans l'adresse, alors que les adresses portent l'`uuid`.
+     Modifier un fournisseur tombait en 404 (Not Found — introuvable). --}}
+                                data-action="{{ route('admin.fournisseurs.modifier', $f) }}"
                                 data-nom="{{ $f->nom }}"
                                 data-type="{{ $f->type_facturation }}"
                                 data-secteur="{{ $f->secteur }}"
@@ -260,7 +263,10 @@
                             <td style="color:var(--text-3);">{{ $f->created_at->format('d/m/Y') }}</td>
                             <td>
                                 <button class="btn btn-outline btn-sm btn-modifier-fournisseur"
-                                    data-id="{{ $f->id }}"
+                                    {{-- Même défaut que sur la fiche client : le numéro de ligne partait
+     seul dans l'adresse, alors que les adresses portent l'`uuid`.
+     Modifier un fournisseur tombait en 404 (Not Found — introuvable). --}}
+                                data-action="{{ route('admin.fournisseurs.modifier', $f) }}"
                                     data-nom="{{ $f->nom }}"
                                     data-secteur="{{ $f->secteur }}"
                                     data-telephone="{{ $f->telephone }}"
@@ -566,7 +572,7 @@ document.querySelectorAll('.btn-modifier-fournisseur').forEach(function(btn) {
         if (!modal || !form) return;
 
         // URL d'action du formulaire
-        form.action = '/admin/fournisseurs/' + data.id;
+        form.action = data.action;
 
         // Remplir les champs
         document.getElementById('edit_nom').value             = data.nom      || '';

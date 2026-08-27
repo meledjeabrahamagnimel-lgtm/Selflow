@@ -469,10 +469,15 @@
         if (empty($modulesActifs)) {
             $modulesActifs = ['principal', 'ventes', 'achats', 'stock', 'production', 'comptabilite', 'points_de_vente', 'produits', 'tiers', 'rapports', 'b2b', 'fne'];
         }
-        $secteurActivite = $entreprise?->secteur_activite ?? ['Commercial'];
+        $secteurActivite = $entreprise?->secteur_activite ?? [];
         if (is_string($secteurActivite)) {
             $secteurActivite = [$secteurActivite];
         }
+        // Le résultat par site n'a de sens qu'à partir de deux sites. Le
+        // compte est fait une fois ici plutôt qu'à chaque lien du menu.
+        $nombreDeSites = $entreprise
+            ? \App\Modules\Admin\Modeles\PointDeVente::where('entreprise_id', $entreprise->id)->count()
+            : 0;
     @endphp
 
     @if($nomPdvAffichage)
@@ -744,6 +749,17 @@
             </a>
             <a href="{{ route('admin.comptabilite.lettrage') }}" class="nav-item {{ request()->routeIs('admin.comptabilite.lettrage') ? 'active' : '' }}">
                 <i class="fas fa-link"></i> Lettrage
+            </a>
+            {{-- La ventilation analytique n'a de sens qu'à plusieurs sites :
+                 comparer un magasin à lui-même n'apprend rien, et le lien
+                 encombrerait le menu d'un commerce qui n'en a qu'un. --}}
+            @if(($nombreDeSites ?? 0) > 1)
+            <a href="{{ route('admin.comptabilite.analytique') }}" class="nav-item {{ request()->routeIs('admin.comptabilite.analytique') ? 'active' : '' }}">
+                <i class="fas fa-store"></i> Résultat par site
+            </a>
+            @endif
+            <a href="{{ route('admin.comptabilite.libelles') }}" class="nav-item {{ request()->routeIs('admin.comptabilite.libelles') ? 'active' : '' }}">
+                <i class="fas fa-pen-nib"></i> Libellés d'écriture
             </a>
             @endif
             @endif
@@ -1192,17 +1208,48 @@
         <div style="width:60px; height:60px; border-radius:14px; background:#FEF3C7; color:#D97706; display:inline-flex; align-items:center; justify-content:center; font-size:26px; margin-bottom:20px;">
             <i class="fas fa-triangle-exclamation"></i>
         </div>
-        <h2 style="font-size:20px; font-weight:800; color:#1E293B; margin-bottom:10px; font-family:'Inter', sans-serif;">Inscription incomplète</h2>
-        <p style="color:#64748B; font-size:14px; line-height:1.5; margin-bottom:28px; font-family:'Inter', sans-serif;">
-            Terminer votre inscription avant de continuer. Vous devez renseigner toutes les informations réglementaires de votre entreprise pour effectuer des ventes, achats ou devis.
+        <h2 style="font-size:20px; font-weight:800; color:#1E293B; margin-bottom:10px; font-family:'Inter', sans-serif;">Il manque encore quelque chose</h2>
+
+        {{-- L'écran disait « renseigner toutes les informations réglementaires »
+             sans jamais dire **lesquelles** : l'utilisateur arrivait sur une
+             page de paramètres de trois écrans de haut et cherchait. --}}
+        @php
+            $manquants = Auth::check() && Auth::user()->entreprise
+                ? Auth::user()->entreprise->elementsInscriptionManquants()
+                : [];
+        @endphp
+
+        <p style="color:#64748B; font-size:14px; line-height:1.6; margin-bottom:18px; font-family:'Inter', sans-serif;">
+            Ces éléments partent avec chaque facture à la plateforme de la DGI. Tant qu'ils manquent,
+            aucune vente ni aucun achat ne peut être enregistré.
         </p>
-        
+
+        @if($manquants)
+            <ul style="text-align:left; margin:0 0 26px; padding:14px 16px 14px 34px; background:#FEF3C7; border:1px solid #FCD34D; border-radius:10px; color:#92400E; font-size:13.5px; line-height:1.8; font-family:'Inter', sans-serif;">
+                @foreach($manquants as $manquant)
+                    <li>{{ $manquant['libelle'] }}</li>
+                @endforeach
+            </ul>
+        @endif
+
         <div style="display:flex; gap:12px; justify-content:center;">
             <button onclick="fermerModalIncomplet()" style="flex:1; padding:12px; background:#F1F5F9; color:#475569; font-weight:600; border:none; border-radius:10px; font-size:14px; cursor:pointer; transition:all 0.15s; font-family:'Inter', sans-serif;" onmouseover="this.style.background='#E2E8F0'" onmouseout="this.style.background='#F1F5F9'">
                 Annuler
             </button>
-            <a href="{{ route('admin.entreprise.parametres') }}" style="flex:1; padding:12px; background:#002B5C; color:#ffffff; font-weight:600; border:none; border-radius:10px; font-size:14px; cursor:pointer; text-decoration:none; display:inline-flex; align-items:center; justify-content:center; transition:all 0.15s; font-family:'Inter', sans-serif;" onmouseover="this.style.background='#001F42'" onmouseout="this.style.background='#002B5C'">
-                Continuer
+            {{-- Le bouton menait toujours aux paramètres, même quand ce qui
+                 manquait se réglait ailleurs : un point de vente se crée sur
+                 son propre écran, un domaine d'activité au parcours. On envoie
+                 là où se règle le premier manque. --}}
+            @php
+                $premier = $manquants[0]['ou'] ?? 'identite';
+                $destination = match ($premier) {
+                    'points_de_vente' => route('admin.pdv.index'),
+                    'parcours'        => route('admin.souscription.index'),
+                    default           => route('admin.entreprise.parametres') . '#' . $premier,
+                };
+            @endphp
+            <a href="{{ $destination }}" style="flex:1; padding:12px; background:#002B5C; color:#ffffff; font-weight:600; border:none; border-radius:10px; font-size:14px; cursor:pointer; text-decoration:none; display:inline-flex; align-items:center; justify-content:center; transition:all 0.15s; font-family:'Inter', sans-serif;" onmouseover="this.style.background='#001F42'" onmouseout="this.style.background='#002B5C'">
+                {{ ($manquants[0]['ou'] ?? '') === 'points_de_vente' ? 'Créer mon point de vente' : 'Compléter' }}
             </a>
         </div>
     </div>

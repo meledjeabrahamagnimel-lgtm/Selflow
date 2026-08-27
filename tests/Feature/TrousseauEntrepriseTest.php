@@ -34,11 +34,27 @@ class TrousseauEntrepriseTest extends TestCase
     {
         $bilan = TrousseauEntrepriseService::doter($this->entreprise);
 
-        $this->assertSame(34, $bilan['comptes']);
+        // L'entreprise ne recevait que les 41 comptes marqués « communs ». Les
+        // 1 256 comptes de l'acte uniforme restaient un dictionnaire, servant à
+        // nommer sans jamais entrer dans le plan de personne : le compte
+        // manquait dès qu'on sortait de l'ordinaire — une immobilisation, un
+        // emprunt, une charge de personnel — et il fallait le créer à la main
+        // en devinant son numéro.
+        $this->assertSame(
+            \App\Modules\Admin\Modeles\Referentiel\Compte::count(),
+            $bilan['comptes'],
+            "L'entreprise doit recevoir le plan de l'acte uniforme en entier."
+        );
         $this->assertSame(10, $bilan['journaux']);
 
-        // Les comptes que toute écriture de vente au comptant touche.
-        foreach (['411000', '401000', '443100', '445200', '571000', '521000', '701000', '601000'] as $numero) {
+        // Les comptes que toute écriture de vente ou d'achat touche. Sept
+        // manquaient encore récemment : le service imputait déjà les taxes
+        // parafiscales au `447000` sans que ce compte figure au plan — la
+        // balance affichait un numéro sans intitulé — et la TVA déductible
+        // n'avait qu'un seul compte pour quatre natures de charge.
+        foreach (['411000', '401000', '443100', '443200', '443300',
+                  '445100', '445200', '445300', '445400',
+                  '447000', '447800', '571000', '521000', '701000', '601000'] as $numero) {
             $this->assertTrue(
                 PlanComptable::where('entreprise_id', $this->entreprise->id)->where('numero', $numero)->exists(),
                 "Le compte {$numero} manque au trousseau."

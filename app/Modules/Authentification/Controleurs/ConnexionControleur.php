@@ -80,6 +80,13 @@ class ConnexionControleur
 
         $request->session()->regenerate();
 
+        // Le point de vente choisi ne vivait qu'en session, et la déconnexion
+        // l'effaçait avec elle. Un responsable de trois magasins repartait donc
+        // chaque matin sur le premier venu — et le point de vente est ce que la
+        // plateforme de la DGI reçoit : une pièce certifiée sous le mauvais
+        // magasin ne se corrige pas, elle s'annule par un avoir.
+        $this->reprendreLePointDeVente();
+
         // Journaliser la connexion réussie
         $this->journaliser('connexion', 'Utilisateur', Auth::id());
 
@@ -92,6 +99,35 @@ class ConnexionControleur
             'caissier'   => redirect()->intended(route('caissier.tableau_de_bord')),
             default      => redirect()->route('connexion'),
         };
+    }
+
+    /**
+     * Rouvrir la session sur le point de vente d'hier.
+     *
+     * Le point de vente reste **vérifié à chaque reprise** : celui qui a été
+     * retenu peut avoir été supprimé, ou rattaché depuis à une autre
+     * entreprise. On ne réouvre que ce qui appartient encore à l'utilisateur.
+     */
+    private function reprendreLePointDeVente(): void
+    {
+        $utilisateur = Auth::user();
+        $souhaite    = $utilisateur->pointDeVenteDOuverture();
+
+        if (!$souhaite) {
+            return;
+        }
+
+        $pdv = \App\Modules\Admin\Modeles\PointDeVente::where('entreprise_id', $utilisateur->entreprise_id)
+            ->find($souhaite);
+
+        if (!$pdv) {
+            return;
+        }
+
+        session([
+            'point_de_vente_actif_id'  => $pdv->id,
+            'point_de_vente_actif_nom' => $pdv->nom,
+        ]);
     }
 
     /**

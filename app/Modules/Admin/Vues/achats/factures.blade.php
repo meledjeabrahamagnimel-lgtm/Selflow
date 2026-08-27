@@ -329,8 +329,14 @@
                     <label style="font-weight: 700; font-size: 13px; display: block; margin-bottom: 6px; color: #334155;">Choisir la facture de doit d'origine *</label>
                     <select id="selectFactureAvoir" onchange="if(this.value) { selectionnerFacturePourAvoir(this.value); } else { masquerDetailsFactureAvoir(); }" class="form-control" style="width: 100%; padding: 10px; border: 1px solid #cbd5e1; border-radius: 8px; font-weight: 600; color: #0f172a; background: #fff;">
                         <option value="">-- Sélectionner une facture --</option>
+                        {{-- Même défaut qu'à l'avoir de vente : le numéro de
+                             ligne partait dans une adresse qui résout par
+                             `uuid`, la requête tombait en 404 (Not Found —
+                             introuvable), et le script recevait la page
+                             d'erreur en HTML là où il attendait du JSON.
+                             Personne ne l'avait signalé de ce côté. --}}
                         @foreach($facturesDispo as $f)
-                            <option value="{{ $f->id }}">{{ $f->numero_facture }} - {{ $f->fournisseur?->nom ?? 'Fournisseur inconnu' }} ({{ number_format($f->montant_ttc, 0, ',', ' ') }} F)</option>
+                            <option value="{{ $f->uuid }}">{{ $f->numero_facture }} - {{ $f->fournisseur?->nom ?? 'Fournisseur inconnu' }} ({{ number_format($f->montant_ttc, 0, ',', ' ') }} F)</option>
                         @endforeach
                     </select>
                 </div>

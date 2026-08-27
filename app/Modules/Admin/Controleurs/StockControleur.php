@@ -36,7 +36,16 @@ class StockControleur
                 ?? 'tout';
         }
 
+        // L'ecran de stock listait tout le catalogue : un cabinet, qui ne vend
+        // que des prestations, y voyait chacune de ses lignes en « Rupture » et
+        // son compteur d'alertes egal a son catalogue. Un service n'a pas de
+        // stock — il n'a rien a faire ici.
+        // Un article archivé qui porte encore de la marchandise n'a pas quitté
+        // le magasin : le taire ferait tomber la valeur de l'inventaire sans
+        // que rien ne l'explique, alors que la quantité reste aux écritures.
         $query = Produit::where('produits.entreprise_id', $entreprise->id)
+            ->stockables()
+            ->visiblesEnStock()
             ->with(['stocks']);
 
         $produits = $query
@@ -162,8 +171,12 @@ class StockControleur
         $produits = collect();
 
         if ($pointDeVenteId) {
+            // Un inventaire se compte sur ce qui est en rayon : l'article
+            // archivé qui porte encore une quantité doit pouvoir être compté,
+            // sans quoi l'écart resterait au stock sans moyen de le solder.
             $produits = Produit::where('entreprise_id', $entreprise->id)
                 ->whereIn('type', Produit::TYPES_STOCKABLES)
+                ->visiblesEnStock()
                 ->with(['stocks' => fn ($q) => $q->where('point_de_vente_id', $pointDeVenteId)])
                 ->orderBy('nom')
                 ->get();
@@ -278,8 +291,10 @@ class StockControleur
             ?? Auth::user()->point_de_vente_id 
             ?? 'tout';
 
-        // Produits avec date de péremption définie
+        // Produits avec date de péremption définie. Seuls ceux qui ont un
+        // stock : on ne met pas une prestation au rebut.
         $query = Produit::where('entreprise_id', $entreprise->id)
+            ->stockables()
             ->whereNotNull('date_peremption')
             ->with(['stocks']);
 

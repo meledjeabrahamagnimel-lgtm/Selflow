@@ -648,6 +648,35 @@ class ComptabiliteControleur
     }
 
     /**
+     * Le résultat, site par site.
+     *
+     * Chaque écriture porte son `point_de_vente_id` depuis toujours — la
+     * vente, l'achat, le règlement, le mouvement de stock, la dotation, la
+     * consignation, l'écriture manuelle. L'information partait vers Comptaflow,
+     * qui l'ignore, et **aucun écran de Selflow ne s'en servait** : la balance
+     * et le grand livre savent se restreindre à un site, mais rien ne les
+     * mettait côte à côte. Or c'est la seule question qui compte quand on en
+     * tient plusieurs — lequel gagne de l'argent, lequel en perd.
+     */
+    public function analytique(Request $request): View
+    {
+        $entreprise = Auth::user()->entreprise;
+
+        [$debut, $fin] = FiltrePeriodeService::intervalle($request);
+
+        $ventilation = \App\Modules\Admin\Services\AnalytiqueService::parSite(
+            $entreprise->id,
+            $debut?->toDateString(),
+            $fin?->toDateString()
+        );
+
+        return view('admin::comptabilite.analytique', [
+            'ventilation'    => $ventilation,
+            'libellePeriode' => FiltrePeriodeService::libelle($request),
+        ]);
+    }
+
+    /**
      * L'écran de lettrage d'un compte.
      */
     public function lettrage(Request $request): View
@@ -782,6 +811,28 @@ class ComptabiliteControleur
     /**
      * Créer un compte dans le Plan Comptable
      */
+    /**
+     * Poser le plan comptable par défaut, en entier.
+     *
+     * Le trousseau ne se posait qu'à la création de l'entreprise : une
+     * entreprise créée avant qu'un compte entre au référentiel ne l'obtenait
+     * plus par aucun chemin, et devait le saisir à la main en devinant son
+     * numéro. Le bouton rejoue la dotation.
+     *
+     * Rien n'est écrasé : les comptes déjà là gardent leur libellé, y compris
+     * ceux que l'entreprise a renommés. Seul ce qui manque est ajouté.
+     */
+    public function poserLePlanParDefaut(): RedirectResponse
+    {
+        $entreprise = Auth::user()->entreprise;
+
+        $bilan = \App\Modules\Admin\Services\TrousseauEntrepriseService::doter($entreprise);
+
+        return back()->with('succes', $bilan['comptes'] > 0
+            ? "{$bilan['comptes']} compte(s) ajouté(s) au plan. Ce qui existait n'a pas bougé."
+            : 'Votre plan comptable porte déjà tous les comptes du référentiel.');
+    }
+
     public function creerCompteComptable(Request $request): RedirectResponse
     {
         $entreprise = Auth::user()->entreprise;

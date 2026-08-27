@@ -45,6 +45,12 @@ image2.png
 !PASSERELLE-COMPTAFLOW/
 !SCRAPER-PORTAIL-FNE/
 !SCRAPER-PORTAIL-FNE/*.md
+# Le `!` sur un repertoire ne re-inclut que le repertoire lui-meme : les
+# fichiers qu'il contient restent pris par `*.md` et `*xlsx` plus haut. La
+# consigne pour Comptaflow et les quatre classeurs d'import refaits n'ont
+# donc jamais quitte le poste ou ils ont ete ecrits — le depot montrait un
+# dossier PASSERELLE-COMPTAFLOW sans ce qu'on venait y chercher.
+!PASSERELLE-COMPTAFLOW/**
 !PASSATION-SESSION.txt
 
 # Le scraper du portail : le code voyage avec le depot, jamais ses acces.

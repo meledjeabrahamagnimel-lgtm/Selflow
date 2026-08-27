@@ -80,10 +80,13 @@
             onclick="window.location='{{ route('admin.produits.fiche', $p) }}'">
 
             {{-- Photo --}}
+            @php $illustre = $p->photoReelle() === null; @endphp
             <div style="height:140px; background:var(--bg3); position:relative; overflow:hidden;">
+                {{-- Une photo remplit le cadre ; un dessin au trait étiré se
+                     déforme. Il tient donc sa place, centré, sans recadrage. --}}
                 <img src="{{ $p->photo_url }}" alt="{{ $p->nom }}"
-                    style="width:100%; height:100%; object-fit:cover;"
-                    onerror="this.src='{{ asset('images/placeholder-produit.png') }}'">
+                    style="width:100%; height:100%; object-fit:{{ $illustre ? 'contain' : 'cover' }}; {{ $illustre ? 'padding:22px;' : '' }}"
+                    onerror="this.src='{{ $p->illustration() }}'; this.style.objectFit='contain'; this.style.padding='22px';">
                 {{-- Badge type --}}
                 @php
                     $typeColors = [
@@ -102,8 +105,12 @@
                 {{-- Upload photo rapide --}}
                 <label style="position:absolute; bottom:6px; right:6px; background:rgba(0,0,0,.5); color:#fff; padding:4px 8px; border-radius:8px; font-size:10px; cursor:pointer;" title="Changer la photo">
                     <i class="fas fa-camera"></i>
+                    {{-- Le numéro de ligne partait dans l'adresse — `…/produits/156/photo` —
+                         alors que les adresses de l'application portent l'`uuid` : le
+                         lien de route ne résolvait aucun article et l'envoi tombait en
+                         404 (Not Found — introuvable), sans un mot à l'écran. --}}
                     <input type="file" accept="image/*" style="display:none;"
-                        onchange="uploaderPhoto(this, {{ $p->id }})">
+                        onchange="uploaderPhoto(this, @js(route('admin.produits.photo', $p)))">
                 </label>
             </div>
 
@@ -185,17 +192,20 @@
                         </span>
                     </td>
                     <td><span class="badge badge-purple">{{ $p->categorie ?? '—' }}</span></td>
-                    <td>@if(in_array($p->type, ['service', 'consommable_non_stockable'])) — @else {{ number_format($p->prix_achat, 0, ',', ' ') }} F @endif</td>
+                    <td>@if(!$p->estStockable()) — @else {{ number_format($p->prix_achat, 0, ',', ' ') }} F @endif</td>
                     <td style="color:var(--success); font-weight:600;">{{ number_format($p->prix_vente, 0, ',', ' ') }} F</td>
                     <td style="color:var(--info);">
-                        @if(in_array($p->type, ['service', 'consommable_non_stockable']))
+                        @if(!$p->estStockable())
                             —
                         @else
                             @php $marge = $p->prix_achat > 0 ? round((($p->prix_vente - $p->prix_achat) / $p->prix_achat) * 100) : 0; @endphp
                             +{{ $marge }}%
                         @endif
                     </td>
-                    @php $sansStock = in_array($p->type, ['service', 'consommable_non_stockable']); @endphp
+                    {{-- La liste des types sans stock vivait ici en dur : une
+                         seconde copie de `Produit::TYPES_STOCKABLES`, qui aurait
+                         diverge au premier type ajoute. --}}
+                    @php $sansStock = !$p->estStockable(); @endphp
                     <td style="font-weight:600; {{ $sansStock ? 'color:var(--text-3)' : ($p->stock_actuel == 0 ? 'color:var(--danger)' : ($p->stock_actuel <= $p->stock_minimum ? 'color:var(--warning)' : 'color:var(--success)')) }}">
                         @if($sansStock) — @else {{ $p->stock_actuel }} {{ $p->unite }} @endif
                     </td>
@@ -713,12 +723,15 @@ function synchroniserTauxLibre(cle) {
 // ─── Champs FNE du produit : code TVA et autres taxes ────────────────────────
 
 const REGIME_ENTREPRISE = @json(Auth::user()->entreprise->regime_imposition ?? null);
-const REGIMES_EXONERATION_LEGALE = ['TEE', 'RNE'];
+// La constante gelee du modele, et non une copie : celle qui vivait ici
+// valait ['TEE', 'RNE'] quand le serveur retient TEE, TCE et RME. L'ecran
+// annoncait donc un code TVA que le payload ne transmettait pas.
+const REGIMES_EXONERATION_LEGALE = {!! json_encode(\App\Modules\Admin\Modeles\Produit::REGIMES_EXONERATION_LEGALE) !!};
 
 /**
  * Même règle de déduction que Produit::deduireCodeTva() côté serveur : un taux
  * nul ne suffit pas à distinguer TVAC (exonération conventionnelle) de TVAD
- * (exonération légale, réservée aux régimes TEE et RNE).
+ * (exonération légale, réservée aux régimes que la DGI énumère).
  */
 function deduireCodeTva(taux) {
     const t = Math.round(parseFloat(taux || 0) * 100) / 100;
@@ -860,14 +873,14 @@ function filtrerProduits() {
 
 // ─── Upload photo (AJAX) ─────────────────────────────────────────────────────
 
-function uploaderPhoto(input, produitId) {
+function uploaderPhoto(input, adressePhoto) {
     if (!input.files || !input.files[0]) return;
 
     const formData = new FormData();
     formData.append('photo', input.files[0]);
     formData.append('_token', document.querySelector('meta[name="csrf-token"]').content);
 
-    fetch('/admin/produits/' + produitId + '/photo', {
+    fetch(adressePhoto, {
         method: 'POST',
         body: formData,
     })

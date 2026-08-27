@@ -49,7 +49,11 @@ class PointDeVenteControleur
         // Initialisation automatique des stocks (vides) pour tous les produits existants de l'entreprise
         // Seuls les articles qui se comptent recoivent une fiche : un service
         // n'a ni quantite disponible, ni seuil, ni rupture.
-        $produits = \App\Modules\Admin\Modeles\Produit::where('entreprise_id', $entreprise->id)->get();
+        // Un article archivé ne reçoit pas de fiche de stock sur un site qui
+        // vient d'ouvrir : il ne s'y vendra jamais.
+        $produits = \App\Modules\Admin\Modeles\Produit::where('entreprise_id', $entreprise->id)
+            ->selectionnables()
+            ->get();
         foreach ($produits as $prod) {
             if (!$prod->estStockable()) {
                 continue;
@@ -97,7 +101,11 @@ class PointDeVenteControleur
 
         session(['point_de_vente_actif_id' => $pdv->id, 'point_de_vente_actif_nom' => $pdv->nom]);
 
-        return back()->with('succes', "Point de vente « {$pdv->nom} » activé pour cette session.");
+        // Et retenu au-delà de la session : elle meurt à la déconnexion, et le
+        // choix mourait avec elle.
+        Auth::user()->retenirLePointDeVente($pdv->id);
+
+        return back()->with('succes', "Point de vente « {$pdv->nom} » activé. Vous le retrouverez à votre prochaine connexion.");
     }
 
     public function activerApercu(PointDeVente $pdv): RedirectResponse

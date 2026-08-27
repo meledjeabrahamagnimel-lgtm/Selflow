@@ -39,10 +39,24 @@ class Entreprise extends Model
         'souscription_etape',
         'souscription_terminee_le',
         'activite_autre',
-        'comptaflow_sync_key',
+        // La clé de liaison Comptaflow ne figure PAS ici, et c'est délibéré :
+        // elle était un champ du formulaire des paramètres, et coller celle
+        // d'une autre entreprise ouvrait la liaison vers ses livres. Elle
+        // s'écrit désormais par `LiaisonComptaflowService`, qui la reçoit de
+        // Comptaflow, et par lui seul. Voir la migration
+        // `liaison_comptaflow_delivree_et_non_saisie`.
         'comptaflow_sync_status',
         'comptaflow_last_sync_at',
         'comptaflow_company_id',
+        'comptaflow_demande_statut',
+        'comptaflow_demande_le',
+        'comptaflow_demande_par',
+        'comptaflow_refus_motif',
+        'comptaflow_liee_le',
+        'comptaflow_revoquee_le',
+        'comptaflow_cle_indice',
+        'comptaflow_cle_tournee_le',
+        'comptaflow_rotation_echouee_le',
         // Champs DGI / Fiscal
         'idu',
         'reference_cadastrale',
@@ -86,7 +100,52 @@ class Entreprise extends Model
         'possede_compte_fne'  => 'boolean',
         'normalisation_auto_factures' => 'boolean',
         'normalisation_auto_recus'    => 'boolean',
+
+        // Chiffrée en base : une sauvegarde égarée, ou un accès en lecture à
+        // la table, livrait toutes les clés en clair — donc l'écriture dans
+        // les livres de chaque entreprise.
+        'comptaflow_sync_key'  => 'encrypted',
+        'comptaflow_demande_le' => 'datetime',
+        'comptaflow_liee_le'    => 'datetime',
+        'comptaflow_revoquee_le' => 'datetime',
+        'comptaflow_cle_tournee_le' => 'datetime',
+        'comptaflow_rotation_echouee_le' => 'datetime',
+        'comptaflow_last_sync_at' => 'datetime',
     ];
+
+    // ── La liaison Comptaflow ────────────────────────────────────────
+
+    /** L'entreprise a demandé un dossier comptable ; le superadmin n'a pas tranché. */
+    public const DEMANDE_EN_ATTENTE = 'en_attente';
+
+    /** Le superadmin a validé : la clé est délivrée, la liaison ouverte. */
+    public const DEMANDE_VALIDEE = 'validee';
+
+    /** Le superadmin a refusé, avec un motif que l'entreprise voit. */
+    public const DEMANDE_REFUSEE = 'refusee';
+
+    public function liaisonComptaflowActive(): bool
+    {
+        return $this->comptaflow_sync_status === 'active'
+            && filled($this->comptaflow_sync_key)
+            && $this->comptaflow_revoquee_le === null;
+    }
+
+    public function demandeComptaflowEnAttente(): bool
+    {
+        return $this->comptaflow_demande_statut === self::DEMANDE_EN_ATTENTE;
+    }
+
+    /**
+     * De quoi reconnaître une clé sans la donner.
+     *
+     * Le superadministrateur doit pouvoir distinguer deux liaisons ; aucun
+     * écran ne doit afficher une clé entière, ni pouvoir la copier.
+     */
+    public function indiceCleComptaflow(): ?string
+    {
+        return $this->comptaflow_cle_indice ? '••••' . $this->comptaflow_cle_indice : null;
+    }
 
     /**
      * Cette pièce doit-elle être certifiée dès son émission ?
@@ -136,25 +195,209 @@ class Entreprise extends Model
     }
 
     /**
-     * Vérifie si toutes les informations requises pour l'inscription complète sont présentes.
+     * Les régimes d'imposition, et leur libellé.
+     *
+     * La liste vivait en dur dans **quatre écrans**, avec quatre contenus
+     * différents — et le régime n'est pas une étiquette : `deduireCodeTva()` le
+     * compare aux régimes d'exonération légale pour choisir entre TVAC et TVAD.
+     * Un sigle qui n'est pas celui du référentiel ne correspond à rien.
+     *
+     * L'écart le plus coûteux était celui de l'écran du superadministrateur :
+     * il proposait « Réel Normal », « Bénéfice Forfaitaire », « Exonéré »… des
+     * intitulés que rien ne reconnaît. Une entreprise créée par cette voie et
+     * enregistrée « Exonéré » voyait ses lignes à 0 % partir en exonération
+     * conventionnelle, quel que soit son régime réel.
+     *
+     * `REGIMES_EXONERATION_LEGALE`, sur `Produit`, reste gelé : cette liste-ci
+     * n'y touche pas, elle fait seulement en sorte que les écrans proposent des
+     * valeurs qu'il puisse reconnaître.
      */
-    public function estInscriptionComplete(): bool
+    public const REGIMES_IMPOSITION = [
+        'TEE' => "TEE — Taxe d'État de l'Entreprenant",
+        'TCE' => "TCE — Taxe Communale de l'Entreprenant",
+        'RME' => 'RME — Régime des Microentreprises',
+        'RNE' => "RNE — Régime du Négoce et de l'Exportation",
+        'RSI' => "RSI — Régime Simplifié d'Imposition",
+        'RNI' => "RNI — Régime Normal d'Imposition",
+    ];
+
+    /**
+     * Ce que chaque régime veut dire, en une phrase.
+     *
+     * L'écran d'inscription portait ces définitions dans son JavaScript, pour
+     * quatre régimes sur six. Elles vivent ici pour que les deux écrans de
+     * création les affichent, et n'en affichent qu'une version.
+     */
+    public const REGIMES_NOTICES = [
+        'TEE' => "Taxe d'État de l'Entreprenant : pour les très petites entreprises et les auto-entrepreneurs. Taux fixe annuel, pas d'obligation de TVA.",
+        'TCE' => "Taxe Communale de l'Entreprenant : la part communale du régime de l'entreprenant, pour les plus petites activités.",
+        'RME' => "Régime des Microentreprises : impôt assis sur le chiffre d'affaires, comptabilité allégée.",
+        'RNE' => "Régime du Négoce et de l'Exportation : impôt sur le bénéfice, comptabilité simplifiée.",
+        'RSI' => "Régime Simplifié d'Imposition : pour les entreprises moyennes. TVA sur option, comptabilité standard.",
+        'RNI' => "Régime Normal d'Imposition : TVA obligatoire, comptabilité complète SYSCOHADA.",
+    ];
+
+    /**
+     * Les régimes qu'un formulaire peut accepter pour CETTE entreprise : le
+     * référentiel, plus ce qu'elle porte déjà.
+     *
+     * Sans ce second terme, une entreprise enregistrée sous l'ancienne liste
+     * — « Réel Normal », par exemple — ne pourrait plus enregistrer aucune
+     * modification, même sans toucher à son régime. Même raisonnement que
+     * `Categorie::domainesAcceptesPour()`.
+     *
+     * @return array<int, string>
+     */
+    public static function regimesAcceptesPour(?self $entreprise = null): array
     {
-        // Nom ne doit pas être temporaire
-        if ($this->nom === '[PENDING_ONBOARDING]') {
-            return false;
+        $codes = array_keys(self::REGIMES_IMPOSITION);
+
+        if ($entreprise?->regime_imposition) {
+            $codes[] = $entreprise->regime_imposition;
         }
 
-        return !empty($this->regime_imposition)
-            && !empty($this->adresse)
-            && !empty($this->rccm)
+        return array_values(array_unique($codes));
+    }
+
+    /**
+     * Les informations que la plateforme FNE exige de l'entreprise.
+     *
+     * **C'est tout ce que l'entreprise a à fournir.** Les clés d'API et la
+     * configuration de la plateforme relèvent du superadministrateur seul ;
+     * l'entreprise, elle, déclare si elle a déjà un compte et reporte les
+     * informations de son espace — ou rassemble celles qu'il faut pour
+     * l'ouvrir.
+     *
+     * La liste vit ici, et non dans une vue, parce que **deux écrans la
+     * lisent** : les paramètres de l'entreprise, qui la font remplir, et le
+     * tableau FNE du superadministrateur, qui doit voir d'un coup d'œil à qui
+     * il manque quoi avant de configurer une clé. Écrite deux fois, elle aurait
+     * divergé au premier champ ajouté.
+     *
+     * @return array<int, array{champ: string, valeur: ?string, note: string}>
+     */
+    public function informationsFne(): array
+    {
+        return [
+            ['champ' => 'Raison sociale',
+             'valeur' => $this->nom !== '[PENDING_ONBOARDING]' ? $this->nom : null,
+             'note' => 'Transmise comme « établissement » à chaque certification.'],
+            ['champ' => 'NCC — Numéro de Compte Contribuable',
+             'valeur' => $this->ncc,
+             'note' => 'Identifie l\'entreprise auprès de la plateforme. Sans lui, rien n\'est certifié.'],
+            ['champ' => 'Régime d\'imposition',
+             'valeur' => $this->regime_imposition,
+             'note' => 'Détermine le code de TVA appliqué aux articles exonérés (TVAC ou TVAD).'],
+            ['champ' => 'RCCM',
+             'valeur' => $this->rccm,
+             'note' => 'Registre du Commerce et du Crédit Mobilier, exigé à l\'inscription.'],
+            ['champ' => 'Centre des impôts',
+             'valeur' => $this->centre_impots,
+             'note' => 'Celui dont dépend l\'entreprise ; figure sur vos documents fiscaux.'],
+            ['champ' => 'Adresse de l\'établissement',
+             'valeur' => $this->adresse,
+             'note' => 'Adresse physique du siège, telle que déclarée à la DGI.'],
+            ['champ' => 'Téléphone',
+             'valeur' => $this->telephone,
+             'note' => 'Contact de l\'entreprise.'],
+            ['champ' => 'Adresse e-mail',
+             'valeur' => $this->email,
+             'note' => 'Reçoit les notifications de la plateforme à chaque facture émise.'],
+            ['champ' => 'Gérant : nom, prénom et fonction',
+             'valeur' => trim(($this->gerant_nom ?? '') . ' ' . ($this->gerant_prenom ?? '')) ?: null,
+             'note' => 'Représentant légal déclaré.'],
+            ['champ' => 'Points de vente',
+             'valeur' => $this->pointsDeVente()->count() > 0
+                 ? $this->pointsDeVente()->count() . ' déclaré(s)'
+                 : null,
+             'note' => 'Leur nom doit être identique des deux côtés : la FNE refuse une facture dont le point de vente lui est inconnu.'],
+        ];
+    }
+
+    /** Combien de ces informations manquent encore. */
+    public function informationsFneManquantes(): int
+    {
+        return collect($this->informationsFne())
+            ->filter(fn ($i) => blank($i['valeur']))
+            ->count();
+    }
+
+    public function estInscriptionComplete(): bool
+    {
+        return $this->elementsInscriptionManquants() === [];
+    }
+
+    /**
+     * Ce qui manque pour qu'une pièce puisse partir à la DGI, et où le régler.
+     *
+     * ── Pourquoi une liste, et non un booléen ──
+     *
+     * L'écran de blocage disait « Terminer votre inscription avant de
+     * continuer. Vous devez renseigner toutes les informations réglementaires »
+     * — sans jamais dire **lesquelles**. L'utilisateur arrivait sur une page de
+     * paramètres de trois écrans de haut et cherchait ce qui n'allait pas.
+     *
+     * ── Le point de vente, ajouté à la demande du propriétaire ──
+     *
+     * Il n'y figurait pas, et c'est le plus déterminant de tous. **Le nom du
+     * point de vente est transmis tel quel à la plateforme de la DGI**, qui
+     * refuse la facture s'il ne correspond à aucun site déclaré sur l'espace
+     * FNE. Une entreprise sans point de vente ne peut donc rien certifier — et
+     * l'application le lui laissait découvrir au premier encaissement.
+     *
+     * Ce qui manquait auparavant se comblait tout seul : la caisse créait un
+     * « Siège » à Abidjan, commune Cocody, responsable « Superviseur ». Trois
+     * informations inventées, sous un nom qui n'était pas celui de l'espace
+     * FNE. La création d'office est retirée ; la réclamation la remplace.
+     *
+     * @return array<int, array{cle: string, libelle: string, ou: string}>
+     */
+    public function elementsInscriptionManquants(): array
+    {
+        // Le nom temporaire de l'inscription par Google : tant qu'il est là,
+        // rien d'autre ne vaut la peine d'être demandé.
+        if ($this->nom === '[PENDING_ONBOARDING]') {
+            return [['cle' => 'nom', 'libelle' => 'Le nom de votre entreprise', 'ou' => 'identite']];
+        }
+
+        $manquants = [];
+
+        $aRenseigner = [
+            'nom'               => ['Le nom de votre entreprise', 'identite'],
+            'gerant_fonction'   => ['La fonction du gérant', 'identite'],
+            'adresse'           => ['L\'adresse de l\'entreprise', 'identite'],
+            'ncc'               => ['Le NCC — sans lui, aucune pièce n\'est certifiée', 'fiscal'],
+            'rccm'              => ['Le RCCM', 'fiscal'],
             // Le compte contribuable (CC) a été retiré des paramètres : il
             // désignait le même numéro que le NCC, saisi deux fois pour rien.
-            // C'est donc le NCC qui conditionne désormais la complétude.
-            && !empty($this->ncc)
-            && !empty($this->gerant_fonction)
-            && is_array($this->secteur_activite)
-            && count($this->secteur_activite) > 0;
+            'regime_imposition' => ['Le régime d\'imposition', 'fiscal'],
+        ];
+
+        foreach ($aRenseigner as $champ => [$libelle, $ou]) {
+            if (blank($this->{$champ})) {
+                $manquants[] = ['cle' => $champ, 'libelle' => $libelle, 'ou' => $ou];
+            }
+        }
+
+        if (!is_array($this->secteur_activite) || count($this->secteur_activite) === 0) {
+            $manquants[] = [
+                'cle'     => 'secteur_activite',
+                'libelle' => 'Votre domaine d\'activité',
+                'ou'      => 'parcours',
+            ];
+        }
+
+        // Compté à la demande : la question ne se pose qu'aux écrans de
+        // blocage, et une requête de plus sur chaque page ne se justifie pas.
+        if ($this->exists && $this->pointsDeVente()->count() === 0) {
+            $manquants[] = [
+                'cle'     => 'point_de_vente',
+                'libelle' => 'Au moins un point de vente — son nom part à la DGI avec chaque facture',
+                'ou'      => 'points_de_vente',
+            ];
+        }
+
+        return $manquants;
     }
 
     /**
@@ -242,4 +485,38 @@ class Entreprise extends Model
         'cycles', 'comptabilite', 'points_de_vente', 'produits', 'tiers',
         'rapports', 'b2b', 'fne',
     ];
+
+    /**
+     * Le nom que l'utilisateur lit dans sa barre latérale.
+     *
+     * Les écrans de configuration fabriquaient le leur à partir du code :
+     * `ucfirst(str_replace('_', ' ', $module))`. Cela donnait « Comptabilite »
+     * sans accent, « Points de vente » par chance, et « Fne » pour la section
+     * que le menu appelle « Fiscalité & DGI ». L'utilisateur devait deviner que
+     * la case qu'il cochait commandait la section qu'il voyait.
+     *
+     * Cette liste est la copie de celle des `nav-section` du gabarit. Elles
+     * doivent rester d'accord ; une épreuve le vérifie.
+     */
+    public const LIBELLES_MODULES = [
+        'principal'       => 'Tableau de bord',
+        'ventes'          => 'Ventes',
+        'achats'          => 'Achats',
+        'stock'           => 'Stock',
+        'production'      => 'Production',
+        'chantiers'       => 'Chantiers',
+        'cycles'          => 'Cycles agricoles',
+        'comptabilite'    => 'Comptabilité',
+        'points_de_vente' => 'Points de vente',
+        'produits'        => 'Produits',
+        'tiers'           => 'Tiers',
+        'rapports'        => 'Rapports',
+        'b2b'             => 'B2B',
+        'fne'             => 'Fiscalité & DGI',
+    ];
+
+    public static function libelleModule(string $module): string
+    {
+        return self::LIBELLES_MODULES[$module] ?? ucfirst(str_replace('_', ' ', $module));
+    }
 }

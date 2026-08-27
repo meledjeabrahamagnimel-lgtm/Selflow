@@ -87,9 +87,13 @@ class PointDeVenteApiControleur
 
         session(['point_de_vente_actif_id' => $pdv->id, 'point_de_vente_actif_nom' => $pdv->nom]);
 
+        // Comme sur l'écran : le choix survit à la déconnexion. Sans quoi
+        // l'application mobile et le web se contrediraient au réveil.
+        Auth::user()->retenirLePointDeVente($pdv->id);
+
         return response()->json([
             'statut' => 'succes',
-            'message' => "Point de vente « {$pdv->nom} » activé pour cette session.",
+            'message' => "Point de vente « {$pdv->nom} » activé.",
             'point_de_vente_actif_id' => $pdv->id
         ]);
     }

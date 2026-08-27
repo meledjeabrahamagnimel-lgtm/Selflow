@@ -31,25 +31,22 @@
                         @error('nom') <small style="color:var(--danger)">{{ $message }}</small> @enderror
                     </div>
 
-                    <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
-                        <div class="form-group">
-                            <label class="form-label">Forme Juridique</label>
-                            <select name="forme_juridique" class="form-control">
-                                <option value="">Sélectionner...</option>
-                                @foreach(['SARL','SA','SAS','SCI','EI','SASU','Association','GIE','Autre'] as $fj)
-                                <option value="{{ $fj }}" {{ old('forme_juridique') == $fj ? 'selected' : '' }}>{{ $fj }}</option>
-                                @endforeach
-                            </select>
-                        </div>
-                        <div class="form-group">
-                            <label class="form-label">Régime d'Imposition</label>
-                            <select name="regime_imposition" class="form-control">
-                                <option value="">Sélectionner...</option>
-                                @foreach(['Réel Normal','Réel Simplifié','Bénéfice Forfaitaire','Micro-Entreprise','Exonéré'] as $reg)
-                                <option value="{{ $reg }}" {{ old('regime_imposition') == $reg ? 'selected' : '' }}>{{ $reg }}</option>
-                                @endforeach
-                            </select>
-                        </div>
+                    {{-- Le régime d'imposition vivait ici, et proposait « Réel
+                         Normal », « Bénéfice Forfaitaire », « Exonéré » — des
+                         intitulés qu'aucune autre partie du logiciel ne
+                         reconnaît. Une entreprise ainsi enregistrée voyait ses
+                         lignes à 0 % partir en exonération conventionnelle quel
+                         que soit son régime réel. Il est demandé à l'étape de
+                         la facture normalisée, et seulement à qui n'a pas
+                         encore de compte FNE. --}}
+                    <div class="form-group">
+                        <label class="form-label">Forme Juridique</label>
+                        <select name="forme_juridique" class="form-control">
+                            <option value="">Sélectionner...</option>
+                            @foreach(['SARL','SA','SAS','SCI','EI','SASU','Association','GIE','Autre'] as $fj)
+                            <option value="{{ $fj }}" {{ old('forme_juridique') == $fj ? 'selected' : '' }}>{{ $fj }}</option>
+                            @endforeach
+                        </select>
                     </div>
 
                     {{-- Informations Gérant --}}
@@ -70,13 +67,42 @@
                     
                     <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
                         <div class="form-group">
-                            <label class="form-label">E-mail de contact</label>
-                            <input type="email" name="email" class="form-control" placeholder="Ex: contact@entreprise.ci" value="{{ old('email') }}">
+                            <label class="form-label">E-mail du responsable <span style="color:var(--danger)">*</span></label>
+                            <input type="email" name="email" class="form-control" required
+                                placeholder="Ex: contact@entreprise.ci" value="{{ old('email') }}">
+                            <small style="font-size:11px;color:var(--text-3);">C'est avec cette adresse qu'il se connectera.</small>
+                            @error('email') <small style="color:var(--danger);display:block;">{{ $message }}</small> @enderror
                         </div>
                         <div class="form-group">
                             <label class="form-label">Téléphone</label>
                             <input type="text" name="telephone" class="form-control" placeholder="Ex: +225 07 00 00 00" value="{{ old('telephone') }}">
                         </div>
+                    </div>
+
+                    {{-- Le mot de passe du responsable.
+
+                         Il manquait. Cet écran créait une entreprise **et
+                         personne pour s'y connecter** : aucun compte n'était
+                         enregistré, et il fallait ensuite en fabriquer un à la
+                         main. --}}
+                    <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
+                        <div class="form-group">
+                            <label class="form-label">Mot de passe du responsable <span style="color:var(--danger)">*</span></label>
+                            <input type="password" name="gerant_password" class="form-control" required
+                                minlength="8" placeholder="Min. 8 caractères" autocomplete="new-password">
+                            @error('gerant_password') <small style="color:var(--danger);display:block;">{{ $message }}</small> @enderror
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Confirmation <span style="color:var(--danger)">*</span></label>
+                            <input type="password" name="gerant_password_confirmation" class="form-control" required
+                                minlength="8" placeholder="Répéter le mot de passe" autocomplete="new-password">
+                        </div>
+                    </div>
+
+                    <div style="font-size:11.5px;color:#92400E;background:#FFFBEB;border:1px solid #FCD34D;border-radius:8px;padding:10px 12px;line-height:1.6;margin-bottom:16px;">
+                        <i class="fas fa-key"></i>
+                        Ce mot de passe vient de vous, non de son propriétaire :
+                        le responsable devra <strong>le changer à sa première connexion</strong>.
                     </div>
 
                     <div class="form-group">
@@ -127,39 +153,43 @@
         {{-- Configuration du Secteur & Modules --}}
         <div style="display:flex; flex-direction:column; gap:20px;">
             <div class="card" style="padding: 24px;">
+                {{-- La facture normalisée : la même question qu'à
+                     l'inscription, dans le même bloc. Les deux écrans créent
+                     une entreprise ; ils ne peuvent pas demander des choses
+                     différentes. --}}
+                <div style="font-size:12px;font-weight:700;color:var(--text-2);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px;display:flex;align-items:center;gap:8px;">
+                    <i class="fas fa-file-invoice" style="color:var(--primary);"></i> La facture normalisée
+                    <span style="font-size:10px;font-weight:600;text-transform:none;letter-spacing:0;color:var(--text-3);">— facultatif</span>
+                </div>
+
+                <div style="margin-bottom:24px;">
+                    @include('admin::partiels.compte-fne', ['prefixeId' => 'sa'])
+                </div>
+
                 <div style="font-size:12px;font-weight:700;color:var(--text-2);text-transform:uppercase;letter-spacing:.5px;margin-bottom:16px;display:flex;align-items:center;gap:8px;">
                     <i class="fas fa-gears" style="color:var(--primary);"></i> Secteur & Modules Actifs
                 </div>
                 
                 <div class="form-group" style="margin-bottom:20px;">
-                    <label class="form-label">Secteurs d'activité <span style="color:var(--danger)">*</span></label>
-                    <p style="font-size:11px;color:var(--text-3);margin-bottom:10px;">Sélectionnez tous les secteurs qui correspondent à l'activité de l'entreprise. Tous les modules sont activés par défaut — l'admin peut les désactiver dans ses paramètres.</p>
+                    <label class="form-label">Secteurs d'activité
+                        <span style="font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.04em;color:var(--text-3);background:var(--bg3);border-radius:4px;padding:1px 6px;margin-left:4px;">Facultatif</span>
+                    </label>
+                    <p style="font-size:11px;color:var(--text-3);margin-bottom:10px;">Le domaine décide des modules ouverts et du catalogue proposé. Il se choisit aussi bien plus tard, au parcours de configuration : ne bloquez pas la création pour lui.</p>
                     <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-top:8px;">
                         @php
-                            $secteursDispo = [
-                                'Commercial'              => 'fas fa-store',
-                                'Industriel'              => 'fas fa-industry',
-                                'Services'                => 'fas fa-concierge-bell',
-                                'Agricole'                => 'fas fa-seedling',
-                                'Artisanat'               => 'fas fa-hammer',
-                                'BTP / Construction'      => 'fas fa-hard-hat',
-                                'Restauration / Hôtellerie' => 'fas fa-utensils',
-                                'Santé'                   => 'fas fa-stethoscope',
-                                'Transport / Logistique'  => 'fas fa-truck',
-                                'Technologies / Numérique' => 'fas fa-laptop-code',
-                                'Éducation / Formation'   => 'fas fa-graduation-cap',
-                                'Autre'                   => 'fas fa-ellipsis-h',
-                            ];
-                            $secteursOld = old('secteur_activite', ['Commercial']);
+                            // Le référentiel fait foi : mêmes douze domaines
+                            // qu'à l'inscription, aux paramètres et à la
+                            // première étape de la souscription.
+                            $secteursDispo = \App\Modules\Admin\Modeles\Referentiel\Categorie::domaines();
+                            $secteursOld = old('secteur_activite', []);
                         @endphp
-                        @foreach($secteursDispo as $valeur => $icone)
+                        @foreach($secteursDispo as $valeur)
                         <label style="display:flex;align-items:center;gap:8px;padding:9px 12px;background:var(--bg3);border-radius:8px;cursor:pointer;font-size:12.5px;border:1px solid var(--border);transition:all .15s;"
                             onmouseover="this.style.borderColor='var(--primary)';this.style.background='#EBF2FC'"
                             onmouseout="this.style.borderColor='var(--border)';this.style.background='var(--bg3)'">
                             <input type="checkbox" name="secteur_activite[]" value="{{ $valeur }}"
                                 {{ in_array($valeur, $secteursOld) ? 'checked' : '' }}
                                 style="width:15px;height:15px;cursor:pointer;accent-color:var(--primary);">
-                            <i class="{{ $icone }}" style="color:var(--primary);width:14px;text-align:center;font-size:11px;"></i>
                             <span>{{ $valeur }}</span>
                         </label>
                         @endforeach
@@ -226,18 +256,13 @@
                     </span>
                 </label>
 
+                {{-- Deux champs de mot de passe vivaient ici : le
+                     superadministrateur choisissait le mot de passe du compte
+                     d'un client, et il partait en clair dans le corps de la
+                     requête. Comptaflow envoie son propre lien d'activation au
+                     responsable, et génère lui-même la clé de liaison — Selflow
+                     n'invente ni l'un ni l'autre. --}}
                 <div id="comptaflow-fields" style="display:none; flex-direction:column; gap:12px;">
-                    <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
-                        <div class="form-group">
-                            <label class="form-label">Mot de passe admin COMPTAFLOW <span style="color:var(--danger)">*</span></label>
-                            <input type="password" name="comptaflow_password" id="comptaflow_password" class="form-control" placeholder="Min. 8 caractères" value="">
-                            @error('comptaflow_password') <small style="color:var(--danger)">{{ $message }}</small> @enderror
-                        </div>
-                        <div class="form-group">
-                            <label class="form-label">Confirmer le mot de passe <span style="color:var(--danger)">*</span></label>
-                            <input type="password" name="comptaflow_password_confirmation" class="form-control" placeholder="Répéter le mot de passe">
-                        </div>
-                    </div>
                     <div style="padding:10px; background:rgba(26,115,232,0.05); border:1px solid rgba(26,115,232,0.2); border-radius:8px;">
                         <div style="font-size:11.5px; color:#1a73e8; display:flex; align-items:center; gap:6px;">
                             <i class="fas fa-info-circle"></i> 

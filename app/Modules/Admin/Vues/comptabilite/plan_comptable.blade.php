@@ -20,6 +20,17 @@
                 <i class="fas fa-sync"></i> COMPTAFLOW
             </button>
         </div>
+        {{-- L'entreprise ne recevait que les comptes marqués « communs » — une
+             quarantaine. Les 1 256 comptes de l'acte uniforme restaient un
+             dictionnaire, servant à nommer sans jamais entrer dans le plan de
+             personne : le compte manquait dès qu'on sortait de l'ordinaire, et
+             il fallait le créer à la main en devinant son numéro. --}}
+        <form method="POST" action="{{ route('admin.comptabilite.poser_plan_defaut') }}" style="margin:0;">
+            @csrf
+            <button type="submit" class="btn btn-outline" title="Ajoute les comptes manquants du référentiel SYSCOHADA, sans toucher aux vôtres">
+                <i class="fas fa-wand-magic-sparkles"></i> Plan comptable par défaut
+            </button>
+        </form>
         <button id="btn-nouveau-compte" class="btn btn-primary" data-modal-open="modalNouveauCompte">
             <i class="fas fa-plus"></i> Nouveau compte
         </button>

@@ -23,6 +23,10 @@ class FneCredential extends Model
         'derniere_verification_at',
         'ncc_associe',
         'notes_superadmin',
+        // L'accès à l'espace FNE de l'entreprise, fourni par elle une fois, à
+        // la création de son compte. Chiffré, jamais rendu à l'écran.
+        'acces_mot_de_passe',
+        'acces_fourni_at',
     ];
 
     protected function casts(): array
@@ -35,6 +39,10 @@ class FneCredential extends Model
             // valeurs stockées en base sont totalement inexploitables.
             'cle_test'               => 'encrypted',
             'cle_reelle'             => 'encrypted',
+            // Meme traitement que les cles : c'est un acces a un service de
+            // l'Etat, pas un reglage.
+            'acces_mot_de_passe'     => 'encrypted',
+            'acces_fourni_at'        => 'datetime',
             'cle_test_ajoutee_at'    => 'datetime',
             'cle_reelle_ajoutee_at'  => 'datetime',
             'derniere_verification_at' => 'datetime',

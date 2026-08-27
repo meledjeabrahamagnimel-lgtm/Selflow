@@ -89,6 +89,28 @@ Elles ne se rediscutent pas sans raison neuve.
 | Secrets | Aucun mot de passe ni clé dans le code versionné. Ils viennent de l'environnement, ou sont tirés au hasard et affichés une seule fois |
 | Impression du reçu | **Par le navigateur** (`window.print()`, format 80 mm) pendant les tests, boîte de dialogue comprise, pour voir le rendu. **À retirer sur ordre du propriétaire**, pas avant |
 | TERNE | **Pas de terminal fiscal.** Selflow passe par l'API de la DGI, qui renvoie les trois éléments du sticker. L'imprimante de caisse est un périphérique ordinaire |
+| Achats et DGI | **Le BAPA est le seul achat transmis à la plateforme**, et il ne collecte aucune TVA — ce que le payload d'achat traduit déjà, et qui reste **gelé**. Les autres achats ne sont enregistrés **que pour la comptabilité** : c'est la finalité visée, et elle confirme le sens du lot 11.3 — 24/08/2026, propriétaire du projet |
+| Taxes supportées à l'achat | **La colonne est retirée**, pas ouverte. À l'achat, une taxe supportée est une charge dont le compte dépend de sa nature ; le deviner reviendrait à en choisir un au hasard — 24/08/2026, propriétaire du projet |
+| Libellés d'écriture | **Paramétrables par entreprise**, deux gabarits par type d'opération. Les défauts reproduisent l'ancien texte au caractère près, et **les écritures passées ne sont jamais réécrites** — 24/08/2026 |
+| Ventilation analytique | **Un seul axe : le point de vente**, celui que l'application renseigne réellement. Aucune clé de répartition : une charge de siège reste au site où elle a été saisie, et l'écran le dit — 24/08/2026 |
+| Secteur d'activité | **Ne se saisit plus à la main.** Il se déduit du parcours de configuration — domaine à l'étape 1, réaligné sur les métiers souscrits à l'étape 4. Deux écrans posaient la même question sans se parler — 24/08/2026, propriétaire du projet |
+| Configuration acquise | **Additive.** Ajouter un domaine, un métier ou un rayon est toujours possible ; ce qui est souscrit ne se retire pas. **Un module qui porte des données ne se referme plus** — le fermer ne supprimerait rien mais ferait disparaître les écrans où ces données se lisent. Le verrou ne s'applique qu'à ce qui est vérifiable par un comptage — 24/08/2026, propriétaire du projet |
+| Photos d'articles | Servies par le lien `public/storage` quand il existe, **par une route de l'application sinon**. Sans ce repli, une installation où `php artisan storage:link` n'a pas été lancé rendait des adresses en 404 (Not Found — introuvable) que seul le fond de carte laissait voir — 24/08/2026 |
+| Article archivé | **Il disparaît des écrans de saisie** : vente, achat, production, consignation, alertes de rupture, ouverture d'un point de vente. Il **reste** visible au stock tant qu'il porte une quantité : la marchandise est là, et les écritures la portent — 25/08/2026, propriétaire du projet |
+| Formulaire d'inscription | **L'étape 1 ne demande que le nom de l'entreprise.** Trois étapes, dont la dernière est facultative ; l'adresse électronique, qui est l'identifiant de connexion, est demandée avec le responsable. La forme juridique et le domaine d'activité se renseignent depuis l'application — 25/08/2026, propriétaire du projet |
+| Illustration d'article | **Vingt-deux dessins au trait tenus dans le dépôt**, choisis d'après le nom de l'article. Ce ne sont pas des photos et cela ne prétend pas l'être : aller chercher une image du commerce montrerait une marchandise que l'entreprise ne vend pas. La vraie photo passe toujours devant — 25/08/2026 |
+| Clé de liaison Comptaflow | **Délivrée, jamais saisie.** L'entreprise demande, le superadministrateur valide, **Comptaflow génère la clé** et la renvoie. Elle est chiffrée en base, retirée de `$fillable`, et n'apparaît jamais entière à l'écran. C'est elle — et non le secret partagé, qui ne dit pas qui appelle — qui authentifie chaque déversement — 26/08/2026, propriétaire du projet |
+| Accès Selflow et Comptaflow | **Un seul compte pour les deux** : même adresse, même mot de passe, dans les deux sens. Ce qui voyage est l'**empreinte** `bcrypt`, jamais le mot de passe — personne ne le lit, et le superadministrateur n'en choisit aucun. **Pas de lien d'activation** dans le cas normal : il ferait choisir un second mot de passe à qui n'a rien demandé. Il reste le repli quand l'empreinte manque — 26/08/2026, propriétaire du projet |
+| Avis d'ouverture d'un dossier | **Un courriel prévient le titulaire**, avec en-tête, corps et pied. Un compte ne s'ouvre pas au nom de quelqu'un sans qu'il l'apprenne. Il ne porte **ni mot de passe ni clé de liaison** : on dit lequel est le mot de passe, jamais quel il est — 26/08/2026, propriétaire du projet |
+| Divergence des deux mots de passe | **Acceptée et dite**, plutôt que corrigée. Le courriel écrit « au jour de l'ouverture » : changer son mot de passe Selflow ne change pas celui de Comptaflow, et promettre « c'est le même » deviendrait faux sans que rien ne le signale. La propagation par la passerelle reste possible, elle n'est pas retenue — 26/08/2026, propriétaire du projet |
+| Point de vente | **Il ne se crée jamais tout seul, et il en faut au moins un.** Son nom part tel quel à la DGI, qui refuse la pièce s'il ne correspond à aucun site déclaré sur l'espace FNE : en inventer un décidait à la place de l'entreprise du nom sous lequel ses factures seraient certifiées. Il figure désormais parmi les éléments réclamés avant toute vente — 26/08/2026, propriétaire du projet |
+| Point de vente actif | **Retenu au-delà de la session**, sur une colonne à part de l'affectation du caissier. Il mourait avec la déconnexion, et un responsable de trois magasins repartait chaque matin sur le premier venu — 26/08/2026, propriétaire du projet |
+| Durée de vie d'une clé de liaison | **Trente jours.** Rotation à la main par le superadministrateur, et automatique le 1ᵉʳ de chaque mois. Rien n'est écrit tant que la nouvelle clé n'est pas en main, et Comptaflow tient une période de grâce pour les requêtes déjà parties — 26/08/2026, propriétaire du projet |
+| Adresse publique de Comptaflow | **`https://comptaflow.dc-knowing.com/`**, réglable par `COMPTAFLOW_APP_URL`. En `https` et non `http` : l'adresse part dans un courriel, vers une page où l'utilisateur saisira son mot de passe — 26/08/2026, propriétaire du projet |
+| Plan comptable par défaut | **Le plan de l'acte uniforme en entier**, et non les 41 comptes usuels. Un compte manquant se créait à la main, son numéro deviné, et l'imputation fausse traversait la balance, le grand livre et la liasse. Deux boutons rejouent la dotation à tout moment — 26/08/2026, propriétaire du projet |
+| Compte d'un journal | **Seuls les journaux de trésorerie en portent un** — le `521` de la banque, le `571` de la caisse. La contrepartie d'une vente ou d'un achat est le tiers de la pièce, et elle change à chaque écriture — 26/08/2026 |
+| Identifiants fiscaux d'un client | **Retirés pour un B2C.** Un particulier n'a ni NCC, ni RCCM, ni régime d'imposition ; les lui demander en les grisant laissait trois champs vides à jamais — 26/08/2026, propriétaire du projet |
+
 
 ---
 
@@ -1561,6 +1583,1580 @@ scénariser tant que ces modules ne sortent pas du référentiel.
 
 - `tests/Feature/ModulesActifsTest.php` — 6 tests.
 
+### Lot 9 — Ce que le propriétaire a relevé — **TERMINÉ**
+
+Quatre points signalés dans un même message, le 21 août. Aucun n'était couvert
+par une épreuve : c'est pour cela qu'ils vivaient là depuis le début.
+
+#### Lot 9.1 — Les écritures de vente — **TERMINÉ**
+
+Le propriétaire écrit : « les écritures sont mal passées, prenons le cas d'une
+écriture de vente avec TVA, normalement on doit avoir 3 lignes — 706/701 crédit,
+4432 TVA crédit, 4478 timbre quittance crédit, 411 débit, et si c'est réglé
+directement on fait le règlement. Ou bien je me trompe ? »
+
+**Il ne se trompait pas, et le défaut était plus large que ce qu'il décrivait.**
+
+| Défaut | Ce qu'il produisait |
+|---|---|
+| **La vente comptant ne passait pas par le 411** | Une seule opération « caisse contre produits ». Le compte du client ne bougeait jamais sur ses achats comptant, **le numéro de tiers n'était transmis à Comptaflow sur aucune de ces ventes** — l'écriture y retombait sur le seul compte collectif — et le journal des ventes, celui qui justifie le chiffre d'affaires en cas de contrôle, ne les contenait pas |
+| **Le droit de timbre n'entrait dans aucune écriture** | Le client le payait, `net_a_payer` le comptait, la facture l'imprimait, la plateforme le certifiait — mais **la caisse était débitée de moins que ce qui y était réellement entré**, et la dette envers l'État n'apparaissait nulle part |
+| **Toute la TVA collectée partait en 4431** | SYSCOHADA distingue la marchandise (4431), la prestation de services (4432) et les travaux (4433). Pour un garage qui vend des pièces et facture de la main-d'œuvre, la déclaration était fausse |
+
+La facturation passe désormais **toujours** par le compte client, pour le net à
+payer — TTC fiscal, taxes parafiscales et timbre compris — et le règlement fait
+l'objet d'une opération distincte. La TVA se ventile ligne à ligne d'après la
+racine du compte de produit ; l'écart d'arrondi est reporté sur le compte le
+plus chargé, parce que **c'est le montant de la pièce qui fait foi** — c'est lui
+que la plateforme certifie.
+
+**Quatre comptes manquaient au plan des entreprises**, dont le `447000` que le
+service imputait déjà sans qu'il figure nulle part : la balance affichait un
+numéro sans intitulé. Ils entrent au référentiel (38 comptes communs au lieu de
+34) et une migration les pose aux entreprises existantes.
+
+Le timbre reste lu depuis `TimbreQuittanceService`, qui n'est pas touché : le
+barème de l'article 873 est gelé.
+
+- `ComptabiliteService::genererEcrituresVente()`, `compteTvaCollectee()`, `accorderTva()`
+- `2026_08_23_000001_comptes_de_taxes_collectees.php`
+- `tests/Feature/EcrituresVenteTest.php` — 14 tests, dont **six échouent contre
+  l'ancien code**, exactement sur les trois défauts.
+
+#### Lot 9.2 — Le domaine d'activité — **TERMINÉ**
+
+« Mets à jour la page `/inscription` car elle affiche l'ancien choix de saisie. »
+
+**Trois listes écrites en dur cohabitaient**, et aucune ne correspondait aux
+douze catégories du référentiel :
+
+| Écran | Ce qu'il proposait |
+|---|---|
+| `/inscription` | dix valeurs — Commercial, Industriel, Agro-industrie, Finance… |
+| Paramètres de l'entreprise | douze autres — Agricole, Artisanat, BTP / Construction… |
+| Superadministrateur (création, modification, validation) | les mêmes douze |
+| **Souscription, étape 1** | **les vraies** — Commerce, E-commerce, Production… |
+
+Une entreprise cochait donc « Commercial » à l'inscription pour choisir
+« Commerce » à l'écran suivant. Et l'écran « secteurs ↔ modules » du
+superadministrateur rangeait sa configuration sous des clés qu'aucune entreprise
+ne portait : **elle ne servait jamais**.
+
+Les cinq écrans et les validations lisent désormais `Categorie::domaines()`. La
+sortie libre « Autre » reste offerte — le référentiel couvre douze domaines, il
+n'en couvrira jamais treize.
+
+- `Referentiel\Categorie::domaines()`, `Categorie::AUTRE`
+- `tests/Feature/DomainesActiviteTest.php` — 7 tests.
+
+#### Lot 9.3 — Le bouton « Configuration » — **TERMINÉ**
+
+« Ajoute un bouton *configuration* dans les paramètres pour pouvoir revenir au
+niveau de la configuration, compléter son domaine et autre, **sans changer ce
+qui a été coché**. »
+
+Le bouton seul aurait été pire que rien. **Le parcours ne lisait que la
+session** : y revenir après une reconnexion — donc toujours — affichait tout
+décoché. Le domaine à rechoisir, les métiers oubliés, et surtout **les modules
+tous cochés**, si bien que valider l'étape 3 rouvrait ce que l'utilisateur avait
+volontairement fermé.
+
+Les choix se relisent en base — métiers souscrits, domaine du premier d'entre
+eux, modules actifs — et la session ne fait que les compléter pendant le
+parcours. Souscrire deux fois ne double ni les rayons ni les articles : le
+service l'écartait déjà.
+
+- `SouscriptionControleur::choix()`, `choixDejaRetenus()`
+- Bouton « Configuration » dans les paramètres, bouton « Quitter » dans le parcours
+- `tests/Feature/ParcoursSouscriptionTest.php` — 8 tests de plus, dont trois
+  échouent contre l'ancien code.
+
+#### Lot 9.4 — Le sens de la passerelle — **CÔTÉ SELFLOW TERMINÉ**
+
+« Selflow ne fait que déverser ses données dans Comptaflow et non construire sur
+Comptaflow. Chaque entreprise Selflow avec ses données se déverse dans Comptaflow
+comme une importation ; Comptaflow ne fait que recevoir si la liaison existe.
+Selflow doit avoir par défaut ses comptes, ses codes journaux et les tiers
+divers. »
+
+**Le code faisait exactement l'inverse.** `synchroniserDepuisComptaflow()`
+appelait Comptaflow, **recevait** son plan comptable, ses codes journaux et ses
+tiers, les recopiait dans Selflow — puis **supprimait** toute ligne Selflow
+marquée `source = comptaflow` absente de la réponse. Une entreprise dont le
+comptable n'avait pas encore rempli son plan **se retrouvait dépouillée du
+sien**, sans que rien ne le lui dise.
+
+Ce que le propriétaire demande par ailleurs est déjà vrai : le trousseau donne à
+chaque entreprise, dès sa création, ses 38 comptes, ses 10 journaux et ses deux
+tiers de passage — `410000` client divers, `400000` fournisseur divers — sans
+rien demander à personne.
+
+La méthode est retirée. `DeversementReferentielService` envoie le référentiel
+**sous les colonnes exactes des modèles d'import de Comptaflow**, pour que le
+déversement emprunte la logique d'import déjà écrite plutôt qu'une seconde voie
+à maintenir. Ce que ces colonnes ne portent pas — téléphone, adresse, NCC —
+voyage à côté, sans contrôle, puisque rien de comptable n'en dépend.
+
+Ne partent pas : les comptes et journaux **archivés**, qui réapparaîtraient dans
+les listes de Comptaflow sans que personne sache pourquoi ; et les tiers **sans
+numéro**, qui s'y rangeraient sous une chaîne vide.
+
+**Ce qui reste chez Comptaflow**, hors de portée depuis ce dépôt : écrire
+`POST /api/external/referentiel/deverser`, qui crée le plan comptable, les codes
+journaux et les tiers **à partir de ceux de Selflow quand Comptaflow est vide**,
+et qui n'écrase ni ne supprime rien quand il ne l'est pas. La consigne complète —
+charge utile, ordre de traitement, contrôle du secret, amorçage — est dans
+`PASSERELLE-COMPTAFLOW/RECEVOIR-LE-REFERENTIEL.md`. En attendant, le déversement
+échoue proprement et le dit à l'utilisateur.
+
+- `DeversementReferentielService`
+- `tests/Feature/DeversementReferentielTest.php` — 13 tests.
+
+#### Lot 9.5 — Qui configure la FNE — **TERMINÉ**
+
+Le propriétaire tranche : « **seul le superadmin gère les clés API, seul le
+superadmin gère tout ce qui concerne la configuration de la FNE**, et non les
+entreprises ; les entreprises offrent uniquement certaines informations. »
+
+L'essentiel était déjà en place — l'entreprise ne voit jamais sa clé, seulement
+un statut — mais **un réglage échappait à la règle**, et pas le moins cher.
+
+**Le timbre de quittance.** Il vivait dans les paramètres de l'entreprise, sous
+une étiquette « Informatif » qui promettait que « cocher ou décocher ici ne
+change aucun montant ». C'était faux, et de plus en plus faux :
+
+- `TimbreQuittanceService::estApplicable()` lit cette colonne pour décider si le
+  droit est dû ;
+- `net_a_payer` l'ajoute au TTC, et c'est ce total que la facture imprime ;
+- depuis le lot 9.1, il commande aussi le débit du compte client et le crédit du
+  `447800`.
+
+Coché à tort, il faisait **payer au client un droit que la plateforme ne
+retenait pas** ; décoché à tort, l'entreprise le payait de sa poche. Et la case
+était à la portée de n'importe quel administrateur d'entreprise.
+
+Le réglage rejoint le tableau FNE du superadministrateur, avec les clés.
+L'entreprise continue de **voir** son état — le retirer sans rien dire serait
+pire : elle doit pouvoir constater un désaccord avec son espace FNE et le
+signaler — mais ne peut plus le poser.
+
+**Ce que l'entreprise fournit, le superadministrateur le voit.** Le tableau FNE
+gagne deux colonnes : l'entreprise a-t-elle déclaré un compte FNE, et combien
+d'informations lui manquent encore pour en ouvrir un. Sans elles, il fallait
+ouvrir les paramètres de chaque entreprise une par une. La liste des dix
+informations exigées vit désormais sur le modèle, `Entreprise::informationsFne()`,
+parce que **deux écrans la lisent** — écrite deux fois, elle aurait divergé au
+premier champ ajouté.
+
+**Un manque du lot 9.2, refermé au passage.** La validation des secteurs dans
+les paramètres de l'entreprise acceptait encore n'importe quelle chaîne de
+soixante caractères, alors que l'écran proposait déjà le référentiel. Elle
+accepte maintenant `Categorie::domainesAcceptesPour($entreprise)` — le
+référentiel **plus ce que l'entreprise porte déjà** : sans ce second terme, une
+entreprise enregistrée sous l'ancien vocabulaire n'aurait plus pu enregistrer
+aucune modification, même sans toucher à son domaine.
+
+Rien de ce qui est gelé n'est touché : le barème de l'article 873 reste dans
+`TimbreQuittanceService`, et le payload ne change pas. Seul change **qui a le
+droit de poser la colonne**.
+
+- `SuperadminFneControleur::basculerTimbre()`, route `superadmin.fne.timbre`
+- `Entreprise::informationsFne()`, `informationsFneManquantes()`
+- `Categorie::domainesAcceptesPour()`
+- `tests/Feature/ConfigurationFneTest.php` — 9 tests, dont deux échouent contre
+  l'ancien code.
+
+### Lot 10 — Le plan complet du propriétaire — **TERMINÉ**
+
+Le message du 21 août avait été envoyé inachevé ; sa version complète ajoute
+quatre points, tous vérifiés dans le code avant correction.
+
+#### Lot 10.1 — Le bouton « créer un avoir » — **TERMINÉ**
+
+Signalé tel quel :
+
+```
+:8003/admin/ventes/facture-details/169  →  404 (Not Found)
+factures?type=avoir:1  Uncaught SyntaxError: Unexpected token '<',
+"<!DOCTYPE "... is not valid JSON
+```
+
+**Le bouton ne fonctionnait pas du tout**, ni pour les ventes ni pour les
+achats. La recherche de factures rendait l'identifiant **numérique**, l'écran le
+remettait dans une adresse qui attend un `uuid` depuis le lot 8.3, et la requête
+tombait sur un 404 — que le script, lisant la réponse en JSON, recevait sous
+forme de page HTML.
+
+La recherche et le détail rendent désormais l'identifiant public, et le
+formulaire d'avoir l'attend. Au passage, cela cesse de publier dans une page
+l'identifiant séquentiel que le lot 8.3 avait précisément retiré des adresses.
+
+- `VenteControleur::rechercherFactures()`, `detailsFacturePourAvoir()`, `creerAvoirNouveau()`
+- `AchatControleur` — le même code y vivait
+- `tests/Feature/IdentifiantOpaqueTest.php` — 5 tests de plus, dont trois
+  échouent contre l'ancien code.
+
+#### Lot 10.2 — La page d'accueil, visible chez l'un et pas chez l'autre — **TERMINÉ**
+
+Le propriétaire ouvrait `127.0.0.1:8003` et voyait « Cette page est en
+préparation » ; un collaborateur, à la même adresse, voyait la page complète.
+
+**Le contenu n'arrivait que par `VitrineSeeder`**, appelé depuis `db:seed` — que
+personne ne relance sur une base en service, puisqu'il repose des données de
+démonstration par-dessus les vraies. Les installations antérieures à l'écriture
+de la vitrine restaient donc vides, sans qu'aucune erreur ne soit levée.
+
+`migrate`, lui, se lance sur une base en service : c'est fait pour ça. Le
+contenu suit désormais le même chemin que le schéma, et n'écrase rien — le
+semeur crée par clé, et une vitrine déjà remplie n'est pas retouchée. Si aucune
+section n'est publiée, le superadministrateur connecté voit désormais pourquoi
+et où aller.
+
+- `2026_08_23_000002_poser_le_contenu_de_la_vitrine.php`
+
+#### Lot 10.3 — La création d'un compte, des deux côtés — **TERMINÉ**
+
+« Au niveau du superadmin, lors de la création d'une entreprise et de son
+gérant, on a oublié de mettre le mot de passe du gérant. »
+
+**C'était pire que cela.** L'écran créait une entreprise **et personne pour s'y
+connecter** : aucun `Utilisateur` n'était enregistré, et le formulaire ne
+demandait pas même un mot de passe. Toute entreprise créée par cette voie était
+inutilisable, sans qu'aucune erreur ne le signale — il fallait s'en apercevoir,
+puis lui fabriquer un compte à la main.
+
+Le compte est désormais créé avec l'entreprise. `doit_changer_password` est posé :
+le mot de passe vient d'un tiers, non de son propriétaire.
+
+**Les deux écrans exigeaient par ailleurs des choses différentes** pour créer la
+même chose — le domaine était obligatoire chez le superadministrateur et
+facultatif à l'inscription. Les étapes vivent maintenant dans
+`EtapesCreation`, et les deux écrans les suivent.
+
+| Étape | Bloque la création ? |
+|---|---|
+| L'entreprise — nom, forme, régime | **oui** |
+| Le responsable — identité, mot de passe | **oui** |
+| La facture normalisée | non |
+| Le domaine d'activité | non |
+
+Le formulaire d'inscription faisait vingt champs d'un seul tenant : on le
+remplit mal, ou pas. Il se parcourt pas à pas, avec un bouton « Suivant ». Ce
+qui n'est pas rempli ne se perd pas pour autant : `estInscriptionComplete()` le
+signale dans les paramètres, et le garde `inscription.complete` retient ventes
+et achats tant que la situation fiscale manque.
+
+#### Lot 10.4 — Le compte FNE à la création — **TERMINÉ**
+
+« Pour tous les formulaires lors de la création, fais un bouton à cocher pour
+demander s'il a un compte FNE ; si oui, faire afficher deux champs qui demandent
+le NCC et le mot de passe FNE ; si non, on va demander les informations fiscales
+de l'entreprise. »
+
+Une seule question décide de la suite, et le même bloc sert aux deux écrans
+(`admin::partiels.compte-fne`) :
+
+- **elle a un compte** — son NCC et le mot de passe de son espace suffisent.
+  Tout le reste est déjà chez la DGI ; le lui faire ressaisir n'introduirait que
+  des écarts entre les deux ;
+- **elle n'en a pas** — on relève ce que la DGI exige pour lui en ouvrir un.
+
+**Le mot de passe est traité comme une clé d'API**, parce que c'en est une :
+c'est un accès à un service de l'État, pas un réglage. Il rejoint
+`fne_credentials`, chiffré au repos par `APP_KEY` ; **aucun écran ne le rend**,
+pas même au superadministrateur — seulement la date à laquelle il a été fourni ;
+et `AccesFneService::oublier()` l'efface une fois le paramétrage relevé.
+
+L'entreprise ne configure toujours rien : elle fournit une information.
+
+- `2026_08_23_000003_acces_fne_de_l_entreprise.php`, `AccesFneService`
+- `app/Modules/Admin/Regles/EtapesCreation.php`
+- `app/Modules/Admin/Vues/partiels/compte-fne.blade.php`
+- `tests/Feature/CreationDeCompteTest.php` — 14 tests, dont cinq échouent contre
+  l'ancien code.
+
+### Lot 11 — Ce que l'usage a montré — **TERMINÉ**
+
+Quatre points signalés le 21 août, dont un que le propriétaire ne pouvait pas
+voir depuis l'application.
+
+#### Lot 11.1 — Le `.gitignore` avalait la passation — **TERMINÉ**
+
+GitHub répondait `404 (Not Found — introuvable)` sur
+`PASSERELLE-COMPTAFLOW/RECEVOIR-LE-REFERENTIEL.md`, alors que le dossier
+figurait bien dans l'arbre.
+
+`*.md` et `*xlsx` ignorent tout le dépôt ; la ligne `!PASSERELLE-COMPTAFLOW/`
+ne rétablissait que **le répertoire**. En git, la négation d'un répertoire ne
+réinclut pas les fichiers qu'il contient. Le dépôt affichait donc un dossier
+sans ce qu'on venait y chercher.
+
+N'avaient jamais quitté le poste où ils ont été écrits :
+
+- `RECEVOIR-LE-REFERENTIEL.md`, la consigne du point d'entrée que Comptaflow
+  doit écrire — **le seul point bloquant du déversement** ;
+- `CONSIGNES-POUR-COMPTAFLOW.md` ;
+- les quatre classeurs d'import refaits, dans `modeles-import/`.
+
+`!PASSERELLE-COMPTAFLOW/**` réinclut le contenu. Rien d'autre n'était perdu :
+la vérification a passé en revue tous les fichiers ignorés du dépôt.
+
+#### Lot 11.2 — Un service n'est pas en rupture de stock — **TERMINÉ**
+
+Sur l'écran de vente d'un cabinet comptable, **chaque prestation s'affichait
+« Rupture de stock » en rouge**.
+
+L'application le savait pourtant là où cela comptait : `estStockable()` existe,
+et aucun contrôleur ne décrémente le stock d'une prestation. **Mais aucun écran
+ne le lisait.**
+
+| Écran | Ce qu'il faisait |
+|---|---|
+| Vente (nouvelle et modification) | « Rupture de stock » sous chaque prestation, **et une modale d'alerte à chaque ligne ajoutée**, puis à chaque incrément de quantité |
+| Stock, et l'API mobile | tout le catalogue listé, services compris ; le compteur d'alertes comptait chaque prestation pour une rupture |
+| Rebut | les prestations y figuraient, avec un bouton de retrait |
+| Liste des articles | sa propre copie, écrite en dur, des types sans stock — **à trois endroits dans le même fichier** |
+
+Rien n'était jamais bloqué — le serveur écartait déjà ces articles — mais rien
+ne le disait, et l'écran affirmait le contraire. Un cabinet, qui ne vend que des
+services, voyait son catalogue entier en rouge et une modale par article.
+
+`etatStock()` rend désormais `Sans stock`, un scope `stockables()` borne les
+requêtes, et les cartes portent `data-stockable`.
+
+- `Produit::ETAT_SANS_STOCK`, `getEstStockableAttribute()`, `scopeStockables()`
+- `tests/Feature/ArticlesSansStockTest.php` — 11 tests, dont **huit échouent
+  contre l'ancien code**.
+
+#### Lot 11.3 — Les achats et le 401 — **TERMINÉ**
+
+« J'espère que les achats aussi sont pris en compte 401 lors des écritures. »
+**Ils ne l'étaient pas.** L'achat portait, à l'identique, le défaut que le lot
+9.1 avait corrigé sur la vente — et personne ne l'avait regardé.
+
+L'achat comptant écrivait une seule opération, « caisse contre charges », sans
+aucune ligne 401 :
+
+- le compte du fournisseur ne bougeait jamais sur ce qu'on lui payait comptant ;
+- **son numéro de tiers n'était transmis à Comptaflow sur aucun de ces achats** —
+  l'écriture y retombait sur le seul compte collectif, et le relevé d'un
+  fournisseur donné devenait impossible à établir ;
+- le journal des achats ne les contenait pas.
+
+La facturation passe désormais **toujours** par le compte du fournisseur, et le
+règlement fait l'objet d'une opération distincte. Le moyen bancaire et la
+référence de paiement, jusqu'ici perdus à la facturation comptant, lui sont
+transmis.
+
+**Second défaut, symétrique de celui de la TVA collectée.** Toute la TVA
+déductible partait en `445200`, « TVA récupérable sur achats », y compris celle
+d'un loyer, d'honoraires ou d'un billet de transport. SYSCOHADA distingue :
+
+| Compte | Nature | Racine de charge |
+|---|---|---|
+| `445100` | sur immobilisations | `2x` |
+| `445200` | sur achats | `60x` |
+| `445300` | sur transports | `61x` |
+| `445400` | sur services extérieurs et autres charges | `62x`, `63x`… |
+
+Une entreprise qui n'achète que des marchandises ne voyait pas la différence ;
+un cabinet, dont l'essentiel des charges est en 62 et 63, la voyait entièrement.
+La ventilation s'applique à la facturation comme à l'avoir — sans quoi une
+charge de service verrait sa TVA débitée en 4454 et recréditée en 4452, et les
+deux comptes dériveraient.
+
+Trois comptes entrent au référentiel (**41 comptes communs au lieu de 38**) et
+une migration les pose aux entreprises existantes.
+
+**Ce qui ne bouge pas :** le bordereau d'achat ne déduit toujours aucune TVA,
+puisque le tiers n'en facture aucune, et rien de ce qui est gelé n'est touché.
+
+- `ComptabiliteService::genererEcrituresAchat()`, `compteTvaDeductible()`
+- `2026_08_24_000001_comptes_de_tva_deductible.php`
+- `tests/Feature/EcrituresAchatTest.php` — 14 tests, dont six échouent contre
+  l'ancien code.
+
+**Signalé, non corrigé :** `Achat` déclare une colonne `montant_autres_taxes`
+qu'**aucun écran n'alimente et qu'aucune écriture ne lit**. Sur la vente, elle
+porte les taxes parafiscales collectées pour l'État. À l'achat, une taxe
+supportée est une charge, pas une dette : le compte à retenir dépend de sa
+nature, et le deviner serait pire que l'omettre. À trancher.
+
+#### Lot 11.4 — Aucune information fiscale avant la question FNE — **TERMINÉ**
+
+« Avant toute information fiscale, demander au client, lors de la création, s'il
+a déjà un compte FNE. »
+
+Le bloc du lot 10.4 posait bien la question — mais **le régime d'imposition
+était réclamé à la première étape des deux écrans**, obligatoire à
+l'inscription, avant même qu'on la pose. C'est une information fiscale : elle
+rejoint l'étape de la facture normalisée, et le volet de celles qui n'ont pas
+encore de compte. Le faire ressaisir à une entreprise dont l'espace FNE le porte
+déjà, c'est ouvrir un écart entre les deux.
+
+**En le déplaçant, quatre listes de régimes écrites en dur sont apparues, avec
+quatre contenus différents :**
+
+| Écran | Ce qu'il proposait |
+|---|---|
+| Superadministrateur | « Réel Normal », « Réel Simplifié », « Bénéfice Forfaitaire », « Micro-Entreprise », « Exonéré » |
+| Inscription | TEE, RNE, RSI, RNI — TCE et RME manquaient |
+| Paramètres | les six, seule liste juste, en dur |
+| Clients / fournisseurs | « TEE (Taxe sur l'Entreprise Employeuse) » |
+
+**Le régime n'est pas une étiquette :** `deduireCodeTva()` le compare aux
+régimes d'exonération légale pour choisir entre TVAC et TVAD. Une entreprise
+créée par le superadministrateur et enregistrée « Exonéré » voyait ses lignes à
+0 % partir en exonération conventionnelle, quel que soit son régime réel — et sa
+validation acceptait n'importe quelle chaîne de quatre-vingts caractères.
+
+Une seule source désormais : `Entreprise::REGIMES_IMPOSITION`, avec les
+définitions que l'inscription gardait dans son JavaScript pour quatre régimes
+sur six. `regimesAcceptesPour()` tolère ce que l'entreprise porte déjà — même
+raisonnement que `Categorie::domainesAcceptesPour()`.
+
+**Troisième écart, celui-là avec le périmètre gelé.** Trois vues portaient leur
+propre copie des régimes d'exonération légale — `['TEE', 'RNE']` — quand la
+constante gelée `Produit::REGIMES_EXONERATION_LEGALE` retient `TEE`, `TCE` et
+`RME`. **L'écran annonçait donc un code TVA que le payload ne transmettait
+pas** : une entreprise en RME voyait TVAC là où la pièce partait en TVAD, et
+l'inverse pour une entreprise en RNE. Les copies sont remplacées par une lecture
+de la constante ; **celle-ci n'est pas touchée** — c'est l'écran qu'on remet
+d'accord avec elle, non l'inverse.
+
+- `Entreprise::REGIMES_IMPOSITION`, `REGIMES_NOTICES`, `regimesAcceptesPour()`
+- `tests/Feature/CreationDeCompteTest.php` — 6 tests de plus, dont trois
+  échouent contre l'ancien code.
+
+### Lot 12 — Ce qui dormait — **TERMINÉ**
+
+Trois chantiers, tous autorisés le 24 août : la colonne à trancher, et les deux
+chantiers proposés que le propriétaire a débloqués d'un coup.
+
+#### Lot 12.1 — Les taxes supportées à l'achat — **RETIRÉ**
+
+`achats.montant_autres_taxes` était déclarée en `fillable` et en `casts`, et
+**rien ne l'écrivait ni ne la lisait** : ni formulaire, ni `ventilationAchat()`,
+ni `montant_ttc`. Le propriétaire a tranché : elle est retirée.
+
+La symétrie avec la vente ne tenait pas. À la vente, une taxe additionnelle est
+collectée pour le compte de l'État — une **dette**, créditée au `447000`, et
+reversée. À l'achat, une taxe supportée est une **charge**, et le compte dépend
+de sa nature : droit d'enregistrement, taxe non récupérable, redevance. Il n'y a
+pas de compte unique à deviner, et en choisir un au hasard dans la classe 6
+aurait été pire que l'omission.
+
+`ventes.montant_autres_taxes` **n'est pas touchée**.
+
+**Trouvé en chemin, non corrigé :** les tables `achat_taxes` et
+`achat_detail_taxes` existent, les relations sont déclarées sur `Achat` et
+`AchatDetail`, et **aucun écran ne les alimente non plus**. C'est la même
+plomberie dormante, posée par symétrie avec la vente. Les retirer suppose de
+supprimer deux tables — geste plus lourd qu'une colonne jamais remplie, et que
+le propriétaire n'a pas demandé. À décider.
+
+- `2026_08_24_000002_retirer_autres_taxes_de_l_achat.php`
+- `tests/Feature/EcrituresAchatTest.php` — 3 tests de plus (17 au total).
+
+#### Lot 12.2 — Les libellés d'écriture — **TERMINÉ**
+
+**Le libellé était l'intitulé du compte.** L'opération d'une facture de vente
+portait « Vente de marchandises » — le nom SYSCOHADA du compte mouvementé. Or
+le compte porte déjà ce nom : le répéter dépense la **seule colonne de texte
+libre du journal**. Un grand livre du `701` dont chaque ligne redit l'en-tête de
+la page n'apprend rien à qui le relit ; ce qu'on veut y trouver, c'est quelle
+pièce, quel client, quels articles, quel site.
+
+Chaque entreprise pose ses gabarits, deux par type d'opération — celui de
+l'opération, celui de ses lignes — pour les six types que `ComptabiliteService`
+écrit depuis une pièce commerciale. Neuf jetons : `{piece}`, `{tiers}`,
+`{produits}`, `{point_de_vente}`, `{date}`, `{nature}`, `{journal}`,
+`{reference}`, `{role}`.
+
+| Décision | Raison |
+|---|---|
+| **Les défauts reproduisent l'ancien texte au caractère près** | Une entreprise qui ne touche à rien ne doit voir aucun changement dans son journal. Les épreuves comparent aux chaînes exactes d'avant |
+| **Les écritures passées ne sont pas réécrites** | Un journal se lit tel qu'il a été tenu ; le regraver effacerait ce que le comptable a relu |
+| **Un jeton vide emporte son séparateur** | `Rglt/{piece}/{reference}/Vente {produits}` sur un règlement sans référence donnerait `Rglt/FV-1//Vente…`. Le premier séparateur d'une suite est conservé **avec ses espaces** : c'est ce qui laisse `Rglt/FV-1/Vente` collé et `FV-1 / Facturation` espacé |
+| **Un gabarit qui ne produit rien retombe sur le défaut** | Une écriture sans libellé rendrait le journal illisible |
+| **Vider les deux champs supprime la ligne** | Enregistrer deux chaînes vides empêcherait une évolution future du défaut de rattraper cette entreprise |
+| **`{role}` ne rend rien sur l'opération** | Seule une ligne porte un rôle. L'aperçu promettrait un texte que l'écriture ne produira jamais |
+| **`$contexte` prime sur le gabarit au règlement** | « Acompte à la facturation » dit que le règlement ne solde pas la pièce — aucun jeton ne saurait le produire |
+
+**Un défaut trouvé en écrivant les épreuves.** Le règlement construisait ses
+jetons avec `$base + ['reference' => $ref]`. L'union de tableaux **garde la
+valeur de gauche** sur une clé déjà présente, et `reference` y valait `null` :
+le numéro de chèque n'atteignait jamais le libellé. `array_merge` a remplacé le
+`+`. Le défaut ne se voyait qu'à la lecture du journal, sur les seuls règlements
+par chèque ou virement.
+
+- `2026_08_24_000003_modeles_de_libelle.php`, `ModeleLibelle`,
+  `LibelleEcritureService`, `ModeleLibelleControleur`, une vue
+- `tests/Feature/LibellesEcritureTest.php` — 22 tests, dont deux simulations
+  d'attaque : type d'opération inventé, `entreprise_id` injecté.
+
+#### Lot 12.3 — Le résultat par site — **TERMINÉ**
+
+**La donnée était là depuis toujours, et personne ne la lisait.**
+`point_de_vente_id` est porté par chaque écriture — la vente, l'achat, le
+règlement, le mouvement de stock, la dotation d'amortissement, la consignation,
+et jusqu'à l'écriture manuelle. Il partait vers Comptaflow, qui l'ignore ; la
+balance et le grand livre savaient s'y restreindre. Mais **aucun écran ne
+mettait les sites côte à côte**, ce qui est la seule question qui compte quand
+on en tient plusieurs : lequel gagne de l'argent, lequel en perd.
+
+| Décision | Raison |
+|---|---|
+| **Classes 6 et 7 seulement** | Le résultat ne se lit pas sur le bilan. Une ligne de trésorerie, de tiers ou de TVA n'y a pas sa place |
+| **Les deux sens sont pris** | Un produit vit au crédit, une charge au débit — mais l'avoir et la contre-passation écrivent dans l'autre sens. Ne retenir que la colonne naturelle ferait apparaître un avoir comme une charge, et gonflerait les deux totaux d'un même montant |
+| **Aucune clé de répartition** | Une charge de siège reste au site où elle a été saisie. La clé n'existe nulle part dans l'application, et l'inventer donnerait un résultat faux que rien ne signalerait. **L'écran le dit**, et une épreuve vérifie qu'il le dit |
+| **Les écritures sans site sont montrées** | Les taire ferait que la somme des sites ne vaudrait pas le résultat de l'entreprise, sans que rien ne l'explique. Elles figurent sous « Sans site », et un bandeau les compte |
+| **Le lien n'apparaît qu'à partir de deux sites** | Comparer un magasin à lui-même n'apprend rien |
+| **Le comptage des écritures est une requête à part** | Une ligne qui porte une charge au débit et un produit au crédit serait comptée deux fois par les deux passes d'agrégation, et le total annoncé dépasserait le journal |
+
+Ce n'est **pas** une comptabilité analytique complète : pas de sections, pas de
+clés, pas de charges indirectes réparties au prorata. C'est la ventilation par
+le seul axe que l'application renseigne réellement — le lieu où la pièce a été
+établie. Prétendre davantage supposerait des clés que personne n'a données.
+
+- `AnalytiqueService`, `ComptabiliteControleur::analytique()`, une vue
+- `tests/Feature/AnalytiqueParSiteTest.php` — 12 tests, dont un de
+  cloisonnement et un de simulation d'attaque (caissier sans habilitation).
+
+#### Lot 12.4 — La photo de l'article en fond de carte — **TERMINÉ**
+
+Demandé par le propriétaire le 24/08. Sur un écran de caisse, on reconnaît un
+article à son image avant de lire son nom. La photo existait déjà sur la fiche,
+et **l'écran de vente ne l'utilisait nulle part** : les cartes se ressemblaient
+toutes.
+
+| Décision | Raison |
+|---|---|
+| **L'image d'attente n'est pas une photo** | `photo_url` rend toujours quelque chose — c'est ce qu'il faut pour une vignette. En arrière-plan, ce serait le même placeholder gris sous toutes les cartes : cela n'apprendrait rien et brouillerait le texte. `photoReelle()` rend `null` quand il n'y a pas de fichier |
+| **Un fichier absent du disque ne compte pas** | La colonne peut survivre à la suppression du fichier. Rendre son adresse afficherait une image cassée |
+| **Le voile est pris sur le fond de la carte** | `var(--bg3)`, non une couleur écrite en dur : le texte reste lisible quel que soit le thème. Le dégradé s'épaissit vers le bas, où sont le nom, le prix et le stock ; le haut de la photo reste dégagé, c'est là qu'on reconnaît l'article |
+| **L'image s'éclaircit au survol** | 45 % au repos, 62 % au survol : la carte visée se distingue sans que la grille devienne illisible |
+
+**Simulation d'attaque.** Le chemin de la photo entre dans un attribut `style`,
+entre apostrophes : `style="--fond-produit: url('…')"`. Une apostrophe dans le
+nom du fichier refermerait l'attribut et laisserait écrire du HTML dans la page
+— une porte ouverte à qui peut téléverser une image. Blade échappe l'apostrophe
+en `&#039;` ; **une épreuve le vérifie** plutôt que de le supposer.
+
+- `Produit::photoReelle()`, `ventes/nouvelle.blade.php`, `ventes/modifier.blade.php`
+- `tests/Feature/PhotoDeLArticleTest.php` — 9 tests, dont trois échouent contre
+  l'ancien code.
+
+#### Lot 12.6 — Les taxes de l'achat — **RETIRÉES**
+
+Le propriétaire a tranché : les tables `achat_taxes` et `achat_detail_taxes`
+sont supprimées.
+
+**Le constat du lot 12.1 était incomplet, et je le corrige ici.** J'avais
+signalé « la même plomberie dormante ». C'était vrai de
+`achat_detail_taxes` — `enregistrerTaxesDeLigne()` n'est appelée que depuis la
+vente. Ce ne l'était **pas** de `achat_taxes` : le formulaire d'achat proposait
+bien un bloc « Taxes sur total TTC », et `AchatControleur:219` l'enregistrait.
+
+Ce qui est pire que dormant :
+
+| Ce qui se passait | Effet |
+|---|---|
+| La taxe était **saisie et enregistrée** | L'utilisateur avait toute raison de la croire prise en compte |
+| **Rien ne la relisait** | Ni le payload du bordereau d'achat — qui ne transmet aucune taxe, l'un des six écarts corrigés au moment de la conformité, **gelé** —, ni `ventilationAchat()`, ni `montant_ttc`, ni le document imprimé |
+| L'écran **l'ajoutait au total affiché** | `const total = htNet + totalAutresTaxes`. Le total montait sous les yeux de l'utilisateur, et la pièce enregistrée l'ignorait, avec sa comptabilité |
+
+Le commentaire de la relation annonçait « → `customTaxes` à la racine du
+payload FNE ». C'était faux depuis le lot 3.
+
+**Le bloc de saisie part avec la table.** Garder un champ qui n'écrit plus
+nulle part serait pire que le défaut d'origine.
+
+##### Le défaut que ce retrait a mis au jour — la TVA manquait au pavé
+
+En retirant la ligne « Autres taxes » du pavé de totaux, il est apparu que
+**l'écran d'achat n'affichait aucune ligne de TVA**, et que son total valait le
+seul HT net. Sur un achat de marchandises à 18 %, **l'écran annonçait 18 % de
+moins que la pièce enregistrée** — le serveur, lui, calcule bien
+`montant_ttc = HT net + TVA`.
+
+La ligne « TVA » prend la place de « Autres taxes », et le calcul de l'écran
+suit celui du serveur au même endroit : taux du catalogue par ligne, aucune TVA
+sur un bordereau d'achat ni sur une ligne libre, puis réduction au prorata de
+la remise globale. Le taux atteint l'écran par un `data-tva` sur chaque option
+du sélecteur d'article ; `bapaActive` est déclaré en tête de script, `recalculer()`
+le lisant depuis sa zone morte sinon, et la bascule BAPA rafraîchit le pavé.
+
+- `2026_08_24_000004_retirer_les_taxes_de_l_achat.php`
+- Modèles `AchatTaxe` et `AchatDetailTaxe` supprimés, relations retirées de
+  `Achat` et `AchatDetail`
+- `AchatControleur` — l'appel et le chargement anticipé retirés
+- `achats/nouveau.blade.php` — bloc, JS et ligne de total
+- `tests/Feature/EcrituresAchatTest.php` — 4 tests de plus (21 au total)
+
+#### Lot 12.5 — La passation Comptaflow, prête à ouvrir — **TERMINÉ**
+
+`PASSERELLE-COMPTAFLOW/COMMENCER-ICI.md` : une page d'entrée pour une session
+qui reçoit le dossier **sans aucun autre contexte**. Elle porte le principe de
+la passerelle, les quatre travaux par ordre d'urgence, ce qu'il ne faut pas
+faire, et le rôle de chaque fichier du dossier.
+
+Les six documents précédents disaient chacun une partie ; aucun ne disait par
+où commencer.
+
+---
+
+### Lot 13 — Le paramétrage ne se saisit plus deux fois — **TERMINÉ**
+
+Trois demandes du propriétaire, faites le même jour : le fond de carte des
+articles ne se voyait toujours pas ; l'ancien choix des secteurs d'activité
+était toujours là ; et ce qui est déjà configuré ne devait plus pouvoir se
+défaire dès lors que l'entreprise porte des données.
+
+#### 13.1 — La photo de fond ne s'affichait pas — le vrai motif
+
+Le lot 12.4 avait posé la photo en arrière-plan de la carte, et le code était
+bien en place. Il ne s'affichait pas pour deux raisons, et la première n'a rien
+à voir avec le style.
+
+**L'adresse tombait en 404 (Not Found — introuvable).** `photoReelle()` rendait
+`asset('storage/…')`, qui ne vaut que si `public/storage` existe — le lien que
+pose `php artisan storage:link`. Sans ce lien, le fichier est bien sur le
+disque, `Storage::exists()` répond oui, et l'adresse rendue ne désigne rien.
+
+Le défaut ne se voyait nulle part ailleurs : la vignette d'un article a un
+`onerror` qui bascule sur l'image d'attente, et l'écran des articles paraissait
+donc normal. **Un fond de carte n'a pas d'`onerror`** — une image introuvable
+ne laisse rien, sans un mot.
+
+Correction : quand le lien manque, l'image est servie par une route de
+l'application (`GET /admin/produits/{produit}/photo`), qui vérifie
+l'appartenance à l'entreprise avant de rendre le fichier. Le chemin rapide
+reste le lien de stockage, servi sans passer par PHP.
+
+**Et le voile mangeait ce qui restait.** La photo était posée à `opacity: .45`
+sous un dégradé à `.88` : il n'en restait presque rien. La photo est passée à
+pleine opacité, le voile ne s'épaissit qu'à partir de 64 % de la hauteur — là
+où se trouvent le nom, le prix et le stock —, et la carte a désormais une
+hauteur minimale qui laisse voir l'image.
+
+Les deux écrans — nouvelle vente et modification — portent le même bloc.
+
+#### 13.2 — Le secteur d'activité ne se coche plus dans les paramètres
+
+Deux écrans posaient la même question sans se parler : les paramètres de
+l'entreprise proposaient de cocher un « secteur d'activité » dans une liste,
+pendant que le parcours de configuration demandait un domaine à sa première
+étape puis des métiers à la deuxième. **On pouvait déclarer « Santé » d'un côté
+et souscrire au métier « Boulangerie » de l'autre** ; les deux réponses
+cohabitaient, et rien ne le signalait.
+
+Le bloc de cases est retiré. À sa place, un panneau « Votre configuration » en
+lecture seule — domaine, métiers, modules ouverts — et un bouton qui rouvre le
+parcours. La colonne `secteur_activite` se déduit désormais du parcours : le
+domaine choisi à l'étape 1 la remplit aussitôt, et l'étape 4 la réaligne sur
+les métiers réellement souscrits.
+
+Deux pièges évités, chacun gardé par une épreuve :
+
+- **la ligne qui l'enregistrait valait `$request->secteurs_activite ?? []`.**
+  Retirer le champ de l'écran sans retirer cette ligne aurait **vidé** la
+  colonne à chaque enregistrement — et une entreprise sans secteur retombe en
+  « inscription incomplète », bannière comprise. La ligne est supprimée, pas
+  neutralisée ;
+- **la bannière d'inscription incomplète ne disait plus où aller.** Le secteur
+  conditionne la complétude, et l'écran où on le cochait n'existe plus. Elle
+  renvoie maintenant au parcours quand c'est lui qui manque.
+
+#### 13.3 — Ce qui porte des données ne se défait plus
+
+Le parcours est **additif presque partout** : rechoisir un domaine ou cocher un
+métier de plus n'enlève rien — `souscrire()` passe sur ce qui existe déjà sans
+y toucher. Un utilisateur qui vient ajouter une activité la trouve ajoutée.
+
+Deux points demandaient tout de même correction.
+
+**Les métiers déjà souscrits paraissaient décochables.** Décocher n'a jamais
+rien retiré, mais l'utilisateur croyait avoir fermé un métier qui restait
+ouvert, avec ses rayons et ses articles. Ils reviennent désormais cochés,
+désactivés, marqués « déjà en place » — et le contrôleur les remet dans le
+choix retenu, pour que l'écran et la base racontent la même chose. La règle
+`required_without` ne s'applique plus qu'à la première fois : sans cela, une
+entreprise déjà souscrite ne pouvait plus traverser l'étape 2 sans recocher un
+métier.
+
+**L'étape des modules, elle, défait réellement.** Elle écrit `modules_actifs`
+par intersection : refermer « Comptabilité » sur six mois d'écritures ne
+supprime rien, mais fait disparaître de la barre latérale l'écran où ces
+écritures se lisent. `VerrouConfigurationService` compte ce que chaque module
+porte, et un module qui porte des données ne se referme plus — case désactivée,
+compte affiché (« 142 ventes enregistrées »), et le contrôleur le rétablit
+quand la liste postée l'omet.
+
+Le comptage a demandé de l'attention : **une vente n'appartient pas à une
+entreprise mais à un point de vente.** Un verrou posé sur `entreprise_id`
+partout aurait laissé trois modules sur cinq — ventes, achats, stock — sans
+protection, sans rien dire. Le service passe par `points_de_vente` pour
+ceux-là.
+
+Le verrou ne s'applique qu'à ce qui est vérifiable. Ce qu'on ne sait pas
+compter reste libre, plutôt que verrouillé « au cas où » : un verrou sans motif
+se contourne, et le suivant ne serait plus cru.
+
+#### Ce que les épreuves gardent
+
+`ConfigurationVerrouilleeTest` — 14 épreuves : la déduction du secteur, son
+réalignement, le fait qu'un parcours sans souscription ne le vide pas, les
+métiers acquis, le verrou par point de vente, l'isolement entre entreprises, et
+deux simulations d'attaque — un module posté sans sa case verrouillée, un
+secteur posté à la main dans un formulaire qui ne le propose plus.
+
+`PhotoDeLArticleTest` passe de 9 à 12 épreuves, dont les deux branches de
+l'adresse — avec et sans lien de stockage — et le refus de la photo d'une
+autre entreprise.
+
+#### 13.4 — Trois reprises, le même jour
+
+**Les modules ouverts n'étaient pas à jour.** Le panneau annonçait « Stock
+porte vos données » juste au-dessus d'une liste de modules ouverts où Stock ne
+figurait pas — et la barre latérale n'avait pas de section Stock. Le module
+avait été fermé avant que le verrou existe : la marchandise était comptée,
+valorisée, reprise dans les écritures, et l'écran où elle se lit avait disparu.
+
+Le verrou empêche d'en refermer un ; il ne répare pas ceux qui l'ont été avant.
+`VerrouConfigurationService::reconcilier()` rouvre un module fermé qui porte
+des données, à l'affichage des écrans de configuration, et le dit. L'opération
+est idempotente et n'ouvre **que** ce dont elle a compté les lignes ; une
+épreuve le vérifie. Réparer sur une lecture est inhabituel — l'alternative
+était de laisser des données hors d'atteinte jusqu'à ce que quelqu'un pense à
+rouvrir la bonne case.
+
+**Les noms des modules étaient fabriqués à partir du code.**
+`ucfirst(str_replace('_', ' ', $module))` donnait « Comptabilite » sans accent
+et « Fne » pour la section que le menu appelle « Fiscalité & DGI ».
+L'utilisateur devait deviner quelle case commandait quelle section.
+`Entreprise::LIBELLES_MODULES` porte la liste de la barre latérale, et une
+épreuve vérifie qu'aucun module n'y manque.
+
+**Le bouton menait à la fin du parcours.** `route('admin.souscription.index')`
+ouvre la dernière étape atteinte — la cinquième pour une entreprise déjà
+configurée, c'est-à-dire l'écran des prix. Le bouton servait donc à tout sauf à
+ce qu'on lui demandait. Il repart de l'étape 1, s'appelle « Ajouter une
+configuration », et la première étape dit maintenant, quand un domaine est déjà
+souscrit, qu'en choisir un autre **n'enlève rien**.
+
+#### 13.5 — Pourquoi une photo ne s'affiche pas : `selflow:photos`
+
+Trois causes possibles, et **aucune ne se distingue à l'écran** : l'article n'a
+pas de photo, le fichier n'est plus sur le disque, ou le lien `public/storage`
+manque. Dans les trois cas la vignette montre l'image d'attente — qui ressemble
+à une photo — et le fond de carte reste vide.
+
+`php artisan selflow:photos` dit laquelle des trois s'applique, entreprise par
+entreprise, avec les noms des articles concernés.
+
+**885 épreuves, 885 vertes, 3 767 vérifications.**
+
+---
+
+### Lot 14 — Ce que six écrans disaient encore de travers — **TERMINÉ**
+
+Six remarques du propriétaire, faites d'un coup. Cinq portaient sur un défaut
+réel ; la sixième — les images de cartes — a ouvert une question qui n'avait
+jamais été posée.
+
+#### 14.1 — Archiver un article ne le retirait de rien
+
+**Le mot n'avait d'effet que sur un écran.** Le catalogue rangeait les archivés
+dans un second onglet ; partout ailleurs, l'article continuait de se proposer
+comme avant. La caisse l'affichait en carte, prix compris, et on pouvait le
+vendre. Le formulaire d'achat le proposait au réapprovisionnement. La fiche
+technique l'acceptait en ingrédient. L'écran des consignations le comptait
+parmi les emballages. Le tableau de bord le portait en rupture — **poussant à
+commander ce qu'on avait décidé de ne plus vendre**. L'ouverture d'un point de
+vente lui créait une fiche de stock neuve.
+
+Le filtre était pourtant écrit : `scopeActifs()` existait, et un seul écran
+l'appelait.
+
+| Décision | Raison |
+|---|---|
+| **Un nom pour la règle, `selectionnables()`** | Et non `actifs()` répété à dix endroits. Quand une raison de plus d'écarter un article apparaîtra — périmé, suspendu —, elle se posera à un seul endroit |
+| **Le stock garde l'archivé qui porte une quantité** | La marchandise est là, et les écritures la portent. La taire ferait tomber la valeur de l'inventaire sans que rien ne l'explique, et l'écart resterait sans moyen de le solder. `visiblesEnStock()` le retient tant qu'il n'est pas à zéro |
+| **La modification d'une pièce garde ce qu'elle porte déjà** | Un devis établi avant l'archivage porte peut-être l'article rangé depuis. Le taire retirerait la ligne du formulaire, donc de la pièce, à la première modification |
+| **Les alertes de rupture l'écartent** | Il ne se réapprovisionne pas |
+
+- `Produit::scopeSelectionnables()`, `Produit::scopeVisiblesEnStock()`
+- Vente, achat, production, consignation, points de vente, tableau de bord
+- `tests/Feature/ArticleArchiveTest.php` — 8 épreuves, dont 7 tombent contre
+  l'ancien code.
+
+#### 14.2 — L'inscription demandait quatre choses pour une
+
+**L'étape 1 réclamait le nom, la forme juridique, l'adresse électronique et le
+téléphone.** Une seule est indispensable — et l'adresse électronique, qui est
+l'**identifiant de connexion**, était demandée une étape avant qu'on sache qui
+se connecte.
+
+Elle rejoint le responsable, avec le téléphone. La forme juridique quitte le
+formulaire : elle se renseigne désormais depuis les paramètres, où elle
+manquait (voir 14.6).
+
+**Un champ était demandé puis jeté.** `telephone_gerant` — « Téléphone
+personnel » — était validé et **jamais enregistré**, ni sur l'entreprise ni sur
+l'utilisateur. Retiré plutôt que branché : un seul numéro suffit à joindre le
+responsable.
+
+**Le bouton de sortie ne se voyait pas.** « Terminer sans remplir la suite »
+était un lien souligné, gris clair, de douze pixels, sous le bouton principal.
+C'est pourtant la sortie de l'inscription — les étapes qui suivent sont
+facultatives. Il devient un vrai bouton, avec la phrase qui dit ce qu'il fait.
+
+**Le bloc Google se referme après le responsable.** S'inscrire par Google
+remplace le formulaire ; passé cette étape, il n'y a plus rien à remplacer, et
+la bascule perdrait la saisie.
+
+#### 14.3 — L'étape 4 était l'ancien mécanisme
+
+Elle posait le domaine d'activité par une grille de cases à cocher — celle-là
+même qui a été retirée des paramètres au lot 13.2. Deux écrans posaient la même
+question sans se parler : **on pouvait déclarer « Santé » à l'inscription et
+souscrire « Boulangerie » au parcours**, et les deux réponses cohabitaient.
+
+L'étape part, la règle `secteurs_activite` avec elle, et l'inscription se
+parcourt en trois étapes. Une épreuve vérifie qu'un domaine posté à la main ne
+s'écrit pas — le champ n'est plus proposé, rien n'empêche de le poster.
+
+**L'écran du superadministrateur garde le sien.** Il crée une entreprise pour
+elle et n'a pas le parcours sous la main ; c'était déjà la décision du lot 13.
+
+#### 14.4 — Le reçu s'annonçait non certifié alors qu'il l'était
+
+L'écran de vente affichait, sous le bouton « Reçu » : « Normalisation RNE en
+attente. Sa certification auprès de la DGI reste suspendue tant que la FNE n'a
+pas fourni les champs de mappage du reçu normalisé électronique. »
+
+C'était vrai avant la refonte du reçu. **Depuis, le reçu emprunte la porte de
+la facture** — mêmes champs, même envoi, même sticker consommé —, et rien ne le
+retient. Le texte est resté : il disait à l'utilisateur que ses reçus
+n'étaient pas certifiés alors qu'ils l'étaient. Le commentaire du code juste
+au-dessus disait déjà le contraire.
+
+L'encadré dit maintenant ce qui se passe, et lit le réglage de normalisation
+automatique des reçus pour annoncer si la pièce part tout de suite ou attend.
+
+**Rien de la FNE n'a été touché** : ni payload, ni champ, ni colonne. Seul le
+texte d'un formulaire.
+
+#### 14.5 — Un seul sac gris pour tout le catalogue
+
+L'image d'attente était la même sous chaque article : trente cartes identiques
+où **seul le texte distinguait un sac de riz d'une prestation de conseil**. Sur
+un écran de caisse, on cherche l'article à sa forme avant de lire son nom.
+
+| Décision | Raison |
+|---|---|
+| **Des dessins au trait, tenus dans le dépôt** | Vingt-deux illustrations. Aller chercher sur internet « une bouteille qui ressemble à la vôtre » montrerait une marchandise que l'entreprise ne vend pas — c'est la règle des contenus inventés, appliquée au catalogue |
+| **Le choix se fait par mots, du plus précis au plus large** | Le nom de l'article, puis sa famille, puis sa catégorie. L'ordre fait la règle : « eau de javel » doit rencontrer « javel » avant « eau », sans quoi le produit d'entretien s'illustrerait d'une goutte d'eau minérale |
+| **Rien n'est deviné au-delà** | Un article dont aucun mot ne parle reçoit le dessin de son type — marchandise ou prestation — plutôt qu'une image prise au hasard qui raconterait autre chose |
+| **Les relations ne sont pas chargées à la volée** | La méthode est appelée une fois par carte ; trente cartes feraient soixante requêtes de plus à chaque ouverture de la caisse. Ce qui a été chargé sert, le reste est absent du texte examiné |
+| **La photo passe toujours devant** | Elle tient tout le fond de la carte ; le dessin, à défaut, se pose en filigrane au coin. Les deux ne cohabitent pas |
+
+**Simulation d'attaque.** Le nom de l'article traverse le service et revient
+dans un attribut `style` entre apostrophes. Un nom bien choisi refermerait
+l'attribut. L'adresse ne porte rien du nom — elle vient d'une liste fermée de
+vingt-deux dessins — et le nom, qui voyage bien dans la carte, y est échappé.
+Une épreuve le vérifie sur les deux points.
+
+Une épreuve relit aussi les dix-sept articles du catalogue réel du propriétaire,
+et une autre vérifie que **chaque dessin annoncé existe sur le disque** : un nom
+sans fichier rendrait une adresse en 404 (Not Found — introuvable) et la carte
+resterait vide sans un mot, exactement le défaut du lot 13.
+
+#### 14.6 — Les paramètres ne disaient pas l'état réel
+
+Le propriétaire a demandé de relire chaque carte à partir de « DGI & Local
+professionnel ». Quatre écarts, dont deux qui empêchaient de travailler.
+
+**Le régime d'imposition se refusait à l'enregistrement.** L'écran proposait les
+six régimes du modèle ; la règle de validation en portait **quatre, écrits en
+dur**, dont `RNE` — qui n'est pas un régime mais le sigle du reçu normalisé, la
+confusion déjà corrigée au lot 3. Une entreprise au **TCE** ou au **régime des
+microentreprises** choisissait son régime, enregistrait, et se voyait refuser
+sans comprendre — les deux régimes que la DGI cite pourtant pour l'exonération
+légale. La règle lit désormais `Entreprise::regimesAcceptesPour()`, comme les
+quatre autres écrans.
+
+**La forme juridique ne se corrigeait nulle part.** Demandée au seul formulaire
+d'inscription, elle n'était plus modifiable ensuite, et la passerelle Comptaflow
+retombait sur « SARL » pour tout le monde. Elle rejoint le RCCM.
+
+**Une carte s'annonçait « Lecture seule »** au-dessus de cinq champs qui se
+saisissent tous, dont le NCC et le régime — ceux-là mêmes qui décident du code
+TVA transmis à la DGI. Annoncer qu'on ne peut rien changer là où tout se change
+est la pire des indications. Elle s'appelle « Identité fiscale ».
+
+**La procédure de conformité ne vérifiait rien.** Six points, dont **cinq
+portaient `fait => null`** : autant de pastilles grises numérotées,
+indiscernables d'un travail non fait. Et sa phrase d'introduction — « Selflow
+établit vos factures et les certifient directement aupres de la DGI . Les deux
+doivent dire la même chose. » — restait d'une version où Selflow et la
+plateforme étaient deux systèmes à tenir d'accord.
+
+| Décision | Raison |
+|---|---|
+| **Trois états, et non deux** | Vérifié, à corriger, et « nous ne pouvons pas le vérifier d'ici ». Les confondre faisait passer six points pour autant de travaux en retard |
+| **Ce qui se compte porte son constat** | Les articles dont le taux de TVA sort du barème DGI, les clients qui portent un NCC, les points de vente déclarés, le seuil d'alerte de stickers. Un nombre vaut mieux qu'une consigne |
+| **Ce qui ne se vérifie pas d'ici le dit** | L'API ne communique ni les noms de points de vente déclarés chez la DGI, ni les options cochées sur l'espace. Le point porte « à vérifier sur votre espace FNE » plutôt qu'une pastille qui ressemble à un manquement |
+| **L'article archivé ne compte pas dans les taux hors barème** | Il ne part sur aucune facture : le signaler enverrait corriger ce qui n'a plus d'effet |
+
+**La page se parcourt.** Onze cartes sur deux colonnes et trois écrans de haut :
+on y cherchait un réglage en faisant défiler. Une barre d'ancres dit d'un coup
+d'œil ce que la page contient, et y mène.
+
+- `tests/Feature/ParametresEntrepriseTest.php` — 14 épreuves
+- `tests/Feature/IllustrationArticleTest.php` — 27 épreuves
+- `tests/Feature/ArticleArchiveTest.php` — 8 épreuves
+
+**942 épreuves, 942 vertes, 3 921 vérifications.**
+
+---
+
+### Lot 15 — La page des paramètres occupe sa largeur — **15.1 TERMINÉ**
+
+#### 15.1 — Huit cartes sur dix tenaient dans la colonne de gauche
+
+Le propriétaire : « à partir de *DGI & Local professionnel* jusqu'à *Impression
+des factures*, tout est aligné sur la ligne gauche, ça fait long, l'espace de
+droite n'est pas occupé. »
+
+La grille avait bien deux colonnes. Seules **les logos et le récapitulatif**
+étaient à droite ; les huit autres cartes s'empilaient à gauche. La moitié
+droite de la page restait blanche sur quatre écrans de défilement.
+
+| Colonne | Cartes |
+|---|---|
+| Gauche | Identité, Identité fiscale (avec la liaison Comptaflow), DGI & local, Numérotation des tiers |
+| Droite | Logos, Compte FNE, Options fiscales, Impression des factures, Récapitulatif |
+| Pleine largeur | Procédure de conformité FNE |
+
+La conformité est la plus longue des cartes : sur une demi-largeur, ses six
+points formaient une colonne de texte de deux écrans de haut. Elle passe sous
+les deux colonnes, en pleine largeur, ses points sur deux colonnes internes et
+le barème du timbre de quittance à droite — la place qui restait vide.
+
+**Ce que le déplacement a mis au jour : la grille ne se repliait pas.** Elle
+portait son `grid-template-columns` en style écrit dans la balise, et un style
+de balise l'emporte sur la feuille, media query comprise. Aucune règle de
+largeur n'était donc possible : sur un portable, les deux colonnes restaient
+côte à côte et les champs devenaient illisibles. Les quatre classes vivent
+maintenant dans `@section('styles')`, et la page se replie à 1 024 px.
+
+L'ordre de la barre d'ancres suit celui des cartes à l'écran — sans quoi un
+raccourci renvoyait plus haut que le précédent.
+
+- `app/Modules/Admin/Vues/entreprise/parametres.blade.php`
+- `tests/Feature/ParametresEntrepriseTest.php` — 4 épreuves ajoutées (18 au total)
+
+Les quatre tombent sans le correctif. **946 épreuves, 946 vertes,
+3 945 vérifications.**
+
+#### 15.2 — Une clé de liaison par entreprise — **CÔTÉ SELFLOW TERMINÉ**
+
+Demande du propriétaire : au lieu d'un secret unique partagé, une clé par
+entreprise, délivrée quand le superadministrateur valide la demande de dossier
+comptable, la liaison s'établissant sans que l'entreprise manipule quoi que ce
+soit.
+
+L'état de départ, à ne pas confondre avec ce qui était demandé :
+
+| Élément | Avant ce lot |
+|---|---|
+| `EXTERNAL_SYNC_SECRET` | **Un seul secret**, la même valeur dans les deux `.env`. Il authentifie Selflow auprès de Comptaflow, et réciproquement |
+| `entreprises.comptaflow_sync_key` | Déjà **une valeur par entreprise** — mais **saisie à la main** : champ libre dans les paramètres, avec la consigne « obtenir depuis Comptaflow → Configuration → Liaison Selflow » |
+
+##### Le défaut, et il n'était pas d'ergonomie
+
+`EntrepriseControleur::enregistrerParametres()` acceptait
+`comptaflow_sync_key` comme un champ de formulaire ordinaire et déclenchait le
+déversement dès qu'il changeait. **Une entreprise qui obtenait la clé d'une
+autre la collait dans ses propres paramètres : la liaison s'ouvrait, et son
+référentiel puis toutes ses écritures partaient dans les livres de l'autre.**
+Le secret partagé n'y changeait rien — il est détenu par le serveur, part sur
+tous les appels, et ne dit pas qui appelle.
+
+Quatre autres écrans mentaient sur le même sujet :
+
+| Écran | Ce qu'il faisait |
+|---|---|
+| « Lancer la synchronisation test » | Annonçait « Synchronisation bidirectionnelle réussie ! Les écritures comptables et les statuts des factures ont été synchronisés » **sans qu'aucun appel ne parte** — et écrivait `comptaflow_sync_status = 'Actif'`, valeur qu'aucun autre code ne reconnaît : le déversement, qui attend `active`, s'arrêtait net après cette « réussite » |
+| « Lier manuellement » (superadmin) | Sa route pointait sur une méthode absente du contrôleur : **500 (Internal Server Error) depuis un renommage** que personne n'avait remarqué |
+| « Créer compte COMPTAFLOW » | Demandait au superadministrateur de **choisir le mot de passe** du compte d'un client, transmis en clair, et tirait `Str::random(40)` en le déclarant « clé de synchronisation » — Selflow inventait une clé que Comptaflow devait accepter sur parole |
+| « Délier » | Effaçait la clé chez Selflow **sans rien dire à Comptaflow**, où elle continuait d'ouvrir le dossier |
+
+Un cinquième, trouvé en chemin : le statut de liaison se déduisait de la
+présence du champ dans la requête, si bien qu'enregistrer les paramètres sans y
+toucher pouvait faire passer une liaison active à `inactive` — les écritures
+cessaient de partir sans que rien ne le dise.
+
+##### La procédure retenue
+
+1. L'entreprise demande. Un bouton, aucun champ.
+2. Le superadministrateur voit la file, avec ce qui manque à l'identité fiscale
+   signalé — un livre va s'ouvrir au nom de quelqu'un. Il valide, ou refuse
+   avec un motif que l'entreprise lit.
+3. Selflow appelle `POST /api/external/companies/provision` avec le secret
+   **serveur**.
+4. **Comptaflow crée le dossier, génère la clé, la renvoie.**
+5. Selflow la range chiffrée et déverse le référentiel dans la foulée.
+6. L'entreprise lit « Liaison active ». Elle n'a rien manipulé.
+
+C'est Comptaflow qui génère : la clé désigne un dossier chez lui, c'est lui qui
+doit la reconnaître. Selflow ne fait que la conserver.
+
+##### Ce que la clé change au modèle d'authentification
+
+Une fois délivrée, **c'est elle qui authentifie chaque déversement**, en
+en-tête `X-Company-Key`, et Comptaflow vérifie que la clé et l'entreprise
+annoncée dans le corps désignent le même dossier. Le secret partagé se rétracte
+alors sur le seul provisionnement. **Un secret volé ne suffit plus à écrire
+dans les livres de n'importe qui.**
+
+##### Les garde-fous posés
+
+| Décision | Raison |
+|---|---|
+| **La clé n'est pas `$fillable`** | Aucune requête ne peut l'y glisser. `LiaisonComptaflowService` est le seul endroit qui la pose, hors affectation en masse |
+| **Chiffrée en base** (cast `encrypted`) | Une sauvegarde égarée livrait toutes les clés en clair, donc l'écriture dans les livres de chaque entreprise. La migration chiffre l'existant, et sait reconnaître ce qui l'est déjà pour ne pas chiffrer deux fois |
+| **Jamais affichée entière** | Quatre derniers caractères, précédés de points. De quoi reconnaître une clé, pas de quoi s'en servir |
+| **Un provisionnement en échec ne lie rien** | La demande reste en attente et se rejoue. Une liaison à moitié ouverte enverrait des écritures qui n'arrivent nulle part, en les disant déversées |
+| **404 et 405 sont reconnus comme « point d'entrée absent »** | Le message envoie au déploiement en retard, pas à chercher une clé perdue |
+| **Délier révoque des deux côtés** | Une clé oubliée chez l'autre est une clé qui marche |
+
+##### Fichiers
+
+- `app/Modules/Admin/Migrations/2026_08_26_000001_liaison_comptaflow_delivree_et_non_saisie.php`
+- `app/Modules/Admin/Services/LiaisonComptaflowService.php` — demander, valider, refuser, révoquer, en-tête
+- `EntrepriseControleur`, `SuperadminLiaisonControleur`, `SuperadminControleur`,
+  `ExternalSyncControleur`, `DeversementReferentielService`,
+  `DeverserEcritureComptaflow`, `Entreprise`
+- `Vues/entreprise/parametres.blade.php`, `Vues/superadmin/liaisons/index.blade.php`,
+  `Vues/superadmin/entreprises/creer.blade.php`
+- `tests/Feature/LiaisonComptaflowTest.php` — 21 épreuves, **20 tombent sans le
+  correctif**
+
+**967 épreuves, 967 vertes, 4 007 vérifications.**
+
+##### La moitié Comptaflow — livrée en fichiers, non appliquée
+
+Ce dépôt n'a pas accès à `guysergekouassi/COMPTAFLOW` : une session Claude Code
+ne peut pas ajouter un dépôt d'un autre propriétaire que celui avec lequel elle
+a démarré. Le travail est donc écrit et rangé dans `docs/passerelle-comptaflow/`,
+à remettre à la session Comptaflow :
+
+| Fichier | Contenu |
+|---|---|
+| `README.md` | Le défaut, le modèle d'authentification visé, la procédure |
+| `01-migration-cles-de-liaison.php` | Clé, révocation, index, unicité |
+| `02-VerifieCleEntreprise.php` | Middleware `X-Company-Key`, avec la distinction 401 / 403 |
+| `03-ExternalCompanyController.php` | `provision`, `revoke`, `verify` |
+| `04-routes-api.php` | Les routes et leurs limitations de débit |
+| `05-modifications-des-points-existants.md` | Les retouches sur les deux déversements |
+| `06-tests-attendus.md` | Ce que les épreuves doivent établir |
+
+Les noms de table et de modèle y sont ceux que la passerelle laisse deviner ;
+chaque endroit à contrôler porte un `// À VÉRIFIER`.
+
+**Tant que le middleware n'est pas en place chez Comptaflow, le secret partagé
+suffit toujours à écrire dans n'importe quel dossier.** La moitié Selflow ferme
+le chemin par le formulaire ; elle ne peut pas fermer celui par l'API.
+
+---
+
+### Lot 16 — Neuf écrans relus par le propriétaire — **TERMINÉ**
+
+#### 16.1 — Trois adresses portaient le numéro de ligne
+
+Deux erreurs 404 (Not Found — introuvable) signalées :
+`POST /admin/produits/156/photo` et `POST /admin/clients/52`.
+
+Même cause, et une troisième occurrence trouvée en cherchant. Trois écrans
+construisaient une adresse en collant `$modele->id` à un chemin. Or les
+adresses de l'application portent l'`uuid` depuis le lot 8.3 — précisément pour
+ne pas publier le nombre de pièces de la plateforme. Le lien de route ne
+résolvait donc aucun modèle :
+
+| Écran | Ce qui tombait |
+|---|---|
+| Fiche article et catalogue | **Changer la photo d'un article** |
+| Liste des clients | **Modifier un client** |
+| Liste des fournisseurs | **Modifier un fournisseur** — personne ne l'avait signalé |
+
+Les trois construisent maintenant leur adresse par le routeur, qui ne peut pas
+se tromper de clé.
+
+#### 16.2 — Le compte comptable était exigé sur les cinq types de journal
+
+Il n'a de sens que sur un journal de **trésorerie** : le `521` de la banque, le
+`571` de la caisse — celui que chaque écriture du journal mouvemente. Un
+journal de ventes ou d'achats n'en a pas : sa contrepartie est le tiers de la
+pièce, et elle change à chaque écriture. **Pour créer un journal de ventes, il
+fallait inventer une valeur.**
+
+Le champ n'apparaît plus que pour Banque et Caisse. Le propriétaire avait
+demandé « uniquement pour Banque » ; la caisse pose le même besoin, et
+l'exemple affiché sous le champ le disait déjà — « Ex: 571000, 521000 ». Un
+journal de caisse sans compte laisserait la contrepartie de chaque
+encaissement indéterminée.
+
+Trouvé en chemin : **la liste des types n'était vérifiée nulle part.** Elle
+vivait en dur dans le `<select>`, et la règle de validation acceptait
+`string|max:255` — n'importe quelle chaîne entrait en base. Elle vit désormais
+sur le modèle, que l'écran et la règle lisent tous deux.
+
+#### 16.3 — On demandait ses identifiants fiscaux à un particulier
+
+NCC, RCCM et régime d'imposition étaient seulement **grisés à 45 % d'opacité**
+pour un B2C : trois champs lisibles, cliquables, saisissables — et vides à
+jamais, puisqu'un particulier n'en a aucun. Sur la fiche la plus souvent
+ouverte de la caisse.
+
+Ils disparaissent pour un B2C, et reviennent pour B2B, B2G et B2F, qui
+désignent tous une personne morale. Le compte comptable, lui, reste : il vaut
+pour tout le monde. Ce qui n'est pas demandé n'est plus envoyé — un NCC saisi
+puis le type basculé sur B2C partait avec le formulaire, et la pièce suivante
+était établie en B2B chez la DGI.
+
+#### 16.4 — Le tableau des clés FNE était coupé, sans barre de défilement
+
+La carte portait `overflow:hidden`. Sur sept colonnes, la fin du tableau — les
+clés, et la colonne qui permet de les poser — **n'était atteignable par aucun
+moyen**, et c'est justement la partie qui sert. La carte laisse défiler, et la
+colonne Actions reste collée à droite.
+
+#### 16.5 — Le plan comptable livré n'était pas un plan
+
+L'entreprise recevait les **41 comptes** marqués « communs ». Les **1 256
+comptes** de l'acte uniforme restaient un dictionnaire du référentiel, servant
+à nommer une subdivision sans jamais entrer dans le plan de personne.
+
+Le compte manquait donc dès qu'on sortait de l'ordinaire — une immobilisation,
+un emprunt, une charge de personnel, un impôt autre que la TVA. Il fallait le
+créer à la main, en devinant son numéro. **Une imputation sur un compte
+inventé ne se rattrape pas** : elle traverse la balance, le grand livre et la
+liasse fiscale.
+
+L'entreprise reçoit maintenant le plan **en entier**, posé par lots de 200
+lignes. L'intitulé contextuel prime toujours : « État, TVA facturée (18 % —
+régime réel) » dit plus que « État, TVA facturée ».
+
+**Ce que ce changement a mis au jour :** la souscription d'un métier inscrivait
+ses comptes de famille *s'ils n'existaient pas*. Le plan complet les posant
+désormais d'avance, `311100` serait resté « Marchandises A » au lieu de
+« Vivres et alimentation ». Le nom du métier prime, et il est maintenant posé
+même sur une ligne existante — mais seulement si elle porte encore l'intitulé
+générique du référentiel : ce que l'entreprise a renommé à la main n'est jamais
+touché.
+
+#### 16.6 — Le trousseau ne se posait qu'une fois
+
+À la création de l'entreprise, et jamais plus. Une entreprise créée avant qu'un
+compte ou un journal entre au référentiel — le mobile money, par exemple — ne
+l'obtenait plus par aucun chemin.
+
+Deux boutons, l'un sur le plan comptable et l'autre sur les codes journaux,
+rejouent la dotation. Rien n'est écrasé : seul ce qui manque est ajouté.
+
+#### 16.7 — Les accès Comptaflow sont les accès Selflow
+
+Décision du propriétaire : **un seul compte pour les deux applications** —
+même adresse, même mot de passe. Dans les deux sens : une entreprise qui a
+Comptaflow et veut Selflow retrouve les siens.
+
+Ce qui voyage n'est pourtant **jamais le mot de passe** : c'est son empreinte
+`bcrypt`, telle qu'elle est en base. Comptaflow la range comme elle arrive, et
+le même mot de passe y ouvre le compte — sans que personne, ni le
+superadministrateur, ni le réseau, ni le journal d'application, ne l'ait jamais
+lu. La route `register-enterprise` de Selflow accepte l'empreinte de la même
+façon, pour le sens inverse.
+
+C'est ce qui distingue cette version de celle d'avant, retirée au lot 15 : la
+route faisait **choisir par le superadministrateur le mot de passe du compte
+d'un client**, et le transportait en clair.
+
+#### 16.8 — Le superadministrateur lie sans attendre de demande
+
+Un client qui souscrit Comptaflow par téléphone n'a pas à cliquer dans un écran
+pour que son dossier s'ouvre. Le bouton « Lier maintenant » provisionne
+directement.
+
+Ce n'est **pas** le retour de l'ancien « Lier manuellement » : la clé continue
+d'être délivrée par Comptaflow, et personne ne la saisit. Seul le déclencheur
+change.
+
+#### 16.9 — L'adresse de Comptaflow, et les identifiants, à l'écran
+
+L'entreprise apprenait qu'elle avait un dossier comptable **sans savoir où le
+consulter, ni avec quels identifiants**. Les deux manquaient. La carte de
+liaison porte maintenant l'adresse — `http://comptaflow.dc-knowing.com/`,
+réglable par `COMPTAFLOW_APP_URL` — son adresse de connexion, et la mention que
+le mot de passe est celui de Selflow.
+
+- `tests/Feature/EcransDuLotSeizeTest.php` — 15 épreuves
+- `tests/Feature/TrousseauALaDemandeTest.php` — 8 épreuves
+- `tests/Feature/LiaisonComptaflowTest.php` — 6 épreuves ajoutées (27 au total)
+
+19 des 23 épreuves nouvelles tombent sans le correctif.
+**996 épreuves, 996 vertes, 4 068 vérifications.**
+
+---
+
+### Lot 17 — La clé borne aussi ce que l'API rend — **TERMINÉ**
+
+La session Comptaflow a livré sa moitié du lot 15 et signalé, dans son
+rapport, que trois de ses points d'entrée restaient sur le seul secret
+partagé. **C'était vrai chez nous aussi**, et personne ne l'avait relevé : le
+lot 15 avait fermé le chemin par le formulaire, pas celui par l'API.
+
+#### Ce qu'un seul secret volé ouvrait
+
+Le secret est le même pour toutes les entreprises, détenu par le serveur, et
+il **ne dit pas qui appelle**. Simulation d'attaque — il fuit par un ancien
+salarié, un journal de requêtes, un `.env` recopié sur un poste de
+développement :
+
+| Point d'entrée | Ce qu'il rendait |
+|---|---|
+| `list-companies` | **Toutes les entreprises de la plateforme**, avec adresse, NCC, RCCM, nom du gérant et **adresse électronique de l'administrateur**. L'annuaire complet des clients, et de quoi monter un hameçonnage crédible contre le compte le plus puissant de chaque entreprise |
+| `company-info` | La fiche de n'importe laquelle |
+| `tier-info` | Le téléphone, l'adresse et le NCC de n'importe quel client de n'importe quelle entreprise — son carnet d'adresses commercial |
+
+#### Ce qui le ferme
+
+La clé du dossier désigne une entreprise et une seule. Présentée en en-tête
+`X-Company-Key`, elle borne la réponse à cette entreprise. Une clé qui en
+désigne une autre reçoit **403 (Forbidden — accès interdit)** ; une clé
+inconnue ou révoquée, **401 (Unauthorized — non authentifié)**. Les confondre
+rendrait le journal illisible — on ne distinguerait plus un déploiement mal
+configuré d'une tentative de lecture croisée.
+
+`list-companies` ne rend plus que ce qui sert à **rapprocher** un dossier —
+identifiant, nom, date, état de liaison. Le détail se demande par
+`company-info`, clé en main.
+
+#### Ce qui reste ouvert, et il faut le dire
+
+**La tolérance de transition est encore en place, des deux côtés.** Un appel
+sans en-tête passe toujours sur le seul secret. Trois blocs, marqués en
+majuscules, à retirer **ensemble** le jour du déploiement conjoint :
+
+| Où | Quoi |
+|---|---|
+| Selflow | `ExternalSyncControleur::entrepriseDeLaCle()` |
+| Comptaflow | `VerifieCleEntreprise::handle()` |
+| Comptaflow | le `??` de `ExternalSyncController::entrepriseDeLaRequete()` |
+
+En retirer un ou deux laisse la porte ouverte du côté qu'on n'a pas fermé.
+`PasserelleEntranteTest::test_la_tolerance_de_transition_est_encore_ouverte`
+documente la porte et **tombera** le jour où elle sera fermée : c'est ce qui
+forcera à activer l'épreuve qui la remplace, écrite juste en dessous et
+commentée.
+
+#### Ce que la session Comptaflow a rapporté
+
+| Point | Ce qui a été trouvé chez elle |
+|---|---|
+| Stockage de la clé | Haché pour la recherche, **plus une copie chiffrée** — le haché seul interdisait l'idempotence de `provision`, qui suppose de pouvoir retourner la clé. Elle n'est en clair nulle part |
+| `referentiel/deverser` | **N'existait pas dans `main`** : il vivait sur une branche non fusionnée, reprise telle quelle plutôt que réécrite |
+| `tier_digits` | **Valait 8, et non 6.** Deux migrations se contredisaient — celle qui posait 6 ne s'exécutait que si la colonne n'existait pas, donc jamais. Corrigé, et nos 6 caractères de `NumerotationTiersService::LONGUEUR` sont bien la référence |
+| Lien d'activation | Aucune infrastructure de réinitialisation n'existait ; elle a été construite. Elle sert de repli — le cas normal est l'empreinte du mot de passe Selflow, transmise au lot 16 |
+
+- `tests/Feature/PasserelleEntranteTest.php` — 10 épreuves, **6 tombent** sans
+  le correctif (les 4 autres décrivent un comportement déjà juste)
+
+**1 006 épreuves, 1 006 vertes, 4 086 vérifications.**
+
+---
+
+### Lot 18 — L'avis d'ouverture du dossier comptable — **TERMINÉ**
+
+Question du propriétaire : lien d'activation où le client choisit un mot de
+passe, ou mot de passe identique à celui de Selflow ?
+
+**Tranché : le mot de passe reste celui de Selflow, et un courriel prévient.**
+
+Le lien d'activation fait choisir un second mot de passe à quelqu'un qui n'a
+rien demandé, il expire, il se perd, et il produit exactement ce qu'on voulait
+éviter — deux mots de passe pour la même personne. Il reste le **repli** quand
+l'empreinte manque.
+
+Mais l'avis, lui, n'est pas du confort. **Un compte s'ouvrait au nom du client,
+chez une autre application, sans qu'il en soit informé.** Le
+superadministrateur le voyait, l'écran des paramètres le disait à qui allait le
+lire ; le titulaire ne savait rien.
+
+#### Ce que le message ne contient pas, et ne contiendra jamais
+
+| Ce qui n'y est pas | Pourquoi |
+|---|---|
+| **Le mot de passe** | On dit *lequel* c'est, jamais *quel* il est. Un courriel traverse des serveurs qu'on ne choisit pas, se range dans une boîte parfois partagée, et dort des années dans une sauvegarde |
+| **La clé de liaison** | Elle ne concerne pas le client : la lui montrer ferait d'un secret d'infrastructure une donnée qui traîne |
+
+Le message porte en revanche **« Vous n'attendiez pas ce message ? »** — une
+personne qui reçoit l'avis d'un dossier ouvert à son nom sans l'avoir demandé
+doit savoir à qui s'adresser.
+
+#### La réserve, écrite dans le message
+
+Les deux mots de passe sont identiques **au jour de l'ouverture**, et le
+courriel le dit ainsi. Si le client change celui de Selflow ensuite, celui de
+Comptaflow ne suit pas : **ils divergent en silence**, et le client à qui on a
+dit « c'est le même » ne comprendra pas. Trois issues, à trancher plus tard :
+l'accepter et le dire (fait), propager le changement par la passerelle
+(recommandé, petit lot), ou une connexion unique (chantier).
+
+#### Ce qui a été soigné en chemin
+
+- **Une messagerie en panne ne défait pas la liaison.** L'envoi est enveloppé :
+  le contraire laisserait la demande en attente alors que le dossier existe
+  déjà chez Comptaflow, et le rejeu en ouvrirait un second ;
+- la mise en page tient sur des **tableaux imbriqués et des styles écrits dans
+  les balises** — Outlook rend le HTML avec le moteur de Word, Gmail retire les
+  feuilles de style. Ce qui serait une faute sur une page l'est ici l'inverse.
+
+- `app/Mail/CompteComptaflowOuvert.php`
+- `resources/views/emails/comptaflow/compte-ouvert.blade.php`
+- `tests/Feature/LiaisonComptaflowTest.php` — 4 épreuves ajoutées (31 au total)
+
+**1 010 épreuves, 1 010 vertes, 4 091 vérifications.**
+
+---
+
+### Lot 19 — Le point de vente, et la clé qui tourne — **TERMINÉ**
+
+#### 19.1 — Le point de vente ne s'invente plus
+
+**Le nom du point de vente part tel quel à la plateforme de la DGI**, avec
+chaque facture, et elle refuse la pièce s'il ne correspond à aucun site
+déclaré sur l'espace FNE. Ce n'est pas une commodité d'organisation : c'est
+une donnée fiscale, et elle appartient à l'entreprise.
+
+**Quatre endroits en créaient un d'office** — la création par le
+superadministrateur, la passerelle entrante, et la caisse **deux fois**, dans
+`nouvelle()` et dans `enregistrer()` :
+
+```
+nom : « Siège » · ville : l'adresse coupée à la première virgule
+commune : « Cocody » ou « Plateau » · responsable : « Superviseur »
+```
+
+Trois informations inventées, sous un nom qui n'a aucune raison d'être celui
+de l'espace FNE. **La première facture partait à ce nom-là.** L'entreprise
+crée le sien ; les quatre créations d'office sont retirées.
+
+#### 19.2 — Le point de vente entre dans les blocages
+
+Il n'y figurait pas, et c'est le plus déterminant de tous : une entreprise
+sans point de vente ne peut rien certifier, et le découvrait au premier
+encaissement — ou ne le découvrait pas, puisque la caisse en fabriquait un.
+
+`estInscriptionComplete()` devient un comptage :
+`elementsInscriptionManquants()` rend la liste, avec pour chaque manque **son
+libellé et l'écran où il se règle**.
+
+**Ce que le changement a mis au jour :** l'écran de blocage disait « Terminer
+votre inscription… renseigner toutes les informations réglementaires » sans
+jamais dire **lesquelles**, et son bouton menait toujours aux paramètres —
+même quand ce qui manquait se réglait ailleurs. Il liste maintenant les
+manques et mène au premier : les paramètres, le parcours, ou l'écran des
+points de vente.
+
+#### 19.3 — Le point de vente actif survit à la déconnexion
+
+Il ne vivait que dans `session('point_de_vente_actif_id')`, et
+`deconnecter()` appelle `session()->invalidate()` — ce qui est juste. Le choix
+partait avec.
+
+Un responsable de trois magasins **repartait donc chaque matin sur le premier
+venu**, sans que rien ne le dise, et pouvait encaisser au nom d'un magasin où
+il n'était pas. Une pièce certifiée sous le mauvais site ne se corrige pas :
+elle s'annule par un avoir.
+
+Une colonne à part, `utilisateurs.point_de_vente_actif_id`, et non
+`point_de_vente_id` : pour un caissier, celui-ci est son **affectation**,
+décidée par son responsable. Y écrire le dernier choix ferait qu'un caissier
+qui bascule d'écran changerait son affectation. Deux idées, deux colonnes — et
+l'affectation prime toujours pour un caissier.
+
+Le point de vente retenu est **revérifié à chaque reprise** : il peut avoir
+été supprimé, ou appartenir à une autre entreprise si la valeur a été écrite à
+la main.
+
+#### 19.4 — La clé de liaison tourne
+
+Décision du propriétaire : le superadministrateur renouvelle quand il veut, et
+une rotation automatique passe chaque mois.
+
+Une clé posée une fois et jamais changée ouvre le dossier comptable aussi
+longtemps que l'entreprise existe. La rotation ne rend pas une fuite
+impossible : **elle borne sa durée de vie à un mois.**
+
+| Ce qui garantit que rien ne casse | Comment |
+|---|---|
+| Un appel qui échoue ne coupe rien | **Rien n'est écrit tant que la nouvelle clé n'est pas en main.** L'ancienne reste active, et la rotation se rejoue |
+| Les écritures en file repartent bien | `DeverserEcritureComptaflow` relit le modèle en base au moment de s'exécuter : elle lira la nouvelle clé |
+| Une requête déjà en vol est acceptée | **Période de grâce tenue par Comptaflow** — l'ancienne clé vaut encore quelques minutes. Sans elle, un déversement parti à l'instant du renouvellement échouerait, rarement et sans qu'on comprenne |
+| Comptaflow pas encore déployé | 404 et 405 sont reconnus comme « ce point d'entrée n'existe pas », le message le dit, la clé en place continue de servir |
+| Une panne ne déclenche pas une boucle | Un échec est **daté** et met le dossier **au repos douze heures** |
+| Un dossier en échec n'arrête pas les autres | Chaque renouvellement dans son propre `try`, et la commande rend toujours la main |
+
+`php artisan selflow:renouveler-cles-comptaflow`, avec `--a-blanc` pour voir
+sans appeler. Planifiée le 1ᵉʳ du mois à 3 h — heure où aucune caisse
+n'encaisse, donc où une clé qui change ne croise aucun déversement.
+
+L'écran du superadministrateur montre la date de la dernière rotation, signale
+celles qui ont dépassé leur durée, et affiche le dernier échec s'il y en a un.
+
+**Ce qui reste dû chez Comptaflow :** le point d'entrée
+`POST /api/external/companies/rotate-key` et sa période de grâce. Spécifiés
+dans `docs/passerelle-comptaflow/05-…`. Tant qu'il n'existe pas, la rotation
+le dit et ne casse rien.
+
+- `tests/Feature/PointDeVenteObligatoireTest.php` — 13 épreuves, **11 tombent**
+  sans le correctif
+- `tests/Feature/LiaisonComptaflowTest.php` — 11 épreuves ajoutées (42 au total)
+
+**1 034 épreuves, 1 034 vertes, 4 141 vérifications.**
+
+---
+
+### Lot 20 — Choisir la facture d'origine d'un avoir — **TERMINÉ**
+
+Signalé par le propriétaire, console du navigateur à l'appui :
+
+```
+GET /admin/ventes/facture-details/169  →  404 (Not Found — introuvable)
+SyntaxError: Unexpected token '<', "<!DOCTYPE "... is not valid JSON
+```
+
+Le second message découle du premier : le script lisait la réponse en JSON et
+recevait la page d'erreur en HTML. **Choisir une facture d'origine ne faisait
+rien** — aucun message à l'écran, la modale restait vide, et seule la console
+en disait quelque chose.
+
+La liste déroulante rendait `$f->id`, le numéro de ligne, quand les adresses
+de l'application portent l'`uuid` depuis le lot 8.3. Et si la requête avait
+abouti, l'envoi du formulaire aurait échoué au coup d'après : `parent_id` est
+validé `['required', 'uuid', …]`.
+
+**Pourquoi le défaut avait survécu.** Le même écran porte **deux** façons de
+choisir la pièce — une liste déroulante et un champ de recherche. Le champ de
+recherche avait été corrigé, et le commentaire de son contrôleur décrit
+exactement ce défaut ; la liste était restée au numéro de ligne. **Une moitié
+réparée cachait l'autre.**
+
+**Le même défaut existait sur l'avoir d'achat**, où personne ne l'avait
+rencontré. Corrigé aussi.
+
+C'est la troisième occurrence de la même famille — après la photo d'article,
+la fiche client et la fiche fournisseur au lot 16. L'épreuve
+`test_le_numero_de_ligne_ne_resout_aucune_facture` fixe la raison plutôt que
+le symptôme : ce n'est pas la route qu'il faut assouplir, c'est l'écran qui
+doit donner l'identifiant public.
+
+- `tests/Feature/AvoirChoixDeLaPieceTest.php` — 6 épreuves, **2 tombent** sans
+  le correctif (les 4 autres décrivent un comportement déjà juste, dont le
+  refus de traverser les entreprises)
+
+**1 040 épreuves, 1 040 vertes, 4 152 vérifications.**
+
+---
+
+### Lot 21 — Le déploiement s'arrêtait sur une colonne absente — **TERMINÉ**
+
+Signalé par le propriétaire, depuis le serveur :
+
+```
+php artisan migrate
+2026_08_09_000003_engagements_calcules ......................... FAIL
+SQLSTATE[42000] 1091 Can't DROP COLUMN `quantite_commandee`;
+check that it exists
+```
+
+**« Tout passe en local, pourquoi ça bloque en ligne ? »** — la question était
+la bonne, et la réponse ne se lit pas dans le message d'erreur.
+
+#### La cause, et elle n'est pas dans le fichier qui échoue
+
+`produits.quantite_commandee` et `quantite_a_receptionner` **n'ont jamais
+existé sur ce serveur**. Elles ont été ajoutées à
+`2026_06_05_000004_creer_table_produits` le **20 juillet** — commit `d6a2227`,
+deux lignes —, soit **quarante-cinq jours après la date de cette migration**,
+donc longtemps après qu'elle eut été appliquée en production.
+
+**Une migration déjà jouée ne se rejoue pas.** Retoucher son fichier ne change
+rien à la base qui l'a passée. Le serveur a gardé un `produits` sans ces
+colonnes, pendant qu'en local chaque `migrate:fresh` les recréait. D'où l'écart
+exact que le propriétaire décrit :
+
+| | Ce qui se passe |
+|---|---|
+| **En local** | `migrate:fresh` rejoue tout dans l'ordre, avec les fichiers d'aujourd'hui. Les colonnes sont créées, puis supprimées. Suite verte |
+| **En production** | La base porte l'histoire réelle des migrations **telles qu'elles étaient le jour où elles sont passées**. Les colonnes n'ont jamais été là, et le retrait échoue |
+
+Une suite verte ne dit rien de ce second cas. C'est ce que le lot ajoute.
+
+#### Le même écart s'était déjà produit, et avait été traité
+
+Le **même commit du même jour** ajoutait `secteur_activite` et `modules_actifs`
+à `2026_06_05_000001_creer_table_entreprises`. Là, quelqu'un avait vu le
+problème et écrit
+`2026_07_20_133019_add_missing_columns_to_entreprises` — une migration de
+rattrapage, datée du jour, qui pose les colonnes sur les bases qui ne les ont
+pas.
+
+**`produits` a reçu la retouche, jamais le rattrapage.** Le défaut a dormi
+trente-huit jours, jusqu'à ce qu'une migration du 9 août veuille supprimer ce
+qui n'existait pas.
+
+#### Ce qui a été corrigé
+
+Pas de migration de rattrapage ici : **ces colonnes doivent disparaître, pas
+revenir**. C'est le retrait qui devait tenir compte de leur absence.
+
+Une migration décrit **un état**, non un geste : « ces colonnes ne doivent plus
+être là ». Là où elles n'ont jamais été, il n'y a rien à faire.
+
+Quatre autres migrations portaient le même défaut latent, trouvées en
+cherchant :
+
+| Migration | Ce qu'elle retirait sans vérifier |
+|---|---|
+| `2026_06_29_000001_creer_table_stocks` | `produits.stock_actuel`, `stock_minimum` |
+| `2026_06_29_000002_creer_categories…` | `produits.categorie` et son index |
+| `2026_06_19_000001_ajouter_entreprise_id…` | l'unicité globale de `plan_comptable.numero` |
+| `2026_07_24_000002_corriger_unicite_code_ordre…` | l'unicité globale de `ordres_production.code_ordre` |
+
+Toutes ont déjà passé en production ; la correction est préventive. La
+migration sœur `2026_07_24_000001` était, elle, déjà gardée — par `try/catch`
+et un `indexExists()`.
+
+#### Ce que les épreuves établissent
+
+- **La reproduction** : `up()` de `2026_08_09_000003` est appelée sur une base
+  qui n'a jamais eu les colonnes. Sans le correctif, elle échoue avec l'erreur
+  de production transposée à SQLite — `no such column: "quantite_commandee"` ;
+- **le rejeu** : les colonnes remises, `up()` passe deux fois de suite — ce que
+  fait un déploiement relancé après interruption, MySQL n'annulant pas ses
+  ordres de structure ;
+- **la famille** : aucune migration ne retire une colonne ou un index dans son
+  `up()` sans vérifier qu'il est là. Le message d'échec dit pourquoi.
+
+- `tests/Feature/MigrationsRejouablesTest.php` — 5 épreuves, **4 tombent** sans
+  le correctif
+
+**1 045 épreuves, 1 045 vertes, 4 166 vérifications.**
+
 ---
 
 ### Lot 9 — Les relevés du portail FNE — **TERMINÉ (import), RAPPROCHEMENT EN ATTENTE**
@@ -2523,6 +4119,57 @@ Posé sur le poste de développement le 21/08/2026 :
 `* * * * * cd /chemin/selflow && php artisan schedule:run >> /dev/null 2>&1`.
 À ajouter à `deploy-production.sh`, qui n'en dit rien aujourd'hui.
 
+### La tolérance de transition de la passerelle — **OUVERTE, DÉLIBÉRÉMENT**
+
+Un appel entrant **sans** en-tête `X-Company-Key` passe encore sur le seul
+secret partagé, des deux côtés de la passerelle. C'est ce qui permet de
+déployer Selflow et Comptaflow séparément sans rien casser — et **tant que
+c'est en place, un secret volé écrit et lit dans n'importe quel dossier**.
+
+Trois blocs, marqués en majuscules dans le code, à retirer **ensemble** :
+
+| Où | Quoi |
+|---|---|
+| Selflow | `ExternalSyncControleur::entrepriseDeLaCle()` |
+| Comptaflow | `VerifieCleEntreprise::handle()` |
+| Comptaflow | le `??` de `ExternalSyncController::entrepriseDeLaRequete()` |
+
+Deux épreuves les gardent, une de chaque côté : elles **passent** aujourd'hui
+et **tomberont** le jour de la fermeture, forçant à activer celles qui les
+remplacent, écrites juste en dessous et commentées.
+
+### Le secret partagé et les clés versionnées — **À RÉVOQUER**
+
+`selflow-comptaflow-secret-2026` a circulé en clair et doit être changé dans
+les deux `.env` avant toute mise en service.
+
+Le dépôt **Comptaflow** versionne par ailleurs deux secrets en clair : une clé
+d'API Gemini dans `.env.example`, et un `APP_KEY` réel dans `.env.example2`.
+
+Le propriétaire précise que la production tourne sur `.env`, **pas** sur
+`.env.example2` — la clé versionnée n'est donc pas, en principe, celle qui
+chiffre les données. Deux vérifications restent dues avant de s'en satisfaire :
+
+1. **comparer** l'`APP_KEY` du `.env` de production à celle du fichier
+   versionné. Si elles coïncident, elle chiffre la copie de sauvegarde de la
+   clé de liaison, et quiconque a lu le dépôt la déchiffre ;
+2. **retirer les deux fichiers du dépôt** et révoquer la clé Gemini chez le
+   fournisseur. Ce qui est entré dans l'historique d'un dépôt y reste : le
+   retrait du fichier ne retire pas le secret.
+
+Rien d'équivalent côté Selflow : aucun fichier d'environnement n'est versionné,
+et la recherche de secrets écrits en dur ne remonte rien.
+
+### ~~Taxes supportées à l'achat~~ — **TRANCHÉ ET RETIRÉ au lot 12.1**
+
+Le propriétaire a choisi le retrait, le 24/08/2026. Voir le lot 12.1.
+
+### ~~Taxes personnalisées à l'achat~~ — **TRANCHÉ ET RETIRÉ au lot 12.6**
+
+Le propriétaire a choisi le retrait, le 24/08/2026. Et le constat qui figurait
+ici était **incomplet** : `achat_taxes` n'était pas dormante, elle était
+**remplie par le formulaire et relue par personne**. Voir le lot 12.6.
+
 ### Stock
 
 - ~~`quantite_disponible` est un `integer` — le référentiel livre des kg,
@@ -2825,9 +4472,16 @@ le suivant hors de la longueur permise.
 
 Vingt-deux épreuves dans `NumerotationTiersTest`.
 
-### Libellés d'écriture — l'intitulé du compte tient lieu de libellé
+### Libellés d'écriture — l'intitulé du compte tient lieu de libellé — **CORRIGÉ au lot 12.2**
 
 Relevé par le propriétaire du projet le 15/08/2026, et vérifié dans le code.
+**Livré le 24/08/2026** — voir le lot 12.2. Le constat ci-dessous est conservé :
+c'est lui qui dit pourquoi le chantier existait.
+
+Une seule chose diffère de ce qui était proposé ici : **le défaut n'est pas
+`{piece} — {tiers}` mais l'ancien texte, à l'identique.** Changer le libellé de
+toutes les entreprises d'office aurait modifié leur journal sans qu'elles
+l'aient demandé ; le nouveau gabarit est proposé à l'écran, il ne s'impose pas.
 
 **Ce sont deux choses différentes.** L'intitulé du compte appartient au plan
 comptable : 701000 s'appelle « Ventes de marchandises », et cela ne change
@@ -2978,6 +4632,14 @@ Pour ne pas re-auditer inutilement :
 - `php artisan test` et `php artisan verifier:variables` avant chaque envoi.
 - Les commentaires de code expliquent **pourquoi**, en rapportant ce qui avait
   échoué — pas ce que le code fait, qui se lit.
+- **Ne jamais retoucher une migration déjà appliquée en production.** Elle ne
+  se rejouera pas : le fichier changera, la base non. Ce qui manque se pose par
+  une migration nouvelle, datée du jour. Deux incidents en sont venus — les
+  colonnes de `entreprises` le 20 juillet, celles de `produits` le même jour,
+  qui ont bloqué le déploiement du 27 août (lot 21).
+- **Une migration décrit un état, pas un geste.** Ce qu'elle retire, elle
+  vérifie d'abord que c'est là ; ce qu'elle pose, elle vérifie d'abord que ce
+  ne l'est pas. `MigrationsRejouablesTest` le tient.
 
 ### Le plan de travail en PDF
 
@@ -2996,3 +4658,34 @@ n'est qu'un outil.
 | 1<sup>re</sup> | 15/08/2026 | 8 | l'état initial, TERNE, l'imprimante, la comptabilité |
 | 2<sup>e</sup> | 15/08/2026 | 10 | la passerelle fusionnée, les modèles d'import, les libellés (section 7) |
 | 3<sup>e</sup> | 16/08/2026 | 14 | la numérotation des tiers (section 8), la page d'accueil (section 9), le filtrage à l'import, `tier_digits` à vérifier chez Comptaflow |
+| 4<sup>e</sup> | 21/08/2026 | 16 | les lots 9 et 10 au tableau, les écritures de vente (section 10), la création d'un compte (section 11), le point d'entrée à écrire chez Comptaflow porté en tête des points bloquants, trois décisions arrêtées de plus |
+| 5<sup>e</sup> | 24/08/2026 | 17 | le lot 11 (section 12), le volet achat des écritures — le 401 et la TVA déductible par nature —, le régime d'imposition au volet FNE, deux décisions arrêtées de plus, et le point de la colonne `montant_autres_taxes` à trancher |
+| 6<sup>e</sup> | 24/08/2026 | 18 | le lot 12 (section 13) : la colonne de taxes retirée, le résultat par site, et ses cinq décisions. La section 7 passe de « ce que je propose » à « ce qui a été livré » ; les deux chantiers de confort quittent la liste de ce qui reste, où il ne demeure que le point d'entrée de Comptaflow |
+| 7<sup>e</sup> | 25/08/2026 | 20 | le lot 13 (section 14) : la photo de fond et son vrai motif, le secteur déduit du parcours, le verrou sur ce qui porte des données, les modules rouverts, `selflow:photos`. Les lots 12 et 13 entrent au tableau des lots livrés ; la section 13 dit désormais que les deux tables de taxes de l'achat sont parties, et que ce retrait a mis au jour l'absence de ligne de TVA au pavé de l'achat. Trois coupures de page forcées sont remplacées par des espaces : elles laissaient trois feuillets à trois ou cinq lignes |
+| 8<sup>e</sup> | 27/08/2026 | 32 | les lots 14 à 20 (sections 15 à 21), et les sept lignes correspondantes au tableau des lots livrés. La section 2.2 change de nature : le point d'entrée qui reçoit le référentiel **n'est plus le point bloquant** — la session Comptaflow l'a livré —, remplacé par la rotation des clés et sa période de grâce, le retrait conjoint des trois tolérances de transition, la fenêtre de liaison qui demande encore le mot de passe d'un client, l'`APP_URL` erronée et les fichiers d'exemple qui portent une clé. Un tableau nouveau dit ce que la session Comptaflow a livré et trouvé — dont `tier_digits` qui valait 8 et non 6. `EXTERNAL_SYNC_SECRET` passe de « à poser » à **« à changer »** et rejoint ce qui revient au propriétaire : la valeur en place est publiée dans l'historique |
+
+### L'état de l'application en PDF
+
+`Etat-de-Selflow.pdf`, à la racine, répond à une autre question que le plan de
+travail. Le plan regarde **devant** — ce qui reste à faire, dans quel ordre,
+et chez qui. L'état regarde **ce qui est** : ce que l'application sait faire
+aujourd'hui domaine par domaine, la conformité fiscale acquise, la passerelle,
+les portes qui ont été fermées, les épreuves qui gardent l'ensemble, et les
+trois choses qui séparent encore le projet d'une exploitation réelle.
+
+Il se donne à lire par quelqu'un qui ne connaît pas le dépôt — un associé, un
+cabinet, un client. Les deux documents ne se remplacent pas : ils se lisent
+ensemble.
+
+| Édition | Date | Pages | Chiffres arrêtés |
+|---|---|---|---|
+| 1<sup>re</sup> | 21/08/2026 | 7 | 711 épreuves / 3 331 vérifications, 262 classes PHP, 317 routes, 94 migrations, 171 révisions, révision `6bb1b16` |
+| 2<sup>e</sup> | 21/08/2026 | 7 | le lot 9 : 752 épreuves / 3 441 vérifications, 264 classes, 95 migrations, 176 révisions, révision `5113e9d`. La passerelle n'est plus décrite comme bidirectionnelle — elle ne l'était pas |
+| 3<sup>e</sup> | 21/08/2026 | 7 | le lot 10 : 779 épreuves / 3 514 vérifications, 268 classes, 97 migrations, 180 révisions, révision `af62a53`. La création d'un compte entre au tableau des domaines |
+| 4<sup>e</sup> | 24/08/2026 | 8 | le lot 11 : 810 épreuves / 3 612 vérifications, 269 classes, 111 migrations, 187 révisions, révision `9d819c1`. Le 401 et la TVA déductible par nature à la ligne « Achats », les articles sans gestion de stock à la ligne « Stock », la question FNE avant toute information fiscale à la ligne « Création d'un compte » ; le point d'entrée à écrire chez Comptaflow porté en tête des points bloquants, et la colonne `montant_autres_taxes` au tableau de ce qui reste à trancher |
+| 5<sup>e</sup> | 24/08/2026 | 7 | le lot 12 : 847 épreuves / 3 684 vérifications, 275 classes, 113 migrations, 190 révisions, révision `a3d9630`. Les libellés et le résultat par site entrent à la ligne « Comptabilité » ; la table des chantiers proposés disparaît — il n'en reste aucun |
+| 6<sup>e</sup> | 25/08/2026 | 8 | le lot 13 : 885 épreuves / 3 767 vérifications, 276 classes, 319 routes, 116 migrations, 195 révisions, révision `8d7d6ad`. Une ligne « Paramétrage » entre au tableau des domaines ; la photo de fond rejoint la ligne « Ventes ». La ligne « Taxes personnalisées à l'achat » quitte ce qui reste — les deux tables sont supprimées — et cède la place au diagnostic des photos |
+| 7<sup>e</sup> | 27/08/2026 | 10 | les lots 14 à 20 : 1 040 épreuves / 4 152 vérifications, 283 classes, 322 routes, 119 migrations, 205 révisions, révision `0b329c4`. Une ligne **« Points de vente »** entre au tableau des domaines — le nom du site part à la DGI, l'application n'en invente plus aucun, et le site actif survit à la déconnexion ; la ligne « Comptabilité » dit que le plan OHADA est livré **en entier** et non plus par ses 41 comptes communs. La section 3 gagne « Une clé par dossier, et non un secret pour tous » ; la section 4 gagne cinq portes fermées de plus, dont la clé qui se collait dans un formulaire et l'annuaire des clients qu'un secret volé ouvrait. Le tableau des épreuves gagne un domaine « Passerelle et liaison » et dit combien d'épreuves tombent sans leur correctif. Une section 7 nouvelle résume les sept lots ; la section 8 est l'état du dépôt |
+
+Fabriqué par `etat.py`, dans le répertoire de travail de la session, non
+versionné — comme `plan.py`, c'est le PDF qui fait foi.
