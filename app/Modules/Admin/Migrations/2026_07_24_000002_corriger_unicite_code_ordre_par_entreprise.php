@@ -19,10 +19,32 @@ return new class extends Migration
 {
     public function up(): void
     {
-        Schema::table('ordres_production', function (Blueprint $table) {
-            $table->dropUnique(['code_ordre']);
-            $table->unique(['entreprise_id', 'code_ordre'], 'uniq_ordre_production_code_par_entreprise');
-        });
+        // Le retrait est conditionnel, comme celui de la migration précédente :
+        // une base qui ne porte pas l'index que la migration croit y trouver
+        // arrête tout le déploiement derrière elle. Voir `2026_08_09_000003`,
+        // qui a bloqué une mise en ligne pour cette raison exacte.
+        if ($this->indexExiste('ordres_production', 'ordres_production_code_ordre_unique')) {
+            Schema::table('ordres_production', function (Blueprint $table) {
+                $table->dropUnique(['code_ordre']);
+            });
+        }
+
+        if (!$this->indexExiste('ordres_production', 'uniq_ordre_production_code_par_entreprise')) {
+            Schema::table('ordres_production', function (Blueprint $table) {
+                $table->unique(['entreprise_id', 'code_ordre'], 'uniq_ordre_production_code_par_entreprise');
+            });
+        }
+    }
+
+    private function indexExiste(string $table, string $nom): bool
+    {
+        foreach (Schema::getIndexes($table) as $index) {
+            if (($index['name'] ?? null) === $nom) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     public function down(): void

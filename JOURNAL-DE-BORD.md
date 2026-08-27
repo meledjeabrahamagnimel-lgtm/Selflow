@@ -3072,6 +3072,93 @@ doit donner l'identifiant public.
 
 ---
 
+### Lot 21 — Le déploiement s'arrêtait sur une colonne absente — **TERMINÉ**
+
+Signalé par le propriétaire, depuis le serveur :
+
+```
+php artisan migrate
+2026_08_09_000003_engagements_calcules ......................... FAIL
+SQLSTATE[42000] 1091 Can't DROP COLUMN `quantite_commandee`;
+check that it exists
+```
+
+**« Tout passe en local, pourquoi ça bloque en ligne ? »** — la question était
+la bonne, et la réponse ne se lit pas dans le message d'erreur.
+
+#### La cause, et elle n'est pas dans le fichier qui échoue
+
+`produits.quantite_commandee` et `quantite_a_receptionner` **n'ont jamais
+existé sur ce serveur**. Elles ont été ajoutées à
+`2026_06_05_000004_creer_table_produits` le **20 juillet** — commit `d6a2227`,
+deux lignes —, soit **quarante-cinq jours après la date de cette migration**,
+donc longtemps après qu'elle eut été appliquée en production.
+
+**Une migration déjà jouée ne se rejoue pas.** Retoucher son fichier ne change
+rien à la base qui l'a passée. Le serveur a gardé un `produits` sans ces
+colonnes, pendant qu'en local chaque `migrate:fresh` les recréait. D'où l'écart
+exact que le propriétaire décrit :
+
+| | Ce qui se passe |
+|---|---|
+| **En local** | `migrate:fresh` rejoue tout dans l'ordre, avec les fichiers d'aujourd'hui. Les colonnes sont créées, puis supprimées. Suite verte |
+| **En production** | La base porte l'histoire réelle des migrations **telles qu'elles étaient le jour où elles sont passées**. Les colonnes n'ont jamais été là, et le retrait échoue |
+
+Une suite verte ne dit rien de ce second cas. C'est ce que le lot ajoute.
+
+#### Le même écart s'était déjà produit, et avait été traité
+
+Le **même commit du même jour** ajoutait `secteur_activite` et `modules_actifs`
+à `2026_06_05_000001_creer_table_entreprises`. Là, quelqu'un avait vu le
+problème et écrit
+`2026_07_20_133019_add_missing_columns_to_entreprises` — une migration de
+rattrapage, datée du jour, qui pose les colonnes sur les bases qui ne les ont
+pas.
+
+**`produits` a reçu la retouche, jamais le rattrapage.** Le défaut a dormi
+trente-huit jours, jusqu'à ce qu'une migration du 9 août veuille supprimer ce
+qui n'existait pas.
+
+#### Ce qui a été corrigé
+
+Pas de migration de rattrapage ici : **ces colonnes doivent disparaître, pas
+revenir**. C'est le retrait qui devait tenir compte de leur absence.
+
+Une migration décrit **un état**, non un geste : « ces colonnes ne doivent plus
+être là ». Là où elles n'ont jamais été, il n'y a rien à faire.
+
+Quatre autres migrations portaient le même défaut latent, trouvées en
+cherchant :
+
+| Migration | Ce qu'elle retirait sans vérifier |
+|---|---|
+| `2026_06_29_000001_creer_table_stocks` | `produits.stock_actuel`, `stock_minimum` |
+| `2026_06_29_000002_creer_categories…` | `produits.categorie` et son index |
+| `2026_06_19_000001_ajouter_entreprise_id…` | l'unicité globale de `plan_comptable.numero` |
+| `2026_07_24_000002_corriger_unicite_code_ordre…` | l'unicité globale de `ordres_production.code_ordre` |
+
+Toutes ont déjà passé en production ; la correction est préventive. La
+migration sœur `2026_07_24_000001` était, elle, déjà gardée — par `try/catch`
+et un `indexExists()`.
+
+#### Ce que les épreuves établissent
+
+- **La reproduction** : `up()` de `2026_08_09_000003` est appelée sur une base
+  qui n'a jamais eu les colonnes. Sans le correctif, elle échoue avec l'erreur
+  de production transposée à SQLite — `no such column: "quantite_commandee"` ;
+- **le rejeu** : les colonnes remises, `up()` passe deux fois de suite — ce que
+  fait un déploiement relancé après interruption, MySQL n'annulant pas ses
+  ordres de structure ;
+- **la famille** : aucune migration ne retire une colonne ou un index dans son
+  `up()` sans vérifier qu'il est là. Le message d'échec dit pourquoi.
+
+- `tests/Feature/MigrationsRejouablesTest.php` — 5 épreuves, **4 tombent** sans
+  le correctif
+
+**1 045 épreuves, 1 045 vertes, 4 166 vérifications.**
+
+---
+
 ## 5 bis. La numérotation des comptes — tranché
 
 Le classeur subdivisait certaines racines sur des positions que l'acte uniforme
@@ -3632,6 +3719,14 @@ Pour ne pas re-auditer inutilement :
 - `php artisan test` et `php artisan verifier:variables` avant chaque envoi.
 - Les commentaires de code expliquent **pourquoi**, en rapportant ce qui avait
   échoué — pas ce que le code fait, qui se lit.
+- **Ne jamais retoucher une migration déjà appliquée en production.** Elle ne
+  se rejouera pas : le fichier changera, la base non. Ce qui manque se pose par
+  une migration nouvelle, datée du jour. Deux incidents en sont venus — les
+  colonnes de `entreprises` le 20 juillet, celles de `produits` le même jour,
+  qui ont bloqué le déploiement du 27 août (lot 21).
+- **Une migration décrit un état, pas un geste.** Ce qu'elle retire, elle
+  vérifie d'abord que c'est là ; ce qu'elle pose, elle vérifie d'abord que ce
+  ne l'est pas. `MigrationsRejouablesTest` le tient.
 
 ### Le plan de travail en PDF
 

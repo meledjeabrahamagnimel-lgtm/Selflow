@@ -110,11 +110,27 @@ return new class extends Migration
         }
 
         // Supprimer l'ancienne colonne texte de produits.
+        //
         // L'index pose a la creation doit tomber en premier : MySQL le retire
         // implicitement avec la colonne, pas SQLite.
-        Schema::table('produits', function (Blueprint $table) {
-            $table->dropIndex('produits_categorie_index');
-        });
+        //
+        // Le retrait est conditionnel pour la raison exposée dans
+        // `2026_08_09_000003` : une base qui n'a jamais porté la colonne — parce
+        // que la migration de création a été retouchée après coup — fait échouer
+        // un `dropColumn` inconditionnel en 1091 (Can't DROP COLUMN), et bloque
+        // tout le déploiement derrière lui.
+        if (!Schema::hasColumn('produits', 'categorie')) {
+            return;
+        }
+
+        $index = collect(Schema::getIndexes('produits'))
+            ->contains(fn ($i) => ($i['name'] ?? null) === 'produits_categorie_index');
+
+        if ($index) {
+            Schema::table('produits', function (Blueprint $table) {
+                $table->dropIndex('produits_categorie_index');
+            });
+        }
 
         Schema::table('produits', function (Blueprint $table) {
             $table->dropColumn('categorie');
