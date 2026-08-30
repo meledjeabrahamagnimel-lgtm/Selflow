@@ -159,17 +159,31 @@ charge. En production (Linux), la ligne cron reste à poser :
 
 ---
 
-## Ce qui ne se corrige jamais tout seul
+## Ce qui se corrige tout seul — et ce qui ne se corrigera jamais
 
-Le rapprochement **montre** les écarts entre le portail et le paramétrage de
-Selflow ; il n'en applique aucun. Trois des champs relevés —
-`timbre_quittance`, `bapa`, `sticker_solde_alerte` — commandent le comportement
-fiscal de l'application. Les recopier automatiquement ferait changer une facture
-parce qu'un fichier est arrivé dans un dossier, sans que personne ne l'ait
-décidé, et sur la foi d'un relevé dont rien ne garantit la fraîcheur.
+Depuis le 29/08/2026, et à la demande du propriétaire du projet, **un seul champ
+se corrige sans intervention** : le **nom du point de vente**. Quand la DGI
+refuse une pièce sur `pointOfSale` et que le portail ne déclare **qu'un seul**
+point de facturation actif, Selflow renomme le point de vente comme le portail
+l'écrit, puis renvoie à la DGI toutes les pièces que ce nom faisait refuser.
 
-C'est la règle d'or du projet, et elle vaut aussi pour le scraper : **il apporte
-un constat, pas une décision.**
+C'est un libellé descriptif, dont le portail est la source de vérité : la DGI
+refuse la pièce précisément parce qu'il ne correspond pas à ce qu'elle a
+enregistré. Et si le portail déclare **plusieurs** points, la machine s'abstient
+— elle ne sait pas dans lequel la pièce a été établie, et choisir renommerait un
+site sur une supposition.
+
+`CorrectionFneService`, `selflow.portail_fne.correction_auto` pour l'éteindre.
+
+**Tout le reste est montré et jamais appliqué.** Les trois champs de la fiche qui
+commandent le comportement fiscal — `timbre_quittance`, `bapa`,
+`sticker_solde_alerte` — ne bougent pas. Les recopier ferait changer le contenu
+d'une facture parce qu'un fichier est arrivé dans un dossier, sans que personne
+ne l'ait décidé, et sur la foi d'un relevé dont rien ne garantit la fraîcheur.
+
+C'est la règle d'or du projet, et l'automatisation ne la lève pas : elle porte
+sur un **nom**, jamais sur un **montant**. Pour tout le reste, le scraper
+**apporte un constat, pas une décision.**
 
 ---
 

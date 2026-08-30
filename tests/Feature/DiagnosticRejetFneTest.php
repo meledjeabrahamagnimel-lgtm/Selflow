@@ -31,6 +31,12 @@ use Tests\TestCase;
  *    que la règle d'or protège : `timbre_quittance` et `bapa` changent ce qui
  *    part à la DGI, et une facture ne change pas parce qu'un fichier est
  *    arrivé dans un dossier.
+ *
+ * Depuis le 29/08/2026, un cinquième maillon suit les quatre : `CorrectionFneService`
+ * applique **le seul nom du point de vente** et renvoie les pièces. Il vit
+ * ailleurs, et s'éprouve ailleurs — `CycleFneTroisCasTest`. Les épreuves d'ici
+ * qui pilotent la commande l'éteignent, pour garder leur sujet : ce que le
+ * rapprochement constate, et non ce qu'on en fait ensuite.
  */
 class DiagnosticRejetFneTest extends TestCase
 {
@@ -207,6 +213,12 @@ class DiagnosticRejetFneTest extends TestCase
 
     public function test_la_commande_de_diagnostic_ne_ferme_pas_un_rejet_sans_releve(): void
     {
+        // Correction automatique éteinte : le sujet est ce que la commande
+        // constate, pas ce qu'elle applique ensuite. Allumée, elle renommerait
+        // le point de vente et effacerait le constat qu'on vient vérifier.
+        // La correction a ses propres épreuves — `CycleFneTroisCasTest`.
+        config(['selflow.portail_fne.correction_auto' => false]);
+
         $rejet = FneRejet::consigner($this->uneVente('FA-0042'), $this->refusDeLaPlateforme());
 
         $this->artisan('fne:diagnostiquer-rejets')->assertExitCode(0);
@@ -225,6 +237,10 @@ class DiagnosticRejetFneTest extends TestCase
 
     public function test_un_releve_plus_frais_rafraichit_un_diagnostic_deja_pose(): void
     {
+        // Même raison : sans cela, le premier passage corrigerait l'écart et il
+        // n'y aurait plus de constat à rafraîchir au second.
+        config(['selflow.portail_fne.correction_auto' => false]);
+
         $rejet = FneRejet::consigner($this->uneVente('FA-0042'), $this->refusDeLaPlateforme());
 
         $this->unReleve();

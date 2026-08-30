@@ -91,8 +91,14 @@ class FactureRecueControleur
             ->where('statut', PortailFneImport::STATUT_IMPORTE)
             ->max('dernier_releve_le');
 
+        // Les onglets FNE pointent vers des ecrans gardes par `modules:comptabilite`.
+        // Une entreprise qui achete sans tenir sa comptabilite dans Selflow verrait
+        // sinon six liens dont cinq lui repondraient 403.
+        $aFne = in_array('comptabilite', (array) ($entreprise->modules_actifs ?? []), true);
+
         return view('admin::fne.factures-recues', [
             'entreprise'     => $entreprise,
+            'aFne'           => $aFne,
             'factures'       => $factures,
             'propositions'   => $propositions,
             'statutActif'    => $statutActif,

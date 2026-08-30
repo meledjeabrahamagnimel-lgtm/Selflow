@@ -90,6 +90,11 @@ class DiagnosticFneService
                 // du portail. Une date formatée se compare mal, et deux relevés
                 // du même jour existent.
                 'fiche_id'  => $fiche->id,
+                // Les points viennent de leur propre fichier, et donc de leur
+                // propre date. Sans elle, un diagnostic posé sur les points de
+                // la veille se croyait à jour tant que la fiche ne bougeait
+                // pas — et la commande horaire le sautait pour toujours.
+                'points_le' => $this->dateDesPoints($points),
             ] : null,
             'champs'       => $champs,
             'ecarts_fiche' => $ecartsFiche,
@@ -139,23 +144,71 @@ class DiagnosticFneService
      */
     public function diagnosticEstAJour(FneRejet $rejet): bool
     {
+        $fiche = $this->dernierReleve($rejet);
+
+        if ($fiche === null) {
+            return false;
+        }
+
         $connu = $rejet->diagnostic['releve']['fiche_id'] ?? null;
 
-        return $connu !== null && $connu === $this->dernierReleve($rejet)?->id;
+        if ($connu === null || $connu !== $fiche->id) {
+            return false;
+        }
+
+        // La fiche n'a pas bougé ; les points, eux, ont pu changer seuls. C'est
+        // même le cas qui compte : un point de facturation renommé au portail
+        // ne touche pas à la fiche, et le constat devait se refaire.
+        return ($rejet->diagnostic['releve']['points_le'] ?? null)
+            === $this->dateDesPoints($this->pointsDuReleve($fiche));
     }
 
     /**
-     * Les points de facturation du même relevé.
+     * La date du jeu de points retenu, ou `null` s'il n'y en a aucun.
      *
-     * Le tableur et le JSON arrivent en deux fichiers, donc deux imports : on
-     * rapproche par login et date de relevé, pas par `import_id`.
+     * @param  array<int, PortailFnePointFacturation>  $points
+     */
+    private function dateDesPoints(array $points): ?string
+    {
+        return $points === []
+            ? null
+            : ($points[0]->date_scraping?->format('Y-m-d'));
+    }
+
+    /**
+     * Les derniers points de facturation connus pour ce login.
+     *
+     * **Le dernier jeu, et non celui qui porte la date de la fiche.** Le
+     * tableur et le JSON sont deux fichiers, donc deux relevés indépendants, et
+     * l'import n'écrit que ce qui a changé : une fiche identique à celle de la
+     * veille n'est pas réécrite, un tableur identique non plus. Leurs dates
+     * divergent donc dès le deuxième passage, et c'est le cas ordinaire.
+     *
+     * Les apparier par égalité de date produisait deux constats faux, tous deux
+     * observés :
+     *
+     * - la fiche n'a pas bougé, les points si — le rapprochement lisait les
+     *   points de la veille et affichait un écart déjà corrigé au portail ;
+     * - les points n'ont pas bougé, la fiche si — aucun point ne portait la
+     *   date de la fiche, et le rapprochement annonçait « le relevé ne déclare
+     *   aucun point de facturation actif » à une entreprise qui en déclare.
+     *
+     * Un jeu de points est complet à sa date — `rangerPoints()` les écrit tous
+     * ou aucun — donc le plus récent décrit ce que le portail déclare.
      *
      * @return array<int, PortailFnePointFacturation>
      */
     private function pointsDuReleve(PortailFneFiche $fiche): array
     {
+        $derniereDate = PortailFnePointFacturation::where('login', $fiche->login)
+            ->max('date_scraping');
+
+        if ($derniereDate === null) {
+            return [];
+        }
+
         return PortailFnePointFacturation::where('login', $fiche->login)
-            ->where('date_scraping', $fiche->date_scraping)
+            ->where('date_scraping', $derniereDate)
             ->orderBy('nom')
             ->get()
             ->all();
@@ -200,7 +253,7 @@ class DiagnosticFneService
                 'envoye'      => $envoye,
                 'portail'     => $declares,
                 'verdict'     => $this->verdict($envoye, $declares),
-                'explication' => $this->expliquerPointDeVente($envoye, $declares, $fiche),
+                'explication' => $this->expliquerPointDeVente($envoye, $declares, $points, $fiche),
             ];
         }
 
@@ -261,11 +314,22 @@ class DiagnosticFneService
     }
 
     /**
+     * La date citée est celle des **points**, pas celle de la fiche.
+     *
+     * Les deux fichiers arrivent séparément et ne sont pas réécrits quand leur
+     * contenu ne change pas : dater les points du jour de la fiche revenait à
+     * attribuer au portail, à une date donnée, une liste qu'il affichait un
+     * autre jour. Celui qui va vérifier au portail doit savoir de quand date ce
+     * qu'on lui montre.
+     *
      * @param  array<int, string>  $declares
+     * @param  array<int, PortailFnePointFacturation>  $points
      */
-    private function expliquerPointDeVente(?string $envoye, array $declares, PortailFneFiche $fiche): string
+    private function expliquerPointDeVente(?string $envoye, array $declares, array $points, PortailFneFiche $fiche): string
     {
-        $date = $fiche->date_scraping?->format('d/m/Y') ?? 'date inconnue';
+        $date = ($points !== [] ? $points[0]->date_scraping?->format('d/m/Y') : null)
+            ?? $fiche->date_scraping?->format('d/m/Y')
+            ?? 'date inconnue';
 
         if ($declares === []) {
             return "Le relevé du {$date} ne déclare aucun point de facturation actif.";

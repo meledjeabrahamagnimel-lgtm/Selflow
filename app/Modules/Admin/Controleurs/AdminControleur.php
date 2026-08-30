@@ -274,17 +274,27 @@ class AdminControleur
         //    dans un palmares ni dans une part de camembert.
         $idsVentesFiltrees = (clone $qVentes)->where('type_facture', '!=', 'avoir')->pluck('id');
 
+        // Le nom complet s'assemble ici, et non en SQL : `CONCAT` n'existe pas
+        // en SQLite, et l'écran rendait 500 partout où la base n'est pas MySQL
+        // — à commencer par la suite d'épreuves, qui ne le voyait donc jamais
+        // passer. Deux colonnes et une concaténation PHP tiennent partout.
         $topVendeurs = DB::table('ventes')
             ->join('utilisateurs', 'utilisateurs.id', '=', 'ventes.utilisateur_id')
             ->select('ventes.utilisateur_id',
-                DB::raw("CONCAT(utilisateurs.prenom, ' ', utilisateurs.nom) as nom_employe"),
+                'utilisateurs.prenom',
+                'utilisateurs.nom',
                 DB::raw('SUM(ventes.montant_ttc) as total'),
                 DB::raw('COUNT(*) as nb_ventes'))
             ->whereIn('ventes.id', $idsVentesFiltrees)
             ->groupBy('ventes.utilisateur_id', 'utilisateurs.prenom', 'utilisateurs.nom')
             ->orderByDesc('total')
             ->limit(5)
-            ->get();
+            ->get()
+            ->map(function ($ligne) {
+                $ligne->nom_employe = trim(($ligne->prenom ?? '') . ' ' . ($ligne->nom ?? ''));
+
+                return $ligne;
+            });
 
         // ── CA par PDV sur la période ─────────────────────────────────────────
         //    Le camembert totalisait toutes les ventes de la base : hors

@@ -175,6 +175,24 @@ return [
         'delai_alerte_heures' => (int) env('PORTAIL_FNE_DELAI_ALERTE_HEURES', 24),
 
         /*
+        | Selflow renomme-t-il seul un point de vente d'apres le portail, et
+        | renvoie-t-il les pieces que ce nom faisait refuser ?
+        |
+        | Demande par le proprietaire du projet le 29/08/2026 : le cas « la DGI
+        | refuse sur un ecart de nom » se refermait en deux clics, il se referme
+        | desormais tout seul. Allume par defaut, donc.
+        |
+        | Un seul champ est concerne — le nom du point de vente, un libelle dont
+        | le portail est la source de verite. Les trois champs de la fiche qui
+        | commandent le comportement fiscal (timbre de quittance, bordereau
+        | d'achat, solde d'alerte des stickers) restent montres et jamais
+        | appliques : la regle d'or ne bouge pas.
+        |
+        | L'interrupteur existe pour reprendre la main sans livrer une version.
+        */
+        'correction_auto' => filter_var(env('PORTAIL_FNE_CORRECTION_AUTO', true), FILTER_VALIDATE_BOOL),
+
+        /*
         | Le scraper : ce qui va chercher les relevés sur le portail de la DGI.
         |
         | Selflow ne dépend toujours pas de lui — il lit un dossier, et ce qui

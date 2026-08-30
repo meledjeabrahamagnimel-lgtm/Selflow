@@ -199,6 +199,56 @@
         .alert-danger  { background: #FEF2F2; border: 1px solid #FEE2E2; color: #991B1B; }
         .alert-warning { background: #FFFBEB; border: 1px solid #FDE68A; color: #92400E; }
 
+        /* ── TOAST (pop-up de notification) ─────────
+           En surimpression, coin haut-droit. Remplace le bandeau de flash :
+           un pop-up qui glisse à l'écran se voit là où un bandeau se rate. */
+        .toast-zone {
+            position: fixed; top: 22px; right: 22px; z-index: 4000;
+            display: flex; flex-direction: column; gap: 12px;
+            width: min(410px, calc(100vw - 32px)); pointer-events: none;
+        }
+        .toast {
+            pointer-events: auto;
+            display: flex; align-items: flex-start; gap: 13px;
+            background: #fff; border-radius: 14px; padding: 15px 16px;
+            box-shadow: 0 16px 44px rgba(15, 23, 42, .20);
+            border: 1px solid var(--border); border-left: 5px solid #94a3b8;
+            animation: toast-in .38s cubic-bezier(.16, 1, .3, 1);
+        }
+        .toast.sortie { animation: toast-out .3s ease forwards; }
+        .toast .ic { font-size: 20px; line-height: 1.2; margin-top: 1px; flex-shrink: 0; color: #94a3b8; }
+        .toast .bd { flex: 1; min-width: 0; }
+        .toast .ti { font-weight: 800; font-size: 12px; text-transform: uppercase; letter-spacing: .3px; margin-bottom: 3px; }
+        .toast .ms { font-size: 13px; color: var(--text-2); line-height: 1.55; word-break: break-word; }
+        .toast .x  { background: none; border: none; cursor: pointer; color: var(--text-3);
+                     font-size: 15px; line-height: 1; padding: 2px 3px; flex-shrink: 0; border-radius: 6px; }
+        .toast .x:hover { color: var(--text-1); background: rgba(100, 116, 139, .12); }
+        .toast-actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px; }
+        .toast-action {
+            display: inline-block; padding: 8px 15px; border-radius: 9px; cursor: pointer;
+            font-size: 12.5px; font-weight: 700; text-decoration: none; color: #fff;
+            background: #64748b; transition: filter .12s ease, transform .12s ease;
+        }
+        .toast-action:hover { filter: brightness(1.07); transform: translateY(-1px); }
+        /* Le bouton principal (POST : lancer la correction) prend la couleur du
+           type ; le secondaire (naviguer) reste en contour, plus discret. */
+        .toast.t-succes        .toast-action { background: #10b981; }
+        .toast.t-avertissement .toast-action { background: #f59e0b; }
+        .toast.t-erreur        .toast-action { background: #ef4444; }
+        .toast.t-info          .toast-action { background: #3b82f6; }
+        .toast-action.secondaire {
+            background: transparent; color: var(--text-2);
+            border: 1px solid var(--border);
+        }
+        .toast-action.secondaire:hover { background: rgba(100, 116, 139, .10); color: var(--text-1); }
+        .toast.t-succes        { border-left-color: #10b981; } .toast.t-succes .ic        { color: #10b981; } .toast.t-succes .ti        { color: #065f46; }
+        .toast.t-avertissement { border-left-color: #f59e0b; } .toast.t-avertissement .ic { color: #f59e0b; } .toast.t-avertissement .ti { color: #92400e; }
+        .toast.t-erreur        { border-left-color: #ef4444; } .toast.t-erreur .ic        { color: #ef4444; } .toast.t-erreur .ti        { color: #991b1b; }
+        .toast.t-info          { border-left-color: #3b82f6; } .toast.t-info .ic          { color: #3b82f6; } .toast.t-info .ti          { color: #1e3a8a; }
+        @keyframes toast-in  { from { opacity: 0; transform: translateX(46px) scale(.98); } to { opacity: 1; transform: none; } }
+        @keyframes toast-out { to  { opacity: 0; transform: translateX(46px) scale(.98); } }
+        @media (max-width: 560px) { .toast-zone { top: 12px; right: 12px; left: 12px; width: auto; } }
+
         /* ── CARDS ───────────────────────────────── */
         .card {
             background: var(--surface); border: 1px solid var(--border);
@@ -661,6 +711,9 @@
             <a href="{{ route('admin.achats.factures', ['type' => 'avoir']) }}" class="nav-item {{ request()->routeIs('admin.achats.factures') && request('type') === 'avoir' ? 'active' : '' }}">
                 <i class="fas fa-file-circle-minus" style="color:#e17055;"></i> Avoirs fournisseurs
             </a>
+            <a href="{{ route('admin.achats.factures_recues') }}" class="nav-item {{ request()->routeIs('admin.achats.factures_recues*') ? 'active' : '' }}">
+                <i class="fas fa-inbox"></i> Factures re&ccedil;ues (portail FNE)
+            </a>
             @endif
 
             @if(auth()->user()->aHabilitation('nouvel_achat'))
@@ -776,9 +829,11 @@
             <a href="{{ route('admin.fne.factures') }}" class="nav-item {{ request()->routeIs('admin.fne.factures') ? 'active' : '' }}">
                 <i class="fas fa-receipt"></i> Factures &amp; Reçus émis/reçus
             </a>
-            <a href="{{ route('admin.fne.factures_recues') }}" class="nav-item {{ request()->routeIs('admin.fne.factures_recues*') ? 'active' : '' }}">
+            @if(in_array('achats', $modulesActifs))
+            <a href="{{ route('admin.achats.factures_recues') }}" class="nav-item {{ request()->routeIs('admin.achats.factures_recues*') ? 'active' : '' }}">
                 <i class="fas fa-inbox"></i> Factures re&ccedil;ues du portail
             </a>
+            @endif
             <a href="{{ route('admin.fne.stickers') }}" class="nav-item {{ request()->routeIs('admin.fne.stickers') ? 'active' : '' }}">
                 <i class="fas fa-ticket"></i> Gestion des stickers
             </a>
@@ -946,20 +1001,52 @@
 <div class="main-wrap">
     <main class="main-content">
 
-        @if(session('succes'))
-        <div class="alert alert-success">
-            <i class="fas fa-check-circle"></i>
-            {{ session('succes') }}
-        </div>
-        @endif
+        {{-- Les messages flash apparaissent en toast — un pop-up en surimpression,
+             coin haut-droit —, non plus en bandeau : un bandeau en haut d'un écran
+             chargé passe inaperçu. La collecte est ici, l'affichage en fin de page.
+             Le message est posé par `textContent` côté JS, jamais interprété comme
+             du HTML. --}}
+        @php
+            $__flashs = [];
+            foreach ([
+                'succes'        => 'Succès',
+                'avertissement' => 'Attention',
+                'erreur'        => 'Erreur',
+                'info'          => 'Information',
+            ] as $__cle => $__titre) {
+                if (session()->has($__cle)) {
+                    $__f = ['type' => $__cle, 'titre' => $__titre, 'message' => (string) session($__cle)];
 
-        @if($errors->any())
-        <div class="alert alert-danger">
-            <i class="fas fa-circle-exclamation"></i>
-            <div>
-                @foreach($errors->all() as $e) <div>{{ $e }}</div> @endforeach
-            </div>
-        </div>
+                    // Une ou plusieurs actions facultatives — des boutons qui
+                    // mènent où agir —, posées par le contrôleur sous
+                    // « {cle}_action ». On accepte une action seule ou une liste.
+                    $__brut = session($__cle . '_action');
+                    if (is_array($__brut) && $__brut !== []) {
+                        $__liste = array_key_exists('url', $__brut) ? [$__brut] : $__brut;
+                        $__actions = [];
+                        foreach ($__liste as $__a) {
+                            if (is_array($__a) && !empty($__a['url']) && !empty($__a['label'])) {
+                                $__actions[] = [
+                                    'url'    => (string) $__a['url'],
+                                    'label'  => (string) $__a['label'],
+                                    'method' => strtolower((string) ($__a['method'] ?? 'get')),
+                                ];
+                            }
+                        }
+                        if ($__actions !== []) {
+                            $__f['actions'] = $__actions;
+                        }
+                    }
+
+                    $__flashs[] = $__f;
+                }
+            }
+            if ($errors->any()) {
+                $__flashs[] = ['type' => 'erreur', 'titre' => 'Erreur', 'message' => implode(' ', $errors->all())];
+            }
+        @endphp
+        @if($__flashs)
+        <script>window.__flashs = (window.__flashs || []).concat(@json($__flashs));</script>
         @endif
 
         {{-- Alerte de stickers. Placee ici plutot que dans chaque vue : le
@@ -1314,6 +1401,79 @@ document.addEventListener('DOMContentLoaded', () => {
 @yield('scripts')
 
 @include('admin::partials.visite-guidee')
+
+{{-- Zone des toasts (pop-up de notification), alimentée par window.__flashs.
+     Succès et information disparaissent seuls ; avertissement et erreur
+     restent jusqu'à ce qu'on les ferme — on ne rate pas un refus. --}}
+<div class="toast-zone" id="toastZone" aria-live="polite" aria-atomic="true"></div>
+<script>
+window.__csrf = '{{ csrf_token() }}';
+(function () {
+    var zone = document.getElementById('toastZone');
+    if (!zone) return;
+    var flashs = window.__flashs || [];
+    var icones = { succes:'fa-circle-check', avertissement:'fa-triangle-exclamation', erreur:'fa-circle-exclamation', info:'fa-circle-info' };
+    var persistants = { avertissement:true, erreur:true };
+
+    flashs.forEach(function (f, i) { setTimeout(function () { afficher(f); }, i * 160); });
+
+    function afficher(f) {
+        var el = document.createElement('div');
+        el.className = 'toast t-' + (f.type || 'info');
+
+        var ic = document.createElement('i');
+        ic.className = 'fas ' + (icones[f.type] || 'fa-circle-info') + ' ic';
+
+        var bd = document.createElement('div'); bd.className = 'bd';
+        var ti = document.createElement('div'); ti.className = 'ti'; ti.textContent = f.titre || '';
+        var ms = document.createElement('div'); ms.className = 'ms'; ms.textContent = f.message || '';
+        bd.appendChild(ti); bd.appendChild(ms);
+
+        // Boutons d'action facultatifs : mènent où agir (voir les rejets), ou
+        // déclenchent une action (POST : lancer la correction).
+        if (Array.isArray(f.actions) && f.actions.length) {
+            var barre = document.createElement('div');
+            barre.className = 'toast-actions';
+            f.actions.forEach(function (ac) {
+                if (!ac || !ac.url || !ac.label) return;
+                var btn = document.createElement('a');
+                btn.className = 'toast-action' + (ac.method === 'post' ? '' : ' secondaire');
+                btn.href = ac.url;
+                btn.textContent = ac.label;
+                if (ac.method === 'post') {
+                    btn.setAttribute('role', 'button');
+                    btn.addEventListener('click', function (e) {
+                        e.preventDefault();
+                        var form = document.createElement('form');
+                        form.method = 'POST';
+                        form.action = ac.url;
+                        var t = document.createElement('input');
+                        t.type = 'hidden'; t.name = '_token';
+                        t.value = (window.__csrf || '');
+                        form.appendChild(t);
+                        document.body.appendChild(form);
+                        form.submit();
+                    });
+                }
+                barre.appendChild(btn);
+            });
+            bd.appendChild(barre);
+        }
+
+        var x = document.createElement('button');
+        x.className = 'x'; x.setAttribute('aria-label', 'Fermer');
+        x.innerHTML = '<i class="fas fa-xmark"></i>';
+
+        el.appendChild(ic); el.appendChild(bd); el.appendChild(x);
+
+        function fermer() { el.classList.add('sortie'); setTimeout(function () { el.remove(); }, 300); }
+        x.addEventListener('click', fermer);
+        zone.appendChild(el);
+
+        if (!persistants[f.type]) { setTimeout(fermer, 6000); }
+    }
+})();
+</script>
 </body>
 </html>
 

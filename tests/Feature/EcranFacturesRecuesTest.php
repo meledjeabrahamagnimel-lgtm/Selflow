@@ -37,7 +37,7 @@ class EcranFacturesRecuesTest extends TestCase
         $this->uneFactureRecue($entreprise, ['emetteur_nom' => 'FOURNISSEUR SARL']);
 
         $this->actingAs($utilisateur)
-            ->get(route('admin.fne.factures_recues'))
+            ->get(route('admin.achats.factures_recues'))
             ->assertOk()
             ->assertSee('B0000001X26000000042')
             ->assertSee('FOURNISSEUR SARL')
@@ -56,7 +56,7 @@ class EcranFacturesRecuesTest extends TestCase
         ]);
 
         $this->actingAs($utilisateur)
-            ->get(route('admin.fne.factures_recues'))
+            ->get(route('admin.achats.factures_recues'))
             ->assertOk()
             ->assertSee('Aucun fournisseur ne porte ce NCC');
     }
@@ -75,7 +75,7 @@ class EcranFacturesRecuesTest extends TestCase
         $facture = $this->uneFactureRecue($entreprise);
 
         $this->actingAs($utilisateur)
-            ->post(route('admin.fne.factures_recues.rattacher', $facture))
+            ->post(route('admin.achats.factures_recues.rattacher', $facture))
             ->assertRedirect();
 
         $facture->refresh();
@@ -104,7 +104,7 @@ class EcranFacturesRecuesTest extends TestCase
         $facture = $this->uneFactureRecue($entreprise);
 
         $this->actingAs($utilisateur)
-            ->post(route('admin.fne.factures_recues.rattacher', $facture))
+            ->post(route('admin.achats.factures_recues.rattacher', $facture))
             ->assertRedirect();
 
         $this->assertStringContainsString('écart', (string) $facture->refresh()->note_rapprochement);
@@ -123,7 +123,7 @@ class EcranFacturesRecuesTest extends TestCase
         $facture = $this->uneFactureRecue($entreprise);
 
         $this->actingAs($utilisateur)
-            ->post(route('admin.fne.factures_recues.rattacher', $facture))
+            ->post(route('admin.achats.factures_recues.rattacher', $facture))
             ->assertRedirect()
             ->assertSessionHas('erreur');
 
@@ -137,7 +137,7 @@ class EcranFacturesRecuesTest extends TestCase
         $facture = $this->uneFactureRecue($entreprise);
 
         $this->actingAs($utilisateur)
-            ->post(route('admin.fne.factures_recues.ecarter', $facture), ['motif' => 'Doublon fournisseur'])
+            ->post(route('admin.achats.factures_recues.ecarter', $facture), ['motif' => 'Doublon fournisseur'])
             ->assertRedirect();
 
         // Le portail la redéposera au prochain relevé : la supprimer ferait
@@ -155,13 +155,35 @@ class EcranFacturesRecuesTest extends TestCase
         $facture = $this->uneFactureRecue($autre);
 
         $this->actingAs($utilisateur)
-            ->post(route('admin.fne.factures_recues.ecarter', $facture))
+            ->post(route('admin.achats.factures_recues.ecarter', $facture))
             ->assertNotFound();
 
         $this->assertSame(
             PortailFneFactureRecue::A_RAPPROCHER,
             $facture->refresh()->statut_rapprochement
         );
+    }
+
+    public function test_l_ecran_est_joignable_sans_le_module_comptabilite(): void
+    {
+        // C'est la raison d'etre du deplacement sous `achats` : une entreprise
+        // qui achete sans tenir sa comptabilite dans Selflow doit voir les
+        // factures que ses fournisseurs lui ont certifiees. Sous le groupe FNE,
+        // garde par `modules:comptabilite`, elle recevait un 403 sur l'ecran de
+        // ses propres factures d'achat.
+        [$utilisateur, $entreprise] = $this->uneEntrepriseAvecUtilisateur();
+
+        $entreprise->update(['modules_actifs' => ['principal', 'achats']]);
+
+        $this->uneFactureRecue($entreprise);
+
+        $this->actingAs($utilisateur)
+            ->get(route('admin.achats.factures_recues'))
+            ->assertOk()
+            ->assertSee('B0000001X26000000042')
+            // Et les onglets FNE ne s'affichent pas : ils pointent vers des
+            // ecrans qui, eux, lui repondraient 403.
+            ->assertDontSee('Stickers');
     }
 
     /* -------------------------------------------------------------------- */

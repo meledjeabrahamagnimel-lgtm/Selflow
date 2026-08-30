@@ -86,6 +86,21 @@ Route::prefix('admin')
             Route::post('/{achat}/normaliser', [AchatControleur::class, 'normaliser'])->name('normaliser');
             Route::post('/{achat}/fne',        [\App\Modules\Admin\Controleurs\FneControleur::class, 'attacherFneAchat'])->name('fne.attacher');
             Route::post('/{achat}/transmettre-b2b', [AchatControleur::class, 'transmettreB2b'])->name('transmettre_b2b');
+
+            // ── Factures reçues du portail FNE ──
+            //
+            // Sous `achats` et non sous `fne` : ce sont des factures d'achat, et
+            // c'est là qu'on les cherche. Le groupe FNE exige `modules:comptabilite`
+            // — une entreprise qui achète sans tenir sa comptabilité dans Selflow
+            // se serait vu refuser l'écran de ses propres factures fournisseurs.
+            //
+            // Rien ici ne crée d'achat ni n'écrit dans les colonnes gelées
+            // d'`achats` : `rattacher` pose un lien vers un achat qui existe déjà,
+            // dans `portail_fne_factures_recues.achat_id`.
+            Route::get('/factures-recues',                      [\App\Modules\Admin\Controleurs\FactureRecueControleur::class, 'index'])->name('factures_recues');
+            Route::post('/factures-recues/{facture}/rattacher', [\App\Modules\Admin\Controleurs\FactureRecueControleur::class, 'rattacher'])->name('factures_recues.rattacher');
+            Route::post('/factures-recues/{facture}/detacher',  [\App\Modules\Admin\Controleurs\FactureRecueControleur::class, 'detacher'])->name('factures_recues.detacher');
+            Route::post('/factures-recues/{facture}/ecarter',   [\App\Modules\Admin\Controleurs\FactureRecueControleur::class, 'ecarter'])->name('factures_recues.ecarter');
         });
 
         // ── FNE / DGI Stub (Lot I) ──
@@ -199,20 +214,11 @@ Route::prefix('admin')
             // n'était lisible nulle part. `appliquer` renomme un point de vente
             // pour l'aligner sur ce que le portail déclare — jamais un champ
             // fiscal, qui reste montré et non recopié.
-            // ── Factures reçues du portail ──
-            //
-            // Les pièces qu'un fournisseur a certifiées au NCC de l'entreprise.
-            // Rien ici ne crée d'achat ni n'écrit dans les colonnes gelées
-            // d'`achats` : `rattacher` pose un lien vers un achat qui existe
-            // déjà, dans `portail_fne_factures_recues.achat_id`.
-            Route::get('/factures-recues',                   [\App\Modules\Admin\Controleurs\FactureRecueControleur::class, 'index'])->name('factures_recues');
-            Route::post('/factures-recues/{facture}/rattacher', [\App\Modules\Admin\Controleurs\FactureRecueControleur::class, 'rattacher'])->name('factures_recues.rattacher');
-            Route::post('/factures-recues/{facture}/detacher',  [\App\Modules\Admin\Controleurs\FactureRecueControleur::class, 'detacher'])->name('factures_recues.detacher');
-            Route::post('/factures-recues/{facture}/ecarter',   [\App\Modules\Admin\Controleurs\FactureRecueControleur::class, 'ecarter'])->name('factures_recues.ecarter');
-
             Route::get('/rejets',                      [\App\Modules\Admin\Controleurs\RejetFneControleur::class, 'index'])->name('rejets');
             Route::post('/rejets/{rejet}/diagnostiquer',[\App\Modules\Admin\Controleurs\RejetFneControleur::class, 'diagnostiquer'])->name('rejets.diagnostiquer');
             Route::post('/rejets/{rejet}/appliquer',    [\App\Modules\Admin\Controleurs\RejetFneControleur::class, 'appliquer'])->name('rejets.appliquer');
+            // Le « tout en un clic » du pop-up : ranger le relevé, rapprocher, corriger.
+            Route::post('/rejets/{rejet}/corriger-maintenant', [\App\Modules\Admin\Controleurs\RejetFneControleur::class, 'corrigerMaintenant'])->name('rejets.corriger_maintenant');
             Route::post('/rejets/{rejet}/resoudre',     [\App\Modules\Admin\Controleurs\RejetFneControleur::class, 'resoudre'])->name('rejets.resoudre');
         });
 

@@ -6,8 +6,9 @@ et ce fichier. Tout ce qui a été décidé, tout ce qui a été écarté et pou
 tout ce qui reste à faire doit donc figurer ici — et y être tenu à jour à chaque
 lot terminé.
 
-Dernière mise à jour : 8 août 2026 — lot 5 côté Selflow : la passerelle
-Comptaflow devient idempotente, et le secret partagé cesse d’être public.
+Dernière mise à jour : 30 août 2026 — lot 20 côté Selflow : le refus FNE
+s'affiche en pop-up, se corrige d'un bouton qui certifie dans la foulée, et la
+correction ne duplique plus un point de vente — elle bascule sur l'existant.
 
 ---
 
@@ -4045,6 +4046,267 @@ trois défauts, non corrigés parce qu'ils traversent le périmètre gelé :
    fournisseur ferait mentir Selflow devant un contrôle.
 
 Le nouvel écran ne passe par aucun de ces chemins.
+
+### Lot 17 — Le cycle FNE joué sur ses trois cas — **TERMINÉ**
+
+Demandé par le propriétaire du projet le 29/08/2026 : vérifier que la chaîne
+réagit bien aux trois situations qu'une facture rencontre, et non seulement que
+chaque maillon fonctionne isolément.
+
+`tests/Feature/CycleFneTroisCasTest.php` les enchaîne comme la production les
+enchaîne — envoi réel par `FneService`, seul le réseau est simulé, et le portail
+dépose ses deux fichiers dans le dossier convenu comme le scraper le fait.
+
+| Cas | Ce que la DGI fait | Ce qui se produit | Vérifié |
+|---|---|---|---|
+| 1 | elle certifie | pièce normalisée, aucun rejet, file du scraper vide | oui |
+| 2 | elle refuse la pièce | demande ouverte, relevé rangé, écart nommé, reprise certifiée | oui |
+| 3 | elle ne répond pas | le job rejoue ; épuisé, il consigne un rejet `reseau` **sans** ouvrir de relevé | oui |
+
+**Le cas 2 se corrige tout seul depuis le lot 18** — voir plus bas. La première
+version de ce lot s'arrêtait à l'écart montré, et le propriétaire du projet a
+demandé, le même jour, qu'il se referme sans intervention.
+
+#### Ce que la simulation a trouvé — la fiche et les points ne se retrouvaient plus
+
+`DiagnosticFneService::pointsDuReleve()` appariait les points de facturation à
+la fiche **par égalité de `date_scraping`**. Or ce sont deux fichiers, donc deux
+relevés indépendants, et depuis le lot 15 l'import **ne réécrit pas un contenu
+inchangé** : leurs dates divergent dès le deuxième passage. C'est le cas
+ordinaire, pas le cas rare.
+
+Les deux constats faux qui en sortaient ont été reproduits, l'un et l'autre :
+
+| Ce qui bouge au portail | Ce que le rapprochement disait |
+|---|---|
+| les points seuls (un point renommé) | il lisait ceux de la veille et **maintenait un écart déjà corrigé** — pour toujours, car `diagnosticEstAJour()` ne comparait que la fiche, inchangée, et la commande horaire sautait le rejet |
+| la fiche seule (un solde d'alerte) | aucun point ne portait la date de la fiche : « **le relevé ne déclare aucun point de facturation actif** », à une entreprise qui en déclare un |
+
+Le second est le plus courant — le tableur des points ne bouge presque jamais —
+et le plus trompeur : il envoie chercher une déclaration manquante là où il n'en
+manque aucune.
+
+**Trois corrections, toutes dans `DiagnosticFneService`, hors périmètre gelé :**
+
+1. les points retenus sont le **dernier jeu connu** du login, quelle que soit sa
+   date. Un jeu est complet à sa date — `rangerPoints()` les écrit tous ou aucun
+   — donc le plus récent décrit ce que le portail déclare. C'est déjà la règle
+   que suit `PortailFnePointFacturation::changementsDepuisLePrecedent()` ;
+2. le diagnostic porte `releve.points_le` en plus de `releve.fiche_id`, et
+   `diagnosticEstAJour()` compare les deux : des points neufs sous une fiche
+   inchangée refont désormais le constat ;
+3. la phrase cite la date **des points**, non celle de la fiche : celui qui va
+   vérifier au portail doit savoir de quand date ce qu'on lui montre.
+
+Les deux épreuves qui tiennent ces cas tombent si l'on retire le correctif —
+vérifié, pas supposé.
+
+#### Au passage : la suite mourait de faim
+
+`php artisan test` s'arrêtait sur `Allowed memory size of 134217728 bytes
+exhausted` dès qu'une épreuve écrivait un classeur — ce que font celles qui
+simulent le dépôt du scraper : le compresseur réclame 16 Mo d'un coup, et la
+suite était déjà à plus de 110 Mo après quelques centaines d'épreuves. Le
+processus de PHPUnit n'hérite pas du `-d memory_limit` de la ligne de commande :
+la limite se pose dans `phpunit.xml`, désormais à 512 Mo.
+
+#### Deux échecs qui ne venaient pas d'ici — **CORRIGÉS au lot 18**
+
+Constatés en passant la suite entière, tous deux hors du cycle FNE :
+
+- `HabilitationsTest` — les quatre routes `admin.achats.factures_recues*` du lot
+  16 n'exigeaient aucune habilitation et n'étaient pas déclarées ouvertes. Elles
+  sont rangées sous **`factures_achat`** : une facture relevée sur le portail est
+  une facture fournisseur, et le rattachement n'écrit que dans
+  `portail_fne_factures_recues.achat_id` — il ne crée aucun achat et ne touche à
+  aucune colonne gelée ;
+- `TableauDeBordGeneralTest` — `AdminControleur.php:280` appelait **`CONCAT`, que
+  SQLite n'a pas**. Le palmarès des vendeurs faisait rendre 500 à tout le tableau
+  de bord partout où la base n'est pas MySQL — à commencer par la suite
+  d'épreuves, qui ne l'a donc jamais vu passer. Le nom complet s'assemble
+  désormais en PHP, à partir de deux colonnes.
+
+### Lot 18 — Le cas 2 se referme tout seul — **TERMINÉ**
+
+Demandé par le propriétaire du projet le 29/08/2026, après la démonstration du
+lot 17 : *« rendre le cas 2 automatique »*.
+
+**Ce que Selflow fait désormais sans qu'on le lui demande.** Quand la DGI refuse
+une pièce sur `pointOfSale` et que le relevé du portail ne déclare **qu'un seul**
+point de facturation actif, le passage horaire renomme le point de vente comme le
+portail l'écrit, puis renvoie à la DGI **toutes** les pièces que ce nom faisait
+refuser. Le cycle complet — refus, demande, relevé, rapprochement, correction,
+renvoi, certification — se déroule sans personne.
+
+C'est `CorrectionFneService`, et l'interrupteur est
+`selflow.portail_fne.correction_auto` (`PORTAIL_FNE_CORRECTION_AUTO`), allumé par
+défaut. L'écran des rejets garde son bouton : la correction peut être éteinte, et
+un rejet arrivé entre deux passages n'attend pas l'heure ronde. **Les deux lisent
+la même règle**, dans le même service — le journal garde le précédent de la liste
+des modules socle qui vivait en double et avait perdu `points_de_vente` des deux
+côtés.
+
+**Ce qui borne l'automatisme, et pourquoi :**
+
+| Garde-fou | Raison |
+|---|---|
+| Un seul champ : le nom du point de vente | c'est un libellé descriptif, dont le portail est la source de vérité. `establishment` ne s'y ajoutera pas : le portail n'en publie que l'identifiant, et corriger sur un identifiant reviendrait à deviner |
+| **Jamais** `timbre_quittance`, `bapa`, `sticker_solde_alerte` | ils commandent ce que la facture contient. La règle d'or ne bouge pas : l'automatisation porte sur un **nom**, jamais sur un **montant** |
+| Un seul point déclaré au portail | à plusieurs, la machine ne sait pas dans lequel la pièce a été établie ; choisir renommerait un site sur une supposition |
+| Rien si le nom est déjà celui du portail | c'est ce qui empêche la boucle : après un renommage, le rapprochement conclut « concordant » et ne propose plus rien. Pas de compteur à tenir |
+| Une entreprise en certification manuelle est corrigée, pas renvoyée | elle vérifie ses pièces avant de les certifier, et **une pièce certifiée ne se reprend pas**. Corriger pour elle est un service ; envoyer à sa place passerait outre un choix explicite |
+| Le renommage part au journal en `warning` | il touche toutes les pièces à venir de ce point de vente, et personne n'est devant l'écran quand la tâche planifiée passe |
+
+**Toutes les pièces, et non la seule du rejet traité.** Un nom mal orthographié
+fait refuser tout ce qui part de ce point de vente : une soirée de saisie laisse
+dix pièces refusées pour une seule cause. Ne renvoyer que la première les
+laisserait refusées — et le rapprochement suivant les dirait *concordantes*,
+puisque la valeur envoyée se relit sur le point de vente, qui vient d'être
+corrigé. Elles seraient restées en plan sans que rien ne le rappelle.
+
+**Un défaut de plus, mis au jour par ce lot.** `fne:diagnostiquer-rejets`
+écrivait `statut = diagnostique` sans regarder l'état courant. Sans conséquence
+tant que rien ne résolvait un rejet pendant le passage ; depuis que la correction
+renvoie les pièces, la commande **rétrogradait de « résolu » à « diagnostiqué »**
+les rejets refermés une seconde plus tôt, et l'écran affichait en souffrance des
+pièces certifiées. Elle applique désormais la règle que l'écran suivait déjà : un
+rejet résolu reste résolu.
+
+Sept épreuves de plus dans `CycleFneTroisCasTest` — quatorze en tout. Suite
+entière : **1 141 épreuves, 1 141 passantes, 4 564 vérifications.**
+
+### Lot 19 — Les trois cas joués sur la vraie plateforme — **FAIT le 29/08/2026**
+
+Les lots 17 et 18 étaient éprouvés en simulation. Le propriétaire du projet a
+demandé la répétition en réel. Elle a eu lieu sur l'environnement de test de la
+DGI (`54.247.95.108` — le `.env` y pointe pour le bac à sable **comme** pour la
+production), avec l'entreprise **DC-KNOWING CGA** (NCC `1864699A`).
+
+Préalable : `fne_credentials` était **vide**, aucune clé API n'existait en base.
+La clé de test a été relevée sur la page Paramétrage du portail — où elle
+s'affiche en clair — et posée chiffrée dans `fne_credentials`. Elle n'est jamais
+passée par un fichier déposé : `fne.js` l'écarte par son libellé, et c'est bien.
+
+**Les trois cas, et ce que la DGI a réellement répondu :**
+
+| Cas | Ce qui a été fait | Ce que la plateforme a rendu |
+|---|---|---|
+| **2** | `VTE-290826-001` émise avec le point de vente nommé `Siège` | **HTTP 400 sur `pointOfSale`** — « Point of sale is invalid ». Rejet classé `dgi`, demande ouverte |
+| | `node fne.js` sans argument | il a lu la file de Selflow, s'est connecté au portail, relevé 14/14 champs, déposé |
+| | `fne:diagnostiquer-rejets` | « Vous avez envoyé *Siège*. Le portail déclare *FACTURATION SIEGE*. » puis **renommage automatique** et renvoi |
+| | le renvoi | **certifiée : `1864699A26000000079`**, signature, UUID, PDF. Rejet refermé seul |
+| **1** | `VTE-290826-002`, nom désormais aligné | **certifiée du premier coup : `1864699A26000000080`**. Aucun rejet, file du scraper vide |
+| **3** | `VTE-290826-003`, envoi dirigé vers `10.255.255.1` (coupure **induite**, réglage changé dans le seul processus) | vrai délai de **10,1 s**, `cURL error 28`. 1<sup>re</sup> tentative : relance demandée, **rien consigné**. Dernière : rejet `reseau`, **zéro demande** — le scraper est resté au repos |
+| | reprise sur la vraie adresse | **certifiée : `1864699A26000000081`** |
+
+État final : trois pièces certifiées, deux rejets refermés, aucune demande en
+attente, point de vente `FACTURATION SIEGE`. Aucun client ni produit n'a été
+créé — les pièces sont parties en B2C avec une ligne libre à 0 %, cohérente avec
+le régime TEE que la FNE code `TVAD`.
+
+#### Ce que le réel a confirmé du lot 17
+
+L'import de la fiche porte `dernier relevé = 21/08`, celui des points `29/08` :
+**les deux dates ont bel et bien divergé dans les données réelles.** Avant le
+correctif, le rapprochement aurait cherché des points datés du 21 alors que les
+derniers portaient le 29. Le défaut n'était pas théorique.
+
+#### Ce que le réel a trouvé — **la file n'est traitée par personne**
+
+C'est le constat le plus grave de la journée, et seule une répétition réelle
+pouvait le donner.
+
+`QUEUE_CONNECTION=database`, et **aucun `queue:work` ne tourne** : ni tâche
+Windows, ni entrée au planificateur — les huit lignes de `schedule:list` n'en
+portent aucune. La table `jobs` contenait **deux jobs en souffrance depuis le
+22 et le 24 juillet**.
+
+Or **sept endroits** normalisent par `dispatch()` — `VenteControleur`,
+`AchatControleur`, `B2bControleur`, `BonLivraisonControleur`,
+`VenteApiControleur`, et désormais `CorrectionFneService`. Conséquence : **une
+facture émise depuis l'application ne part jamais à la DGI**. Elle reste
+`normalise = false`, aucun rejet n'est consigné, et rien ne le signale — le job
+attend dans une table que personne ne lit.
+
+Seuls deux appels échappent au piège, en `dispatchSync()` : les boutons
+« normaliser » manuels. C'est ce qui a masqué la panne — à la main, tout marche.
+
+**Ce qui reste à poser**, et qui n'a pas été fait ici parce que cela engage
+l'exploitation : un `queue:work` permanent. Deux formes possibles — une entrée
+au planificateur (`php artisan queue:work --stop-when-empty` chaque minute, dans
+l'esprit des tâches déjà en place) ou un service permanent. Les deux jobs de
+juillet ont été **laissés intacts** : les traiter enverrait à la DGI des pièces
+vieilles d'un mois, et c'est une décision du propriétaire.
+
+### Lot 20 — Le refus se voit, se corrige d'un bouton, et ne duplique plus — **TERMINÉ le 30/08/2026**
+
+Demandé par le propriétaire du projet le 30/08/2026, à partir de son écran :
+*« quand je normalise avec un point de vente qui n'existe pas côté DGI, le pop-up
+doit m'informer d'abord, puis lancer le scraping »*, puis *« un vrai pop-up, pas
+un bandeau »*, *« un bouton pour lancer la correction »*, et enfin *« ne plus
+créer le même point de vente — basculer sur celui qui existe »*.
+
+**Le refus parle, à l'instant du clic.** `VenteControleur::normaliser()` rendait
+un flash **« succès »** même quand la DGI refusait : un message vert rassurant sur
+une pièce non normalisée. Il lit désormais l'état réel après le job et distingue
+trois issues — certifiée (vert), refusée par la DGI (avertissement), plateforme
+injoignable (erreur). Sur un refus `pointOfSale`, il **lance le scraper dans la
+foulée** (`ScraperPortailFneService`, `node fne.js <login>` détaché en arrière-
+plan) : la relève ne dépend plus du seul passage horaire. Le lancement est borné
+par `selflow.portail_fne.scraper.actif`, ne lève jamais d'exception — un échec
+laisse la demande en file, l'ordonnanceur prend le relais.
+
+**Le flash devient un pop-up.** La gabarit rendait les messages en bandeau, en
+tête d'un écran chargé, où ils passaient inaperçus — et deux clés, `erreur` et
+`info`, n'étaient même **pas rendues** : le message se perdait en silence. À la
+place, un **toast** en surimpression, coin haut-droit : succès et information
+s'effacent seuls, avertissement et erreur restent jusqu'à ce qu'on les ferme —
+on ne rate pas un refus. Le message est posé en `textContent`, jamais interprété
+comme du HTML. Un toast peut porter des **boutons d'action**, colorés selon le
+type ; le refus DGI en porte deux : *« Lancer la correction »* et *« Voir les
+rejets FNE »*.
+
+**Le bouton fait tout, en un clic.** `RejetFneControleur::corrigerMaintenant()`
+enchaîne ce que l'utilisateur ferait à la main : ranger le relevé
+(`portail-fne:importer`), rapprocher le rejet, puis appliquer la correction. Si
+le relevé n'est pas encore arrivé — le scraper tourne encore —, il le dit et ne
+fait rien de faux.
+
+**La correction ne duplique plus un point de vente.** C'était un défaut réel,
+constaté à l'écran : **trois** « FACTURATION SIEGE » dans trois villes, parce que
+la correction *renommait* à chaque fois un point de test différent vers le même
+nom. Désormais, si un point de vente porte **déjà** le nom déclaré au portail, on
+ne renomme pas — on **rattache la pièce au point existant** (`basculerSurExistant`)
+et le point mal nommé reste tel quel. Un seul point par nom, comme le portail n'en
+déclare qu'un. Le renommage ne subsiste que pour le premier alignement, quand
+aucun homonyme n'existe. Les trois doublons déjà en base ont été fusionnés sur le
+plus ancien (ventes certifiées et écritures rattachées, stocks de test retirés,
+références redirigées, le tout en transaction) — un seul « FACTURATION SIEGE »
+subsiste.
+
+**Le bouton certifie tout de suite.** Rappel du lot 19 : `QUEUE_CONNECTION=database`
+et aucun `queue:work` ne tourne, donc un `dispatch()` reste en souffrance.
+`CorrectionFneService::corriger()` prend un paramètre `synchrone` : les **deux
+boutons** (`appliquer`, `corrigerMaintenant`) passent `true` et renvoient en
+`dispatchSync()` — la certification a eu lieu quand le message s'affiche.
+L'ordonnanceur nocturne, lui, garde la file (`false` par défaut) : il ne doit pas
+bloquer sur des dizaines d'appels réseau. Cela ne referme pas la question du
+`queue:work` permanent (lot 19), mais les gestes déclenchés par un humain ne
+tombent plus dans le trou.
+
+**Deux migrations réparées au passage.** `comptes_de_taxes_collectees` et
+`comptes_de_tva_deductible` avaient une garde d'idempotence cassée : les clés
+numériques de leur table de comptes (`'443200'`) sont transtypées en entier par
+PHP, quand `pluck('numero')` rend des chaînes ; la comparaison stricte échouait
+toujours, la garde ne sautait jamais un compte présent, et la migration se
+brisait sur l'index unique du plan comptable dès la deuxième entreprise. Comparées
+en chaîne, elles sont de nouveau idempotentes.
+
+Un test permanent de plus, `CorrectionSansDoublonPdvTest` — la pièce est rattachée
+au point existant sans le dupliquer. `phpunit.xml` épingle deux valeurs pour que la
+suite ne dépende plus du `.env` du poste : `PORTAIL_FNE_CORRECTION_AUTO=true` (le
+défaut que supposent les épreuves du cas 2) et `PORTAIL_FNE_SCRAPER_ACTIF=false`
+(aucune épreuve ne lance Node).
 
 ## 5 bis. La numérotation des comptes — tranché
 

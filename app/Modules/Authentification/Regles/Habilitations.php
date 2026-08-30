@@ -117,6 +117,14 @@ class Habilitations
         'admin.achats.factures.produits_categories'  => 'nouvel_achat',
         // Rattacher une pièce à la plateforme touche une donnée fiscale.
         'admin.achats.fne.attacher'                  => 'factures_achat',
+        // Les factures relevées sur le portail sont des factures fournisseurs :
+        // elles se lisent et se rattachent avec les autres. Le rattachement
+        // n'écrit que dans `portail_fne_factures_recues.achat_id` — il ne crée
+        // aucun achat et ne touche à aucune colonne gelée.
+        'admin.achats.factures_recues'               => 'factures_achat',
+        'admin.achats.factures_recues.rattacher'     => 'factures_achat',
+        'admin.achats.factures_recues.detacher'      => 'factures_achat',
+        'admin.achats.factures_recues.ecarter'       => 'factures_achat',
         'admin.achats.transmettre_b2b'               => 'nouvel_achat',
 
         // ── Stock ──
@@ -298,10 +306,12 @@ class Habilitations
         'admin.fne.rejets'              => 'factures_vente',
         'admin.fne.rejets.diagnostiquer'=> 'factures_vente',
         'admin.fne.rejets.resoudre'     => 'factures_vente',
-        // Sauf « appliquer », qui renomme un point de vente. Le ranger avec les
-        // factures ouvrirait à qui saisit des ventes une porte latérale vers le
-        // renommage des points de vente de l'entreprise.
-        'admin.fne.rejets.appliquer'    => 'gestion_pdv',
+        // Sauf « appliquer » et « corriger-maintenant », qui renomment ou
+        // rattachent un point de vente. Les ranger avec les factures ouvrirait à
+        // qui saisit des ventes une porte latérale vers le renommage des points
+        // de vente de l'entreprise.
+        'admin.fne.rejets.appliquer'          => 'gestion_pdv',
+        'admin.fne.rejets.corriger_maintenant'=> 'gestion_pdv',
 
         // ── Souscription ──
         'admin.souscription.index'       => 'gestion_pdv',

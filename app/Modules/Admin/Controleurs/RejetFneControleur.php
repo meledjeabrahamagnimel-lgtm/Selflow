@@ -6,6 +6,7 @@ use App\Modules\Admin\Modeles\FneRejet;
 use App\Modules\Admin\Modeles\PortailFneDemande;
 use App\Modules\Admin\Modeles\PortailFneFiche;
 use App\Modules\Admin\Modeles\PortailFneImport;
+use App\Modules\Admin\Services\CorrectionFneService;
 use App\Modules\Admin\Services\DiagnosticFneService;
 use Carbon\CarbonImmutable;
 use Illuminate\Http\RedirectResponse;
@@ -184,16 +185,9 @@ class RejetFneControleur
      * formulaire : un navigateur peut poster ce qu'il veut, et la liste des
      * champs corrigeables ne se négocie pas côté client.
      */
-    public function appliquer(FneRejet $rejet): RedirectResponse
+    public function appliquer(FneRejet $rejet, CorrectionFneService $correcteur): RedirectResponse
     {
         $this->verifierAppartenance($rejet);
-
-        $correction = $this->correctionApplicable($rejet);
-
-        if ($correction === null) {
-            return back()->with('erreur', "Aucune correction applicable sur ce rejet. "
-                . 'Rapprochez-le d\'un relevé du portail d\'abord.');
-        }
 
         $piece = $rejet->piece();
         $pdv   = $piece?->pointDeVente;
@@ -202,20 +196,127 @@ class RejetFneControleur
             return back()->with('erreur', 'Le point de vente de cette pièce est introuvable.');
         }
 
-        $ancien = $pdv->nom;
-        $pdv->update(['nom' => $correction]);
+        // La règle vit dans le service, celle-là même que suit le passage
+        // horaire. Le bouton reste : la correction automatique peut être
+        // éteinte, et un rejet arrivé entre deux passages n'attend pas l'heure
+        // ronde. Synchrone : l'utilisateur attend le résultat à l'écran.
+        $fait = $correcteur->corriger($rejet, synchrone: true);
 
-        // Le diagnostic devient faux dès que la correction est appliquée : il
-        // décrivait un écart qui n'existe plus. Le rejet retourne en file
-        // d'attente d'un nouveau rapprochement plutôt que d'afficher un
-        // constat périmé.
-        $rejet->update(['statut' => FneRejet::STATUT_OUVERT, 'diagnostic' => null]);
+        if ($fait === null) {
+            return back()->with('erreur', "Aucune correction applicable sur ce rejet. "
+                . 'Rapprochez-le d\'un relevé du portail d\'abord.');
+        }
 
-        return back()->with(
-            'succes',
-            "Le point de vente « {$ancien} » a été renommé « {$correction} », "
-            . 'comme il est déclaré au portail. La pièce peut être renvoyée à la DGI.'
-        );
+        return back()->with('succes', $this->phraseDeCorrection($fait));
+    }
+
+    /**
+     * La phrase de succès d'une correction, selon ce qui a été fait.
+     *
+     * Deux cas : on a renommé un point de vente pour l'aligner sur le portail,
+     * ou — un point portant déjà ce nom existait — on a rattaché les pièces à
+     * ce point existant sans en créer un doublon.
+     *
+     * @param  array{mode?: string, ancien: string, nouveau: string, renvoyees: int, suspendues: int}  $fait
+     */
+    private function phraseDeCorrection(array $fait): string
+    {
+        $intro = ($fait['mode'] ?? 'renomme') === 'bascule'
+            ? sprintf(
+                'Les pièces ont été rattachées au point de vente « %s », déjà déclaré au '
+                . 'portail — le point « %s » n\'a pas été dupliqué.',
+                $fait['nouveau'],
+                $fait['ancien']
+            )
+            : sprintf(
+                'Le point de vente « %s » a été renommé « %s », comme il est déclaré au portail.',
+                $fait['ancien'],
+                $fait['nouveau']
+            );
+
+        return $intro . ' ' . $this->direLeRenvoi($fait);
+    }
+
+    /**
+     * Ce qu'il est advenu des pièces que ce nom faisait refuser.
+     *
+     * Le message le dit toujours, y compris quand rien n'est reparti : « la
+     * pièce peut être renvoyée » laissait croire à un geste restant à faire là
+     * où il n'y en a plus, et taire un renvoi suspendu ferait attendre une
+     * certification qui n'arrivera jamais.
+     *
+     * @param  array{renvoyees: int, suspendues: int}  $fait
+     */
+    private function direLeRenvoi(array $fait): string
+    {
+        $phrases = [];
+
+        if ($fait['renvoyees'] > 0) {
+            $phrases[] = $fait['renvoyees'] === 1
+                ? 'La pièce est repartie à la DGI.'
+                : "{$fait['renvoyees']} pièces sont reparties à la DGI.";
+        }
+
+        if ($fait['suspendues'] > 0) {
+            $phrases[] = ($fait['suspendues'] === 1 ? 'La pièce est' : "{$fait['suspendues']} pièces sont")
+                . " à renvoyer depuis l'écran des ventes : cette entreprise certifie ses "
+                . 'pièces à la main.';
+        }
+
+        return $phrases === []
+            ? "Aucune pièce n'attendait ce nom."
+            : implode(' ', $phrases);
+    }
+
+    /**
+     * Le bouton « Lancer la correction » du pop-up : tout, en un clic.
+     *
+     * Au moment du refus, le relevé du portail n'est pas encore revenu — le
+     * scraper tourne en arrière-plan. Ce point d'entrée enchaîne donc les trois
+     * gestes que l'utilisateur ferait sinon à la main : ranger ce que le scraper
+     * a déposé, rapprocher le rejet du relevé, puis appliquer la correction. Si
+     * le relevé n'est pas encore là, il le dit et ne fait rien de faux.
+     */
+    public function corrigerMaintenant(
+        FneRejet $rejet,
+        DiagnosticFneService $diagnosticService,
+        CorrectionFneService $correcteur
+    ): RedirectResponse {
+        $this->verifierAppartenance($rejet);
+
+        if ($rejet->estReseau()) {
+            return back()->with('erreur', "Cette pièce n'a pas été refusée par la DGI : la plateforme "
+                . "n'a pas répondu. Il n'y a rien à corriger — la pièce est à renvoyer.");
+        }
+
+        // Ranger ce que le scraper a pu déposer depuis le refus.
+        \Illuminate\Support\Facades\Artisan::call('portail-fne:importer');
+
+        // Rapprocher du dernier relevé.
+        $diagnostic = $diagnosticService->diagnostiquer($rejet);
+
+        if ($diagnostic['releve'] === null) {
+            return back()->with('avertissement', "Le relevé du portail n'est pas encore arrivé — "
+                . 'la vérification est en cours. Réessayez dans quelques instants.');
+        }
+
+        $rejet->update([
+            'diagnostic' => $diagnostic,
+            'statut'     => $rejet->statut === FneRejet::STATUT_RESOLU
+                ? FneRejet::STATUT_RESOLU
+                : FneRejet::STATUT_DIAGNOSTIQUE,
+        ]);
+
+        // Appliquer, si le rapprochement l'autorise. Synchrone : le bouton du
+        // pop-up doit certifier dans la foulée, pas laisser un job en file.
+        $fait = $correcteur->corriger($rejet, synchrone: true);
+
+        if ($fait === null) {
+            return back()->with('avertissement', 'Rapprochement effectué, mais aucune correction '
+                . 'automatique applicable ici. ' . $diagnostic['conclusion']);
+        }
+
+        return back()->with('succes', $this->phraseDeCorrection($fait));
     }
 
     /**
@@ -232,30 +333,6 @@ class RejetFneControleur
         $rejet->update(['statut' => FneRejet::STATUT_RESOLU]);
 
         return back()->with('succes', 'Rejet classé.');
-    }
-
-    /**
-     * La valeur du portail à appliquer, s'il y en a une.
-     *
-     * Un seul champ est corrigeable depuis cet écran : le nom du point de
-     * vente. Les autres sont soit hors de portée du portail, soit gelés.
-     */
-    private function correctionApplicable(FneRejet $rejet): ?string
-    {
-        foreach ($rejet->diagnostic['champs'] ?? [] as $champ) {
-            if (($champ['champ'] ?? null) !== 'pointOfSale' || ($champ['verdict'] ?? null) !== 'ecart') {
-                continue;
-            }
-
-            // Un seul nom déclaré au portail : il n'y a pas d'ambiguïté.
-            // Plusieurs : la machine ne choisit pas à la place de l'utilisateur,
-            // qui seul sait dans quel point de vente la pièce a été établie.
-            $declares = $champ['portail'] ?? [];
-
-            return count($declares) === 1 ? (string) $declares[0] : null;
-        }
-
-        return null;
     }
 
     /**

@@ -84,6 +84,35 @@
     .actions { display:flex; gap:8px; flex-wrap:wrap; margin-top:4px; }
     .actions form { display:inline; }
 
+    /* Le panneau de correction : l'action que l'écran met en avant. Un écart de
+       nom se répare d'un geste, et ce geste doit se voir — d'où le relief, là où
+       le reste de la carte reste sobre. */
+    .correction {
+        margin-top:14px; padding:16px 18px; border-radius:14px;
+        background:linear-gradient(135deg,#eef2ff,#f5f3ff);
+        border:1px solid #c7d2fe;
+        display:flex; align-items:center; gap:18px; flex-wrap:wrap;
+    }
+    .correction-txt { flex:1; min-width:230px; }
+    .correction-txt .t {
+        font-size:12px; font-weight:800; color:#3730a3; margin-bottom:4px;
+        text-transform:uppercase; letter-spacing:.3px;
+        display:flex; align-items:center; gap:7px;
+    }
+    .correction-txt .d { font-size:12.5px; color:#4338ca; line-height:1.55; }
+    .correction-txt .d b { font-family:monospace; font-weight:700; }
+    .btn-correction {
+        display:inline-flex; align-items:center; gap:9px;
+        padding:12px 22px; border:none; border-radius:11px; cursor:pointer;
+        font-size:13px; font-weight:700; color:#fff; white-space:nowrap;
+        background:linear-gradient(135deg,#6366f1,#4f46e5);
+        box-shadow:0 4px 14px rgba(79,70,229,.35);
+        transition:transform .12s ease, box-shadow .12s ease, filter .12s ease;
+    }
+    .btn-correction:hover  { transform:translateY(-1px); box-shadow:0 7px 22px rgba(79,70,229,.45); filter:brightness(1.06); }
+    .btn-correction:active { transform:translateY(0);    box-shadow:0 3px 10px rgba(79,70,229,.35); }
+    .btn-correction i { font-size:14px; }
+
     .ecarts-fiche { border:1px solid #fde68a; background:#fffbeb; border-radius:14px; padding:18px 20px; margin-top:28px; }
     .ecarts-table { width:100%; border-collapse:collapse; margin-top:12px; }
     .ecarts-table th { text-align:left; padding:8px 12px; font-size:11px; text-transform:uppercase; color:#92400e; border-bottom:1px solid #fde68a; }
@@ -96,24 +125,17 @@
 
 @section('contenu')
 
-@if(session('succes'))
-<div style="display:flex;align-items:center;gap:10px;padding:14px 18px;background:#d1fae5;border:1px solid #6ee7b7;border-radius:10px;margin-bottom:20px;color:#065f46;font-weight:500;">
-    <i class="fas fa-check-circle" style="font-size:16px;color:#10b981;"></i> {{ session('succes') }}
-</div>
-@endif
-
-@if(session('erreur'))
-<div style="display:flex;align-items:center;gap:10px;padding:14px 18px;background:#fff5f5;border:1px solid #fed7d7;border-radius:10px;margin-bottom:20px;color:#c53030;font-weight:500;">
-    <i class="fas fa-exclamation-triangle" style="font-size:16px;"></i> {{ session('erreur') }}
-</div>
-@endif
+{{-- Les messages de succès et d'erreur s'affichent en toast (pop-up), rendu
+     par la gabarit. Plus de bandeau ici : il ferait doublon. --}}
 
 {{-- Onglets FNE --}}
 <div class="fne-tabs">
     <a href="{{ route('admin.fne.gestion') }}"   class="fne-tab"><i class="fas fa-chart-bar"></i> Gestion</a>
     <a href="{{ route('admin.fne.situation') }}" class="fne-tab"><i class="fas fa-balance-scale"></i> Situation</a>
     <a href="{{ route('admin.fne.factures') }}"  class="fne-tab"><i class="fas fa-file-invoice"></i> Factures</a>
-    <a href="{{ route('admin.fne.factures_recues') }}" class="fne-tab"><i class="fas fa-inbox"></i> Factures reçues</a>
+    @if(in_array('achats', (array) ($entreprise->modules_actifs ?? [])))
+    <a href="{{ route('admin.achats.factures_recues') }}" class="fne-tab"><i class="fas fa-inbox"></i> Factures reçues</a>
+    @endif
     <a href="{{ route('admin.fne.stickers') }}"  class="fne-tab"><i class="fas fa-stamp"></i> Stickers</a>
     <a href="{{ route('admin.fne.rejets') }}"    class="fne-tab active"><i class="fas fa-triangle-exclamation"></i> Rejets
         @if($kpis['ouverts'] > 0)
@@ -322,13 +344,21 @@
                 @if(($champ['champ'] ?? null) === 'pointOfSale'
                     && ($champ['verdict'] ?? null) === 'ecart'
                     && count($champ['portail'] ?? []) === 1)
-                <div class="actions" style="margin-top:10px;">
+                <div class="correction">
+                    <div class="correction-txt">
+                        <div class="t"><i class="fas fa-wand-magic-sparkles"></i> Correction proposée</div>
+                        <div class="d">
+                            Renommer le point de vente <b>« {{ $champ['envoye'] }} »</b>
+                            en <b>« {{ $champ['portail'][0] }} »</b> — le nom déclaré au portail —
+                            puis renvoyer automatiquement les pièces que ce nom faisait refuser.
+                        </div>
+                    </div>
                     <form method="POST" action="{{ route('admin.fne.rejets.appliquer', $rejet) }}"
                           onsubmit="return confirm('Renommer le point de vente « {{ $champ['envoye'] }} » en « {{ $champ['portail'][0] }} » ? Toutes les pièces de ce point de vente porteront ce nom.');">
                         @csrf
-                        <button type="submit" class="btn btn-primary" style="font-size:12px;">
+                        <button type="submit" class="btn-correction">
                             <i class="fas fa-wand-magic-sparkles"></i>
-                            Renommer le point de vente en « {{ $champ['portail'][0] }} »
+                            Lancer la correction
                         </button>
                     </form>
                 </div>

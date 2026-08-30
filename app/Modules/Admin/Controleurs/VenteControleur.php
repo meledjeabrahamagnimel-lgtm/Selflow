@@ -26,6 +26,8 @@ use Illuminate\View\View;
 use App\Modules\Admin\Regles\Appartenance;
 use App\Modules\Admin\Regles\Quantite;
 use App\Modules\Admin\Services\StockService;
+use App\Modules\Admin\Services\ScraperPortailFneService;
+use App\Modules\Admin\Modeles\FneRejet;
 
 class VenteControleur
 {
@@ -1310,7 +1312,65 @@ class VenteControleur
 
         $this->journaliser('normalisation_manuelle_vente', 'Vente', $vente->id);
 
-        return back()->with('succes', 'La normalisation DGI a été effectuée avec succès. Le document est maintenant normalisé.');
+        // La pièce est-elle passée ? Le job travaille en synchrone : on relit
+        // l'état plutôt que de supposer le succès. Auparavant, un refus de la
+        // DGI renvoyait quand même « effectuée avec succès » — un message vert
+        // rassurant sur une facture qui n'était pas normalisée.
+        if ($vente->fresh()->normalise) {
+            return back()->with('succes', 'La normalisation DGI a été effectuée avec succès. Le document est maintenant normalisé.');
+        }
+
+        // Non normalisée : le job a consigné un rejet. On le relit pour dire à
+        // l'utilisateur ce qui s'est passé, et — si la DGI a examiné puis
+        // refusé la pièce — on lance la relève du portail sans attendre le
+        // passage horaire, pour aller chercher le nom réellement déclaré.
+        $rejet = FneRejet::where('piece_type', 'vente')
+            ->where('piece_id', $vente->id)
+            ->where('statut', FneRejet::STATUT_OUVERT)
+            ->latest('id')
+            ->first();
+
+        if ($rejet && $rejet->cause === FneRejet::CAUSE_DGI) {
+            ScraperPortailFneService::lancerPourLogin($rejet->login);
+
+            $champs = $rejet->nomsDesChamps();
+            $precision = $champs ? ' (' . implode(', ', $champs) . ')' : '';
+
+            return back()
+                ->with('avertissement', sprintf(
+                    "La DGI a refusé la facture%s : le point de vente n'est pas déclaré à "
+                    . "l'identique sur votre espace FNE. Une vérification au portail a été "
+                    . "lancée automatiquement ; la correction proposée apparaîtra sur l'écran "
+                    . 'des rejets FNE dans quelques instants.',
+                    $precision
+                ))
+                // Le pop-up porte deux boutons : lancer la correction sans
+                // quitter l'écran, ou aller voir le détail sur l'écran des
+                // rejets. Informer sans dire où agir laisserait l'utilisateur
+                // chercher.
+                ->with('avertissement_action', [
+                    [
+                        'url'    => route('admin.fne.rejets.corriger_maintenant', $rejet),
+                        'label'  => 'Lancer la correction',
+                        'method' => 'post',
+                    ],
+                    [
+                        'url'   => route('admin.fne.rejets'),
+                        'label' => 'Voir les rejets FNE',
+                    ],
+                ]);
+        }
+
+        if ($rejet && $rejet->estReseau()) {
+            return back()->with('erreur',
+                "La plateforme FNE est injoignable pour le moment. La facture n'a pas été "
+                . 'normalisée ; elle sera reprise automatiquement, ou réessayez dans un instant.'
+            );
+        }
+
+        return back()->with('erreur',
+            "La normalisation n'a pas abouti. Consultez l'écran des rejets FNE pour le détail."
+        );
     }
 
     // ──────────────────────────────────────────────────────────────────────────

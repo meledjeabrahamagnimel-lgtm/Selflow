@@ -1,6 +1,6 @@
 @extends('admin::gabarits.application')
 @section('titre', 'Factures reçues du portail FNE')
-@section('topbar_titre', 'Fiscalité & DGI — Factures reçues')
+@section('topbar_titre', 'Achats — Factures reçues du portail FNE')
 
 @section('styles')
 <style>
@@ -75,12 +75,13 @@
 
 @section('contenu')
 
-{{-- Onglets FNE --}}
+{{-- Onglets FNE : seulement si les ecrans qu'ils visent sont atteignables --}}
+@if($aFne)
 <div class="fne-tabs">
     <a href="{{ route('admin.fne.gestion') }}"   class="fne-tab"><i class="fas fa-chart-bar"></i> Gestion</a>
     <a href="{{ route('admin.fne.situation') }}" class="fne-tab"><i class="fas fa-balance-scale"></i> Situation</a>
     <a href="{{ route('admin.fne.factures') }}"  class="fne-tab"><i class="fas fa-file-invoice"></i> Factures</a>
-    <a href="{{ route('admin.fne.factures_recues') }}" class="fne-tab active"><i class="fas fa-inbox"></i> Factures reçues
+    <a href="{{ route('admin.achats.factures_recues') }}" class="fne-tab active"><i class="fas fa-inbox"></i> Factures reçues
         @if($aRapprocher > 0)
         <span style="background:#f59e0b;color:#fff;border-radius:20px;padding:1px 7px;font-size:10px;margin-left:4px;">{{ $aRapprocher }}</span>
         @endif
@@ -88,6 +89,7 @@
     <a href="{{ route('admin.fne.stickers') }}"  class="fne-tab"><i class="fas fa-stamp"></i> Stickers</a>
     <a href="{{ route('admin.fne.rejets') }}"    class="fne-tab"><i class="fas fa-triangle-exclamation"></i> Rejets</a>
 </div>
+@endif
 
 @if(session('succes'))
 <div style="padding:12px 16px;border-radius:12px;background:#ecfdf5;color:#065f46;border:1px solid #a7f3d0;margin-bottom:18px;font-size:13px;">
@@ -143,10 +145,10 @@
 
 {{-- Filtres --}}
 <div class="filtres">
-    <a href="{{ route('admin.fne.factures_recues') }}"
+    <a href="{{ route('admin.achats.factures_recues') }}"
        class="filtre {{ $statutActif === null ? 'active' : '' }}">Toutes <span class="n">{{ $total }}</span></a>
     @foreach($filtres as $cle => $filtre)
-        <a href="{{ route('admin.fne.factures_recues', ['statut' => $cle]) }}"
+        <a href="{{ route('admin.achats.factures_recues', ['statut' => $cle]) }}"
            class="filtre {{ $statutActif === $cle ? 'active' : '' }}">
             {{ $filtre['libelle'] }} <span class="n">{{ $filtre['total'] }}</span>
         </a>
@@ -275,14 +277,14 @@
 
             <div class="actions">
                 @if($facture->achat_id)
-                    <form method="POST" action="{{ route('admin.fne.factures_recues.detacher', $facture) }}">
+                    <form method="POST" action="{{ route('admin.achats.factures_recues.detacher', $facture) }}">
                         @csrf
                         <button type="submit" class="btn btn-outline btn-sm">
                             <i class="fas fa-link-slash"></i> Détacher
                         </button>
                     </form>
                 @elseif($propose['achat'])
-                    <form method="POST" action="{{ route('admin.fne.factures_recues.rattacher', $facture) }}">
+                    <form method="POST" action="{{ route('admin.achats.factures_recues.rattacher', $facture) }}">
                         @csrf
                         <button type="submit" class="btn btn-primary btn-sm">
                             <i class="fas fa-link"></i> Rattacher à {{ $propose['achat']->numero_facture }}
@@ -291,7 +293,7 @@
                 @endif
 
                 @if($facture->statut_rapprochement !== \App\Modules\Admin\Modeles\PortailFneFactureRecue::ECARTEE)
-                    <form method="POST" action="{{ route('admin.fne.factures_recues.ecarter', $facture) }}">
+                    <form method="POST" action="{{ route('admin.achats.factures_recues.ecarter', $facture) }}">
                         @csrf
                         <input type="hidden" name="motif" value="">
                         <button type="submit" class="btn btn-outline btn-sm">
