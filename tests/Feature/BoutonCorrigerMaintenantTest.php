@@ -17,7 +17,7 @@ use Illuminate\Support\Facades\Http;
 use Tests\TestCase;
 
 /**
- * Le bouton « Lancer la correction » du pop-up, éprouvé sur ses cinq issues.
+ * Le bouton « Lancer la correction » du pop-up, et le choix qu'il propose.
  *
  * `RejetFneControleur::corrigerMaintenant()` enchaîne trois gestes en un clic :
  * ranger ce que le scraper a déposé, rapprocher le rejet du relevé, appliquer
@@ -27,16 +27,23 @@ use Tests\TestCase;
  * | Situation | Ce que le bouton doit rendre |
  * |---|---|
  * | un seul nom déclaré au portail | `succes` : renommé, la pièce repart |
- * | deux noms déclarés | `avertissement` : rien n'est touché |
+ * | plusieurs noms déclarés | le pop-up **propose les noms**, rien n'est touché |
+ * | un nom cliqué dans le pop-up | `succes` : ce nom-là est appliqué |
+ * | un rang qui ne désigne rien | `avertissement`, aucun renommage |
  * | aucun relevé rangé | `avertissement` : le relevé n'est pas arrivé |
  * | rejet réseau | `erreur` : la DGI n'a rien refusé |
  * | rejet d'une autre entreprise | 404 |
  *
  * La deuxième ligne est celle observée en production le 31/08/2026 : le portail
- * de l'entreprise déclare « FACTURATION SIEGE » **et** « FACTURATION TEST 2 »,
- * le garde-fou d'ambiguïté rend la main, et le pop-up — qui propose le bouton
- * sans vérifier cette condition, là où l'écran des rejets le masque — laisse
- * croire à une panne.
+ * de l'entreprise déclare « FACTURATION SIEGE » **et** « FACTURATION TEST 2 ».
+ * L'automatisme s'abstient — il ne choisit pas le point de vente à la place de
+ * qui a établi la pièce —, mais s'abstenir n'est pas se taire : le pop-up
+ * aligne les noms déclarés, et **c'est un humain qui tranche**. La règle tient,
+ * et l'utilisateur n'est plus laissé devant rien.
+ *
+ * Ce qui revient du navigateur est un **rang** dans la liste, jamais un nom :
+ * le clic désigne une valeur que le rapprochement a écrite, il n'en introduit
+ * aucune.
  */
 class BoutonCorrigerMaintenantTest extends TestCase
 {
@@ -127,7 +134,7 @@ class BoutonCorrigerMaintenantTest extends TestCase
         $this->assertTrue((bool) $vente->refresh()->normalise);
     }
 
-    public function test_deux_noms_declares_le_bouton_ne_corrige_rien_et_le_dit(): void
+    public function test_deux_noms_declares_le_pop_up_propose_les_deux_sans_rien_toucher(): void
     {
         $vente = $this->uneVente('FA-0042');
         $rejet = FneRejet::consigner($vente, $this->refus());
@@ -135,15 +142,24 @@ class BoutonCorrigerMaintenantTest extends TestCase
         // Le cas de production : le portail déclare deux points de facturation.
         $this->unReleve(['FACTURATION SIEGE', 'FACTURATION TEST 2']);
 
-        $reponse = $this->post(route('admin.fne.rejets.corriger_maintenant', $rejet));
+        $this->post(route('admin.fne.rejets.corriger_maintenant', $rejet))
+            ->assertRedirect()
+            ->assertSessionHas('avertissement');
 
-        $reponse->assertRedirect()->assertSessionHas('avertissement');
-        $this->assertStringContainsString(
-            'aucune correction automatique applicable',
-            session('avertissement')
+        $this->assertStringContainsString('ne choisit pas à votre place', session('avertissement'));
+
+        // Le pop-up porte un bouton par nom déclaré, plus le lien vers l'écran.
+        $actions = session('avertissement_action');
+
+        $this->assertSame(
+            ['FACTURATION SIEGE', 'FACTURATION TEST 2', 'Voir les rejets FNE'],
+            array_column($actions, 'label')
         );
+        $this->assertSame('post', $actions[0]['method']);
+        $this->assertStringContainsString('/corriger-avec/0', $actions[0]['url']);
+        $this->assertStringContainsString('/corriger-avec/1', $actions[1]['url']);
 
-        // Rien n'a bougé : ni le nom, ni la pièce.
+        // Rien n'a bougé tant que personne n'a cliqué : ni le nom, ni la pièce.
         $this->assertSame('FACTURATION SIEGES', $this->monMagasin->refresh()->nom);
         $this->assertFalse((bool) $vente->refresh()->normalise);
 
@@ -154,6 +170,82 @@ class BoutonCorrigerMaintenantTest extends TestCase
             ['FACTURATION SIEGE', 'FACTURATION TEST 2'],
             $rejet->diagnostic['champs'][0]['portail']
         );
+    }
+
+    public function test_le_nom_choisi_dans_le_pop_up_est_applique_et_la_piece_repart(): void
+    {
+        $vente = $this->uneVente('FA-0042');
+        $rejet = FneRejet::consigner($vente, $this->refus());
+
+        $this->unReleve(['FACTURATION SIEGE', 'FACTURATION TEST 2']);
+        $this->post(route('admin.fne.rejets.corriger_maintenant', $rejet));
+
+        // L'humain tranche : le premier de la liste.
+        $this->post(route('admin.fne.rejets.corriger_avec', ['rejet' => $rejet, 'rang' => 0]))
+            ->assertRedirect()
+            ->assertSessionHas('succes');
+
+        $this->assertSame('FACTURATION SIEGE', $this->monMagasin->refresh()->nom);
+        $this->assertTrue((bool) $vente->refresh()->normalise);
+    }
+
+    public function test_l_autre_nom_du_pop_up_mene_a_l_autre_point(): void
+    {
+        $rejet = FneRejet::consigner($this->uneVente('FA-0042'), $this->refus());
+
+        $this->unReleve(['FACTURATION SIEGE', 'FACTURATION TEST 2']);
+        $this->post(route('admin.fne.rejets.corriger_maintenant', $rejet));
+
+        $this->post(route('admin.fne.rejets.corriger_avec', ['rejet' => $rejet, 'rang' => 1]))
+            ->assertSessionHas('succes');
+
+        // Le second, et non le plus ressemblant : c'est l'humain qui décide,
+        // et la machine ne redresse pas son choix.
+        $this->assertSame('FACTURATION TEST 2', $this->monMagasin->refresh()->nom);
+    }
+
+    /**
+     * Un rang qui ne désigne rien ne renomme rien.
+     *
+     * C'est ce qui borne le geste : ce qui revient du navigateur **désigne**
+     * une valeur écrite par le rapprochement, il ne peut pas en introduire une.
+     */
+    public function test_un_rang_qui_ne_designe_aucun_nom_ne_renomme_rien(): void
+    {
+        $rejet = FneRejet::consigner($this->uneVente('FA-0042'), $this->refus());
+
+        $this->unReleve(['FACTURATION SIEGE', 'FACTURATION TEST 2']);
+        $this->post(route('admin.fne.rejets.corriger_maintenant', $rejet));
+
+        $this->post(route('admin.fne.rejets.corriger_avec', ['rejet' => $rejet, 'rang' => 7]))
+            ->assertRedirect()
+            ->assertSessionHas('avertissement');
+
+        $this->assertSame('FACTURATION SIEGES', $this->monMagasin->refresh()->nom);
+    }
+
+    public function test_le_choix_sur_le_rejet_d_une_autre_entreprise_n_existe_pas(): void
+    {
+        $sienne = $this->uneEntreprise('Quincaillerie rivale', 'CI-ABJ-2026-B-03333', '8888888Y');
+
+        $sonMagasin = PointDeVente::create([
+            'entreprise_id' => $sienne->id, 'nom' => 'Magasin rival',
+            'ville' => 'Abidjan', 'commune' => 'Yopougon',
+        ]);
+
+        $saVente = Vente::create([
+            'point_de_vente_id' => $sonMagasin->id,
+            'numero_facture'    => 'FA-RIVALE-002',
+            'date_vente'        => now()->toDateString(),
+            'mode_paiement'     => 'Espèces',
+            'montant_ht'        => 100000, 'montant_tva' => 18000, 'montant_ttc' => 118000,
+            'etape'             => 'Facture',
+        ]);
+
+        $sonRejet = FneRejet::consigner($saVente, $this->refus());
+
+        $this->post(route('admin.fne.rejets.corriger_avec', ['rejet' => $sonRejet, 'rang' => 0]))
+            ->assertNotFound();
     }
 
     public function test_sans_releve_le_bouton_dit_que_le_portail_n_a_pas_repondu(): void

@@ -316,6 +316,7 @@ class Habilitations
         // de vente de l'entreprise.
         'admin.fne.rejets.appliquer'          => 'gestion_pdv',
         'admin.fne.rejets.corriger_maintenant'=> 'gestion_pdv',
+        'admin.fne.rejets.corriger_avec'      => 'gestion_pdv',
 
         // ── Souscription ──
         'admin.souscription.index'       => 'gestion_pdv',

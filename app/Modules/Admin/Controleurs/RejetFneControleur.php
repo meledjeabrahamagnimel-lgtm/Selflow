@@ -305,11 +305,97 @@ class RejetFneControleur
         $fait = $correcteur->corriger($rejet, synchrone: true);
 
         if ($fait === null) {
+            // Le portail déclare plusieurs points : l'automatisme s'abstient,
+            // et il a raison — il ne choisit pas le point de vente à la place
+            // de qui a établi la pièce. Mais s'abstenir n'est pas se taire :
+            // plutôt qu'un « aucune correction applicable » qui laisse devant
+            // rien, le pop-up **propose les noms** et l'humain tranche.
+            $auChoix = $correcteur->nomsAuChoix($rejet);
+
+            if ($auChoix !== []) {
+                return back()
+                    ->with('avertissement', sprintf(
+                        'Le portail déclare %d points de facturation : Selflow ne choisit pas à '
+                        . 'votre place. Lequel correspond à cette pièce ?',
+                        count($auChoix)
+                    ))
+                    ->with('avertissement_action', $this->boutonsDeChoix($rejet, $auChoix));
+            }
+
             return back()->with('avertissement', 'Rapprochement effectué, mais aucune correction '
                 . 'automatique applicable ici. ' . $diagnostic['conclusion']);
         }
 
         return back()->with('succes', $this->phraseDeCorrection($fait));
+    }
+
+    /**
+     * Le nom que l'utilisateur a désigné dans le pop-up : on l'applique.
+     *
+     * Le rang, et non le nom : ce qui revient du navigateur ne fait que
+     * **désigner** une valeur que le rapprochement a écrite, et ne peut pas en
+     * introduire une autre. Le service revérifie de son côté.
+     */
+    public function corrigerAvec(
+        FneRejet $rejet,
+        int $rang,
+        CorrectionFneService $correcteur
+    ): RedirectResponse {
+        $this->verifierAppartenance($rejet);
+
+        $choisi = $correcteur->nomAuRang($rejet, $rang);
+
+        if ($choisi === null) {
+            // Le rapprochement a changé depuis que le pop-up s'est affiché —
+            // un relevé est arrivé, ou le rejet a été rouvert. Refaire le geste
+            // sur une liste périmée renommerait d'après un constat qui n'a plus
+            // cours.
+            return back()->with('avertissement', "Ce choix ne correspond plus à ce que le portail "
+                . 'déclare : le rapprochement a été refait entre-temps. Relancez la correction '
+                . "pour voir la liste à jour.");
+        }
+
+        $fait = $correcteur->corriger($rejet, synchrone: true, choisi: $choisi);
+
+        if ($fait === null) {
+            return back()->with('avertissement', sprintf(
+                "« %s » n'a pas pu être appliqué : le point de vente de la pièce porte peut-être "
+                . 'déjà ce nom, ou la pièce a été certifiée entre-temps.',
+                $choisi
+            ));
+        }
+
+        return back()->with('succes', $this->phraseDeCorrection($fait));
+    }
+
+    /**
+     * Un bouton par nom déclaré, plus le lien vers l'écran des rejets.
+     *
+     * Les noms sont bornés à cinq : un pop-up qui en aligne quinze ne se lit
+     * plus, et l'écran des rejets porte le détail complet — c'est là qu'il faut
+     * envoyer quand le portail en déclare beaucoup.
+     *
+     * @param  array<int, string>  $auChoix
+     * @return array<int, array{url: string, label: string, method?: string}>
+     */
+    private function boutonsDeChoix(FneRejet $rejet, array $auChoix): array
+    {
+        $boutons = [];
+
+        foreach (array_slice($auChoix, 0, 5) as $rang => $nom) {
+            $boutons[] = [
+                'url'    => route('admin.fne.rejets.corriger_avec', ['rejet' => $rejet, 'rang' => $rang]),
+                'label'  => $nom,
+                'method' => 'post',
+            ];
+        }
+
+        $boutons[] = [
+            'url'   => route('admin.fne.rejets'),
+            'label' => count($auChoix) > 5 ? 'Voir les ' . count($auChoix) . ' points' : 'Voir les rejets FNE',
+        ];
+
+        return $boutons;
     }
 
     /**

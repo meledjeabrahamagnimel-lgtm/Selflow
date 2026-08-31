@@ -219,6 +219,10 @@ Route::prefix('admin')
             Route::post('/rejets/{rejet}/appliquer',    [\App\Modules\Admin\Controleurs\RejetFneControleur::class, 'appliquer'])->name('rejets.appliquer');
             // Le « tout en un clic » du pop-up : ranger le relevé, rapprocher, corriger.
             Route::post('/rejets/{rejet}/corriger-maintenant', [\App\Modules\Admin\Controleurs\RejetFneControleur::class, 'corrigerMaintenant'])->name('rejets.corriger_maintenant');
+            // Quand le portail déclare plusieurs points, Selflow ne tranche pas :
+            // le pop-up propose les noms, et ce rang-là est celui qu'on a cliqué.
+            Route::post('/rejets/{rejet}/corriger-avec/{rang}', [\App\Modules\Admin\Controleurs\RejetFneControleur::class, 'corrigerAvec'])
+                ->whereNumber('rang')->name('rejets.corriger_avec');
             Route::post('/rejets/{rejet}/resoudre',     [\App\Modules\Admin\Controleurs\RejetFneControleur::class, 'resoudre'])->name('rejets.resoudre');
         });
 

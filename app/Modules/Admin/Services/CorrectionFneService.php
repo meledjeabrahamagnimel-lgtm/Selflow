@@ -93,6 +93,71 @@ class CorrectionFneService
     }
 
     /**
+     * Les noms que le portail déclare, entre lesquels il faut choisir.
+     *
+     * L'automatisme s'abstient quand il y en a plusieurs — il ne choisit pas à
+     * la place de qui a établi la pièce. Mais **quelqu'un** peut choisir, et
+     * pour cela il faut lui montrer la liste. C'est la seule chose que ce
+     * service en dit : l'affichage est au contrôleur, la décision à l'humain.
+     *
+     * Rendue vide quand il n'y a rien à trancher — pas de rapprochement, aucun
+     * écart sur le nom, ou un seul nom déclaré, que l'automatisme applique
+     * déjà seul.
+     *
+     * @return array<int, string>
+     */
+    public function nomsAuChoix(FneRejet $rejet): array
+    {
+        foreach ($rejet->diagnostic['champs'] ?? [] as $champ) {
+            if (($champ['champ'] ?? null) !== self::CHAMP_CORRIGEABLE
+                || ($champ['verdict'] ?? null) !== 'ecart') {
+                continue;
+            }
+
+            $declares = array_values(array_filter(
+                array_map(fn ($nom) => trim((string) $nom), $champ['portail'] ?? []),
+                fn (string $nom) => $nom !== ''
+            ));
+
+            return count($declares) > 1 ? $declares : [];
+        }
+
+        return [];
+    }
+
+    /**
+     * Le nom déclaré que désigne ce choix, ou `null` s'il n'en désigne aucun.
+     *
+     * Un rang dans la liste, et non le nom lui-même : ce qui revient du
+     * navigateur ne sert alors qu'à **désigner** une valeur que le
+     * rapprochement a écrite, et ne peut pas en introduire une autre. Un
+     * formulaire forgé renomme au pire un point de vente avec un nom que le
+     * portail déclare déjà — c'est-à-dire rien de neuf.
+     */
+    public function nomAuRang(FneRejet $rejet, int $rang): ?string
+    {
+        return $this->nomsAuChoix($rejet)[$rang] ?? null;
+    }
+
+    /**
+     * Le nom choisi, s'il figure bien parmi ceux que le portail déclare.
+     *
+     * La vérification se refait ici et pas seulement au contrôleur : c'est le
+     * dernier point avant le renommage, et c'est ce qui garantit qu'un nom ne
+     * peut pas entrer par ce chemin sans que le portail l'ait déclaré.
+     */
+    private function nomRetenu(FneRejet $rejet, string $choisi): ?string
+    {
+        foreach ($this->nomsAuChoix($rejet) as $declare) {
+            if ($declare === trim($choisi)) {
+                return $declare;
+            }
+        }
+
+        return null;
+    }
+
+    /**
      * Renomme le point de vente, puis renvoie les pièces que ce nom bloquait.
      *
      * @return array{
@@ -108,10 +173,17 @@ class CorrectionFneService
      *   (dispatchSync), plutôt que de les mettre en file. Un bouton attend un
      *   résultat immédiat — la certification doit avoir eu lieu quand le
      *   message s'affiche ; l'ordonnanceur nocturne, lui, garde la file.
+     * @param  string|null  $choisi  Le nom retenu **par un humain** quand le
+     *   portail en déclare plusieurs. La machine continue de s'abstenir dans ce
+     *   cas ; ce paramètre n'est jamais rempli par elle. Il doit désigner un nom
+     *   que le rapprochement a effectivement relevé au portail — sans quoi rien
+     *   n'est appliqué, et le geste n'ouvre pas la porte à un renommage libre.
      */
-    public function corriger(FneRejet $rejet, bool $synchrone = false): ?array
+    public function corriger(FneRejet $rejet, bool $synchrone = false, ?string $choisi = null): ?array
     {
-        $correction = $this->correctionApplicable($rejet);
+        $correction = $choisi === null
+            ? $this->correctionApplicable($rejet)
+            : $this->nomRetenu($rejet, $choisi);
 
         if ($correction === null) {
             return null;

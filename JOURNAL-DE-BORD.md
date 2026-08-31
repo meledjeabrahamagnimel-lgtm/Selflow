@@ -4704,20 +4704,47 @@ l'entreprise déclare deux points de facturation — `FACTURATION SIEGE` et
 (`count($declares) === 1`) rend la main sans rien toucher. C'est voulu : la
 machine ne choisit pas le point de vente à la place de qui a établi la pièce.
 
-Ce qui trompe est ailleurs. **Les deux points d'entrée du même bouton ne
-portent pas le même garde-fou** : l'écran des rejets masque le bouton quand le
+Ce qui trompait était ailleurs. **Les deux points d'entrée du même bouton ne
+portaient pas le même garde-fou** : l'écran des rejets masque le bouton quand le
 portail déclare plusieurs points (`rejets.blade.php`), le pop-up de refus le
-propose toujours (`VenteControleur`). Le pop-up promet donc un geste que le
-service refusera. *Signalé, non corrigé — le choix revient au propriétaire :
-masquer le bouton, ou laisser le rapprochement trancher sur le nom le plus
-proche.* Le diagnostic le calcule déjà (« le plus proche est *FACTURATION
-SIEGE* »).
+proposait toujours (`VenteControleur`). Le pop-up promettait donc un geste que
+le service refusait, et l'utilisateur restait devant « aucune correction
+automatique applicable », sans rien à faire de cette phrase.
+
+#### S'abstenir n'est pas se taire
+
+Trois issues ont été proposées au propriétaire du projet : corriger d'office
+sur le nom le plus proche, masquer le bouton, ou **laisser choisir**. Il a
+retenu la troisième le 31/08/2026 : *« le pop-up liste les noms déclarés et
+l'utilisateur clique celui qui convient »*.
+
+C'est la seule des trois qui ne déplace pas la frontière. La règle n'est pas
+« il n'y a rien à faire quand le portail déclare deux points », elle est **la
+machine ne choisit pas le point de vente à la place de qui a établi la
+pièce**. Un humain qui clique un nom ne l'enfreint pas : il l'applique.
+
+| Décision | Raison |
+|---|---|
+| Le pop-up sert la liste, il n'ouvre pas d'écran | le mécanisme des boutons de toast existait déjà (`{cle}_action`) ; un écran de plus à tenir pour trois boutons n'en valait pas le prix |
+| Ce qui revient du navigateur est un **rang**, jamais un nom | le clic **désigne** une valeur que le rapprochement a écrite ; il ne peut pas en introduire une. Un formulaire forgé renomme au pire avec un nom que le portail déclare déjà |
+| `CorrectionFneService` reverifie le nom de son côté | le contrôleur n'est pas le dernier point avant le renommage ; le service l'est |
+| Cinq noms au plus dans le pop-up | un toast qui en aligne quinze ne se lit plus ; au-delà, le bouton renvoie à l'écran des rejets, qui porte le détail |
+| Un rang périmé ne renomme rien | le rapprochement a pu être refait depuis que le pop-up s'est affiché ; appliquer d'après une liste ancienne renommerait sur un constat qui n'a plus cours |
+
+`corriger()` prend désormais un troisième paramètre, `$choisi`, **que la machine
+ne remplit jamais** : l'automatisme horaire continue de s'abstenir exactement
+comme avant. Le renommage, la bascule sur un point existant et le renvoi des
+pièces restent un seul chemin de code, quel que soit celui qui a décidé du nom.
+
+*L'écran des rejets, lui, masque toujours la correction quand le portail
+déclare plusieurs points. Le choix ne lui a pas été porté — il n'a pas été
+demandé.*
 
 `corrigerMaintenant` n'était couvert par **aucune épreuve** — seul `appliquer`,
 le geste unitaire de l'écran, l'était. `BoutonCorrigerMaintenantTest` couvre
-désormais ses cinq issues : un seul nom déclaré (renommé, pièce repartie,
-`succes`), deux noms (rien touché, `avertissement`), aucun relevé, rejet
-réseau, rejet d'autrui (404).
+désormais neuf issues : un seul nom déclaré (renommé, pièce repartie), plusieurs
+noms (la liste proposée, rien touché), chacun des deux noms cliqué, un rang qui
+ne désigne rien, aucun relevé, rejet réseau, et deux fois le rejet d'autrui.
 
 #### `LoadFileFne` — charger un relevé sans le scraper
 
@@ -4762,8 +4789,8 @@ un PDF et un JSON illisible.
 espaces admin et caissier soit classée. `admin.pdv.load_file_fne` ne l'était
 pas — rangée sous `gestion_pdv`, comme les trois autres routes du portail.
 
-Seize épreuves de plus (5 + 11). Suite entière : **1 179 épreuves, 1 179
-passantes, 4 715 vérifications.**
+Vingt épreuves de plus (9 + 11). Suite entière : **1 183 épreuves, 1 183
+passantes, 4 729 vérifications.**
 
 ## 5 bis. La numérotation des comptes — tranché
 
