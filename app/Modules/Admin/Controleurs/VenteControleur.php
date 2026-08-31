@@ -1359,7 +1359,12 @@ class VenteControleur
             ->first();
 
         if ($rejet && $rejet->cause === FneRejet::CAUSE_DGI) {
-            ScraperPortailFneService::lancerPourLogin($rejet->login);
+            // `FneRejet::consigner()` l'a déjà lancé — tous les refus y passent,
+            // celui-ci comme ceux de l'achat ou du lot. L'appel reste pour que
+            // le message ci-dessous dise vrai si cette voie change, mais il est
+            // verrouillé : sans cela, un même refus ouvrirait deux navigateurs
+            // sur le portail de la DGI.
+            ScraperPortailFneService::relancerApresRejet($rejet->login);
 
             $champs = $rejet->nomsDesChamps();
             $precision = $champs ? ' (' . implode(', ', $champs) . ')' : '';

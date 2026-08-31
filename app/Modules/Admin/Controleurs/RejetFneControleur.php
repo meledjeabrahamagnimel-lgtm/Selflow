@@ -8,6 +8,7 @@ use App\Modules\Admin\Modeles\PortailFneFiche;
 use App\Modules\Admin\Modeles\PortailFneImport;
 use App\Modules\Admin\Services\CorrectionFneService;
 use App\Modules\Admin\Services\DiagnosticFneService;
+use App\Modules\Admin\Services\ScraperPortailFneService;
 use Carbon\CarbonImmutable;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Facades\Auth;
@@ -322,11 +323,50 @@ class RejetFneControleur
                     ->with('avertissement_action', $this->boutonsDeChoix($rejet, $auChoix));
             }
 
+            // Le rapprochement conclut « concordant » alors que la DGI a refusé
+            // ce champ-là : les deux ne peuvent pas avoir raison en même temps,
+            // et c'est le relevé qui est en retard. Un point renommé au portail
+            // il y a dix minutes n'a encore été vu par personne — le bouton
+            // range ce que le scraper a déposé, il ne va pas le chercher.
+            //
+            // Constaté le 31/08/2026 : le nom changé au portail à 20 h 44, et
+            // l'écran affirmant « le portail confirme les valeurs envoyées »
+            // sur un relevé antérieur au changement.
+            if ($this->leReleveEstEnRetard($rejet)
+                && ScraperPortailFneService::lancerPourLogin($rejet->login)) {
+                return back()->with('avertissement', "La plateforme refuse ce point de vente, alors "
+                    . 'que le dernier relevé le déclarait conforme : ce relevé est antérieur à '
+                    . 'votre modification au portail. Une relève vient d\'être lancée — '
+                    . 'relancez la correction dans une minute.');
+            }
+
             return back()->with('avertissement', 'Rapprochement effectué, mais aucune correction '
                 . 'automatique applicable ici. ' . $diagnostic['conclusion']);
         }
 
         return back()->with('succes', $this->phraseDeCorrection($fait));
+    }
+
+    /**
+     * Le relevé dit-il le contraire de ce que la DGI vient de faire ?
+     *
+     * La plateforme a refusé un champ que le rapprochement déclare concordant.
+     * L'un des deux se trompe, et ce n'est pas la plateforme : **son message
+     * fait foi**. Il ne reste donc qu'une explication — le relevé décrit le
+     * portail d'avant.
+     */
+    private function leReleveEstEnRetard(FneRejet $rejet): bool
+    {
+        $refuses = $rejet->nomsDesChamps();
+
+        foreach ($rejet->diagnostic['champs'] ?? [] as $champ) {
+            if (($champ['verdict'] ?? null) === 'concordant'
+                && in_array($champ['champ'] ?? '', $refuses, true)) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /**

@@ -2,6 +2,7 @@
 
 namespace App\Modules\Admin\Modeles;
 
+use App\Modules\Admin\Services\ScraperPortailFneService;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -203,6 +204,17 @@ class FneRejet extends Model
                     $rejet->entreprise_id,
                     $rejet->id
                 );
+
+                // Et le relevé part tout de suite, sans attendre le passage de
+                // :40. C'est ici, et non dans un écran, parce que tous les
+                // refus passent par là — une facture normalisée à la main, un
+                // bordereau d'achat, une normalisation par lot, le tableau de
+                // bord. Poser le geste dans un contrôleur, c'était l'oublier
+                // dans les cinq autres.
+                //
+                // Verrouillé par login : vingt refus d'un même lot ont la même
+                // cause et n'appellent qu'un seul relevé.
+                ScraperPortailFneService::relancerApresRejet($rejet->login);
             }
 
             return $rejet;

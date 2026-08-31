@@ -245,6 +245,27 @@ return [
             'releve_a_la_connexion' => filter_var(env('PORTAIL_FNE_RELEVE_A_LA_CONNEXION', true), FILTER_VALIDATE_BOOL),
 
             'fraicheur_heures' => (int) env('PORTAIL_FNE_FRAICHEUR_HEURES', 12),
+
+            /*
+            | Le relevé qui part dès qu'une pièce est refusée par la DGI.
+            |
+            | Demandé par le propriétaire du projet le 31/08/2026 : « dès qu'il
+            | y a une erreur le scraper se met en action ». Un refus signifie
+            | que le portail dit autre chose que la pièce ; aller le lire est
+            | exactement ce qu'il faut faire, et attendre le passage horaire
+            | (:40) faisait perdre jusqu'à une heure sur un geste que
+            | l'utilisateur vient de faire.
+            |
+            | Le délai est un verrou, pas une temporisation : une normalisation
+            | par lot peut consigner vingt refus en dix secondes, et vingt
+            | navigateurs ouverts sur le portail de la DGI seraient vingt
+            | connexions avec le mot de passe du client. Un relevé par login et
+            | par tranche suffit — les vingt refus ont la même cause.
+            |
+            | Court, parce qu'un utilisateur qui corrige son portail puis
+            | relance doit obtenir un relevé neuf, pas celui d'avant.
+            */
+            'delai_apres_rejet_minutes' => (int) env('PORTAIL_FNE_DELAI_APRES_REJET_MINUTES', 2),
         ],
     ],
 

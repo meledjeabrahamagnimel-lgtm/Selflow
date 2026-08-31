@@ -4792,6 +4792,73 @@ pas — rangée sous `gestion_pdv`, comme les trois autres routes du portail.
 Vingt épreuves de plus (9 + 11). Suite entière : **1 183 épreuves, 1 183
 passantes, 4 729 vérifications.**
 
+### Lot 26 — Le scraper part au refus, et le constat cesse de mentir — **TERMINÉ le 31/08/2026**
+
+Le propriétaire du projet renomme un point au portail à 20 h 44, relance sa
+facture, et l'écran répond : *« le portail confirme les valeurs envoyées : la
+cause du refus est ailleurs »*. Trois défauts distincts étaient derrière cette
+seule phrase.
+
+#### 1. Deux relevés du même jour étaient invisibles
+
+`diagnosticEstAJour()` jugeait la fraîcheur des points sur leur **date**. Le
+relevé de 20 h 45 portait la même date que celui du matin : le rapprochement
+s'est cru à jour et **n'a jamais refait le constat**. Il aurait continué
+d'affirmer « le portail confirme » indéfiniment.
+
+Le fichier portait pourtant déjà la remarque, appliquée à la fiche et pas aux
+points : *« deux relevés du même jour existent »*. Les points comparent
+désormais l'identité du jeu (`points_id`, l'import qui l'a écrit), pas sa date.
+Un diagnostic antérieur à ce champ est tenu pour dépassé et refait une fois.
+
+**L'épreuve a été vérifiée à l'envers** : correctif retiré, elle rend
+`'concordant'` là où on attend `'ecart'` — mot pour mot ce que l'écran
+affichait. Une première version passait des deux côtés : elle créait une fiche
+neuve à chaque relevé et empruntait donc l'autre chemin. Le second relevé doit
+être **sans fiche** — c'est le cas réel, le tableur bouge et la fiche non.
+
+#### 2. Le bouton rangeait le dépôt sans jamais aller le chercher
+
+Quand le rapprochement dit « concordant » sur un champ que la DGI vient de
+refuser, les deux ne peuvent pas avoir raison — **et le message de la plateforme
+fait foi**. Il ne reste qu'une explication : le relevé décrit le portail d'avant.
+« Lancer la correction » lance désormais une relève dans ce cas précis, et ne
+le promet que s'il a pu la lancer.
+
+#### 3. Un seul écran sur six réveillait le scraper
+
+*« Dès qu'il y a une erreur le scraper se met en action »*, demandé le
+31/08/2026. Le geste vivait dans `VenteControleur` : une facture normalisée
+depuis cet écran-là déclenchait un relevé, **et rien d'autre**. Ni un bordereau
+d'achat, ni une normalisation par lot, ni le tableau de bord FNE, ni le job en
+file. Six chemins mènent à un refus, un seul agissait.
+
+Le lancement est descendu dans `FneRejet::consigner()`, le point par lequel ils
+passent tous — ce qui s'y trouve est vrai partout et n'est à maintenir qu'une
+fois.
+
+| Décision | Raison |
+|---|---|
+| Cause DGI seulement | une coupure réseau veut dire que la DGI n'a pas vu la pièce : le portail n'a rien à en dire, et une session sur l'espace FNE se paie d'une connexion avec le mot de passe du client |
+| Un verrou de cache par login, deux minutes | une normalisation par lot consigne vingt refus en dix secondes ; sans lui, vingt navigateurs s'ouvriraient pour lire vingt fois la même chose |
+| Court, deux minutes | qui corrige son portail puis relance doit obtenir un relevé neuf, pas celui d'avant |
+| La demande en file reste ouverte | elle est la trace, et le filet si le lancement échoue |
+| Ne lève jamais | consigner un rejet ne doit pas échouer parce que le scraper est mal armé. Le rejet compte, le relevé est un confort |
+
+`ReleveDesQuUnePieceEstRefuseeTest` : refus sur une vente, refus sur un achat,
+vingt refus qui n'ouvrent qu'un relevé, coupure réseau qui n'ouvre rien, scraper
+éteint qui consigne quand même.
+
+#### Ce que la soirée a prouvé en production
+
+Le pop-up de choix livré à 20 h 30 a servi à 20 h 50 : deux points déclarés,
+l'automatisme s'abstient, l'utilisateur clique « FACTURATION SIEGES », le point
+est renommé et la facture VTE-310826-005 repart — **certifiée
+`1864699A26000000088`**.
+
+Sept épreuves de plus (2 + 5). Suite entière : **1 190 épreuves, 1 190
+passantes, 4 748 vérifications.**
+
 ## 5 bis. La numérotation des comptes — tranché
 
 Le classeur subdivisait certaines racines sur des positions que l'acte uniforme

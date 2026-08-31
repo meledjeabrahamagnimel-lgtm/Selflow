@@ -248,6 +248,70 @@ class BoutonCorrigerMaintenantTest extends TestCase
             ->assertNotFound();
     }
 
+    /**
+     * Deux relevés le même jour : le second doit rafraîchir le constat.
+     *
+     * Le 31/08/2026, un point renommé au portail à 20 h 44 est arrivé dans un
+     * second relevé du 31/08. La fraîcheur se jugeait sur la **date** du jeu de
+     * points : elle n'avait pas bougé, le rapprochement s'est cru à jour, et
+     * l'écran a continué d'affirmer « le portail confirme les valeurs
+     * envoyées » sur un constat périmé. Une date n'identifie pas un relevé.
+     */
+    public function test_un_second_releve_du_meme_jour_rafraichit_le_constat(): void
+    {
+        // La correction reste à l'arrêt : ce qui s'éprouve ici est le constat,
+        // pas ce qu'on en fait.
+        config(['selflow.portail_fne.correction_auto' => false]);
+
+        $rejet = FneRejet::consigner($this->uneVente('FA-0042'), $this->refus());
+
+        // Premier relevé : le portail déclare le nom que la pièce porte.
+        $this->unReleve(['FACTURATION SIEGES']);
+        $this->artisan('fne:diagnostiquer-rejets', ['--rejet' => $rejet->id])->assertExitCode(0);
+
+        $this->assertSame('concordant', $rejet->refresh()->diagnostic['champs'][0]['verdict']);
+
+        // Second relevé, le même jour, **sans fiche neuve** : c'est ce qui se
+        // produit quand un point est renommé au portail — le tableur change,
+        // la fiche non. C'est donc la fraîcheur des points, et elle seule, qui
+        // doit faire refaire le constat.
+        $this->unReleve(['FACTURATION SIEGE'], avecFiche: false);
+        $this->artisan('fne:diagnostiquer-rejets', ['--rejet' => $rejet->id])->assertExitCode(0);
+
+        $champ = $rejet->refresh()->diagnostic['champs'][0];
+
+        $this->assertSame('ecart', $champ['verdict']);
+        $this->assertSame(['FACTURATION SIEGE'], $champ['portail']);
+    }
+
+    /**
+     * Le rapprochement dit « concordant » là où la DGI a refusé ce champ.
+     *
+     * Les deux ne peuvent pas avoir raison : le message de la plateforme fait
+     * foi, donc le relevé est en retard. Le bouton va chercher un relevé neuf
+     * plutôt que de conclure « la cause est ailleurs » — mais il ne le promet
+     * que s'il a pu le lancer. Scraper éteint, il ne promet rien.
+     */
+    public function test_scraper_eteint_le_bouton_ne_promet_pas_de_releve(): void
+    {
+        config(['selflow.portail_fne.scraper.actif' => false]);
+
+        $rejet = FneRejet::consigner($this->uneVente('FA-0042'), $this->refus());
+
+        // Le portail déclare exactement ce que la pièce a envoyé.
+        $this->unReleve(['FACTURATION SIEGES']);
+
+        $this->post(route('admin.fne.rejets.corriger_maintenant', $rejet))
+            ->assertRedirect()
+            ->assertSessionHas('avertissement');
+
+        $this->assertStringContainsString(
+            'aucune correction automatique applicable',
+            session('avertissement')
+        );
+        $this->assertStringNotContainsString("relève vient d'être lancée", session('avertissement'));
+    }
+
     public function test_sans_releve_le_bouton_dit_que_le_portail_n_a_pas_repondu(): void
     {
         $rejet = FneRejet::consigner($this->uneVente('FA-0042'), $this->refus());
@@ -339,26 +403,32 @@ class BoutonCorrigerMaintenantTest extends TestCase
     }
 
     /** @param  array<int, string>  $noms */
-    private function unReleve(array $noms): PortailFneImport
+    private function unReleve(array $noms, bool $avecFiche = true): PortailFneImport
     {
         $import = PortailFneImport::create([
             'entreprise_id'     => $this->mienne->id,
             'login'             => self::LOGIN,
             'date_scraping'     => '2026-08-31',
-            'type'              => PortailFneImport::TYPE_FICHE,
-            'fichier_nom'       => self::LOGIN . '_20260831.json',
+            'type'              => $avecFiche ? PortailFneImport::TYPE_FICHE : PortailFneImport::TYPE_POINTS,
+            'fichier_nom'       => self::LOGIN . ($avecFiche ? '_20260831.json' : '_20260831.xlsx'),
             'fichier_empreinte' => hash('sha256', uniqid('', true)),
             'statut'            => PortailFneImport::STATUT_IMPORTE,
         ]);
 
-        PortailFneFiche::create([
-            'import_id'            => $import->id,
-            'entreprise_id'        => $this->mienne->id,
-            'login'                => self::LOGIN,
-            'date_scraping'        => '2026-08-31',
-            'timbre_quittance'     => true,
-            'sticker_solde_alerte' => 5000,
-        ]);
+        // Sans fiche : c'est le cas ordinaire d'un second passage. Le tableur
+        // et le JSON sont deux fichiers, et l'import n'ecrit que ce qui a
+        // change — une fiche identique a la precedente n'est pas reecrite. Un
+        // point renomme au portail fait donc bouger les points, et eux seuls.
+        if ($avecFiche) {
+            PortailFneFiche::create([
+                'import_id'            => $import->id,
+                'entreprise_id'        => $this->mienne->id,
+                'login'                => self::LOGIN,
+                'date_scraping'        => '2026-08-31',
+                'timbre_quittance'     => true,
+                'sticker_solde_alerte' => 5000,
+            ]);
+        }
 
         foreach ($noms as $nom) {
             PortailFnePointFacturation::create([

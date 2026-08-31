@@ -135,6 +135,51 @@ class ScraperPortailFneService
     }
 
     /**
+     * Relever le portail dès qu'une pièce est refusée par la DGI.
+     *
+     * Demandé par le propriétaire du projet le 31/08/2026 : *« dès qu'il y a
+     * une erreur le scraper se met en action »*. Un refus dit que le portail
+     * déclare autre chose que la pièce — aller le lire est exactement ce qu'il
+     * faut faire, et c'est ce qui permet à l'écran des rejets de nommer l'écart
+     * au lieu de rendre un code.
+     *
+     * **Ce qui change par rapport à hier** : le refus ouvrait une demande en
+     * file, servie par le passage de :40. Jusqu'à une heure d'attente sur un
+     * geste que l'utilisateur venait de faire — et il ne restait devant l'écran
+     * que le temps de comprendre pourquoi. Le relevé part maintenant tout de
+     * suite ; la demande reste ouverte, elle, comme trace et comme filet si le
+     * lancement échoue.
+     *
+     * **Un verrou, et pas une temporisation.** Une normalisation par lot
+     * consigne vingt refus en dix secondes : sans lui, vingt navigateurs
+     * s'ouvriraient sur le portail de la DGI, soit vingt connexions avec le mot
+     * de passe du client, pour lire vingt fois la même chose. `Cache::add()` et
+     * non `put` : c'est l'écriture atomique qui décide, pas la lecture qui la
+     * précède.
+     *
+     * Ne lève jamais : consigner un rejet ne doit pas échouer parce que le
+     * scraper est mal armé. C'est le rejet qui compte, le relevé est un confort.
+     */
+    public static function relancerApresRejet(?string $login): bool
+    {
+        $login = trim((string) $login);
+
+        if ($login === '' || !config('selflow.portail_fne.scraper.actif')) {
+            return false;
+        }
+
+        $minutes = max(1, (int) config('selflow.portail_fne.scraper.delai_apres_rejet_minutes', 2));
+
+        if (!Cache::add("portail_fne_releve_rejet_{$login}", true, now()->addMinutes($minutes))) {
+            return false;
+        }
+
+        Log::info("ScraperPortailFne : relève lancée après un refus de la DGI pour le login {$login}.");
+
+        return self::lancerPourLogin($login);
+    }
+
+    /**
      * Lancer une commande en processus détaché, sa sortie versée au journal.
      *
      * @param  array<int, string>  $arguments  programme puis arguments

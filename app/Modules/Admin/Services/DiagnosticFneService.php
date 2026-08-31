@@ -95,6 +95,14 @@ class DiagnosticFneService
                 // la veille se croyait à jour tant que la fiche ne bougeait
                 // pas — et la commande horaire le sautait pour toujours.
                 'points_le' => $this->dateDesPoints($points),
+                // Et leur identité, pour la même raison que `fiche_id` plus
+                // haut : **deux relevés du même jour existent**. Le 31/08/2026,
+                // un point renommé au portail à 20 h 44 est arrivé dans un
+                // second relevé du 31/08 ; la date n'ayant pas bougé, le
+                // rapprochement s'est cru à jour et a continué d'affirmer « le
+                // portail confirme les valeurs envoyées » sur un constat périmé
+                // d'une journée. Une date ne peut pas identifier un relevé.
+                'points_id' => $this->identiteDesPoints($points),
             ] : null,
             'champs'       => $champs,
             'ecarts_fiche' => $ecartsFiche,
@@ -159,8 +167,35 @@ class DiagnosticFneService
         // La fiche n'a pas bougé ; les points, eux, ont pu changer seuls. C'est
         // même le cas qui compte : un point de facturation renommé au portail
         // ne touche pas à la fiche, et le constat devait se refaire.
-        return ($rejet->diagnostic['releve']['points_le'] ?? null)
-            === $this->dateDesPoints($this->pointsDuReleve($fiche));
+        //
+        // Sur l'identité du jeu, et non sur sa date. La date ne distingue pas
+        // deux relevés du même jour, et c'est précisément ce qui est arrivé le
+        // 31/08/2026 : le constat est resté figé sur un nom que le portail ne
+        // déclarait plus.
+        $connuDesPoints = $rejet->diagnostic['releve']['points_id'] ?? null;
+
+        // Un diagnostic écrit avant que cette identité existe ne porte pas la
+        // clé. Le refaire une fois vaut mieux que de le croire à jour sans
+        // pouvoir le vérifier.
+        if ($connuDesPoints === null) {
+            return false;
+        }
+
+        return $connuDesPoints === $this->identiteDesPoints($this->pointsDuReleve($fiche));
+    }
+
+    /**
+     * L'identité du jeu de points retenu, ou `null` s'il n'y en a aucun.
+     *
+     * Le relevé qui l'a écrit : un jeu est déposé d'un bloc — le service les
+     * écrit tous ou aucun —, si bien que son import le désigne entièrement, et
+     * qu'un jeu nouveau porte forcément un import nouveau.
+     *
+     * @param  array<int, PortailFnePointFacturation>  $points
+     */
+    private function identiteDesPoints(array $points): ?int
+    {
+        return $points === [] ? null : (int) $points[0]->import_id;
     }
 
     /**
