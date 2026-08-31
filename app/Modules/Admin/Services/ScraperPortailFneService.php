@@ -2,6 +2,10 @@
 
 namespace App\Modules\Admin\Services;
 
+use App\Modules\Admin\Modeles\Entreprise;
+use App\Modules\Admin\Modeles\PortailFneImport;
+use Carbon\CarbonImmutable;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
 
 /**
@@ -64,6 +68,70 @@ class ScraperPortailFneService
 
             return false;
         }
+    }
+
+    /**
+     * Relever le portail à l'ouverture de Selflow, si le dernier relevé date.
+     *
+     * Demandé par le propriétaire du projet le 31/08/2026, après avoir créé un
+     * point de facturation au portail à 12 h 27 et constaté que Selflow ne le
+     * voyait pas : le passage horaire regarde d'abord la file des demandes et
+     * s'arrête sans ouvrir de navigateur quand elle est vide — le cas ordinaire
+     * —, et le passage complet n'a lieu qu'à 02:30. Une modification faite au
+     * portail dans la journée n'était donc visible que le lendemain matin.
+     *
+     * **Ce n'est pas un relevé par connexion.** Trois garde-fous, dans cet
+     * ordre :
+     *
+     * 1. l'interrupteur `releve_a_la_connexion`, qui éteint tout ;
+     * 2. un verrou de cache posé **avant** d'aller voir, et pour la durée de
+     *    fraîcheur : dix employés qui se connectent à huit heures ne lancent
+     *    qu'un seul relevé, et un relevé qui échoue ne se rejoue pas en boucle.
+     *    `Cache::add()` et non `put` : c'est l'écriture atomique qui décide,
+     *    pas la lecture qui la précède ;
+     * 3. la fraîcheur elle-même : si le portail a été lu il y a moins de
+     *    `fraicheur_heures`, on ne le rouvre pas. Une session sur le portail de
+     *    la DGI se paie d'une connexion avec le mot de passe du client.
+     *
+     * Ne lève jamais : une ouverture de session ne doit pas échouer parce que
+     * le scraper est mal armé.
+     */
+    public static function relancerSiLeReleveEstVieux(?Entreprise $entreprise): bool
+    {
+        if (!$entreprise || !config('selflow.portail_fne.scraper.releve_a_la_connexion')) {
+            return false;
+        }
+
+        $login = trim((string) $entreprise->ncc);
+
+        if ($login === '' || !config('selflow.portail_fne.scraper.actif')) {
+            return false;
+        }
+
+        $heures = max(1, (int) config('selflow.portail_fne.scraper.fraicheur_heures', 12));
+
+        // Le verrou d'abord : sans lui, deux connexions simultanées lanceraient
+        // deux navigateurs sur le même portail.
+        if (!Cache::add("portail_fne_releve_{$login}", true, now()->addHours($heures))) {
+            return false;
+        }
+
+        try {
+            $dernier = PortailFneImport::where('login', $login)->max('updated_at');
+
+            // Le portail a été lu récemment : rien ne justifie d'y retourner.
+            if ($dernier !== null && CarbonImmutable::parse($dernier)->gt(now()->subHours($heures))) {
+                return false;
+            }
+        } catch (\Throwable $e) {
+            Log::error('ScraperPortailFne : fraîcheur du relevé illisible — ' . $e->getMessage());
+
+            return false;
+        }
+
+        Log::info("ScraperPortailFne : relève lancée à l'ouverture de Selflow pour le login {$login}.");
+
+        return self::lancerPourLogin($login);
     }
 
     /**

@@ -5,6 +5,7 @@ namespace App\Modules\Admin\Controleurs;
 use App\Modules\Admin\Modeles\Achat;
 use App\Modules\Admin\Modeles\AchatDetail;
 use App\Modules\Admin\Modeles\Fournisseur;
+use App\Modules\Admin\Modeles\FneRejet;
 use App\Modules\Admin\Modeles\MouvementStock;
 use App\Modules\Admin\Modeles\Produit;
 use App\Modules\Admin\Modeles\TresorerieJournal;
@@ -768,7 +769,44 @@ class AchatControleur
 
         $this->journaliser('normalisation_manuelle_achat', 'Achat', $achat->id);
 
-        return back()->with('succes', 'La normalisation BAPA/DGI a été effectuée avec succès. Le document est maintenant normalisé.');
+        // Le succès se lit sur la pièce, il ne se suppose pas. Ce message
+        // partait en vert quoi qu'il arrive — même quand la DGI refusait le
+        // bordereau, même quand la plateforme n'avait pas répondu : un vert
+        // rassurant sur un achat resté non normalisé. C'est le défaut corrigé
+        // sur les ventes au lot 20 ; il vivait ici aussi.
+        if ($achat->fresh()->normalise) {
+            return back()->with('succes', 'La normalisation BAPA/DGI a été effectuée avec succès. Le document est maintenant normalisé.');
+        }
+
+        $rejet = FneRejet::where('piece_type', 'achat')
+            ->where('piece_id', $achat->id)
+            ->where('statut', FneRejet::STATUT_OUVERT)
+            ->latest('id')
+            ->first();
+
+        // La plateforme n'a pas répondu : rien n'a été refusé, rien n'a été
+        // examiné, et personne ne rejouera à notre place.
+        if ($rejet && $rejet->estReseau()) {
+            return back()
+                ->with('erreur',
+                    "La plateforme FNE est injoignable pour le moment : le bordereau n'a pas été "
+                    . "envoyé, et la DGI n'a rien refusé. Réessayez dans un instant — le rejet "
+                    . 'se refermera de lui-même dès que la pièce passera.'
+                )
+                ->with('erreur_action', [[
+                    'url'    => route('admin.achats.normaliser', $achat),
+                    'label'  => 'Réessayer',
+                    'method' => 'post',
+                ]]);
+        }
+
+        return back()
+            ->with('avertissement', "La DGI n'a pas certifié le bordereau. Le détail du refus, et "
+                . "la correction s'il y en a une à faire, sont sur l'écran des rejets FNE.")
+            ->with('avertissement_action', [[
+                'url'   => route('admin.fne.rejets'),
+                'label' => 'Voir les rejets FNE',
+            ]]);
     }
 
     public function rechercherFacturesPourAvoir(Request $request): \Illuminate\Http\JsonResponse

@@ -230,6 +230,13 @@ Route::prefix('admin')
             Route::post('/activer/{pdv}',       [PointDeVenteControleur::class, 'activerSession'])->name('activer');
             Route::post('/activer-apercu/{pdv}', [PointDeVenteControleur::class, 'activerApercu'])->name('activer_apercu');
             Route::post('/desactiver-apercu',    [PointDeVenteControleur::class, 'desactiverApercu'])->name('desactiver_apercu');
+
+            // Reprendre dans Selflow les points de facturation que le portail
+            // FNE déclare. Le sens ne s'inverse jamais : rien n'est créé au
+            // portail depuis Selflow.
+            Route::post('/relever-le-portail', [PointDeVenteControleur::class, 'releverLePortail'])->name('relever_le_portail');
+            Route::get('/etat-du-portail',      [PointDeVenteControleur::class, 'etatDuPortail'])->name('etat_du_portail');
+            Route::post('/importer-du-portail', [PointDeVenteControleur::class, 'importerDuPortail'])->name('importer_du_portail');
         });
 
         // ── Import CSV ──

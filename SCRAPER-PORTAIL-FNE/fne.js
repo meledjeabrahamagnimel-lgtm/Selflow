@@ -514,6 +514,13 @@ async function releverUnLogin(navigateur, login, motDePasse, dossier) {
   const contexte = await navigateur.newContext({ acceptDownloads: true });
   const page = await contexte.newPage();
 
+  // Le jeton des appels `/ws/` se capte au vol, sur un appel que la page fait
+  // elle-même : l'écoute doit donc être posée avant toute navigation. Elle ne
+  // sert qu'au relevé des factures reçues, plus bas, et le jeton ne vit qu'en
+  // mémoire — ni journal, ni fichier déposé.
+  const { capterLAutorisation, releverDansLaSession } = require('./achats.js');
+  const autorisation = capterLAutorisation(page);
+
   try {
     console.log('   Connexion...');
     await seConnecter(page, login, motDePasse);
@@ -533,6 +540,21 @@ async function releverUnLogin(navigateur, login, motDePasse, dossier) {
 
     const cheminExcel = await telechargerLesPoints(page, login, dossier);
     console.log(`   Points de facturation -> ${path.basename(cheminExcel)}`);
+
+    // Une session ouverte est ce qui coûte : le portail de la DGI demande une
+    // connexion avec le mot de passe du client, et y retourner souvent est le
+    // meilleur moyen de faire bloquer le compte. Tant qu'on y est, on relève
+    // tout — les factures reçues comprises, qui partaient jusqu'ici d'un second
+    // passage rouvrant une seconde session pour la même entreprise.
+    //
+    // Leur échec ne perd pas le relevé : la fiche et les points sont déjà
+    // déposés, et c'est eux que la certification attend. On le dit, et on rend
+    // la main.
+    try {
+      await releverDansLaSession(page, autorisation, login, path.join(dossier, 'achats'));
+    } catch (erreur) {
+      console.warn(`   /!\ Factures reçues non relevées : ${erreur.message}`);
+    }
 
     if (process.env.URL_SERVER) {
       const statutJson = await envoyerAuServeur(cheminJson);

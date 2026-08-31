@@ -211,6 +211,9 @@ class Habilitations
         'admin.pdv.activer'           => 'gestion_pdv',
         'admin.pdv.activer_apercu'    => 'gestion_pdv',
         'admin.pdv.desactiver_apercu' => 'gestion_pdv',
+        'admin.pdv.relever_le_portail'  => 'gestion_pdv',
+        'admin.pdv.etat_du_portail'     => 'gestion_pdv',
+        'admin.pdv.importer_du_portail' => 'gestion_pdv',
 
         // ── Personnel ──
         'admin.personnel.index'     => 'gestion_personnel',

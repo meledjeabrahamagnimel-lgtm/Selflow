@@ -479,7 +479,74 @@ async function reconnaitre(navigateur, login, motDePasse) {
 
 /* -------------------------------- Le relevé ------------------------------- */
 
+/**
+ * Le relevé des factures reçues, dans une session **déjà ouverte**.
+ *
+ * Extrait de `releverUnLogin` pour que `fne.js` puisse l'appeler sans rouvrir
+ * une session : une connexion au portail de la DGI est ce qui coûte, et il n'y
+ * a aucune raison d'en payer deux quand on est déjà dedans. Demandé par le
+ * propriétaire du projet le 31/08/2026 — « à chaque fois que la plateforme
+ * s'ouvre, il fait un relevé ».
+ *
+ * `autorisation` est l'état rendu par `capterLAutorisation()`, posé sur la page
+ * **avant** toute navigation vers l'application : le jeton se capte au vol sur
+ * un appel que la page fait elle-même.
+ */
+async function releverDansLaSession(page, autorisation, login, dossier) {
+  console.log('   Factures reçues...');
+  await allerAuxFacturesRecues(page);
+
+  // La page est ouverte pour deux raisons : établir la session côté
+  // application, et faire échouer bruyamment si elle a disparu. Les données,
+  // elles, viennent de l'API.
+  const tableau = await lireLeTableau(page);
+
+  if (!tableau) {
+    throw new Error(
+      "Le tableau des factures reçues n'est plus sur la page : le portail a "
+      + "changé de structure. Rien n'est déposé."
+    );
+  }
+
+  const depuis  = optionDepuis();
+  const jusquA  = aujourdHui();
+  const { factures, total } = await interrogerLesFactures(page, autorisation, 'received', depuis, jusquA);
+
+  if (factures.length !== total) {
+    console.warn(`   /!\\ ${factures.length} facture(s) ramenée(s) pour un total annoncé de ${total}.`);
+  }
+
+  // Le dépôt : un fichier, dans le sous-dossier `achats/`.
+  //
+  // Pas d'horodatage de génération dans le fichier : c'est l'empreinte du
+  // contenu qui dit à Selflow s'il y a du neuf, et un champ qui change à
+  // chaque passage annulerait cette économie. `periode` en fait partie parce
+  // qu'elle décrit ce qui a été demandé — élargir la fenêtre est un vrai
+  // changement, et Selflow doit le voir.
+  const contenu = {
+    login,
+    source: `${CHEMIN_API}?listing=received`,
+    periode: { du: depuis, au: jusquA },
+    colonnes_a_l_ecran: tableau.entetes,
+    factures,
+  };
+
+  if (!fs.existsSync(dossier)) fs.mkdirSync(dossier, { recursive: true });
+  const chemin = path.join(dossier, `${nomDeBase(login)}.json`);
+  fs.writeFileSync(chemin, JSON.stringify(contenu, null, 2), 'utf-8');
+
+  console.log(
+    `   ${factures.length} facture(s) reçue(s) du ${depuis} au ${jusquA} -> ${path.basename(chemin)}`
+  );
+
+  return { login, ok: true, nombre: factures.length, chemin };
+}
+
+/* ------------------------------ Un relevé, un login ----------------------- */
+
 async function releverUnLogin(navigateur, login, motDePasse, dossier) {
+  // Un contexte neuf par login : deux entreprises ne partagent jamais une
+  // session, sous peine de ranger les factures de l'une chez l'autre.
   const contexte = await navigateur.newContext({ acceptDownloads: true });
   const page = await contexte.newPage();
   const autorisation = capterLAutorisation(page);
@@ -488,53 +555,7 @@ async function releverUnLogin(navigateur, login, motDePasse, dossier) {
     console.log('   Connexion...');
     await seConnecter(page, login, motDePasse);
 
-    console.log('   Factures reçues...');
-    await allerAuxFacturesRecues(page);
-
-    // La page est ouverte pour deux raisons : établir la session côté
-    // application, et faire échouer bruyamment si elle a disparu. Les données,
-    // elles, viennent de l'API.
-    const tableau = await lireLeTableau(page);
-
-    if (!tableau) {
-      throw new Error(
-        "Le tableau des factures reçues n'est plus sur la page : le portail a "
-        + "changé de structure. Rien n'est déposé."
-      );
-    }
-
-    const depuis  = optionDepuis();
-    const jusquA  = aujourdHui();
-    const { factures, total } = await interrogerLesFactures(page, autorisation, 'received', depuis, jusquA);
-
-    if (factures.length !== total) {
-      console.warn(`   /!\\ ${factures.length} facture(s) ramenée(s) pour un total annoncé de ${total}.`);
-    }
-
-    // Le dépôt : un fichier, dans le sous-dossier `achats/`.
-    //
-    // Pas d'horodatage de génération dans le fichier : c'est l'empreinte du
-    // contenu qui dit à Selflow s'il y a du neuf, et un champ qui change à
-    // chaque passage annulerait cette économie. `periode` en fait partie parce
-    // qu'elle décrit ce qui a été demandé — élargir la fenêtre est un vrai
-    // changement, et Selflow doit le voir.
-    const contenu = {
-      login,
-      source: `${CHEMIN_API}?listing=received`,
-      periode: { du: depuis, au: jusquA },
-      colonnes_a_l_ecran: tableau.entetes,
-      factures,
-    };
-
-    if (!fs.existsSync(dossier)) fs.mkdirSync(dossier, { recursive: true });
-    const chemin = path.join(dossier, `${nomDeBase(login)}.json`);
-    fs.writeFileSync(chemin, JSON.stringify(contenu, null, 2), 'utf-8');
-
-    console.log(
-      `   ${factures.length} facture(s) reçue(s) du ${depuis} au ${jusquA} -> ${path.basename(chemin)}`
-    );
-
-    return { login, ok: true, nombre: factures.length, chemin };
+    return await releverDansLaSession(page, autorisation, login, dossier);
   } catch (erreur) {
     let capture = null;
     try {
@@ -658,4 +679,11 @@ module.exports = {
   extraireLesEnregistrements,
   lireLeTableau,
   allerAuxFacturesRecues,
+
+  // Ce que `fne.js` appelle pour relever les factures reçues sans rouvrir une
+  // session. L'ordre compte à l'usage : poser `capterLAutorisation` sur la page
+  // AVANT toute navigation, puis appeler `releverDansLaSession` une fois
+  // connecté.
+  capterLAutorisation,
+  releverDansLaSession,
 };

@@ -130,6 +130,21 @@ if (config('selflow.portail_fne.scraper.actif')) {
         ->withoutOverlapping(120)
         ->runInBackground()
         ->appendOutputTo(storage_path('logs/portail-fne.log'));
+
+    /*
+     * Le relevé des factures REÇUES n'a plus de rendez-vous à lui.
+     *
+     * Il en a eu un, le 31/08/2026 au matin : `achats.js --tous` à 04:15. Il
+     * rouvrait une seconde session sur le portail de la DGI pour la même
+     * entreprise, quelques heures après celle de `fne.js`. Or c'est la
+     * connexion qui coûte — et qui, répétée, fait bloquer un compte. `fne.js`
+     * relève désormais les factures reçues **dans la session qu'il vient
+     * d'ouvrir**, à chaque passage : file d'attente, passage nocturne, ou
+     * lancement à la main depuis l'écran des points de vente.
+     *
+     * `achats.js` reste lançable seul — `node achats.js <login>` —, pour un
+     * relevé ciblé ou une reconnaissance.
+     */
 }
 
 // Rotation mensuelle des clés de liaison Comptaflow.

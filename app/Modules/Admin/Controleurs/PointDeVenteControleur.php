@@ -2,8 +2,13 @@
 
 namespace App\Modules\Admin\Controleurs;
 
+use App\Modules\Admin\Modeles\Entreprise;
 use App\Modules\Admin\Modeles\PointDeVente;
 use App\Modules\Admin\Services\CacheService;
+use App\Modules\Admin\Services\PointsDeVentePortailService;
+use App\Modules\Admin\Services\ScraperPortailFneService;
+use Illuminate\Support\Facades\Artisan;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -11,7 +16,7 @@ use Illuminate\View\View;
 
 class PointDeVenteControleur
 {
-    public function index(): View
+    public function index(PointsDeVentePortailService $portail): View
     {
         $entreprise   = Auth::user()->entreprise;
         $pointsDeVente = PointDeVente::where('entreprise_id', $entreprise->id)
@@ -22,7 +27,212 @@ class PointDeVenteControleur
 
         $quotaMax = $entreprise->quota_points_de_vente;
 
-        return view('admin::points_de_vente.index', compact('pointsDeVente', 'quotaMax'));
+        // Ranger ce que le scraper a déposé, avant de comparer.
+        //
+        // Sans cela, l'écran s'enfermait : le bouton « Reprendre » n'apparaît
+        // que s'il y a un point à créer, et il n'y en avait aucun **parce que**
+        // le dépôt n'était pas rangé. Celui qui venait de cliquer « Relever le
+        // portail maintenant » voyait donc son point déclaré nulle part, et
+        // n'avait aucun bouton pour le faire entrer — jusqu'au ramassage de
+        // l'heure ronde. Constaté par le propriétaire du projet le 31/08/2026,
+        // le point « teste » créé au portail à 13 h 00.
+        //
+        // Le passage est sans effet quand rien n'a changé : un fichier déjà lu
+        // est reconnu à son empreinte, sans être ouvert.
+        Artisan::call('portail-fne:importer');
+
+        // Ce que le portail FNE déclare, en face. La comparaison se calcule à
+        // l'affichage et ne se range nulle part : un point créé ce matin doit
+        // se voir ce matin, sans attendre le relevé de la nuit.
+        $portailFne = $portail->comparer($entreprise);
+
+        // L'empreinte de ce que l'écran montre. Le navigateur la redemande
+        // pendant qu'un relevé tourne : dès qu'elle change, il se recharge —
+        // personne n'a à guetter, ni à recharger à la main.
+        $portailFne['empreinte'] = self::empreinte($portailFne);
+
+        // Et la date du dernier dépôt du scraper. L'empreinte seule ne suffit
+        // pas : un relevé qui redit exactement ce que le portail disait déjà ne
+        // la change pas, et la surveillance concluait « le relevé n'est pas
+        // arrivé » alors qu'il était arrivé et n'avait rien de neuf à dire.
+        $portailFne['depose_le'] = self::deposeLe($entreprise);
+
+        return view('admin::points_de_vente.index', compact('pointsDeVente', 'quotaMax', 'portailFne'));
+    }
+
+    /**
+     * Où en est le portail ? — interrogé par l'écran pendant qu'un relevé tourne.
+     *
+     * Un relevé ouvre un vrai navigateur sur le portail de la DGI : il dure des
+     * dizaines de secondes, et bloquer la réponse HTTP dessus figerait l'écran.
+     * Plutôt que de demander à l'utilisateur d'attendre puis de recharger — ce
+     * qu'il ne doit pas avoir à faire —, la page redemande cet état et se
+     * recharge d'elle-même dès que l'empreinte change.
+     *
+     * Le rangement est refait à chaque appel : c'est lui qui fait apparaître ce
+     * que le scraper vient de déposer, et il est sans effet quand rien n'a
+     * changé.
+     */
+    public function etatDuPortail(PointsDeVentePortailService $portail): JsonResponse
+    {
+        Artisan::call('portail-fne:importer');
+
+        $comparaison = $portail->comparer(Auth::user()->entreprise);
+
+        return response()->json([
+            'releve_le' => $comparaison['releve_le'],
+            'a_creer'   => $comparaison['a_creer'],
+            'empreinte' => self::empreinte($comparaison),
+            'depose_le' => self::deposeLe(Auth::user()->entreprise),
+        ]);
+    }
+
+    /**
+     * Quand le scraper a-t-il déposé pour la dernière fois, pour ce NCC ?
+     *
+     * Le fichier, et non la base : c'est la seule chose qui dise « le scraper a
+     * répondu », que le portail ait quelque chose de neuf à déclarer ou non. Un
+     * relevé identique au précédent ne crée aucune ligne et n'en modifie
+     * aucune — `confirmerLeReleve()` ne bouge même pas quand le relevé tombe le
+     * même jour que le précédent —, si bien qu'il ne laisse en base aucune
+     * trace de son passage.
+     */
+    private static function deposeLe(Entreprise $entreprise): ?int
+    {
+        $login = trim((string) $entreprise->ncc);
+
+        if ($login === '') {
+            return null;
+        }
+
+        $dossier = rtrim((string) config('selflow.portail_fne.dossier_import'), '/\\');
+        $dernier = null;
+
+        foreach ([$dossier, $dossier . DIRECTORY_SEPARATOR . 'achats'] as $ou) {
+            foreach (glob($ou . DIRECTORY_SEPARATOR . $login . '_*') ?: [] as $fichier) {
+                $date = @filemtime($fichier);
+
+                if ($date && ($dernier === null || $date > $dernier)) {
+                    $dernier = $date;
+                }
+            }
+        }
+
+        return $dernier;
+    }
+
+    /**
+     * Ce que l'écran montre, résumé en une chaîne comparable.
+     *
+     * La date du relevé, et pour chaque point déclaré son nom et le point de
+     * vente qui lui correspond : un relevé qui rapporte un point de plus, ou
+     * une reprise qui vient d'en créer un, changent l'empreinte. Un relevé
+     * identique ne la change pas, et l'écran ne clignote pas pour rien.
+     *
+     * @param  array<string, mixed>  $comparaison
+     */
+    private static function empreinte(array $comparaison): string
+    {
+        $points = array_map(
+            fn (array $point) => $point['nom'] . ':' . ($point['point_de_vente']->id ?? '-'),
+            $comparaison['points']
+        );
+
+        return md5(($comparaison['releve_le'] ?? '') . '|' . implode('|', $points));
+    }
+
+    /**
+     * Va relever le portail maintenant, sans attendre un rendez-vous.
+     *
+     * Le passage horaire n'ouvre une session que si une pièce a été refusée, et
+     * le passage complet attend 02:30 : celui qui vient de déclarer un point de
+     * facturation au portail n'a aucune raison d'attendre demain matin.
+     *
+     * Le relevé part **détaché** — il ouvre un vrai navigateur et prend des
+     * dizaines de secondes ; bloquer la réponse HTTP figerait l'écran.
+     */
+    public function releverLePortail(): RedirectResponse|JsonResponse
+    {
+        $entreprise = Auth::user()->entreprise;
+
+        $lance = ScraperPortailFneService::lancerPourLogin($entreprise->ncc);
+
+        // Le bouton lance en arrière-plan et surveille : il attend une réponse
+        // qu'il peut lire, pas une page entière.
+        if (request()->wantsJson()) {
+            return response()->json([
+                'lance'   => $lance,
+                'message' => $lance
+                    ? 'Relevé du portail en cours.'
+                    : "Le scraper du portail est éteint sur ce serveur, ou l'entreprise n'a pas de NCC.",
+            ], $lance ? 200 : 409);
+        }
+
+        if (!$lance) {
+            return back()->with('avertissement',
+                "Le relevé n'a pas pu être lancé : le scraper du portail est éteint sur ce "
+                . "serveur, ou l'entreprise n'a pas de NCC. Le passage nocturne reste en place."
+            );
+        }
+
+        // Sans JavaScript, on retombe sur le message : le relevé tourne quand
+        // même, et le prochain affichage de l'écran le rangera.
+        return back()->with('info',
+            'Relevé du portail lancé. Il prend quelques dizaines de secondes ; '
+            . "l'écran le montrera dès qu'il sera arrivé."
+        );
+    }
+
+    /**
+     * Reprend dans Selflow les points de facturation déclarés au portail FNE.
+     *
+     * Le sens est celui-là, et pas l'autre : le portail déclare, Selflow
+     * s'aligne. Rien n'est jamais créé au portail depuis ici — déclarer un
+     * point de facturation est un acte du contribuable, et le scraper ne fait
+     * que lire.
+     */
+    public function importerDuPortail(PointsDeVentePortailService $portail): RedirectResponse
+    {
+        $entreprise = Auth::user()->entreprise;
+
+        // Ranger d'abord ce que le scraper a pu déposer depuis — un relevé
+        // lancé par le bouton d'à côté met des dizaines de secondes, et il
+        // serait absurde de faire attendre l'heure ronde à qui vient de le
+        // demander. Même geste que le « corriger maintenant » des rejets.
+        Artisan::call('portail-fne:importer');
+
+        $rapport = $portail->importer($entreprise);
+
+        if (!$rapport['releve']) {
+            return back()->with('avertissement',
+                "Aucun relevé du portail FNE n'est disponible pour votre entreprise : il n'y a "
+                . 'rien à reprendre. Le relevé des points de facturation se fait chaque nuit.'
+            );
+        }
+
+        $messages = [];
+
+        if ($rapport['crees'] !== []) {
+            $messages[] = count($rapport['crees']) . ' point(s) de vente créé(s) d\'après le portail : '
+                . implode(', ', $rapport['crees']) . '. Leur ville et leur commune restent à compléter.';
+        }
+
+        if ($rapport['adoptes'] !== []) {
+            $messages[] = count($rapport['adoptes']) . ' point(s) déjà saisi(s) reconnu(s) au portail : '
+                . implode(', ', $rapport['adoptes']) . '.';
+        }
+
+        if ($rapport['quota_atteint']) {
+            return back()->with('avertissement', trim(implode(' ', $messages) . ' Quota de points de '
+                . "vente atteint : les points restants du portail n'ont pas été repris."));
+        }
+
+        if ($messages === []) {
+            return back()->with('info', 'Rien à reprendre : les '
+                . $rapport['deja_presents'] . ' point(s) déclaré(s) au portail sont déjà dans Selflow.');
+        }
+
+        return back()->with('succes', implode(' ', $messages));
     }
 
     public function creer(Request $request): RedirectResponse
@@ -46,28 +256,10 @@ class PointDeVenteControleur
             ['entreprise_id' => $entreprise->id, 'statut' => 'Ouvert']
         ));
 
-        // Initialisation automatique des stocks (vides) pour tous les produits existants de l'entreprise
-        // Seuls les articles qui se comptent recoivent une fiche : un service
-        // n'a ni quantite disponible, ni seuil, ni rupture.
-        // Un article archivé ne reçoit pas de fiche de stock sur un site qui
-        // vient d'ouvrir : il ne s'y vendra jamais.
-        $produits = \App\Modules\Admin\Modeles\Produit::where('entreprise_id', $entreprise->id)
-            ->selectionnables()
-            ->get();
-        foreach ($produits as $prod) {
-            if (!$prod->estStockable()) {
-                continue;
-            }
-
-            \App\Modules\Admin\Modeles\Stock::firstOrCreate([
-                'produit_id'        => $prod->id,
-                'point_de_vente_id' => $pdv->id,
-            ], [
-                'quantite_disponible' => 0,
-                'stock_minimum'       => 5,
-                'stock_maximum'       => 100,
-            ]);
-        }
+        // Les fiches de stock vides du nouveau site. La règle vit désormais sur
+        // le modèle : l'import des points déclarés au portail crée lui aussi des
+        // points de vente, et deux copies de cette boucle auraient divergé.
+        $pdv->initialiserLesFichesDeStock();
 
         // Invalider le cache des PDV pour cette entreprise
         CacheService::invaliderPointsDeVente($entreprise->id);

@@ -4308,6 +4308,391 @@ suite ne dépende plus du `.env` du poste : `PORTAIL_FNE_CORRECTION_AUTO=true` (
 défaut que supposent les épreuves du cas 2) et `PORTAIL_FNE_SCRAPER_ACTIF=false`
 (aucune épreuve ne lance Node).
 
+### Lot 21 — Une plateforme injoignable rendait une erreur 500 — **TERMINÉ le 31/08/2026**
+
+Demandé par le propriétaire du projet le 31/08/2026, après avoir cherché comment
+rejouer le **cas 3** en réel : le bouton « Normaliser » ne montrait pas ce que le
+lot 17 avait éprouvé.
+
+**Le défaut.** Le job décidait de relancer sur `attempts() < $tries`. Or les deux
+boutons travaillent en synchrone (`dispatchSync`, depuis le lot 20), et
+`SyncJob::attempts()` rend **toujours 1** : la condition était vraie pour
+toujours. Sur une plateforme injoignable, le job levait donc son exception,
+`SyncQueue::handleException` la relançait telle quelle, et l'écran rendait une
+**erreur 500** — aucun rejet consigné, et le message « la plateforme FNE est
+injoignable » que `VenteControleur` tenait prêt depuis le lot 20 était
+**inatteignable**. Reproduit avant correction : `RuntimeException`, HTTP 500.
+
+Les quatorze épreuves du cycle ne le voyaient pas : elles jouent `handle()` à la
+main ou avec un message de file simulé, jamais le chemin du bouton.
+
+**La correction, dans les deux jobs** (`NormaliserFactureFne`,
+`NormaliserAchatBapaJob`) : la relance est décidée par `uneAutreTentativeViendra()`,
+qui rend `false` dès que le job tourne en `SyncJob`. En synchrone personne ne
+rejouera : c'est là, et à cet instant, qu'il faut consigner. Hors file — `handle()`
+appelé directement — la règle ne change pas. **Rien du périmètre gelé n'est
+touché** : ni payload, ni champ, ni colonne `fne_*`.
+
+**Ce que l'écran dit maintenant.** Le message promettait une reprise automatique
+qui n'existe pas — aucune tâche planifiée ne rejoue un rejet `reseau`, et l'écran
+des rejets le dit déjà lui-même (« la pièce est à renvoyer »). Il annonce
+désormais que la pièce **n'a pas été envoyée**, que la DGI n'a rien refusé, et
+porte un bouton **« Réessayer »** (`erreur_action`, le mécanisme du pop-up du lot
+20), dirigé vers la route du parcours en cours — admin ou caissier.
+
+**Le bouton des achats portait en plus le défaut corrigé au lot 20 côté ventes** :
+il rendait « succès » en vert quoi qu'il arrive, y compris sur un bordereau resté
+non normalisé. Sans cela, la correction ci-dessus l'aurait rendu franchement
+faux — un rejet consigné sous un message vert. Il distingue à son tour trois
+issues : certifié, plateforme injoignable (avec « Réessayer »), refus de la DGI
+(renvoi vers l'écran des rejets).
+
+Deux épreuves de plus dans `CycleFneTroisCasTest` — **seize en tout** —, qui
+passent par la route, pas par le job : elles tombent toutes deux si l'on retire
+le correctif (vérifié : HTTP 500). Suite entière : **1 144 épreuves, 1 144
+passantes, 4 585 vérifications.**
+
+**Ce qui reste, et n'a pas bougé** : le `queue:work` permanent du lot 19. Ce lot
+répare le geste humain, pas la file — une facture émise depuis l'application part
+toujours en `dispatch()` dans une table que personne ne lit.
+
+### Lot 22 — Le relevé des factures reçues entre au planificateur — **TERMINÉ le 31/08/2026**
+
+Demandé par le propriétaire du projet le 31/08/2026. Le lot 16 avait laissé
+`achats.js` hors du planificateur, faute d'avoir vu une seule facture réelle.
+
+**Le rendez-vous : une fois par jour, à 04:15** (`PORTAIL_FNE_SCRAPER_HEURE_ACHATS`),
+`--tous`, en arrière-plan, verrou de deux heures — comme le passage nocturne de
+`fne.js`. Le chemin du script est `selflow.portail_fne.scraper.script_achats`.
+
+**Pourquoi pas toutes les heures, comme `fne.js`.** `fne.js` consulte d'abord la
+file de Selflow et s'arrête **sans ouvrir de navigateur** quand elle est vide —
+le cas ordinaire. `achats.js` n'a rien qui le retienne : chaque passage ouvre une
+session sur le portail de la DGI. Toutes les heures, ce serait vingt-quatre
+connexions par jour pour une liste qui bouge au rythme des fournisseurs. Et une
+facture reçue est un **fait acquis** — certifiée par son émetteur, elle ne
+changera plus : la relever une heure plus tôt ne change rien à ce qu'elle dit.
+
+**L'heure choisie** tient dans la journée déjà remplie : après le passage
+nocturne de `fne.js` (02:30) et la rotation des clés Comptaflow (03:00), et
+cinquante minutes avant le ramassage de `portail-fne:importer-achats` (05:05),
+ce qui laisse au navigateur le temps de finir.
+
+**Vérifié en réel le jour même**, sans attendre le rendez-vous :
+
+| Geste | Résultat |
+|---|---|
+| `schedule:list` | la ligne `15 4 * * * node achats.js --tous` y figure |
+| `node achats.js --tous` | connexion au portail, `0 facture(s) reçue(s) du 2024-01-01 au 2026-08-31`, dépôt de `1864699A_20260831.json` |
+| `portail-fne:importer-achats` | « inchangé — identique au relevé du 27/08/2026 » : la règle du lot 15 tient, un contenu identique ne recrée aucune ligne |
+
+**La chaîne est donc complète et éprouvée de bout en bout ; ce qui manque reste
+la matière.** `DC-KNOWING CGA` n'a toujours aucune facture reçue au portail — le
+`total: 0` est celui de la DGI, pas un défaut de Selflow. L'écran
+`admin/fne/factures-recues` affiche `0 facture(s)` sans erreur, et se remplira au
+premier fournisseur qui certifiera une pièce à son NCC.
+
+Le planificateur de Windows, lui, tourne bien : la tâche « Selflow —
+planificateur » appelle `schedule:run` chaque minute par
+`storage/app/planificateur-selflow.vbs` (dernier résultat 0). Le trou du lot 19
+porte sur la **file** (`queue:work`), pas sur l'ordonnanceur.
+
+#### Un relevé d'exemple, à retirer — **DONNÉES DE DÉMONSTRATION EN BASE**
+
+À la demande du propriétaire du projet, pour voir l'écran avant qu'un
+fournisseur ait certifié quoi que ce soit, un relevé d'exemple a été déposé à la
+main le 31/08/2026 dans `achats/1864699A_20260831.json` — **il a écrasé le
+relevé réel du jour, qui était vide** ; `node achats.js 1864699A` le rétablit en
+une minute.
+
+Quatre pièces, choisies pour montrer chacun des états de l'écran :
+
+| Référence | Émetteur | Ce qu'elle montre |
+|---|---|---|
+| `B0000001X26000000042` | FOURNITURES DEMO SARL | fournisseur retrouvé par NCC, achat candidat, **écart de 800 F** (Selflow dit 11 000, la DGI détient 11 800) |
+| `B0000002Y26000000018` | GRANDS MOULINS DEMO | aucun fournisseur ne porte ce NCC — pièce orpheline |
+| `B0000003Z26000000007` | COOPERATIVE AGRICOLE DEMO | bordereau d'achat agricole : **TVA non déductible** |
+| `B0000001X26000000043` | FOURNITURES DEMO SARL | un avoir |
+
+S'y ajoutent, créés pour que le rapprochement ait de quoi se proposer : le
+fournisseur **FOURNITURES DEMO SARL** (NCC `0000001X`) et l'achat
+**`AC-DEMO-0001`** (28/08/2026, TTC 11 000). Aucune écriture comptable, aucun
+mouvement de stock — les deux lignes ont été posées directement.
+
+**Tout se retire d'une commande** — les lignes suivent par cascade :
+
+```
+php artisan tinker --execute="use App\Modules\Admin\Modeles\PortailFneFactureRecue as F; use App\Modules\Admin\Modeles\Achat; use App\Modules\Admin\Modeles\Fournisseur; F::where('reference','like','B00000%')->get()->each->delete(); Achat::where('numero_facture','AC-DEMO-0001')->delete(); Fournisseur::where('ncc','0000001X')->delete();"
+```
+
+### Lot 23 — Les points du portail repris dans Selflow — **TERMINÉ le 31/08/2026**
+
+Demandé par le propriétaire du projet le 31/08/2026 : *« si dans Selflow je n'ai
+pas encore un point de vente et que le scraper fait un relevé, peut-il créer le
+même point de vente dans Selflow ? normalement c'est ce qui devrait se faire »*.
+
+**Le sens, et un seul : du portail vers Selflow.** L'inverse reste exclu —
+déclarer un point de facturation à la DGI est un acte du contribuable, pas une
+écriture technique, et le scraper ne fait que lire. Ce qui est repris est **le
+nom que le portail écrit**, celui-là même que `pointOfSale` doit porter pour
+qu'une facture soit certifiée : le reprendre plutôt que le ressaisir retire
+l'accent et la casse du chemin d'une certification. C'est le refus du lot 19,
+pris à sa racine.
+
+**Un geste, pas un automatisme.** Un point de vente porte des utilisateurs, du
+stock, des ventes, un site comptable : il ne doit pas naître à 4 h 15 parce
+qu'un fichier est arrivé. L'écran des points de vente montre donc ce que le
+portail déclare — relevé daté, un badge *Dans Selflow* ou *À créer* par point —
+et un bouton **« Reprendre N point(s) manquant(s) »**. La comparaison se calcule
+à l'affichage et ne se range nulle part : un point créé ce matin se voit ce
+matin.
+
+**L'appariement porte sur l'identifiant, pas sur le nom.** Nouvelle colonne
+`points_de_vente.etablissement_fne_id`, migration `2026_08_31_000001`. Le lot 18
+renomme les points d'après le portail et le lot 20 a dû fusionner à la main
+trois « FACTURATION SIEGE » nés d'un appariement par nom : un point repris se
+reconnaît désormais même renommé des deux côtés. Le nom ne sert qu'au **premier**
+appariement — c'est lui qui fait *adopter* un point déjà saisi à la main, au lieu
+d'en créer un second à côté. **Cette colonne ne part pas à la DGI** : `FneService`
+n'est pas touché, le périmètre gelé non plus.
+
+**Ce que la reprise ne fait pas** :
+
+| Garde-fou | Raison |
+|---|---|
+| Ni ville, ni commune inventées | le portail n'en publie aucune ; les deux restent vides, à compléter — comme à l'import CSV |
+| Le nom d'un point déjà saisi n'est pas récrit | aligner un nom est le geste du rapprochement des rejets, qui sait de quelle pièce il parle |
+| Le quota d'abonnement borne la reprise | un relevé du portail n'ouvre pas l'abonnement |
+| Rien pour une autre entreprise | le relevé est retenu par `entreprise_id`, celui que l'import a résolu depuis le NCC |
+
+**Une duplication supprimée au passage.** L'ouverture des fiches de stock d'un
+site neuf vivait dans `PointDeVenteControleur::creer()`. Un second endroit crée
+désormais des points de vente ; la règle est passée sur le modèle
+(`PointDeVente::initialiserLesFichesDeStock()`), et les deux chemins l'appellent.
+Le journal garde le précédent de la liste des modules socle qui vivait en double
+et avait perdu `points_de_vente` des deux côtés.
+
+`PointsDeVenteDuPortailTest` — 8 épreuves : création, adoption sans doublon,
+second passage après renommage, absence de relevé, cloisonnement entre
+entreprises, quota, fiches de stock, et l'écran. Suite entière : **1 152
+épreuves, 1 152 passantes, 4 611 vérifications.**
+
+**Sur les données réelles**, l'écran dit aujourd'hui : relevé du 21/08,
+`FACTURATION SIEGE` **dans Selflow** (#12), rien à créer — et, en dessous,
+`hgf` (#18) **inconnu du portail**, avec la phrase qui explique qu'une facture
+émise depuis ce point sera refusée tant qu'il n'aura pas été déclaré sur
+l'espace FNE.
+
+#### Ce que le premier vrai point de facturation créé a trouvé — **un relevé qui se disait « inchangé »**
+
+Le propriétaire du projet a créé un point au portail dans la foulée, à 12 h 27,
+et le relevé l'a bien rapporté : le tableur déposé porte deux lignes,
+`FACTURATION TEST 2` et `FACTURATION SIEGE`. **L'import a pourtant répondu
+« identique au relevé du 21/08/2026 »**, et le point n'est jamais entré en base.
+
+La cause tient en une clé. `ImportPortailFneService::pointsCanoniques()` — et,
+sous la même convention, `PortailFnePointFacturation::changementsDepuisLePrecedent()`
+— indexaient les points sur `etablissement_id`. Or **le portail donne le même
+identifiant d'établissement à tous les points d'un même établissement** : les
+deux lignes portent `42200613-f402-40a8-bd4d-a778bb5b96f0`. Elles s'écrasaient
+donc l'une l'autre, le relevé se réduisait à la dernière lue, l'empreinte de
+contenu ne bougeait pas, et le portail pouvait déclarer un point de plus sans
+que Selflow s'en aperçoive. Aucune épreuve ne le voyait : toutes donnaient un
+identifiant **par point** — une forme inventée, qui cachait le défaut au lieu
+de le montrer.
+
+**Ce qui identifie un point de facturation est la paire établissement + date de
+création.** La date de création est propre à chaque point et ne bouge pas quand
+l'intitulé change : l'intention d'origine — « un point renommé reste le même
+point » — est conservée. La règle vit désormais en un seul endroit,
+`PortailFnePointFacturation::identite()`, que l'import et la détection de
+changements appellent tous les deux.
+
+Côté points de vente, l'appariement suit la même paire : migration
+`2026_08_31_000002`, colonne `points_de_vente.point_fne_cree_a`. La migration du
+matin n'a pas été retouchée — elle est appliquée, et une migration appliquée ne
+se rejoue pas ; son en-tête porte la correction, la colonne manquante est posée
+par une migration nouvelle.
+
+Deux épreuves de plus dans `ImportPortailFneTest`, bâties sur le relevé réel :
+deux points d'un même établissement ne s'écrasent pas, et un point créé au
+portail ne passe pas pour un relevé inchangé. Elles tombent l'une et l'autre si
+l'on remet la clé d'avant. Suite entière : **1 154 épreuves, 1 154 passantes,
+4 617 vérifications.**
+
+**Après correction, sur les données réelles** : relevé du 31/08,
+`FACTURATION SIEGE` dans Selflow (#12), **`FACTURATION TEST 2` à créer**, et
+`hgf` toujours inconnu du portail.
+
+### Lot 24 — Une session ouverte, un relevé complet — **TERMINÉ le 31/08/2026**
+
+Demandé par le propriétaire du projet le 31/08/2026, après avoir constaté qu'un
+point de facturation déclaré au portail à 12 h 27 n'était pas visible de
+Selflow : *« ce que le scraper doit faire : à chaque fois que la plateforme
+s'ouvre, il fait un relevé »*. Retenu : **A + B, avec le bouton**.
+
+#### A — tant qu'on est dedans, on relève tout
+
+Ce qui coûte n'est pas le relevé, c'est **la connexion** : une session sur le
+portail de la DGI se paie d'une authentification avec le mot de passe du client,
+et y retourner souvent est le meilleur moyen de faire bloquer un compte. Le
+relevé des factures reçues rouvrait pourtant une seconde session pour la même
+entreprise, quelques heures après celle de `fne.js`.
+
+`achats.js` expose désormais `releverDansLaSession()` — le corps de son relevé,
+sans la connexion — et `fne.js` l'appelle **dans la session qu'il vient
+d'ouvrir**, juste après les points de facturation. Un passage rapporte donc la
+fiche, les points **et** les factures reçues. L'échec des factures reçues ne
+perd rien : la fiche et les points sont déjà déposés, et c'est eux que la
+certification attend ; le passage le dit et rend la main.
+
+Le rendez-vous de 04:15 **disparaît, absorbé** — il avait vécu une matinée. Ses
+deux réglages partent avec lui. `achats.js` reste lançable seul, pour un relevé
+ciblé ou une reconnaissance. Le jeton `/ws/` continue de se capter au vol, et
+l'écoute est posée sur la page **avant** toute navigation ; il ne vit qu'en
+mémoire.
+
+Vérifié en réel, en un seul passage :
+
+```
+-- 1864699A --
+   Connexion...
+   Parametrage...
+   Fiche : 14/14 champs reconnus -> 1864699A_20260831.json
+   Points de facturation -> 1864699A_20260831.xlsx
+   Factures reçues...
+   0 facture(s) reçue(s) du 2024-01-01 au 2026-08-31 -> 1864699A_20260831.json
+```
+
+`verifier-extraction.js` passe toujours ses 17 contrôles.
+
+#### B — un relevé à l'ouverture de Selflow
+
+Le passage horaire de :40 ne va au portail **que si la file des demandes n'est
+pas vide** — c'est-à-dire que si une pièce a été refusée. Le journal le disait à
+chaque heure : *« Rien à relever (la file de Selflow est vide) »*. Le passage
+complet, lui, attend 02:30. Une modification faite au portail dans la journée
+n'était donc visible que le lendemain matin.
+
+`ScraperPortailFneService::relancerSiLeReleveEstVieux()` est appelé à la
+connexion (`ConnexionControleur`), et lance le relevé en arrière-plan si le
+portail n'a pas été lu depuis plus de `PORTAIL_FNE_FRAICHEUR_HEURES` (12 par
+défaut). Trois garde-fous, dans cet ordre :
+
+| Garde-fou | Raison |
+|---|---|
+| `PORTAIL_FNE_RELEVE_A_LA_CONNEXION` | l'interrupteur, qui éteint tout — et n'écrit pas le verrou, sans quoi rallumer ne servirait à rien pendant douze heures |
+| Un verrou de cache posé **avant** d'aller voir | dix employés qui se connectent à huit heures ne lancent qu'un seul navigateur ; un relevé qui échoue ne se rejoue pas en boucle. `Cache::add()`, pas `put` : c'est l'écriture atomique qui décide |
+| La fraîcheur | lu il y a moins de douze heures, on n'y retourne pas |
+
+Le lancement est détaché : l'ouverture de session n'attend pas le navigateur, et
+le service ne lève jamais.
+
+#### Le bouton
+
+**« Relever le portail maintenant »**, sur l'écran des points de vente, à côté
+de « Reprendre les points manquants ». C'est le seul moyen d'avoir le portail
+sous les yeux à la seconde où l'on vient d'y déclarer quelque chose. Éteint, le
+scraper le dit plutôt que de laisser croire qu'un relevé part.
+
+Et « Reprendre » **range d'abord** (`portail-fne:importer`) : un relevé lancé
+trente secondes plus tôt ne doit pas attendre l'heure ronde. Même geste que le
+« corriger maintenant » des rejets.
+
+#### Une épreuve qui lisait les vrais relevés du poste
+
+Ajouter ce rangement a fait tomber six épreuves : `portail-fne:importer` lisait
+le dossier de dépôt **réel**, et rangeait dans la base de test le relevé du
+portail — un point de facturation apparaissait que personne n'avait écrit.
+`phpunit.xml` épingle désormais `PORTAIL_FNE_DOSSIER_IMPORT` sur un dossier de
+test, comme il épingle déjà l'interrupteur du scraper et la correction
+automatique. L'épreuve concernée se donne en plus son propre dossier.
+
+Quatre épreuves de plus dans `PointsDeVenteDuPortailTest` — **douze en tout** :
+le bouton quand le scraper est éteint, un relevé frais qui ne renvoie personne
+au portail, le verrou, et l'interrupteur. Suite entière : **1 158 épreuves,
+1 158 passantes, 4 623 vérifications.**
+
+#### L'écran s'enfermait — trois défauts pris au vol
+
+Le propriétaire du projet crée un troisième point au portail, « teste », à
+13 h 00, clique, et rien n'entre. Trois causes, dans l'ordre où elles se sont
+montrées :
+
+1. **Le rangement était accroché au mauvais bouton.** « Reprendre les points
+   manquants » rangeait le dépôt — mais il **n'apparaît que s'il y a un point à
+   créer**, et il n'y en avait aucun *parce que* le dépôt n'était pas rangé.
+   Celui qui venait de lancer un relevé n'avait donc aucun bouton pour le faire
+   entrer, jusqu'au ramassage de l'heure ronde. `portail-fne:importer` est
+   remonté dans `index()` : l'écran range avant de comparer, et le passage reste
+   sans effet quand rien n'a changé — un fichier déjà lu est reconnu à son
+   empreinte, sans être ouvert.
+
+2. **Deux relevés du même jour s'empilaient.** Le passage nocturne, puis un clic
+   sur « Relever maintenant » : deux jeux, une seule date. Retenus par leur
+   date, ils se cumulaient et l'écran montrait chaque point **deux fois**. Le
+   jeu est identifié par son **import**, désormais —
+   `PortailFnePointFacturation::dernierJeu()` —, et les trois lecteurs le
+   suivent : l'écran des points de vente, le rapprochement des rejets
+   (`DiagnosticFneService`, qui citait deux fois le même nom au responsable venu
+   comprendre un refus) et `changementsDepuisLePrecedent()`, qui comparait des
+   points n'ayant jamais coexisté.
+
+3. **Un dossier d'import absent faisait tomber la commande.** La ligne d'erreur
+   « Le dossier d'import n'existe pas » était bâtie à la main, sans `lignes` ni
+   `import_id` : la commande qui met le rapport en tableau rendait *Undefined
+   array key « lignes »*. Sans conséquence tant que le dossier existait ; une
+   erreur 500 sur l'écran des points de vente dès que l'écran s'est mis à
+   ranger. Elle passe par `resultat()`, comme toutes les autres.
+
+Deux épreuves de plus — deux relevés du même jour ne montrent pas les points en
+double, et l'écran range le dépôt avant de comparer. **Quatorze en tout** dans
+`PointsDeVenteDuPortailTest`. Suite entière : **1 160 épreuves, 1 160 passantes,
+4 628 vérifications.**
+
+**Sur les données réelles** : relevé du 31/08, `FACTURATION SIEGE` (#12) et
+`FACTURATION TEST 2` (#19) dans Selflow, **`teste` à créer**, `hgf` toujours
+inconnu du portail.
+
+#### « Rechargez dans une minute » — ce qu'il ne fallait pas dire
+
+Le propriétaire du projet, devant le message du bouton : *« normalement cela
+doit se faire rapidement, pas de temps d'attente, voilà ce que je veux
+éviter »*. Il a raison : demander à quelqu'un de guetter puis de recharger, ce
+n'est pas une fonctionnalité, c'est une corvée déguisée.
+
+Le relevé ne peut pas être plus rapide — il ouvre un vrai navigateur sur le
+portail de la DGI, et cela dure des dizaines de secondes. Ce qui peut
+disparaître, c'est **l'attente à tenir**. Le bouton lance désormais le relevé en
+arrière-plan puis **surveille** : toutes les trois secondes, l'écran redemande
+`admin.pdv.etat_du_portail`, qui range le dépôt et rend une **empreinte** — la
+date du relevé, et pour chaque point déclaré son nom et le point de vente qui
+lui correspond. Dès qu'elle change, la page se recharge d'elle-même, et les
+points manquants apparaissent avec leur bouton.
+
+| Détail | Raison |
+|---|---|
+| Une empreinte, et non un simple compteur | un relevé qui rapporte un point de plus, comme une reprise qui vient d'en créer un, changent l'écran ; un relevé identique ne le fait pas clignoter pour rien |
+| Trois secondes, quarante essais | deux minutes au plus : un relevé qui n'arrive pas rend la main plutôt que d'interroger le serveur sans fin |
+| Le lancement répond en JSON | le bouton attend une réponse qu'il peut lire, pas une page entière. Éteint, le scraper le dit en 409 |
+| Le formulaire reste un vrai formulaire | sans JavaScript, il part normalement, le relevé tourne quand même, et le prochain affichage le rangera |
+
+Deux épreuves de plus — l'empreinte change quand le dépôt apporte un point, et
+le lancement répond au bouton sans page à recharger. **Seize en tout.** Suite
+entière : **1 162 épreuves, 1 162 passantes, 4 636 vérifications.**
+
+**Et le sablier ne s'affichait pas.** Une apostrophe : `'… mise à jour de
+l'écran…'`, en guillemets simples, fermait la chaîne au milieu du mot. Le
+navigateur rejetait **tout le pilote** sur une erreur de syntaxe, le clic
+repartait donc en formulaire classique — et rendait le message d'attente qu'on
+venait justement de retirer. Rien ne le signalait : une épreuve qui vérifie que
+le script est *dans la page* ne dit pas qu'il *s'exécute*.
+
+Le script est désormais relu mécaniquement : on l'extrait de la vue, on
+remplace les expressions Blade par des valeurs plausibles, et `node --check` le
+lit. C'est la seule façon de tenir un script inline sans navigateur sous la
+main, et cela prend dix secondes.
+
 ## 5 bis. La numérotation des comptes — tranché
 
 Le classeur subdivisait certaines racines sur des positions que l'acte uniforme

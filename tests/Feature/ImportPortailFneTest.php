@@ -389,6 +389,61 @@ class ImportPortailFneTest extends TestCase
         );
     }
 
+    public function test_deux_points_du_meme_etablissement_ne_s_ecrasent_pas(): void
+    {
+        // La forme **réelle** du portail, relevée le 31/08/2026 : deux points
+        // de facturation, un seul identifiant d'établissement pour les deux.
+        // Les épreuves d'au-dessus donnaient un identifiant par point — une
+        // forme inventée. Indexés sur l'établissement seul, les deux points
+        // s'écrasaient : le relevé se réduisait au dernier lu.
+        $this->uneEntreprise(['ncc' => '1864699A']);
+
+        $this->poserTableur('1864699A_20260831.xlsx', [
+            ['Nom', 'Outil', 'Statut', "ID de l'établissement", 'Créé à', 'Mise à jour à'],
+            ['FACTURATION TEST 2', 'Application FNE', '1', '42200613-f402-40a8-bd4d-a778bb5b96f0', '2026-08-31T12:27:44.987Z', '2026-08-31T12:27:44.987Z'],
+            ['FACTURATION SIEGE',  'Application FNE', '1', '42200613-f402-40a8-bd4d-a778bb5b96f0', '2026-07-30T10:38:40.726Z', '2026-07-30T10:38:40.726Z'],
+        ]);
+
+        $rapport = app(ImportPortailFneService::class)->importerDossier($this->dossier);
+
+        $this->assertSame(1, $rapport['importes']);
+        $this->assertSame(
+            ['FACTURATION SIEGE', 'FACTURATION TEST 2'],
+            PortailFnePointFacturation::orderBy('nom')->pluck('nom')->all()
+        );
+    }
+
+    public function test_un_point_cree_au_portail_ne_passe_pas_pour_un_releve_inchange(): void
+    {
+        // Le défaut tel que le propriétaire du projet l'a rencontré : il crée un
+        // point de facturation au portail, le scraper le relève, et l'import
+        // répond « identique au relevé du 21/08 ». Le point n'entrait jamais.
+        $this->uneEntreprise(['ncc' => '1864699A']);
+
+        $service = app(ImportPortailFneService::class);
+
+        $this->poserTableur('1864699A_20260830.xlsx', [
+            ['Nom', 'Outil', 'Statut', "ID de l'établissement", 'Créé à', 'Mise à jour à'],
+            ['FACTURATION SIEGE', 'Application FNE', '1', '42200613-f402-40a8-bd4d-a778bb5b96f0', '2026-07-30T10:38:40.726Z', '2026-07-30T10:38:40.726Z'],
+        ]);
+        $service->importerDossier($this->dossier);
+
+        $this->poserTableur('1864699A_20260831.xlsx', [
+            ['Nom', 'Outil', 'Statut', "ID de l'établissement", 'Créé à', 'Mise à jour à'],
+            ['FACTURATION TEST 2', 'Application FNE', '1', '42200613-f402-40a8-bd4d-a778bb5b96f0', '2026-08-31T12:27:44.987Z', '2026-08-31T12:27:44.987Z'],
+            ['FACTURATION SIEGE',  'Application FNE', '1', '42200613-f402-40a8-bd4d-a778bb5b96f0', '2026-07-30T10:38:40.726Z', '2026-07-30T10:38:40.726Z'],
+        ]);
+        $rapport = $service->importerDossier($this->dossier);
+
+        $this->assertSame(1, $rapport['importes']);
+        $this->assertSame(0, $rapport['inchanges']);
+
+        $dernier = PortailFnePointFacturation::whereDate('date_scraping', '2026-08-31')->get();
+
+        $this->assertCount(2, $dernier);
+        $this->assertTrue($dernier->contains('nom', 'FACTURATION TEST 2'));
+    }
+
     public function test_une_fiche_orpheline_se_rattache_quand_l_entreprise_arrive(): void
     {
         $service = app(ImportPortailFneService::class);

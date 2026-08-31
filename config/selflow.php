@@ -223,6 +223,28 @@ return [
             // attendre qu'une pièce soit refusée. La file dit ce qui est
             // urgent, pas ce qui est permis.
             'heure_nocturne' => env('PORTAIL_FNE_SCRAPER_HEURE_NUIT', '02:30'),
+
+            /*
+            | Le relevé des factures reçues n'a pas de réglage à lui : `fne.js`
+            | le fait dans la session qu'il vient d'ouvrir, à chaque passage.
+            | Une connexion au portail de la DGI est ce qui coûte, et il n'y a
+            | aucune raison d'en payer deux. `achats.js` reste lançable seul.
+            */
+
+            /*
+            | Le relevé à l'ouverture de Selflow.
+            |
+            | Le passage horaire ne va au portail que si une pièce a été
+            | refusée, et le passage complet n'a lieu qu'à 02:30 : une
+            | modification faite au portail dans la journée n'était visible que
+            | le lendemain. Quand quelqu'un ouvre Selflow et que le dernier
+            | relevé date de plus de `fraicheur_heures`, le scraper part en
+            | arrière-plan — une fois, verrou de cache à l'appui, quel que soit
+            | le nombre d'employés qui se connectent.
+            */
+            'releve_a_la_connexion' => filter_var(env('PORTAIL_FNE_RELEVE_A_LA_CONNEXION', true), FILTER_VALIDATE_BOOL),
+
+            'fraicheur_heures' => (int) env('PORTAIL_FNE_FRAICHEUR_HEURES', 12),
         ],
     ],
 

@@ -200,18 +200,10 @@ class DiagnosticFneService
      */
     private function pointsDuReleve(PortailFneFiche $fiche): array
     {
-        $derniereDate = PortailFnePointFacturation::where('login', $fiche->login)
-            ->max('date_scraping');
-
-        if ($derniereDate === null) {
-            return [];
-        }
-
-        return PortailFnePointFacturation::where('login', $fiche->login)
-            ->where('date_scraping', $derniereDate)
-            ->orderBy('nom')
-            ->get()
-            ->all();
+        // Le dernier jeu, et non ceux du dernier jour : deux relevés du même
+        // jour empilaient leurs points, et le rapprochement citait deux fois
+        // le même nom au responsable venu comprendre un refus.
+        return PortailFnePointFacturation::dernierJeu('login', $fiche->login);
     }
 
     /**

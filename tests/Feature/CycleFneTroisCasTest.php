@@ -3,7 +3,10 @@
 namespace Tests\Feature;
 
 use App\Jobs\NormaliserFactureFne;
+use App\Modules\Admin\Modeles\Achat;
+use App\Modules\Admin\Modeles\AchatDetail;
 use App\Modules\Admin\Modeles\Client;
+use App\Modules\Admin\Modeles\Fournisseur;
 use App\Modules\Admin\Modeles\Entreprise;
 use App\Modules\Admin\Modeles\FneCredential;
 use App\Modules\Admin\Modeles\FneRejet;
@@ -14,6 +17,7 @@ use App\Modules\Admin\Modeles\PortailFnePointFacturation;
 use App\Modules\Admin\Modeles\Produit;
 use App\Modules\Admin\Modeles\Vente;
 use App\Modules\Admin\Modeles\VenteDetail;
+use App\Modules\Authentification\Modeles\Utilisateur;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Support\Facades\Http;
@@ -68,7 +72,7 @@ class CycleFneTroisCasTest extends TestCase
             'rccm'              => 'CI-ABJ-2026-B-12345',
             'gerant_fonction'   => 'Gérant',
             'secteur_activite'  => ['Commerce'],
-            'modules_actifs'    => ['principal', 'ventes'],
+            'modules_actifs'    => ['principal', 'ventes', 'achats'],
         ]);
 
         // Sans clé, `FneService` refuse avant tout appel : ce serait un
@@ -564,6 +568,66 @@ class CycleFneTroisCasTest extends TestCase
         $this->assertSame(0, PortailFneDemande::count());
     }
 
+    /**
+     * Le cas 3 tel que l'utilisateur le rencontre : par le bouton.
+     *
+     * Le bouton « Normaliser » travaille en synchrone, et `SyncJob::attempts()`
+     * rend toujours 1 : la condition « il me reste des tentatives » du job etait
+     * donc vraie pour toujours, l'exception remontait jusqu'a `SyncQueue` qui la
+     * relançait, et l'ecran rendait une **erreur 500** — sans consigner le
+     * moindre rejet. Les epreuves d'au-dessus ne le voyaient pas : elles jouent
+     * le job a la main, jamais le chemin du bouton.
+     */
+    public function test_cas_3_le_bouton_dit_l_injoignable_au_lieu_de_rendre_une_erreur_500(): void
+    {
+        $this->laDgiNeRepondPas('cURL error 28: Operation timed out after 10001 milliseconds');
+
+        $vente = $this->uneFacture('FA-0049');
+
+        $this->actingAs($this->unAdmin())
+            ->post(route('admin.ventes.normaliser', $vente))
+            ->assertRedirect();
+
+        $this->assertStringContainsString('injoignable', session('erreur'));
+
+        // Et le bouton de reprise est la : rien ne rejoue un rejet « reseau »
+        // a notre place, ni file derriere le bouton, ni tache planifiee.
+        $this->assertSame(
+            route('admin.ventes.normaliser', $vente),
+            session('erreur_action')[0]['url']
+        );
+
+        // Ce que le 500 empechait : le rejet est consigne, et il l'est comme un
+        // incident de transport — la file du scraper reste vide.
+        $rejet = FneRejet::sole();
+        $this->assertSame(FneRejet::CAUSE_RESEAU, $rejet->cause);
+        $this->assertSame(FneRejet::STATUT_OUVERT, $rejet->statut);
+        $this->assertSame(0, PortailFneDemande::count());
+        $this->assertFalse((bool) $vente->refresh()->normalise);
+    }
+
+    /**
+     * Le meme bouton, cote achats — ou le message partait en vert quoi qu'il
+     * arrive, y compris sur une piece restee non normalisee.
+     */
+    public function test_cas_3_le_bouton_des_achats_ne_dit_plus_succes_quand_la_plateforme_ne_repond_pas(): void
+    {
+        $this->laDgiNeRepondPas('cURL error 28: Operation timed out after 10001 milliseconds');
+
+        $achat = $this->unBordereau('BA-0001');
+
+        $this->actingAs($this->unAdmin())
+            ->post(route('admin.achats.normaliser', $achat))
+            ->assertRedirect();
+
+        $this->assertNull(session('succes'));
+        $this->assertStringContainsString('injoignable', session('erreur'));
+
+        $this->assertSame(FneRejet::CAUSE_RESEAU, FneRejet::sole()->cause);
+        $this->assertSame(0, PortailFneDemande::count());
+        $this->assertFalse((bool) $achat->refresh()->normalise);
+    }
+
     /* ═══════════════ Les rouages de la simulation ═══════════════ */
 
     /**
@@ -582,6 +646,51 @@ class CycleFneTroisCasTest extends TestCase
 
         $job->setJob($messageDeFile);
         $job->handle();
+    }
+
+    private function unAdmin(): Utilisateur
+    {
+        return Utilisateur::create([
+            'nom'               => 'Yao',
+            'prenom'            => 'Adjoua',
+            'email'             => 'adjoua@dcknowing.ci',
+            'password'          => bcrypt('secret-de-test'),
+            'role'              => 'admin',
+            'entreprise_id'     => $this->entreprise->id,
+            'point_de_vente_id' => $this->pointDeVente->id,
+        ]);
+    }
+
+    private function unBordereau(string $numero): Achat
+    {
+        $fournisseur = Fournisseur::create([
+            'entreprise_id' => $this->entreprise->id,
+            'nom'           => 'Carriere du Banco',
+        ]);
+
+        $achat = Achat::create([
+            'point_de_vente_id' => $this->pointDeVente->id,
+            'fournisseur_id'    => $fournisseur->id,
+            'numero_facture'    => $numero,
+            'date_achat'        => now(),
+            'mode_paiement'     => 'Espèces',
+            'type_facture'      => 'bapa',
+            'etape'             => 'Facture',
+            'montant_ht'        => 40000,
+            'montant_tva'       => 0,
+            'montant_ttc'       => 40000,
+        ]);
+
+        AchatDetail::create([
+            'achat_id'      => $achat->id,
+            'produit_id'    => $this->article->id,
+            'quantite'      => 8,
+            'prix_unitaire' => 5000,
+            'montant_tva'   => 0,
+            'montant_ttc'   => 40000,
+        ]);
+
+        return $achat->fresh();
     }
 
     private function uneFacture(string $numero): Vente

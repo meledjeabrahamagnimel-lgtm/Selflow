@@ -61,6 +61,69 @@ class PortailFnePointFacturation extends Model
     }
 
     /**
+     * Le dernier jeu de points relevé, pour un login ou une entreprise.
+     *
+     * **Le dernier jeu, et non ceux du dernier jour.** Un jeu est complet à son
+     * import — `rangerPoints()` les écrit tous ou aucun —, et deux relevés
+     * peuvent tomber le même jour : le passage nocturne, puis un clic sur
+     * « Relever le portail maintenant ». Retenus par leur date, les deux jeux
+     * s'empilaient, et l'écran montrait chaque point deux fois — constaté le
+     * 31/08/2026, après deux relevés à une heure d'intervalle.
+     *
+     * L'import identifie le dépôt : c'est lui qui dit ce que le portail
+     * déclarait la dernière fois qu'on l'a lu.
+     *
+     * @return array<int, self>
+     */
+    public static function dernierJeu(string $colonne, mixed $valeur): array
+    {
+        $dernier = self::where($colonne, $valeur)
+            ->orderByDesc('date_scraping')
+            ->orderByDesc('import_id')
+            ->first();
+
+        if ($dernier === null) {
+            return [];
+        }
+
+        return self::where($colonne, $valeur)
+            ->where('import_id', $dernier->import_id)
+            ->orderBy('nom')
+            ->get()
+            ->all();
+    }
+
+    /**
+     * L'identité d'un point de facturation, d'un relevé au suivant.
+     *
+     * **Ce n'est pas `etablissement_id` seul**, contrairement à ce qui était
+     * écrit ici jusqu'au 31/08/2026 : le portail donne le même identifiant
+     * d'établissement à **tous** les points d'un même établissement. Le relevé
+     * réel de ce jour-là le montre — « FACTURATION TEST 2 » et
+     * « FACTURATION SIEGE » portent tous deux `42200613-f402-40a8-bd4d-…`.
+     * Les indexer là-dessus les faisait s'écraser l'un l'autre : un point
+     * créé au portail n'entrait jamais en base, et le relevé qui l'apportait
+     * se déclarait « inchangé ». C'est ainsi qu'un point de facturation créé
+     * à 12 h 27 est resté invisible de Selflow.
+     *
+     * Ce qui distingue deux points d'un même établissement est leur **date de
+     * création**, propre à chacun et stable quand l'intitulé change — un point
+     * renommé reste donc le même point, ce qui était et reste l'intention. Le
+     * nom ne sert qu'à défaut, quand le portail ne donne ni l'un ni l'autre.
+     */
+    public static function identite(?string $etablissement, ?string $creeA, ?string $nom): string
+    {
+        $etablissement = trim((string) $etablissement);
+        $creeA         = trim((string) $creeA);
+
+        if ($etablissement !== '' || $creeA !== '') {
+            return $etablissement . '|' . $creeA;
+        }
+
+        return 'nom:' . trim((string) $nom);
+    }
+
+    /**
      * Ce que le portail a changé dans les points de facturation d'un login,
      * entre son dernier relevé et le précédent.
      *
@@ -70,9 +133,9 @@ class PortailFnePointFacturation extends Model
      * octet pour octet. Se fier aux octets annoncerait un changement chaque
      * nuit ; se fier au contenu ne dit quelque chose que quand il y en a un.
      *
-     * L'identité d'un point est son `etablissement_id` quand il en porte un —
-     * un point renommé reste le même point, et c'est justement le renommage
-     * qu'on veut voir. À défaut, son nom.
+     * L'identité d'un point est donnée par `identite()` — la paire
+     * établissement et date de création, et non l'établissement seul, qui est
+     * commun à tous les points d'un même établissement.
      *
      * @return array{
      *     apparus: array<int, self>,
@@ -84,24 +147,33 @@ class PortailFnePointFacturation extends Model
     {
         $vide = ['apparus' => [], 'disparus' => [], 'modifies' => []];
 
-        $dates = self::where('login', $login)
+        // Les deux derniers **jeux**, et non les deux derniers jours : deux
+        // relevés du même jour — le passage nocturne, puis un clic sur
+        // « Relever maintenant » — se mélangeaient en un seul jeu, et la
+        // comparaison portait alors sur des points qui n'ont jamais coexisté.
+        $jeux = self::where('login', $login)
+            ->select('import_id')
             ->distinct()
-            ->orderByDesc('date_scraping')
+            ->orderByDesc('import_id')
             ->limit(2)
-            ->pluck('date_scraping');
+            ->pluck('import_id');
 
         // Un seul relevé : rien à comparer, et surtout pas de quoi annoncer
         // que tous les points viennent d'apparaître.
-        if ($dates->count() < 2) {
+        if ($jeux->count() < 2) {
             return $vide;
         }
 
         $indexer = fn ($points) => $points->keyBy(
-            fn (self $p) => $p->etablissement_id ?: 'nom:' . $p->nom
+            fn (self $p) => self::identite(
+                $p->etablissement_id,
+                $p->cree_a?->format('Y-m-d H:i:s'),
+                $p->nom
+            )
         );
 
-        $maintenant = $indexer(self::where('login', $login)->where('date_scraping', $dates[0])->get());
-        $avant      = $indexer(self::where('login', $login)->where('date_scraping', $dates[1])->get());
+        $maintenant = $indexer(self::where('login', $login)->where('import_id', $jeux[0])->get());
+        $avant      = $indexer(self::where('login', $login)->where('import_id', $jeux[1])->get());
 
         $resultat = $vide;
 

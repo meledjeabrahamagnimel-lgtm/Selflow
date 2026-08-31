@@ -7,6 +7,7 @@ use App\Modules\Admin\Services\FneService;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
 use Illuminate\Queue\InteractsWithQueue;
+use Illuminate\Queue\Jobs\SyncJob;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Facades\Log;
 
@@ -78,7 +79,7 @@ class NormaliserAchatBapaJob implements ShouldQueue
                 // sans objet. Voir NormaliserFactureFne, même raisonnement.
                 if (\App\Modules\Admin\Modeles\FneRejet::classer($fneResult)
                         === \App\Modules\Admin\Modeles\FneRejet::CAUSE_RESEAU
-                    && $this->attempts() < $this->tries) {
+                    && $this->uneAutreTentativeViendra()) {
                     throw new \RuntimeException(
                         "Plateforme FNE injoignable pour Achat #{$this->achat->id} : "
                         . ($fneResult['message'] ?? 'sans message')
@@ -93,6 +94,22 @@ class NormaliserAchatBapaJob implements ShouldQueue
             Log::error("NormaliserAchatBapaJob: Exception pour Achat #{$this->achat->id} - " . $e->getMessage());
             throw $e;
         }
+    }
+
+    /**
+     * Une autre tentative viendra-t-elle ? Même raisonnement, et même défaut
+     * corrigé, que dans `NormaliserFactureFne` : en synchrone — le bouton
+     * « Normaliser » de l'écran des achats —, `SyncJob::attempts()` rend
+     * toujours 1, le job relançait donc pour toujours, et une plateforme
+     * injoignable rendait une erreur 500 sans consigner le moindre rejet.
+     */
+    private function uneAutreTentativeViendra(): bool
+    {
+        if ($this->job instanceof SyncJob) {
+            return false;
+        }
+
+        return $this->attempts() < $this->tries;
     }
 
     /**

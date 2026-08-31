@@ -162,11 +162,15 @@ class ImportPortailFneService
 
         if (!is_dir($dossier)) {
             $rapport['erreurs']++;
-            $rapport['details'][] = [
-                'fichier' => $dossier,
-                'statut'  => 'erreur',
-                'message' => "Le dossier d'import n'existe pas.",
-            ];
+            // Par `resultat()`, et non à la main : la ligne bâtie ici n'avait
+            // ni `import_id` ni `lignes`, et la commande qui met le rapport en
+            // tableau tombait sur « Undefined array key "lignes" ». Personne ne
+            // l'avait vu tant que le dossier existait toujours.
+            $rapport['details'][] = $this->resultat(
+                $dossier,
+                'erreur',
+                "Le dossier d'import n'existe pas."
+            );
 
             return $rapport;
         }
@@ -618,7 +622,18 @@ class ImportPortailFneService
             // Même identité que `changementsDepuisLePrecedent()` : un point
             // renommé reste le même point. Sans cette clé commune, « inchangé »
             // ici et « aucun changement » là-bas pourraient se contredire.
-            $points[$point['etablissement_id'] ?: 'nom:' . $point['nom']] = $point;
+            //
+            // La clé était `etablissement_id` seul. Le portail le donne
+            // identique à tous les points d'un même établissement : deux points
+            // s'écrasaient donc l'un l'autre, le relevé se réduisait au dernier
+            // lu, et un point créé au portail n'entrait jamais — le relevé se
+            // déclarait « inchangé ». Constaté sur le relevé réel du
+            // 31/08/2026. Voir `PortailFnePointFacturation::identite()`.
+            $points[PortailFnePointFacturation::identite(
+                $point['etablissement_id'],
+                $point['cree_a'],
+                $point['nom']
+            )] = $point;
         }
 
         ksort($points);

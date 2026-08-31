@@ -65,16 +65,16 @@ class RejetFneControleur
             ? request('cause')
             : null;
 
-        $pourEntreprise = fn () => FneRejet::where('entreprise_id', $entreprise->id);
+        $pourEntreprise = fn() => FneRejet::where('entreprise_id', $entreprise->id);
 
         // Les rejets ouverts d'abord, les classés en dernier. Un `CASE` et non
         // `FIELD()`, qui n'existe que chez MySQL : les épreuves tournent sur
         // SQLite, et une requête qui n'y passe pas n'est jamais éprouvée.
         $rejets = $pourEntreprise()
-            ->when($causeActive === self::CAUSE_NON_CLASSES, fn ($q) => $q->whereNull('cause'))
+            ->when($causeActive === self::CAUSE_NON_CLASSES, fn($q) => $q->whereNull('cause'))
             ->when(
                 $causeActive !== null && $causeActive !== self::CAUSE_NON_CLASSES,
-                fn ($q) => $q->where('cause', $causeActive)
+                fn($q) => $q->where('cause', $causeActive)
             )
             ->orderByRaw("CASE statut WHEN 'ouvert' THEN 0 WHEN 'diagnostique' THEN 1 ELSE 2 END")
             ->orderByDesc('created_at')
@@ -91,7 +91,7 @@ class RejetFneControleur
             ->groupBy('cause')
             ->pluck('total', 'cause');
 
-        $compte = fn (string $statut) => FneRejet::where('entreprise_id', $entreprise->id)
+        $compte = fn(string $statut) => FneRejet::where('entreprise_id', $entreprise->id)
             ->where('statut', $statut)
             ->count();
 
@@ -113,30 +113,30 @@ class RejetFneControleur
             ->max('dernier_releve_le');
 
         return view('admin::fne.rejets', [
-            'entreprise'  => $entreprise,
-            'rejets'      => $rejets,
+            'entreprise' => $entreprise,
+            'rejets' => $rejets,
             'causeActive' => $causeActive,
             // L'ordre des onglets est celui de l'urgence : ce que la DGI a
             // refusé d'abord, ce qui n'est jamais parti ensuite, ce qui n'a
             // même pas quitté Selflow en dernier.
             'filtresCause' => [
-                FneRejet::CAUSE_DGI      => ['libelle' => 'Refus DGI',        'total' => $parCause[FneRejet::CAUSE_DGI] ?? 0],
-                FneRejet::CAUSE_RESEAU   => ['libelle' => 'Réseau',           'total' => $parCause[FneRejet::CAUSE_RESEAU] ?? 0],
-                FneRejet::CAUSE_LOCALE   => ['libelle' => 'Bloqué ici',       'total' => $parCause[FneRejet::CAUSE_LOCALE] ?? 0],
-                self::CAUSE_NON_CLASSES  => ['libelle' => 'Cause inconnue',   'total' => $parCause[self::CAUSE_NON_CLASSES] ?? 0],
+                FneRejet::CAUSE_DGI => ['libelle' => 'Refus DGI', 'total' => $parCause[FneRejet::CAUSE_DGI] ?? 0],
+                FneRejet::CAUSE_RESEAU => ['libelle' => 'Réseau', 'total' => $parCause[FneRejet::CAUSE_RESEAU] ?? 0],
+                FneRejet::CAUSE_LOCALE => ['libelle' => 'Bloqué ici', 'total' => $parCause[FneRejet::CAUSE_LOCALE] ?? 0],
+                self::CAUSE_NON_CLASSES => ['libelle' => 'Cause inconnue', 'total' => $parCause[self::CAUSE_NON_CLASSES] ?? 0],
             ],
             'totalRejets' => $parCause->sum(),
-            'fiche'          => $fiche,
+            'fiche' => $fiche,
             'dernierPassage' => $dernierPassage ? CarbonImmutable::parse($dernierPassage) : null,
-            'ecartsFiche'    => $fiche?->ecartsAvecEntreprise() ?? [],
-            'demandes'    => PortailFneDemande::where('entreprise_id', $entreprise->id)
+            'ecartsFiche' => $fiche?->ecartsAvecEntreprise() ?? [],
+            'demandes' => PortailFneDemande::where('entreprise_id', $entreprise->id)
                 ->where('statut', PortailFneDemande::STATUT_EN_ATTENTE)
                 ->orderBy('created_at')
                 ->get(),
             'kpis' => [
-                'ouverts'      => $compte(FneRejet::STATUT_OUVERT),
+                'ouverts' => $compte(FneRejet::STATUT_OUVERT),
                 'diagnostiques' => $compte(FneRejet::STATUT_DIAGNOSTIQUE),
-                'resolus'      => $compte(FneRejet::STATUT_RESOLU),
+                'resolus' => $compte(FneRejet::STATUT_RESOLU),
             ],
         ]);
     }
@@ -170,7 +170,7 @@ class RejetFneControleur
 
         $rejet->update([
             'diagnostic' => $diagnostic,
-            'statut'     => $rejet->statut === FneRejet::STATUT_RESOLU
+            'statut' => $rejet->statut === FneRejet::STATUT_RESOLU
                 ? FneRejet::STATUT_RESOLU
                 : FneRejet::STATUT_DIAGNOSTIQUE,
         ]);
@@ -187,10 +187,11 @@ class RejetFneControleur
      */
     public function appliquer(FneRejet $rejet, CorrectionFneService $correcteur): RedirectResponse
     {
+        // dd('test');
         $this->verifierAppartenance($rejet);
 
         $piece = $rejet->piece();
-        $pdv   = $piece?->pointDeVente;
+        $pdv = $piece?->pointDeVente;
 
         if (!$pdv || $pdv->entreprise_id !== Auth::user()->entreprise->id) {
             return back()->with('erreur', 'Le point de vente de cette pièce est introuvable.');
@@ -268,15 +269,7 @@ class RejetFneControleur
             : implode(' ', $phrases);
     }
 
-    /**
-     * Le bouton « Lancer la correction » du pop-up : tout, en un clic.
-     *
-     * Au moment du refus, le relevé du portail n'est pas encore revenu — le
-     * scraper tourne en arrière-plan. Ce point d'entrée enchaîne donc les trois
-     * gestes que l'utilisateur ferait sinon à la main : ranger ce que le scraper
-     * a déposé, rapprocher le rejet du relevé, puis appliquer la correction. Si
-     * le relevé n'est pas encore là, il le dit et ne fait rien de faux.
-     */
+
     public function corrigerMaintenant(
         FneRejet $rejet,
         DiagnosticFneService $diagnosticService,
@@ -302,7 +295,7 @@ class RejetFneControleur
 
         $rejet->update([
             'diagnostic' => $diagnostic,
-            'statut'     => $rejet->statut === FneRejet::STATUT_RESOLU
+            'statut' => $rejet->statut === FneRejet::STATUT_RESOLU
                 ? FneRejet::STATUT_RESOLU
                 : FneRejet::STATUT_DIAGNOSTIQUE,
         ]);
