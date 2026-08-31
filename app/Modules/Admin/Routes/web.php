@@ -237,6 +237,9 @@ Route::prefix('admin')
             Route::post('/relever-le-portail', [PointDeVenteControleur::class, 'releverLePortail'])->name('relever_le_portail');
             Route::get('/etat-du-portail',      [PointDeVenteControleur::class, 'etatDuPortail'])->name('etat_du_portail');
             Route::post('/importer-du-portail', [PointDeVenteControleur::class, 'importerDuPortail'])->name('importer_du_portail');
+            // Charger un relevé à la main, quand le scraper ne peut pas tourner :
+            // .json (fiche) ou .xlsx / .xls (points de facturation).
+            Route::post('/charger-fichier-fne', [PointDeVenteControleur::class, 'LoadFileFne'])->name('load_file_fne');
         });
 
         // ── Import CSV ──

@@ -214,6 +214,7 @@ class Habilitations
         'admin.pdv.relever_le_portail'  => 'gestion_pdv',
         'admin.pdv.etat_du_portail'     => 'gestion_pdv',
         'admin.pdv.importer_du_portail' => 'gestion_pdv',
+        'admin.pdv.load_file_fne'       => 'gestion_pdv',
 
         // ── Personnel ──
         'admin.personnel.index'     => 'gestion_personnel',

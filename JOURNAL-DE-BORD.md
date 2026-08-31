@@ -4693,6 +4693,78 @@ remplace les expressions Blade par des valeurs plausibles, et `node --check` le
 lit. C'est la seule façon de tenir un script inline sans navigateur sous la
 main, et cela prend dix secondes.
 
+### Lot 25 — Le relevé se charge à la main — **TERMINÉ le 31/08/2026**
+
+#### Ce qui a été cherché d'abord
+
+Le propriétaire du projet a signalé une erreur au bouton *« Lancer la
+correction »*. Recherche faite, **le bouton n'a pas de défaut** : le portail de
+l'entreprise déclare deux points de facturation — `FACTURATION SIEGE` et
+`FACTURATION TEST 2` —, et le garde-fou d'ambiguïté de `CorrectionFneService`
+(`count($declares) === 1`) rend la main sans rien toucher. C'est voulu : la
+machine ne choisit pas le point de vente à la place de qui a établi la pièce.
+
+Ce qui trompe est ailleurs. **Les deux points d'entrée du même bouton ne
+portent pas le même garde-fou** : l'écran des rejets masque le bouton quand le
+portail déclare plusieurs points (`rejets.blade.php`), le pop-up de refus le
+propose toujours (`VenteControleur`). Le pop-up promet donc un geste que le
+service refusera. *Signalé, non corrigé — le choix revient au propriétaire :
+masquer le bouton, ou laisser le rapprochement trancher sur le nom le plus
+proche.* Le diagnostic le calcule déjà (« le plus proche est *FACTURATION
+SIEGE* »).
+
+`corrigerMaintenant` n'était couvert par **aucune épreuve** — seul `appliquer`,
+le geste unitaire de l'écran, l'était. `BoutonCorrigerMaintenantTest` couvre
+désormais ses cinq issues : un seul nom déclaré (renommé, pièce repartie,
+`succes`), deux noms (rien touché, `avertissement`), aucun relevé, rejet
+réseau, rejet d'autrui (404).
+
+#### `LoadFileFne` — charger un relevé sans le scraper
+
+Le scraper dépose ses relevés sur le serveur et le passage horaire les range.
+Là où il ne tourne pas — poste sans Node, second facteur au portail —, **rien
+ne pouvait entrer**, alors que l'entreprise a le fichier sous les yeux, exporté
+depuis son espace FNE. `PointDeVenteControleur::LoadFileFne()` comble ce trou.
+
+Elle **ne fait que cela** : lire le fichier déposé et écrire ses lignes. Aucune
+entreprise n'est résolue, aucun login n'est vérifié, rien n'est comparé au
+paramétrage — le rapprochement et la correction sont ailleurs et le restent.
+Elle n'appelle pas `ImportPortailFneService`, qui garde son propre chemin pour
+le scraper : les deux voies ne se gênent pas.
+
+| Extension | Ce que le portail exporte | Modèle écrit |
+|---|---|---|
+| `.json` | la fiche de l'entreprise | `PortailFneFiche` |
+| `.xlsx`, `.xls` | les points de facturation | `PortailFnePointFacturation` |
+
+| Décision | Raison |
+|---|---|
+| Nomenclature **exigée** : `NCC_AAAAMMJJ.<ext>` | le NCC vient du nom du fichier, et de lui seul ; un nom hors nomenclature est refusé plutôt que deviné |
+| Le NCC est écrit dans chaque ligne, colonne `login` | la migration la décrit déjà comme « le login tel qu'il figure dans le nom du fichier — en pratique le NCC ». Aucune colonne nouvelle : le NCC a déjà la sienne |
+| Mise à jour si la ligne existe, création sinon | demandé par le propriétaire du projet. La fiche n'existe qu'une fois par NCC |
+| Les points se distinguent par **NCC + nom** | le NCC seul ne peut pas être la clé d'un classeur qui déclare plusieurs points : chaque ligne écraserait la précédente, et seul le dernier point du fichier subsisterait. Arbitré par le propriétaire du projet le 31/08/2026 |
+| Le dossier de dépôt porte le **NCC** | les relevés d'une entreprise se retrouvent d'un coup d'œil ; le passage horaire n'y descend pas et ne relit pas ce qui est déjà enregistré |
+| Une ligne `portail_fne_imports` est écrite | la clé étrangère `import_id` des deux tables n'est pas nulle. Retrouvée à l'empreinte du fichier, qui est unique : recharger le même fichier réutilise sa ligne au lieu d'échouer |
+
+**Ce qui n'est pas fait, et qui se verra** : `entreprise_id` reste nul sur les
+lignes chargées à la main — aucun login n'étant vérifié, rien ne rattache le
+relevé à une entreprise. Les écrans qui filtrent par entreprise (points de
+vente, rejets) ne montrent donc pas ces lignes. C'est la fonctionnalité
+demandée, sans un pas de plus ; le rattachement est à demander s'il est voulu.
+
+`LoadFileFneTest` suit le trajet complet — du dépôt par le navigateur à la
+ligne en base — sur l'export réel `FNE.xlsx` versé au dépôt, plus le JSON, le
+`.xls`, la mise à jour sans doublon des deux côtés, deux NCC qui ne se mêlent
+pas, le dossier au nom du NCC, un nom hors nomenclature, une date impossible,
+un PDF et un JSON illisible.
+
+**Une épreuve de garde a mordu** : `HabilitationsTest` exige que toute route des
+espaces admin et caissier soit classée. `admin.pdv.load_file_fne` ne l'était
+pas — rangée sous `gestion_pdv`, comme les trois autres routes du portail.
+
+Seize épreuves de plus (5 + 11). Suite entière : **1 179 épreuves, 1 179
+passantes, 4 715 vérifications.**
+
 ## 5 bis. La numérotation des comptes — tranché
 
 Le classeur subdivisait certaines racines sur des positions que l'acte uniforme

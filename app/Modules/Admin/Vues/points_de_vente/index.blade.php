@@ -75,8 +75,32 @@
                     </button>
                 </form>
                 @endif
+
+                {{-- Charger le relevé à la main. Le scraper ne tourne pas
+                     partout — poste sans Node, second facteur au portail — et
+                     l'entreprise a pourtant le fichier sous les yeux, exporté
+                     depuis son espace FNE. Le champ se déclenche au clic du
+                     bouton : un « parcourir » nu à côté de deux boutons pleins
+                     ne se lit pas comme une action. --}}
+                <form method="POST" action="{{ route('admin.pdv.load_file_fne') }}"
+                      enctype="multipart/form-data" id="formChargerFichierFne">
+                    @csrf
+                    <input type="file" name="fichier_fne" id="fichierFne" accept=".json,.xlsx,.xls"
+                           style="display:none;" onchange="document.getElementById('formChargerFichierFne').submit();">
+                    <button type="button" class="btn btn-outline" style="font-size:13px;"
+                            onclick="document.getElementById('fichierFne').click();"
+                            title="Fiche (.json) ou points de facturation (.xlsx, .xls) exportés du portail FNE. Le fichier doit être nommé NCC_AAAAMMJJ — par exemple 1864699A_20260831.xlsx">
+                        <i class="fas fa-file-arrow-up"></i> Charger un relevé
+                    </button>
+                </form>
             </div>
         </div>
+
+        @error('fichier_fne')
+        <div style="margin-top:10px; font-size:12px; color:var(--danger, #c0392b);">
+            <i class="fas fa-circle-exclamation"></i> {{ $message }}
+        </div>
+        @enderror
 
         @if($portailFne['points'])
         <div style="margin-top:16px; display:flex; flex-direction:column; gap:8px;">

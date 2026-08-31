@@ -123,5 +123,18 @@ Route::prefix('external')->middleware('throttle:externe')->group(function () {
         ->name('api.external.list-companies');
     Route::post('/tier-info', [\App\Modules\Admin\Controleurs\Api\ExternalSyncControleur::class, 'tierInfo'])
         ->name('api.external.tier-info');
+    //api permettens de charger les fichier excel et json
+    Route::post('/fne/load-file', [\App\Modules\Admin\Controleurs\Api\ExternalSyncControleur::class, 'LoadFileFne']);
+
+
+
+
 });
+
+
+
+Route::post('/charger-fichier-fne', [PointDeVenteApiControleur::class, 'LoadFileFne'])->name('load_file_fne');
+
+
+
 
