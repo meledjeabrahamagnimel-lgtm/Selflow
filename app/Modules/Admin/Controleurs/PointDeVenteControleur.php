@@ -34,33 +34,23 @@ class PointDeVenteControleur
         $quotaMax = $entreprise->quota_points_de_vente;
 
         // Ranger ce que le scraper a déposé, avant de comparer.
-        //
-        // Sans cela, l'écran s'enfermait : le bouton « Reprendre » n'apparaît
-        // que s'il y a un point à créer, et il n'y en avait aucun **parce que**
-        // le dépôt n'était pas rangé. Celui qui venait de cliquer « Relever le
-        // portail maintenant » voyait donc son point déclaré nulle part, et
-        // n'avait aucun bouton pour le faire entrer — jusqu'au ramassage de
-        // l'heure ronde. Constaté par le propriétaire du projet le 31/08/2026,
-        // le point « teste » créé au portail à 13 h 00.
-        //
-        // Le passage est sans effet quand rien n'a changé : un fichier déjà lu
-        // est reconnu à son empreinte, sans être ouvert.
         Artisan::call('portail-fne:importer');
 
-        // Ce que le portail FNE déclare, en face. La comparaison se calcule à
-        // l'affichage et ne se range nulle part : un point créé ce matin doit
-        // se voir ce matin, sans attendre le relevé de la nuit.
+        // Créer automatiquement dans Selflow tout nouveau point de vente scrappé
+        // qui n'y figure pas encore (sans jamais modifier ni renommer l'existant).
+        $portail->importer($entreprise);
+
+        $pointsDeVente = PointDeVente::where('entreprise_id', $entreprise->id)
+            ->withCount('utilisateurs')
+            ->withCount('ventes')
+            ->orderBy('nom')
+            ->get();
+
+        // Ce que le portail FNE déclare, en face.
         $portailFne = $portail->comparer($entreprise);
 
-        // L'empreinte de ce que l'écran montre. Le navigateur la redemande
-        // pendant qu'un relevé tourne : dès qu'elle change, il se recharge —
-        // personne n'a à guetter, ni à recharger à la main.
+        // L'empreinte de ce que l'écran montre.
         $portailFne['empreinte'] = self::empreinte($portailFne);
-
-        // Et la date du dernier dépôt du scraper. L'empreinte seule ne suffit
-        // pas : un relevé qui redit exactement ce que le portail disait déjà ne
-        // la change pas, et la surveillance concluait « le relevé n'est pas
-        // arrivé » alors qu'il était arrivé et n'avait rien de neuf à dire.
         $portailFne['depose_le'] = self::deposeLe($entreprise);
 
         return view('admin::points_de_vente.index', compact('pointsDeVente', 'quotaMax', 'portailFne'));
@@ -68,20 +58,11 @@ class PointDeVenteControleur
 
     /**
      * Où en est le portail ? — interrogé par l'écran pendant qu'un relevé tourne.
-     *
-     * Un relevé ouvre un vrai navigateur sur le portail de la DGI : il dure des
-     * dizaines de secondes, et bloquer la réponse HTTP dessus figerait l'écran.
-     * Plutôt que de demander à l'utilisateur d'attendre puis de recharger — ce
-     * qu'il ne doit pas avoir à faire —, la page redemande cet état et se
-     * recharge d'elle-même dès que l'empreinte change.
-     *
-     * Le rangement est refait à chaque appel : c'est lui qui fait apparaître ce
-     * que le scraper vient de déposer, et il est sans effet quand rien n'a
-     * changé.
      */
     public function etatDuPortail(PointsDeVentePortailService $portail): JsonResponse
     {
         Artisan::call('portail-fne:importer');
+        $portail->importer(Auth::user()->entreprise);
 
         $comparaison = $portail->comparer(Auth::user()->entreprise);
 
@@ -353,12 +334,19 @@ class PointDeVenteControleur
 
         $releve->update(['lignes_importees' => $lignes]);
 
+        if ($extension !== 'json') {
+            $entreprise = Entreprise::where('ncc', $ncc)->first() ?? Auth::user()->entreprise;
+            if ($entreprise) {
+                app(PointsDeVentePortailService::class)->importer($entreprise);
+            }
+        }
+
         if ($lignes === 0) {
             return back()->with('avertissement', "Le fichier « {$nomOriginal} » ne contient aucune ligne à enregistrer.");
         }
 
         return back()->with('succes', sprintf(
-            '%s : %d ligne(s) enregistrée(s) pour le NCC %s, relevé du %s.',
+            '%s : %d ligne(s) enregistrée(s) et synchronisée(s) pour le NCC %s, relevé du %s.',
             $extension === 'json' ? 'Fiche du portail' : 'Points de facturation',
             $lignes,
             $ncc,
