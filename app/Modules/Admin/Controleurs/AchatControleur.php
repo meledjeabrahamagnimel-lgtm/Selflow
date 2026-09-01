@@ -800,6 +800,53 @@ class AchatControleur
                 ]]);
         }
 
+        if ($rejet && $rejet->cause === FneRejet::CAUSE_DGI) {
+            \Illuminate\Support\Facades\Artisan::call('portail-fne:importer');
+            $entreprise = $rejet->entreprise ?? $achat->pointDeVente?->entreprise ?? Auth::user()->entreprise;
+            if ($entreprise) {
+                app(\App\Modules\Admin\Services\PointsDeVentePortailService::class)->importer($entreprise);
+            }
+
+            $correcteur = app(\App\Modules\Admin\Services\CorrectionFneService::class);
+            app(\App\Modules\Admin\Services\DiagnosticFneService::class)->diagnostiquer($rejet);
+            $rejet->refresh();
+
+            $correctionDirecte = $correcteur->correctionApplicable($rejet);
+            if ($correctionDirecte !== null) {
+                $fait = $correcteur->corriger($rejet, synchrone: true);
+                if ($fait !== null) {
+                    $msg = ($fait['mode'] ?? 'bascule') === 'cree'
+                        ? sprintf('Le point de vente « %s » a été créé automatiquement dans Selflow d\'après la DGI, et le document a été normalisé.', $fait['nouveau'])
+                        : sprintf('Le document a été rattaché au point de vente « %s » et normalisé avec succès.', $fait['nouveau']);
+                    return back()->with('succes', $msg);
+                }
+            }
+
+            $auChoix = $correcteur->nomsAuChoix($rejet);
+            if ($auChoix !== []) {
+                $boutons = [];
+                foreach (array_slice($auChoix, 0, 5) as $rang => $nom) {
+                    $boutons[] = [
+                        'url'    => route('admin.fne.rejets.corriger_avec', ['rejet' => $rejet, 'rang' => $rang]),
+                        'label'  => $nom,
+                        'method' => 'post',
+                    ];
+                }
+                $boutons[] = [
+                    'url'   => route('admin.fne.rejets'),
+                    'label' => count($auChoix) > 5 ? 'Voir les ' . count($auChoix) . ' points' : 'Voir les rejets FNE',
+                ];
+
+                return back()
+                    ->with('avertissement', sprintf(
+                        'La DGI a refusé le document : le point de vente ne correspond pas. '
+                        . 'Le portail FNE déclare %d points de facturation. Sélectionnez celui correspondant à cette pièce :',
+                        count($auChoix)
+                    ))
+                    ->with('avertissement_action', $boutons);
+            }
+        }
+
         return back()
             ->with('avertissement', "La DGI n'a pas certifié le bordereau. Le détail du refus, et "
                 . "la correction s'il y en a une à faire, sont sur l'écran des rejets FNE.")

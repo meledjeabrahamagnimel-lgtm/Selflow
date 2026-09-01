@@ -1359,12 +1359,56 @@ class VenteControleur
             ->first();
 
         if ($rejet && $rejet->cause === FneRejet::CAUSE_DGI) {
-            // `FneRejet::consigner()` l'a déjà lancé — tous les refus y passent,
-            // celui-ci comme ceux de l'achat ou du lot. L'appel reste pour que
-            // le message ci-dessous dise vrai si cette voie change, mais il est
-            // verrouillé : sans cela, un même refus ouvrirait deux navigateurs
-            // sur le portail de la DGI.
             ScraperPortailFneService::relancerApresRejet($rejet->login);
+
+            // Importer les relevés disponibles et créer automatiquement tout point de vente FNE manquant dans Selflow
+            \Illuminate\Support\Facades\Artisan::call('portail-fne:importer');
+            $entreprise = $rejet->entreprise ?? $vente->pointDeVente?->entreprise ?? Auth::user()->entreprise;
+            if ($entreprise) {
+                app(\App\Modules\Admin\Services\PointsDeVentePortailService::class)->importer($entreprise);
+            }
+
+            // Diagnostiquer immédiatement le rejet
+            $correcteur = app(\App\Modules\Admin\Services\CorrectionFneService::class);
+            app(\App\Modules\Admin\Services\DiagnosticFneService::class)->diagnostiquer($rejet);
+            $rejet->refresh();
+
+            // S'il n'y a qu'un seul nom au portail : corriger directement sans étape humaine
+            $correctionDirecte = $correcteur->correctionApplicable($rejet);
+            if ($correctionDirecte !== null) {
+                $fait = $correcteur->corriger($rejet, synchrone: true);
+                if ($fait !== null) {
+                    $msg = ($fait['mode'] ?? 'bascule') === 'cree'
+                        ? sprintf('Le point de vente « %s » a été créé automatiquement dans Selflow d\'après la DGI, et la facture a été normalisée.', $fait['nouveau'])
+                        : sprintf('La facture a été rattachée au point de vente « %s » et normalisée avec succès.', $fait['nouveau']);
+                    return back()->with('succes', $msg);
+                }
+            }
+
+            // Si plusieurs points sont déclarés au portail : afficher DIRECTEMENT la liste des points de vente
+            $auChoix = $correcteur->nomsAuChoix($rejet);
+            if ($auChoix !== []) {
+                $boutons = [];
+                foreach (array_slice($auChoix, 0, 5) as $rang => $nom) {
+                    $boutons[] = [
+                        'url'    => route('admin.fne.rejets.corriger_avec', ['rejet' => $rejet, 'rang' => $rang]),
+                        'label'  => $nom,
+                        'method' => 'post',
+                    ];
+                }
+                $boutons[] = [
+                    'url'   => route('admin.fne.rejets'),
+                    'label' => count($auChoix) > 5 ? 'Voir les ' . count($auChoix) . ' points' : 'Voir les rejets FNE',
+                ];
+
+                return back()
+                    ->with('avertissement', sprintf(
+                        'La DGI a refusé la facture : le point de vente ne correspond pas. '
+                        . 'Le portail FNE déclare %d points de facturation. Sélectionnez celui correspondant à cette pièce :',
+                        count($auChoix)
+                    ))
+                    ->with('avertissement_action', $boutons);
+            }
 
             $champs = $rejet->nomsDesChamps();
             $precision = $champs ? ' (' . implode(', ', $champs) . ')' : '';
@@ -1372,21 +1416,10 @@ class VenteControleur
             return back()
                 ->with('avertissement', sprintf(
                     "La DGI a refusé la facture%s : le point de vente n'est pas déclaré à "
-                    . "l'identique sur votre espace FNE. Une vérification au portail a été "
-                    . "lancée automatiquement ; la correction proposée apparaîtra sur l'écran "
-                    . 'des rejets FNE dans quelques instants.',
+                    . "l'identique sur votre espace FNE. Une relève du portail a été lancée automatiquement.",
                     $precision
                 ))
-                // Le pop-up porte deux boutons : lancer la correction sans
-                // quitter l'écran, ou aller voir le détail sur l'écran des
-                // rejets. Informer sans dire où agir laisserait l'utilisateur
-                // chercher.
                 ->with('avertissement_action', [
-                    [
-                        'url' => route('admin.fne.rejets.corriger_maintenant', $rejet),
-                        'label' => 'Lancer la correction',
-                        'method' => 'post',
-                    ],
                     [
                         'url' => route('admin.fne.rejets'),
                         'label' => 'Voir les rejets FNE',
