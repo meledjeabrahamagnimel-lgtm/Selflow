@@ -404,35 +404,36 @@ class RejetFneControleur
             ));
         }
 
+        // Basculer directement la session sur le point de vente choisi
+        if (!empty($fait['point_de_vente_id'])) {
+            session([
+                'point_de_vente_actif_id'  => $fait['point_de_vente_id'],
+                'point_de_vente_actif_nom' => $fait['nouveau'] ?? $choisi,
+            ]);
+        }
+
         return back()->with('succes', $this->phraseDeCorrection($fait));
     }
 
     /**
-     * Un bouton par nom déclaré, plus le lien vers l'écran des rejets.
-     *
-     * Les noms sont bornés à cinq : un pop-up qui en aligne quinze ne se lit
-     * plus, et l'écran des rejets porte le détail complet — c'est là qu'il faut
-     * envoyer quand le portail en déclare beaucoup.
+     * Liste sélective des points de vente déclarés au portail, chacun avec un bouton Activer.
      *
      * @param  array<int, string>  $auChoix
-     * @return array<int, array{url: string, label: string, method?: string}>
+     * @return array<int, array{url: string, label: string, nom: string, action_label: string, method: string}>
      */
     private function boutonsDeChoix(FneRejet $rejet, array $auChoix): array
     {
         $boutons = [];
 
-        foreach (array_slice($auChoix, 0, 5) as $rang => $nom) {
+        foreach ($auChoix as $rang => $nom) {
             $boutons[] = [
-                'url'    => route('admin.fne.rejets.corriger_avec', ['rejet' => $rejet, 'rang' => $rang]),
-                'label'  => $nom,
-                'method' => 'post',
+                'url'          => route('admin.fne.rejets.corriger_avec', ['rejet' => $rejet, 'rang' => $rang]),
+                'label'        => $nom,
+                'nom'          => $nom,
+                'action_label' => 'Activer',
+                'method'       => 'post',
             ];
         }
-
-        $boutons[] = [
-            'url'   => route('admin.fne.rejets'),
-            'label' => count($auChoix) > 5 ? 'Voir les ' . count($auChoix) . ' points' : 'Voir les rejets FNE',
-        ];
 
         return $boutons;
     }
@@ -489,30 +490,14 @@ class RejetFneControleur
             }
         }
 
-        // Plusieurs points : liste des boutons au choix
+        // Plusieurs points : liste sélective des points de vente
         $auChoix = $correcteur->nomsAuChoix($rejet);
         if ($auChoix !== []) {
-            $boutons = [];
-            foreach (array_slice($auChoix, 0, 5) as $rang => $nom) {
-                $boutons[] = [
-                    'url'    => route('admin.fne.rejets.corriger_avec', ['rejet' => $rejet, 'rang' => $rang]),
-                    'label'  => $nom,
-                    'method' => 'post',
-                ];
-            }
-            $boutons[] = [
-                'url'   => route('admin.fne.rejets'),
-                'label' => count($auChoix) > 5 ? 'Voir les ' . count($auChoix) . ' points' : 'Voir les rejets FNE',
-            ];
-
             return response()->json([
                 'pret' => true,
                 'resolu' => false,
-                'choix' => $boutons,
-                'message' => sprintf(
-                    'Le portail FNE déclare %d points de facturation. Sélectionnez celui correspondant à cette pièce :',
-                    count($auChoix)
-                ),
+                'choix' => $this->boutonsDeChoix($rejet, $auChoix),
+                'message' => 'La DGI a refusé la pièce : le point de vente ne correspond pas. Sélectionnez et activez le point de vente correspondant sur votre espace FNE :',
             ]);
         }
 

@@ -828,27 +828,22 @@ class AchatControleur
                 }
             }
 
+            // Si plusieurs points sont déclarés au portail : afficher DIRECTEMENT la liste sélective des points de vente
             $auChoix = $correcteur->nomsAuChoix($rejet);
             if ($auChoix !== []) {
                 $boutons = [];
-                foreach (array_slice($auChoix, 0, 5) as $rang => $nom) {
+                foreach ($auChoix as $rang => $nom) {
                     $boutons[] = [
-                        'url'    => route('admin.fne.rejets.corriger_avec', ['rejet' => $rejet, 'rang' => $rang]),
-                        'label'  => $nom,
-                        'method' => 'post',
+                        'url'          => route('admin.fne.rejets.corriger_avec', ['rejet' => $rejet, 'rang' => $rang]),
+                        'label'        => $nom,
+                        'nom'          => $nom,
+                        'action_label' => 'Activer',
+                        'method'       => 'post',
                     ];
                 }
-                $boutons[] = [
-                    'url'   => route('admin.fne.rejets'),
-                    'label' => count($auChoix) > 5 ? 'Voir les ' . count($auChoix) . ' points' : 'Voir les rejets FNE',
-                ];
 
                 return back()
-                    ->with('avertissement', sprintf(
-                        'La DGI a refusé le document : le point de vente ne correspond pas. '
-                        . 'Le portail FNE déclare %d points de facturation. Sélectionnez celui correspondant à cette pièce :',
-                        count($auChoix)
-                    ))
+                    ->with('avertissement', 'La DGI a refusé le document : le point de vente ne correspond pas. Sélectionnez et activez le point de vente correspondant sur votre espace FNE :')
                     ->with('avertissement_action', $boutons);
             }
         }

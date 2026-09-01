@@ -244,6 +244,36 @@
         .toast.t-avertissement { border-left-color: #f59e0b; } .toast.t-avertissement .ic { color: #f59e0b; } .toast.t-avertissement .ti { color: #92400e; }
         .toast.t-erreur        { border-left-color: #ef4444; } .toast.t-erreur .ic        { color: #ef4444; } .toast.t-erreur .ti        { color: #991b1b; }
         .toast.t-info          { border-left-color: #3b82f6; } .toast.t-info .ic          { color: #3b82f6; } .toast.t-info .ti          { color: #1e3a8a; }
+        /* ── Liste sélective des points de vente dans le pop-up ── */
+        .toast-pdv-list {
+            display: flex; flex-direction: column; gap: 8px; margin-top: 14px;
+            max-height: 250px; overflow-y: auto; padding-right: 4px; width: 100%;
+        }
+        .toast-pdv-item {
+            display: flex; align-items: center; justify-content: space-between; gap: 12px;
+            background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 10px;
+            padding: 9px 12px; transition: all .15s ease;
+        }
+        .toast-pdv-item:hover {
+            background: #f1f5f9; border-color: #cbd5e1;
+        }
+        .toast-pdv-name {
+            display: flex; align-items: center; gap: 8px; font-weight: 700;
+            font-size: 13.5px; color: #1e293b;
+        }
+        .toast-pdv-name i { color: #f59e0b; font-size: 13px; }
+        .toast-pdv-btn {
+            display: inline-flex; align-items: center; gap: 6px;
+            padding: 6px 14px; border-radius: 8px; cursor: pointer;
+            font-size: 12.5px; font-weight: 700; text-decoration: none;
+            color: #fff; background: #2563eb; border: none;
+            box-shadow: 0 2px 6px rgba(37, 99, 235, .25);
+            transition: all .15s ease; flex-shrink: 0;
+        }
+        .toast-pdv-btn:hover {
+            background: #1d4ed8; transform: translateY(-1px);
+            box-shadow: 0 4px 10px rgba(37, 99, 235, .35);
+        }
         @keyframes toast-in  { from { opacity: 0; transform: scale(.90); } to { opacity: 1; transform: scale(1); } }
         @keyframes toast-out { to  { opacity: 0; transform: scale(.90); } }
         @media (max-width: 560px) { .toast-zone { top: 50%; left: 50%; transform: translate(-50%, -50%); width: calc(100vw - 28px); } }
@@ -1026,9 +1056,11 @@
                         foreach ($__liste as $__a) {
                             if (is_array($__a) && !empty($__a['url']) && !empty($__a['label'])) {
                                 $__actions[] = [
-                                    'url'    => (string) $__a['url'],
-                                    'label'  => (string) $__a['label'],
-                                    'method' => strtolower((string) ($__a['method'] ?? 'get')),
+                                    'url'          => (string) $__a['url'],
+                                    'label'        => (string) $__a['label'],
+                                    'nom'          => (string) ($__a['nom'] ?? ''),
+                                    'action_label' => (string) ($__a['action_label'] ?? ''),
+                                    'method'       => strtolower((string) ($__a['method'] ?? 'get')),
                                 ];
                             }
                         }
@@ -1428,21 +1460,30 @@ window.__csrf = '{{ csrf_token() }}';
         var ms = document.createElement('div'); ms.className = 'ms'; ms.textContent = f.message || '';
         bd.appendChild(ti); bd.appendChild(ms);
 
-        // Boutons d'action facultatifs : mènent où agir (voir les rejets), ou
-        // déclenchent une action (POST : lancer la correction).
+        // Actions ou liste sélective des points de vente
         if (Array.isArray(f.actions) && f.actions.length) {
-            var barre = document.createElement('div');
-            barre.className = 'toast-actions';
-            f.actions.forEach(function (ac) {
-                if (!ac || !ac.url || !ac.label) return;
-                var btn = document.createElement('a');
-                btn.className = 'toast-action' + (ac.method === 'post' ? '' : ' secondaire');
-                btn.href = ac.url;
-                btn.textContent = ac.label;
-                if (ac.method === 'post') {
-                    btn.setAttribute('role', 'button');
-                    btn.addEventListener('click', function (e) {
+            var estListePdv = f.actions.some(function (ac) { return ac.action_label || ac.nom; });
+
+            if (estListePdv) {
+                var listeDiv = document.createElement('div');
+                listeDiv.className = 'toast-pdv-list';
+
+                f.actions.forEach(function (ac) {
+                    if (!ac || !ac.url || !ac.label) return;
+                    var item = document.createElement('div');
+                    item.className = 'toast-pdv-item';
+
+                    var nomDiv = document.createElement('div');
+                    nomDiv.className = 'toast-pdv-name';
+                    nomDiv.innerHTML = '<i class="fas fa-store"></i> <span>' + (ac.nom || ac.label) + '</span>';
+
+                    var btnActiver = document.createElement('button');
+                    btnActiver.className = 'toast-pdv-btn';
+                    btnActiver.innerHTML = '<i class="fas fa-bolt"></i> ' + (ac.action_label || 'Activer');
+                    btnActiver.addEventListener('click', function (e) {
                         e.preventDefault();
+                        btnActiver.disabled = true;
+                        btnActiver.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Activation...';
                         var form = document.createElement('form');
                         form.method = 'POST';
                         form.action = ac.url;
@@ -1453,10 +1494,41 @@ window.__csrf = '{{ csrf_token() }}';
                         document.body.appendChild(form);
                         form.submit();
                     });
-                }
-                barre.appendChild(btn);
-            });
-            bd.appendChild(barre);
+
+                    item.appendChild(nomDiv);
+                    item.appendChild(btnActiver);
+                    listeDiv.appendChild(item);
+                });
+
+                bd.appendChild(listeDiv);
+            } else {
+                var barre = document.createElement('div');
+                barre.className = 'toast-actions';
+                f.actions.forEach(function (ac) {
+                    if (!ac || !ac.url || !ac.label) return;
+                    var btn = document.createElement('a');
+                    btn.className = 'toast-action' + (ac.method === 'post' ? '' : ' secondaire');
+                    btn.href = ac.url;
+                    btn.textContent = ac.label;
+                    if (ac.method === 'post') {
+                        btn.setAttribute('role', 'button');
+                        btn.addEventListener('click', function (e) {
+                            e.preventDefault();
+                            var form = document.createElement('form');
+                            form.method = 'POST';
+                            form.action = ac.url;
+                            var t = document.createElement('input');
+                            t.type = 'hidden'; t.name = '_token';
+                            t.value = (window.__csrf || '');
+                            form.appendChild(t);
+                            document.body.appendChild(form);
+                            form.submit();
+                        });
+                    }
+                    barre.appendChild(btn);
+                });
+                bd.appendChild(barre);
+            }
         }
 
         var x = document.createElement('button');
@@ -1507,7 +1579,7 @@ window.__csrf = '{{ csrf_token() }}';
                 afficherToast('succes', 'Succès', data.message);
                 setTimeout(function () { location.reload(); }, 3000);
             } else if (data.choix && data.choix.length) {
-                // Plusieurs points au choix
+                // Plusieurs points au choix sous forme de liste sélective
                 afficherToastAvecBoutons('avertissement', 'Attention', data.message, data.choix);
             } else {
                 afficherToast('info', 'Information', data.message);
@@ -1546,28 +1618,69 @@ window.__csrf = '{{ csrf_token() }}';
         var ms = document.createElement('div'); ms.className = 'ms'; ms.textContent = message;
         bd.appendChild(ti); bd.appendChild(ms);
 
-        var barre = document.createElement('div');
-        barre.className = 'toast-actions';
-        boutons.forEach(function (ac) {
-            var btn = document.createElement('a');
-            btn.className = 'toast-action' + (ac.method === 'post' ? '' : ' secondaire');
-            btn.href = ac.url;
-            btn.textContent = ac.label;
-            if (ac.method === 'post') {
-                btn.setAttribute('role', 'button');
-                btn.addEventListener('click', function (e) {
+        var estListePdv = boutons.some(function (ac) { return ac.action_label || ac.nom; });
+
+        if (estListePdv) {
+            var listeDiv = document.createElement('div');
+            listeDiv.className = 'toast-pdv-list';
+
+            boutons.forEach(function (ac) {
+                if (!ac || !ac.url || !ac.label) return;
+                var item = document.createElement('div');
+                item.className = 'toast-pdv-item';
+
+                var nomDiv = document.createElement('div');
+                nomDiv.className = 'toast-pdv-name';
+                nomDiv.innerHTML = '<i class="fas fa-store"></i> <span>' + (ac.nom || ac.label) + '</span>';
+
+                var btnActiver = document.createElement('button');
+                btnActiver.className = 'toast-pdv-btn';
+                btnActiver.innerHTML = '<i class="fas fa-bolt"></i> ' + (ac.action_label || 'Activer');
+                btnActiver.addEventListener('click', function (e) {
                     e.preventDefault();
+                    btnActiver.disabled = true;
+                    btnActiver.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Activation...';
                     var form = document.createElement('form');
-                    form.method = 'POST'; form.action = ac.url;
+                    form.method = 'POST';
+                    form.action = ac.url;
                     var t = document.createElement('input');
-                    t.type = 'hidden'; t.name = '_token'; t.value = (window.__csrf || '');
+                    t.type = 'hidden'; t.name = '_token';
+                    t.value = (window.__csrf || '');
                     form.appendChild(t);
-                    document.body.appendChild(form); form.submit();
+                    document.body.appendChild(form);
+                    form.submit();
                 });
-            }
-            barre.appendChild(btn);
-        });
-        bd.appendChild(barre);
+
+                item.appendChild(nomDiv);
+                item.appendChild(btnActiver);
+                listeDiv.appendChild(item);
+            });
+
+            bd.appendChild(listeDiv);
+        } else {
+            var barre = document.createElement('div');
+            barre.className = 'toast-actions';
+            boutons.forEach(function (ac) {
+                var btn = document.createElement('a');
+                btn.className = 'toast-action' + (ac.method === 'post' ? '' : ' secondaire');
+                btn.href = ac.url;
+                btn.textContent = ac.label;
+                if (ac.method === 'post') {
+                    btn.setAttribute('role', 'button');
+                    btn.addEventListener('click', function (e) {
+                        e.preventDefault();
+                        var form = document.createElement('form');
+                        form.method = 'POST'; form.action = ac.url;
+                        var t = document.createElement('input');
+                        t.type = 'hidden'; t.name = '_token'; t.value = (window.__csrf || '');
+                        form.appendChild(t);
+                        document.body.appendChild(form); form.submit();
+                    });
+                }
+                barre.appendChild(btn);
+            });
+            bd.appendChild(barre);
+        }
 
         var x = document.createElement('button');
         x.className = 'x'; x.setAttribute('aria-label', 'Fermer');

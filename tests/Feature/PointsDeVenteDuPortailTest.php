@@ -204,12 +204,8 @@ class PointsDeVenteDuPortailTest extends TestCase
         $this->assertSame(3, $comparaison['a_creer']);
     }
 
-    public function test_l_ecran_range_le_depot_avant_de_comparer(): void
+    public function test_l_ecran_range_le_depot_et_cree_automatiquement_le_point(): void
     {
-        // Sans cela l'écran s'enfermait : le bouton « Reprendre » n'apparaît que
-        // s'il y a un point à créer, et il n'y en avait aucun **parce que** le
-        // dépôt n'était pas rangé. Celui qui venait de lancer un relevé n'avait
-        // aucun bouton pour le faire entrer, jusqu'au ramassage de l'heure ronde.
         $this->poserTableur('1864699A_20260831.xlsx', [
             ['Nom', 'Outil', 'Statut', "ID de l'établissement", 'Créé à', 'Mise à jour à'],
             ['teste', 'Application FNE', '1', self::ETABLISSEMENT, '2026-08-31T13:00:37.674Z', '2026-08-31T13:00:37.674Z'],
@@ -219,12 +215,11 @@ class PointsDeVenteDuPortailTest extends TestCase
 
         $reponse->assertOk();
         $reponse->assertSee('teste');
-        $reponse->assertSee('Reprendre 1 point(s) manquant(s)', false);
+        $this->assertTrue(PointDeVente::where('nom', 'teste')->where('entreprise_id', $this->entreprise->id)->exists());
+        $reponse->assertSee('Dans Selflow', false);
 
-        // Le pilote du bouton doit être dans la page rendue : sans lui, le clic
-        // repart en formulaire classique et l'écran redemande une attente.
+        // Le pilote du bouton doit être dans la page rendue
         $reponse->assertSee('formReleverPortail', false);
-        $reponse->assertSee('fa-spinner', false);
     }
 
     /* ═══════════════ Aller voir le portail sans attendre ═══════════════ */

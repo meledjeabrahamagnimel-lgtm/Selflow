@@ -152,13 +152,15 @@ class BoutonCorrigerMaintenantTest extends TestCase
 
         $this->assertStringContainsString('ne choisit pas à votre place', session('avertissement'));
 
-        // Le pop-up porte un bouton par nom déclaré, plus le lien vers l'écran.
+        // Le pop-up porte un bouton Activer par nom déclaré, sans lien 'Voir les rejets'.
         $actions = session('avertissement_action');
 
         $this->assertSame(
-            ['FACTURATION SIEGE', 'FACTURATION TEST 2', 'Voir les rejets FNE'],
+            ['FACTURATION SIEGE', 'FACTURATION TEST 2'],
             array_column($actions, 'label')
         );
+        $this->assertSame('Activer', $actions[0]['action_label']);
+        $this->assertSame('Activer', $actions[1]['action_label']);
         $this->assertSame('post', $actions[0]['method']);
         $this->assertStringContainsString('/corriger-avec/0', $actions[0]['url']);
         $this->assertStringContainsString('/corriger-avec/1', $actions[1]['url']);

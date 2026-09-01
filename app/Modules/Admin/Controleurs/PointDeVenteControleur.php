@@ -62,7 +62,6 @@ class PointDeVenteControleur
     public function etatDuPortail(PointsDeVentePortailService $portail): JsonResponse
     {
         Artisan::call('portail-fne:importer');
-        $portail->importer(Auth::user()->entreprise);
 
         $comparaison = $portail->comparer(Auth::user()->entreprise);
 
