@@ -223,17 +223,16 @@ class RejetFneControleur
      */
     private function phraseDeCorrection(array $fait): string
     {
-        $intro = ($fait['mode'] ?? 'renomme') === 'bascule'
+        $intro = ($fait['mode'] ?? 'bascule') === 'cree'
             ? sprintf(
-                'Les pièces ont été rattachées au point de vente « %s », déjà déclaré au '
-                . 'portail — le point « %s » n\'a pas été dupliqué.',
-                $fait['nouveau'],
-                $fait['ancien']
+                'Le point de vente « %s » a été créé dans Selflow d\'après la déclaration du portail, et les pièces lui ont été rattachées.',
+                $fait['nouveau']
             )
             : sprintf(
-                'Le point de vente « %s » a été renommé « %s », comme il est déclaré au portail.',
-                $fait['ancien'],
-                $fait['nouveau']
+                'Les pièces ont été rattachées au point de vente « %s », déjà déclaré au '
+                . 'portail — le point « %s » n\'a pas été modifié.',
+                $fait['nouveau'],
+                $fait['ancien']
             );
 
         return $intro . ' ' . $this->direLeRenvoi($fait);

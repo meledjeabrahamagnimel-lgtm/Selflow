@@ -116,7 +116,7 @@ class BoutonCorrigerMaintenantTest extends TestCase
         parent::tearDown();
     }
 
-    public function test_un_seul_nom_declare_le_bouton_renomme_et_renvoie_la_piece(): void
+    public function test_un_seul_nom_declare_le_bouton_cree_le_point_et_renvoie_la_piece(): void
     {
         $vente = $this->uneVente('FA-0042');
         $rejet = FneRejet::consigner($vente, $this->refus());
@@ -127,11 +127,15 @@ class BoutonCorrigerMaintenantTest extends TestCase
             ->assertRedirect()
             ->assertSessionHas('succes');
 
-        // Le point de vente porte le nom déclaré au portail...
-        $this->assertSame('FACTURATION SIEGE', $this->monMagasin->refresh()->nom);
+        // Le point de vente d'origine n'est JAMAIS renommé...
+        $this->assertSame('FACTURATION SIEGES', $this->monMagasin->refresh()->nom);
 
-        // ...et la pièce est repartie dans la foulée, pas en file.
-        $this->assertTrue((bool) $vente->refresh()->normalise);
+        // ...un nouveau point a été créé d'après le portail...
+        $this->assertTrue(PointDeVente::where('entreprise_id', $this->mienne->id)->where('nom', 'FACTURATION SIEGE')->exists());
+
+        // ...et la pièce lui a été rattachée et repartie dans la foulée.
+        $this->assertSame('FACTURATION SIEGE', $vente->refresh()->pointDeVente->nom);
+        $this->assertTrue((bool) $vente->normalise);
     }
 
     public function test_deux_noms_declares_le_pop_up_propose_les_deux_sans_rien_toucher(): void
@@ -185,13 +189,17 @@ class BoutonCorrigerMaintenantTest extends TestCase
             ->assertRedirect()
             ->assertSessionHas('succes');
 
-        $this->assertSame('FACTURATION SIEGE', $this->monMagasin->refresh()->nom);
-        $this->assertTrue((bool) $vente->refresh()->normalise);
+        // Le point d'origine n'a pas été renommé
+        $this->assertSame('FACTURATION SIEGES', $this->monMagasin->refresh()->nom);
+        // Le nouveau point a été créé et la vente rattachée
+        $this->assertSame('FACTURATION SIEGE', $vente->refresh()->pointDeVente->nom);
+        $this->assertTrue((bool) $vente->normalise);
     }
 
     public function test_l_autre_nom_du_pop_up_mene_a_l_autre_point(): void
     {
-        $rejet = FneRejet::consigner($this->uneVente('FA-0042'), $this->refus());
+        $vente = $this->uneVente('FA-0042');
+        $rejet = FneRejet::consigner($vente, $this->refus());
 
         $this->unReleve(['FACTURATION SIEGE', 'FACTURATION TEST 2']);
         $this->post(route('admin.fne.rejets.corriger_maintenant', $rejet));
@@ -199,9 +207,11 @@ class BoutonCorrigerMaintenantTest extends TestCase
         $this->post(route('admin.fne.rejets.corriger_avec', ['rejet' => $rejet, 'rang' => 1]))
             ->assertSessionHas('succes');
 
-        // Le second, et non le plus ressemblant : c'est l'humain qui décide,
-        // et la machine ne redresse pas son choix.
-        $this->assertSame('FACTURATION TEST 2', $this->monMagasin->refresh()->nom);
+        // Le point d'origine n'a pas été renommé
+        $this->assertSame('FACTURATION SIEGES', $this->monMagasin->refresh()->nom);
+        // Le second point a été créé et la vente rattachée
+        $this->assertSame('FACTURATION TEST 2', $vente->refresh()->pointDeVente->nom);
+        $this->assertTrue((bool) $vente->normalise);
     }
 
     /**

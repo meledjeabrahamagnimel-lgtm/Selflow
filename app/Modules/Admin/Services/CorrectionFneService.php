@@ -208,45 +208,43 @@ class CorrectionFneService
             return null;
         }
 
-        // Un point de vente porte-t-il DÉJÀ le nom déclaré ? Alors ne pas
-        // renommer : renommer celui-ci créerait un second « FACTURATION SIEGE »
-        // à côté de celui qui existe. On rattache plutôt les pièces au point
-        // existant — un seul point par nom, comme le portail n'en déclare qu'un.
-        $existant = PointDeVente::where('entreprise_id', $pdv->entreprise_id)
+        // Un point de vente porte-t-il DÉJÀ le nom déclaré ?
+        $cible = PointDeVente::where('entreprise_id', $pdv->entreprise_id)
             ->whereRaw('TRIM(nom) = ?', [trim($correction)])
-            ->where('id', '!=', $pdv->id)
             ->first();
 
-        if ($existant instanceof PointDeVente) {
-            return $this->basculerSurExistant($pdv, $existant, $rejet, $synchrone);
+        $mode = 'bascule';
+
+        // Si aucun point ne porte ce nom dans Selflow : on CRÉE le nouveau point de vente.
+        // Règle d'or : On ne modifie ni ne renomme JAMAIS un point de vente existant.
+        if (!$cible instanceof PointDeVente) {
+            $cible = PointDeVente::create([
+                'entreprise_id' => $pdv->entreprise_id,
+                'nom'           => trim($correction),
+                'ville'         => $pdv->ville ?? '',
+                'commune'       => $pdv->commune ?? '',
+                'statut'        => 'Ouvert',
+            ]);
+
+            if (method_exists($cible, 'initialiserLesFichesDeStock')) {
+                $cible->initialiserLesFichesDeStock();
+            }
+
+            $mode = 'cree';
+
+            Log::info('FNE : nouveau point de vente créé automatiquement dans Selflow d\'après le portail', [
+                'point_de_vente' => $cible->id,
+                'nom'            => $cible->nom,
+                'rejet'          => $rejet->id,
+                'entreprise'     => $rejet->entreprise_id,
+            ]);
         }
 
-        // Aucun point ne porte ce nom : le premier alignement se fait par un
-        // renommage, sans risque de doublon.
-        $ancien = (string) $pdv->nom;
-        $pdv->update(['nom' => $correction]);
+        // On bascule les pièces rejetées vers le point de vente cible (existant ou nouvellement créé)
+        $resultat = $this->basculerSurExistant($pdv, $cible, $rejet, $synchrone);
+        $resultat['mode'] = $mode;
 
-        // Un renommage automatique doit se voir dans le journal : il touche
-        // toutes les pièces à venir de ce point de vente, et personne n'est
-        // devant l'écran quand la tâche planifiée passe.
-        Log::warning('FNE : point de vente renommé automatiquement d\'après le portail', [
-            'point_de_vente' => $pdv->id,
-            'ancien'         => $ancien,
-            'nouveau'        => $correction,
-            'rejet'          => $rejet->id,
-            'entreprise'     => $rejet->entreprise_id,
-        ]);
-
-        $renvoi = $this->renvoyerLesPiecesRefusees($pdv, $rejet, $synchrone);
-
-        return [
-            'mode'              => 'renomme',
-            'ancien'            => $ancien,
-            'nouveau'           => $correction,
-            'point_de_vente_id' => $pdv->id,
-            'renvoyees'         => $renvoi['renvoyees'],
-            'suspendues'        => $renvoi['suspendues'],
-        ];
+        return $resultat;
     }
 
     /**
