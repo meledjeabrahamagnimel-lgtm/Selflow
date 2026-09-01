@@ -140,4 +140,24 @@ class Achat extends Model
     {
         return $this->hasMany(Achat::class, 'parent_id');
     }
+
+    public function rejets(): HasMany
+    {
+        return $this->hasMany(FneRejet::class, 'piece_id')->where('piece_type', 'achat');
+    }
+
+    /**
+     * Vérifie si cet achat a un rejet FNE en cours de relève ou de correction.
+     */
+    public function aRejetEnCours(): bool
+    {
+        if ($this->normalise) {
+            return false;
+        }
+
+        return $this->rejets->contains(fn (FneRejet $r) => in_array($r->statut, [
+            FneRejet::STATUT_OUVERT,
+            FneRejet::STATUT_DIAGNOSTIQUE,
+        ]));
+    }
 }

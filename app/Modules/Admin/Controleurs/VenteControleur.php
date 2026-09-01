@@ -517,7 +517,7 @@ class VenteControleur
             }
             $ventes = $blQuery->latest()->paginate(20);
         } else {
-            $baseQuery = Vente::with(['client', 'pointDeVente', 'details.produit', 'pieceLiee']);
+            $baseQuery = Vente::with(['client', 'pointDeVente', 'details.produit', 'pieceLiee', 'rejets']);
 
             if ($type === 'avoir') {
                 $baseQuery->where('type_facture', 'avoir');

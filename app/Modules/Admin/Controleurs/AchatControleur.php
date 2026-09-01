@@ -394,7 +394,7 @@ class AchatControleur
         $etapeActive = request('etape', 'Facture');
         $type = request('type');
 
-        $baseQuery = Achat::with(['fournisseur', 'pointDeVente', 'details.produit'])
+        $baseQuery = Achat::with(['fournisseur', 'pointDeVente', 'details.produit', 'rejets'])
             ->whereHas('pointDeVente', fn($q) => $q->where('entreprise_id', $entreprise->id));
 
         if ($pointDeVenteId) {
