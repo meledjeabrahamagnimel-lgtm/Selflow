@@ -97,20 +97,20 @@ class ImportPortailFneService
      * @var array<string, string>
      */
     private const CHAMPS_FICHE = [
-        'Email'                                                 => 'email',
-        'Téléphone'                                             => 'telephone',
-        'Adresse'                                               => 'adresse',
-        'Commune'                                               => 'commune',
-        'Quartier'                                              => 'quartier',
-        'Référence Cadastrale'                                  => 'reference_cadastrale',
-        'IDU'                                                   => 'idu',
-        "Propriétaire du local professionnel de l'entreprise"   => 'proprietaire_local',
-        "Sticker : solde d'alerte"                              => 'sticker_solde_alerte',
-        'Références bancaires'                                  => 'ref_bancaire',
-        'Timbre de quittance'                                   => 'timbre_quittance',
-        "Bordereau d'achat de produits agricoles"               => 'bapa',
-        'Pied de page des factures'                             => 'pied_de_page_facture',
-        'Factures autres mentions'                              => 'facture_autres_mentions',
+        'Email' => 'email',
+        'Téléphone' => 'telephone',
+        'Adresse' => 'adresse',
+        'Commune' => 'commune',
+        'Quartier' => 'quartier',
+        'Référence Cadastrale' => 'reference_cadastrale',
+        'IDU' => 'idu',
+        "Propriétaire du local professionnel de l'entreprise" => 'proprietaire_local',
+        "Sticker : solde d'alerte" => 'sticker_solde_alerte',
+        'Références bancaires' => 'ref_bancaire',
+        'Timbre de quittance' => 'timbre_quittance',
+        "Bordereau d'achat de produits agricoles" => 'bapa',
+        'Pied de page des factures' => 'pied_de_page_facture',
+        'Factures autres mentions' => 'facture_autres_mentions',
     ];
 
     /**
@@ -123,21 +123,21 @@ class ImportPortailFneService
      * @var array<string, string>
      */
     private const COLONNES_POINTS = [
-        'nom'                     => 'nom',
-        'outil'                   => 'outil',
-        'id du terminal'          => 'terminal_id',
-        'statut'                  => 'statut',
-        'raison de statut'        => 'raison_statut',
-        "id de l'etablissement"   => 'etablissement_id',
-        'cree a'                  => 'cree_a',
-        'mise a jour a'           => 'mis_a_jour_a',
+        'nom' => 'nom',
+        'outil' => 'outil',
+        'id du terminal' => 'terminal_id',
+        'statut' => 'statut',
+        'raison de statut' => 'raison_statut',
+        "id de l'etablissement" => 'etablissement_id',
+        'cree a' => 'cree_a',
+        'mise a jour a' => 'mis_a_jour_a',
     ];
 
     /**
      * Les champs de la fiche qui sont des nombres, et ceux qui sont des
      * booléens. Tout le reste est conservé tel quel.
      */
-    private const CHAMPS_ENTIERS  = ['sticker_solde_alerte'];
+    private const CHAMPS_ENTIERS = ['sticker_solde_alerte'];
     private const CHAMPS_BOOLEENS = ['timbre_quittance', 'bapa'];
 
     /**
@@ -152,12 +152,12 @@ class ImportPortailFneService
         $dossier = $dossier ?: (string) config('selflow.portail_fne.dossier_import');
 
         $rapport = [
-            'dossier'   => $dossier,
-            'importes'  => 0,
-            'ignores'   => 0,
+            'dossier' => $dossier,
+            'importes' => 0,
+            'ignores' => 0,
             'inchanges' => 0,
-            'erreurs'   => 0,
-            'details'   => [],
+            'erreurs' => 0,
+            'details' => [],
         ];
 
         if (!is_dir($dossier)) {
@@ -189,10 +189,10 @@ class ImportPortailFneService
 
             $rapport['details'][] = $resultat;
             $cle = match ($resultat['statut']) {
-                'importe'  => 'importes',
-                'ignore'   => 'ignores',
+                'importe' => 'importes',
+                'ignore' => 'ignores',
                 'inchange' => 'inchanges',
-                default    => 'erreurs',
+                default => 'erreurs',
             };
             $rapport[$cle]++;
         }
@@ -252,7 +252,7 @@ class ImportPortailFneService
                     ? $this->lireJson($chemin)
                     : $this->lireTableur($chemin);
 
-                $contenu   = $this->empreinteDuContenu($type, $donnees);
+                $contenu = $this->empreinteDuContenu($type, $donnees);
                 $precedent = $this->dernierReleveDeMemeContenu($login, $type, $contenu);
 
                 // Le portail redit ce qu'il disait déjà : on ne crée rien, on
@@ -276,18 +276,18 @@ class ImportPortailFneService
                 }
 
                 $import = PortailFneImport::create([
-                    'entreprise_id'     => $entreprise?->id,
-                    'login'             => $login,
-                    'date_scraping'     => $date,
-                    'type'              => $type,
-                    'fichier_nom'       => $nom,
+                    'entreprise_id' => $entreprise?->id,
+                    'login' => $login,
+                    'date_scraping' => $date,
+                    'type' => $type,
+                    'fichier_nom' => $nom,
                     'fichier_empreinte' => $empreinte,
                     'contenu_empreinte' => $contenu,
-                    'donnees_brutes'    => $donnees,
-                    'statut'            => PortailFneImport::STATUT_IMPORTE,
-                    'importe_at'        => now(),
+                    'donnees_brutes' => $donnees,
+                    'statut' => PortailFneImport::STATUT_IMPORTE,
+                    'importe_at' => now(),
                     'dernier_releve_le' => $date,
-                    'releves'           => 1,
+                    'releves' => 1,
                 ]);
 
                 $lignes = $type === PortailFneImport::TYPE_FICHE
@@ -309,20 +309,20 @@ class ImportPortailFneService
             // sans elle, un fichier illisible se redéposerait indéfiniment sans
             // que rien n'explique pourquoi il n'arrive jamais en base.
             $import = PortailFneImport::create([
-                'entreprise_id'     => $entreprise?->id,
-                'login'             => $login,
-                'date_scraping'     => $date,
-                'type'              => $type,
-                'fichier_nom'       => $nom,
+                'entreprise_id' => $entreprise?->id,
+                'login' => $login,
+                'date_scraping' => $date,
+                'type' => $type,
+                'fichier_nom' => $nom,
                 'fichier_empreinte' => $empreinte,
-                'statut'            => PortailFneImport::STATUT_ERREUR,
-                'message'           => $e->getMessage(),
+                'statut' => PortailFneImport::STATUT_ERREUR,
+                'message' => $e->getMessage(),
             ]);
 
             Log::error('Import portail FNE : lecture impossible', [
-                'fichier'   => $nom,
+                'fichier' => $nom,
                 'import_id' => $import->id,
-                'erreur'    => $e->getMessage(),
+                'erreur' => $e->getMessage(),
             ]);
 
             return $this->resultat($nom, 'erreur', $e->getMessage(), $import->id);
@@ -360,7 +360,7 @@ class ImportPortailFneService
         }
 
         $login = substr($base, 0, $position);
-        $date  = $this->lireDate(substr($base, $position + 1));
+        $date = $this->lireDate(substr($base, $position + 1));
 
         if ($date === null || trim($login) === '') {
             return null;
@@ -405,7 +405,7 @@ class ImportPortailFneService
             $entreprise = Entreprise::whereNotNull($colonne)
                 ->where($colonne, '<>', '')
                 ->get()
-                ->first(fn (Entreprise $e) => $this->normaliser((string) $e->{$colonne}) === $recherche);
+                ->first(fn(Entreprise $e) => $this->normaliser((string) $e->{$colonne}) === $recherche);
 
             if ($entreprise) {
                 return $entreprise;
@@ -452,14 +452,14 @@ class ImportPortailFneService
         $lecteur->setReadDataOnly(true);
 
         $feuille = $lecteur->load($chemin)->getActiveSheet();
-        $lignes  = $feuille->toArray(null, true, false, false);
+        $lignes = $feuille->toArray(null, true, false, false);
 
         if ($lignes === []) {
             return [];
         }
 
         $entetes = array_map(
-            fn ($entete) => trim((string) $entete),
+            fn($entete) => trim((string) $entete),
             array_shift($lignes)
         );
 
@@ -479,7 +479,7 @@ class ImportPortailFneService
 
             // Une ligne entièrement vide est un artefact du tableur, pas un
             // point de facturation.
-            if (array_filter($associee, fn ($v) => $v !== null && $v !== '') !== []) {
+            if (array_filter($associee, fn($v) => $v !== null && $v !== '') !== []) {
                 $resultat[] = $associee;
             }
         }
@@ -493,9 +493,9 @@ class ImportPortailFneService
     private function rangerFiche(PortailFneImport $import, array $donnees): int
     {
         $valeurs = [
-            'import_id'     => $import->id,
+            'import_id' => $import->id,
             'entreprise_id' => $import->entreprise_id,
-            'login'         => $import->login,
+            'login' => $import->login,
             'date_scraping' => $import->date_scraping,
         ];
 
@@ -517,7 +517,7 @@ class ImportPortailFneService
         if ($inconnus !== []) {
             Log::warning('Import portail FNE : champs inconnus dans la fiche', [
                 'fichier' => $import->fichier_nom,
-                'champs'  => array_keys($inconnus),
+                'champs' => array_keys($inconnus),
             ]);
         }
 
@@ -561,7 +561,7 @@ class ImportPortailFneService
      */
     private function ficheCanonique(array $donnees): array
     {
-        $champs   = array_fill_keys(array_values(self::CHAMPS_FICHE), null);
+        $champs = array_fill_keys(array_values(self::CHAMPS_FICHE), null);
         $inconnus = [];
 
         foreach ($donnees as $libelle => $valeur) {
@@ -581,7 +581,7 @@ class ImportPortailFneService
             $champs[$colonne] = match (true) {
                 $valeur === null => null,
                 is_bool($valeur) => $valeur ? '1' : '0',
-                default          => (string) $valeur,
+                default => (string) $valeur,
             };
         }
 
@@ -681,7 +681,7 @@ class ImportPortailFneService
 
         if ($import->dernier_releve_le === null || $import->dernier_releve_le->lt($date)) {
             $modifications['dernier_releve_le'] = $date;
-            $modifications['releves']           = $import->releves + 1;
+            $modifications['releves'] = $import->releves + 1;
         }
 
         // Un relevé arrivé avant que l'entreprise n'existe dans Selflow porte un
@@ -718,7 +718,7 @@ class ImportPortailFneService
         PortailFneDemande::where('login', $login)
             ->where('statut', PortailFneDemande::STATUT_EN_ATTENTE)
             ->get()
-            ->each(fn (PortailFneDemande $demande) => $demande->servir($import));
+            ->each(fn(PortailFneDemande $demande) => $demande->servir($import));
     }
 
     /**
@@ -741,9 +741,9 @@ class ImportPortailFneService
 
         foreach ($lignes as $ligne) {
             $valeurs = [
-                'import_id'     => $import->id,
+                'import_id' => $import->id,
                 'entreprise_id' => $import->entreprise_id,
-                'login'         => $import->login,
+                'login' => $import->login,
                 'date_scraping' => $import->date_scraping,
             ];
 
@@ -775,10 +775,29 @@ class ImportPortailFneService
     {
         $sansAccent = strtr(
             $entete,
-            ['é' => 'e', 'è' => 'e', 'ê' => 'e', 'ë' => 'e', 'à' => 'a', 'â' => 'a',
-             'î' => 'i', 'ï' => 'i', 'ô' => 'o', 'ö' => 'o', 'ù' => 'u', 'û' => 'u',
-             'ü' => 'u', 'ç' => 'c', 'É' => 'e', 'È' => 'e', 'Ê' => 'e', 'À' => 'a',
-             'Ô' => 'o', 'Ç' => 'c', '’' => "'"]
+            [
+                'é' => 'e',
+                'è' => 'e',
+                'ê' => 'e',
+                'ë' => 'e',
+                'à' => 'a',
+                'â' => 'a',
+                'î' => 'i',
+                'ï' => 'i',
+                'ô' => 'o',
+                'ö' => 'o',
+                'ù' => 'u',
+                'û' => 'u',
+                'ü' => 'u',
+                'ç' => 'c',
+                'É' => 'e',
+                'È' => 'e',
+                'Ê' => 'e',
+                'À' => 'a',
+                'Ô' => 'o',
+                'Ç' => 'c',
+                '’' => "'"
+            ]
         );
 
         return trim(preg_replace('/\s+/', ' ', mb_strtolower($sansAccent)) ?? '');
@@ -840,11 +859,11 @@ class ImportPortailFneService
         int $lignes = 0
     ): array {
         return [
-            'fichier'   => $fichier,
-            'statut'    => $statut,
-            'message'   => $message,
+            'fichier' => $fichier,
+            'statut' => $statut,
+            'message' => $message,
             'import_id' => $importId,
-            'lignes'    => $lignes,
+            'lignes' => $lignes,
         ];
     }
 }

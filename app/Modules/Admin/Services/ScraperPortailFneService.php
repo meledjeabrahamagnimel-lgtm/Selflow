@@ -49,11 +49,11 @@ class ScraperPortailFneService
         // pas armé (identifiants.json vide en production, dev éteint), on ne le
         // lance pas — la demande en file suffit, et un lancement voué à échouer
         // ne remplit que le journal.
-        if (! config('selflow.portail_fne.scraper.actif')) {
+        if (!config('selflow.portail_fne.scraper.actif')) {
             return false;
         }
 
-        $node   = (string) config('selflow.portail_fne.scraper.node');
+        $node = (string) config('selflow.portail_fne.scraper.node');
         $script = (string) config('selflow.portail_fne.scraper.script');
         $journal = storage_path('logs/portail-fne.log');
 
@@ -137,28 +137,8 @@ class ScraperPortailFneService
     /**
      * Relever le portail dès qu'une pièce est refusée par la DGI.
      *
-     * Demandé par le propriétaire du projet le 31/08/2026 : *« dès qu'il y a
-     * une erreur le scraper se met en action »*. Un refus dit que le portail
-     * déclare autre chose que la pièce — aller le lire est exactement ce qu'il
-     * faut faire, et c'est ce qui permet à l'écran des rejets de nommer l'écart
-     * au lieu de rendre un code.
-     *
-     * **Ce qui change par rapport à hier** : le refus ouvrait une demande en
-     * file, servie par le passage de :40. Jusqu'à une heure d'attente sur un
-     * geste que l'utilisateur venait de faire — et il ne restait devant l'écran
-     * que le temps de comprendre pourquoi. Le relevé part maintenant tout de
-     * suite ; la demande reste ouverte, elle, comme trace et comme filet si le
-     * lancement échoue.
-     *
-     * **Un verrou, et pas une temporisation.** Une normalisation par lot
-     * consigne vingt refus en dix secondes : sans lui, vingt navigateurs
-     * s'ouvriraient sur le portail de la DGI, soit vingt connexions avec le mot
-     * de passe du client, pour lire vingt fois la même chose. `Cache::add()` et
-     * non `put` : c'est l'écriture atomique qui décide, pas la lecture qui la
-     * précède.
-     *
-     * Ne lève jamais : consigner un rejet ne doit pas échouer parce que le
-     * scraper est mal armé. C'est le rejet qui compte, le relevé est un confort.
+     * @param string|null $login
+     * @return bool
      */
     public static function relancerApresRejet(?string $login): bool
     {
@@ -187,9 +167,7 @@ class ScraperPortailFneService
     private static function detacher(array $arguments, string $journal): void
     {
         if (\PHP_OS_FAMILY === 'Windows') {
-            // `start /B ""` détache : le `""` est le titre de fenêtre exigé par
-            // `start` dès qu'un argument est entre guillemets, sans quoi il
-            // prendrait le chemin du programme pour un titre.
+
             $commande = 'start /B "" ' . self::composer($arguments)
                 . ' >> ' . self::citer($journal) . ' 2>&1';
 
