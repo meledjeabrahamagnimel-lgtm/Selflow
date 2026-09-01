@@ -808,7 +808,13 @@ class AchatControleur
             }
 
             $correcteur = app(\App\Modules\Admin\Services\CorrectionFneService::class);
-            app(\App\Modules\Admin\Services\DiagnosticFneService::class)->diagnostiquer($rejet);
+            $diagnostic = app(\App\Modules\Admin\Services\DiagnosticFneService::class)->diagnostiquer($rejet);
+            $rejet->update([
+                'diagnostic' => $diagnostic,
+                'statut'     => $rejet->statut === FneRejet::STATUT_RESOLU
+                    ? FneRejet::STATUT_RESOLU
+                    : FneRejet::STATUT_DIAGNOSTIQUE,
+            ]);
             $rejet->refresh();
 
             $correctionDirecte = $correcteur->correctionApplicable($rejet);
