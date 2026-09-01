@@ -198,7 +198,7 @@
                 @php
                     $rejetEnCours = !$achat->normalise && $achat->aRejetEnCours();
                 @endphp
-                <tr @if($rejetEnCours) style="background:#fffbeb; border-left:4px solid #f59e0b;" @elseif($achat->normalise) style="border-left:4px solid #10b981;" @endif>
+                <tr @if($rejetEnCours) style="background:#fffbeb; border-left:4px solid #f59e0b;" @elseif($achat->normalise) style="background:#ecfdf5; border-left:4px solid #10b981;" @endif>
                     @if($activerSelectionGroup)
                     <td style="text-align: center; white-space: nowrap;">
                         @if(!$achat->normalise)

@@ -371,7 +371,7 @@
                     $routeSupprimer = $isCaissier ? route('caissier.ventes.supprimer', $vente) : route('admin.ventes.supprimer', $vente);
                     $rejetEnCours = !$vente->normalise && $vente->aRejetEnCours();
                 @endphp
-                <tr @if($rejetEnCours) style="background:#fffbeb; border-left:4px solid #f59e0b;" @elseif($vente->normalise) style="border-left:4px solid #10b981;" @endif>
+                <tr @if($rejetEnCours) style="background:#fffbeb; border-left:4px solid #f59e0b;" @elseif($vente->normalise) style="background:#ecfdf5; border-left:4px solid #10b981;" @endif>
                     @if($activerSelectionGroup)
                     <td style="text-align: center; white-space: nowrap;">
                         @if(!$vente->normalise)
