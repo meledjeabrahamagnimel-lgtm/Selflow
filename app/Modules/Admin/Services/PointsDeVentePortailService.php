@@ -202,27 +202,14 @@ class PointsDeVentePortailService
      */
     private function correspondant(PortailFnePointFacturation $declare, $siens): ?PointDeVente
     {
-        $identite = $this->identite($declare);
-
-        if ($identite !== null) {
-            $parIdentite = $siens->first(fn (PointDeVente $pdv) => $pdv->etablissement_fne_id !== null
-                && PortailFnePointFacturation::identite(
-                    $pdv->etablissement_fne_id,
-                    $pdv->point_fne_cree_a?->format('Y-m-d H:i:s'),
-                    $pdv->nom
-                ) === $identite);
-
-            if ($parIdentite) {
-                return $parIdentite;
-            }
-        }
-
         $nom = $this->nomComparable($declare->nom);
 
         if ($nom === '') {
             return null;
         }
 
+        // On apparie par le nom : si un point de vente porte ce nom dans Selflow, il correspond.
+        // Sinon, le point du portail est considéré comme manquant et sera créé sans renommer l'existant.
         return $siens->first(fn (PointDeVente $pdv) => $this->nomComparable($pdv->nom) === $nom);
     }
 

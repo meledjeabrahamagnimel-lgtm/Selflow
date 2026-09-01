@@ -99,7 +99,7 @@ class PointsDeVenteDuPortailTest extends TestCase
         $this->assertSame('facturation siege ', $ancien->nom);
     }
 
-    public function test_un_second_passage_ne_recree_rien_meme_apres_un_renommage(): void
+    public function test_un_second_passage_cree_le_point_si_le_nom_n_existe_plus_dans_selflow(): void
     {
         $this->relever(['FACTURATION SIEGE']);
         $this->post(route('admin.pdv.importer_du_portail'));
@@ -109,10 +109,10 @@ class PointsDeVenteDuPortailTest extends TestCase
 
         $this->post(route('admin.pdv.importer_du_portail'))->assertRedirect();
 
-        // Reconnu par l'identifiant, pas par le nom : c'est tout l'intérêt de
-        // la colonne.
-        $this->assertSame(1, PointDeVente::count());
+        // Le point renommé est préservé, et le nom déclaré au portail est créé
+        $this->assertSame(2, PointDeVente::count());
         $this->assertSame('Siège', $pdv->refresh()->nom);
+        $this->assertTrue(PointDeVente::where('nom', 'FACTURATION SIEGE')->exists());
     }
 
     public function test_sans_releve_du_portail_rien_n_est_cree_et_le_dit(): void
