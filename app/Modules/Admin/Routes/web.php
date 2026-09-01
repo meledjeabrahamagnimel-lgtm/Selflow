@@ -220,6 +220,7 @@ Route::prefix('admin')
             // Le « tout en un clic » du pop-up : ranger le relevé, rapprocher, corriger.
             Route::post('/rejets/{rejet}/corriger-maintenant', [\App\Modules\Admin\Controleurs\RejetFneControleur::class, 'corrigerMaintenant'])->name('rejets.corriger_maintenant');
             Route::post('/rejets/{rejet}/corriger-avec/{rang}', [\App\Modules\Admin\Controleurs\RejetFneControleur::class, 'corrigerAvec'])->name('rejets.corriger_avec');
+            Route::get('/rejets/{rejet}/statut-scraping', [\App\Modules\Admin\Controleurs\RejetFneControleur::class, 'statutScraping'])->name('rejets.statut_scraping');
             Route::post('/rejets/{rejet}/resoudre', [\App\Modules\Admin\Controleurs\RejetFneControleur::class, 'resoudre'])->name('rejets.resoudre');
         });
 

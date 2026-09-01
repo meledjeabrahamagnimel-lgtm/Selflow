@@ -317,6 +317,7 @@ class Habilitations
         'admin.fne.rejets.appliquer'          => 'gestion_pdv',
         'admin.fne.rejets.corriger_maintenant'=> 'gestion_pdv',
         'admin.fne.rejets.corriger_avec'      => 'gestion_pdv',
+        'admin.fne.rejets.statut_scraping'    => 'factures_vente',
 
         // ── Souscription ──
         'admin.souscription.index'       => 'gestion_pdv',

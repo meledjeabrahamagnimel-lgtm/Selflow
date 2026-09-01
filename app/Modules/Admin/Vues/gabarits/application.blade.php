@@ -1473,6 +1473,118 @@ window.__csrf = '{{ csrf_token() }}';
     }
 })();
 </script>
+
+{{-- Polling automatique : quand le scraper est lancé après un échec de normalisation,
+     le pop-up interroge le serveur et se met à jour automatiquement avec les points
+     de vente récupérés du portail FNE. --}}
+@if(session('rejet_en_cours_id'))
+<script>
+(function () {
+    var rejetId = @json(session('rejet_en_cours_id'));
+    var url = '/admin/fne/rejets/' + rejetId + '/statut-scraping';
+    var tentatives = 0;
+    var maxTentatives = 15;
+    var intervalle = 8000;
+    var zone = document.getElementById('toastZone');
+
+    function interroger() {
+        tentatives++;
+        fetch(url, {
+            headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' }
+        })
+        .then(function (r) { return r.json(); })
+        .then(function (data) {
+            if (!data.pret) {
+                if (tentatives < maxTentatives) { setTimeout(interroger, intervalle); }
+                return;
+            }
+
+            // Vider les toasts existants
+            if (zone) { zone.innerHTML = ''; }
+
+            if (data.resolu) {
+                // Succès automatique : le point a été créé et la pièce normalisée
+                afficherToast('succes', 'Succès', data.message);
+                setTimeout(function () { location.reload(); }, 3000);
+            } else if (data.choix && data.choix.length) {
+                // Plusieurs points au choix
+                afficherToastAvecBoutons('avertissement', 'Attention', data.message, data.choix);
+            } else {
+                afficherToast('info', 'Information', data.message);
+            }
+        })
+        .catch(function () {
+            if (tentatives < maxTentatives) { setTimeout(interroger, intervalle); }
+        });
+    }
+
+    function afficherToast(type, titre, message) {
+        if (!zone) return;
+        var icones = { succes:'fa-circle-check', avertissement:'fa-triangle-exclamation', erreur:'fa-circle-exclamation', info:'fa-circle-info' };
+        var el = document.createElement('div');
+        el.className = 'toast t-' + type;
+        el.innerHTML = '<i class="fas ' + (icones[type] || 'fa-circle-info') + ' ic"></i>'
+            + '<div class="bd"><div class="ti">' + titre + '</div><div class="ms">' + message + '</div></div>'
+            + '<button class="x" aria-label="Fermer"><i class="fas fa-xmark"></i></button>';
+        el.querySelector('.x').addEventListener('click', function () {
+            el.classList.add('sortie'); setTimeout(function () { el.remove(); }, 300);
+        });
+        zone.appendChild(el);
+    }
+
+    function afficherToastAvecBoutons(type, titre, message, boutons) {
+        if (!zone) return;
+        var icones = { succes:'fa-circle-check', avertissement:'fa-triangle-exclamation', erreur:'fa-circle-exclamation', info:'fa-circle-info' };
+        var el = document.createElement('div');
+        el.className = 'toast t-' + type;
+
+        var ic = document.createElement('i');
+        ic.className = 'fas ' + (icones[type] || 'fa-circle-info') + ' ic';
+
+        var bd = document.createElement('div'); bd.className = 'bd';
+        var ti = document.createElement('div'); ti.className = 'ti'; ti.textContent = titre;
+        var ms = document.createElement('div'); ms.className = 'ms'; ms.textContent = message;
+        bd.appendChild(ti); bd.appendChild(ms);
+
+        var barre = document.createElement('div');
+        barre.className = 'toast-actions';
+        boutons.forEach(function (ac) {
+            var btn = document.createElement('a');
+            btn.className = 'toast-action' + (ac.method === 'post' ? '' : ' secondaire');
+            btn.href = ac.url;
+            btn.textContent = ac.label;
+            if (ac.method === 'post') {
+                btn.setAttribute('role', 'button');
+                btn.addEventListener('click', function (e) {
+                    e.preventDefault();
+                    var form = document.createElement('form');
+                    form.method = 'POST'; form.action = ac.url;
+                    var t = document.createElement('input');
+                    t.type = 'hidden'; t.name = '_token'; t.value = (window.__csrf || '');
+                    form.appendChild(t);
+                    document.body.appendChild(form); form.submit();
+                });
+            }
+            barre.appendChild(btn);
+        });
+        bd.appendChild(barre);
+
+        var x = document.createElement('button');
+        x.className = 'x'; x.setAttribute('aria-label', 'Fermer');
+        x.innerHTML = '<i class="fas fa-xmark"></i>';
+
+        el.appendChild(ic); el.appendChild(bd); el.appendChild(x);
+        x.addEventListener('click', function () {
+            el.classList.add('sortie'); setTimeout(function () { el.remove(); }, 300);
+        });
+        zone.appendChild(el);
+    }
+
+    // Démarrer le polling après un court délai pour laisser le scraper partir
+    setTimeout(interroger, 5000);
+})();
+</script>
+@endif
 </body>
 </html>
 

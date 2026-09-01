@@ -1416,9 +1416,10 @@ class VenteControleur
             return back()
                 ->with('avertissement', sprintf(
                     "La DGI a refusé la facture%s : le point de vente n'est pas déclaré à "
-                    . "l'identique sur votre espace FNE. Une relève du portail a été lancée automatiquement.",
+                    . "l'identique sur votre espace FNE. Récupération des points de vente sur le portail en cours...",
                     $precision
                 ))
+                ->with('rejet_en_cours_id', $rejet->id)
                 ->with('avertissement_action', [
                     [
                         'url' => route('admin.fne.rejets'),

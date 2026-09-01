@@ -438,6 +438,86 @@ class RejetFneControleur
     }
 
     /**
+     * Vérifie l'état de la relève du portail et renvoie les points de vente disponibles
+     * ou la résolution automatique dès que le scraper a déposé les données.
+     */
+    public function statutScraping(
+        FneRejet $rejet,
+        DiagnosticFneService $diagnosticService,
+        CorrectionFneService $correcteur,
+        PointsDeVentePortailService $pdvPortail
+    ): \Illuminate\Http\JsonResponse {
+        $this->verifierAppartenance($rejet);
+
+        // Importer ce que le scraper a pu déposer
+        \Illuminate\Support\Facades\Artisan::call('portail-fne:importer');
+
+        $entreprise = $rejet->entreprise ?? Auth::user()->entreprise;
+        if ($entreprise) {
+            $pdvPortail->importer($entreprise);
+        }
+
+        // Diagnostiquer le rejet
+        $diagnostic = $diagnosticService->diagnostiquer($rejet);
+        $rejet->refresh();
+
+        if (($diagnostic['releve'] ?? null) === null) {
+            return response()->json([
+                'pret' => false,
+                'message' => 'Relève en cours sur le portail FNE...',
+            ]);
+        }
+
+        // 1 seul point : correction applicable directement
+        $correctionDirecte = $correcteur->correctionApplicable($rejet);
+        if ($correctionDirecte !== null) {
+            $fait = $correcteur->corriger($rejet, synchrone: true);
+            if ($fait !== null) {
+                return response()->json([
+                    'pret' => true,
+                    'resolu' => true,
+                    'message' => ($fait['mode'] ?? 'bascule') === 'cree'
+                        ? sprintf('Le point de vente « %s » a été créé dans Selflow d\'après la DGI, et la pièce a été normalisée avec succès.', $fait['nouveau'])
+                        : sprintf('La pièce a été rattachée au point de vente « %s » et normalisée avec succès.', $fait['nouveau']),
+                ]);
+            }
+        }
+
+        // Plusieurs points : liste des boutons au choix
+        $auChoix = $correcteur->nomsAuChoix($rejet);
+        if ($auChoix !== []) {
+            $boutons = [];
+            foreach (array_slice($auChoix, 0, 5) as $rang => $nom) {
+                $boutons[] = [
+                    'url'    => route('admin.fne.rejets.corriger_avec', ['rejet' => $rejet, 'rang' => $rang]),
+                    'label'  => $nom,
+                    'method' => 'post',
+                ];
+            }
+            $boutons[] = [
+                'url'   => route('admin.fne.rejets'),
+                'label' => count($auChoix) > 5 ? 'Voir les ' . count($auChoix) . ' points' : 'Voir les rejets FNE',
+            ];
+
+            return response()->json([
+                'pret' => true,
+                'resolu' => false,
+                'choix' => $boutons,
+                'message' => sprintf(
+                    'Le portail FNE déclare %d points de facturation. Sélectionnez celui correspondant à cette pièce :',
+                    count($auChoix)
+                ),
+            ]);
+        }
+
+        return response()->json([
+            'pret' => true,
+            'resolu' => false,
+            'message' => $diagnostic['conclusion'] ?? 'Rapprochement terminé.',
+        ]);
+    }
+
+    /**
      * Referme un rejet à la main.
      *
      * Un rejet se referme normalement tout seul quand la pièce finit par
