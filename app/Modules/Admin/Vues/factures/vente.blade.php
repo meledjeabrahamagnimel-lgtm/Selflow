@@ -513,7 +513,7 @@ var isDeliveryMode = {{ isset($bl) ? 'true' : 'false' }};
     $entreprise = $vente->pointDeVente->entreprise;
     $logoUrl = $entreprise->logo_path;
     if ($logoUrl && !str_starts_with($logoUrl, 'http://') && !str_starts_with($logoUrl, 'https://')) {
-        $logoUrl = Storage::disk('public')->url($logoUrl);
+        $logoUrl = \App\Modules\Admin\Services\FichierPublic::url($logoUrl);
     }
 @endphp
 

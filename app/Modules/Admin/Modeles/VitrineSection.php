@@ -53,7 +53,7 @@ class VitrineSection extends Model
     public function mediaUrl(): ?string
     {
         if ($this->media_path) {
-            return \Illuminate\Support\Facades\Storage::disk('public')->url($this->media_path);
+            return \App\Modules\Admin\Services\FichierPublic::url($this->media_path);
         }
 
         return $this->media_url ?: null;

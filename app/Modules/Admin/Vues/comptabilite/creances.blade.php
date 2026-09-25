@@ -114,9 +114,22 @@
                         <td style="text-align: right; color: var(--danger); font-weight: 700; font-size: 15px;">{{ number_format($cc['solde'], 0, ',', ' ') }} F</td>
                         <td style="text-align: center;">
                             <div style="display: flex; gap: 8px; justify-content: center;">
+                                {{-- Une vente au comptoir n'a pas de fiche client :
+                                     `client_id` est nul, et la ligne se range sous
+                                     l'identifiant 0. Le bouton menait donc a
+                                     `/tiers/client/0`, qui repond 404 (Not Found -
+                                     introuvable). Il n'y a pas de releve a etablir
+                                     pour quelqu'un qu'on ne connait pas. --}}
+                                @if($cc['id'])
                                 <a href="{{ route('admin.comptabilite.releve_tiers', ['type' => 'client', 'id' => $cc['id']]) }}" class="btn btn-outline btn-sm">
                                     <i class="fas fa-folder-open"></i> Relevé
                                 </a>
+                                @else
+                                <span class="btn btn-outline btn-sm" style="opacity:.45; cursor:not-allowed;"
+                                      title="Ces ventes n'ont pas de fiche client : il n'y a pas de releve a etablir.">
+                                    <i class="fas fa-folder-open"></i> Relevé
+                                </span>
+                                @endif
                                 <button type="button" class="btn btn-primary btn-sm" data-tier="{{ json_encode($cc) }}" onclick="ouvrirModalReglement('client', this)">
                                     <i class="fas fa-hand-holding-dollar"></i> Enregistrer Règlement
                                 </button>
@@ -168,9 +181,18 @@
                         <td style="text-align: right; color: var(--danger); font-weight: 700; font-size: 15px;">{{ number_format($df['solde'], 0, ',', ' ') }} F</td>
                         <td style="text-align: center;">
                             <div style="display: flex; gap: 8px; justify-content: center;">
+                                {{-- Meme regle du cote fournisseur : un achat sans
+                                     fiche n'a pas de releve. --}}
+                                @if($df['id'])
                                 <a href="{{ route('admin.comptabilite.releve_tiers', ['type' => 'fournisseur', 'id' => $df['id']]) }}" class="btn btn-outline btn-sm">
                                     <i class="fas fa-folder-open"></i> Relevé
                                 </a>
+                                @else
+                                <span class="btn btn-outline btn-sm" style="opacity:.45; cursor:not-allowed;"
+                                      title="Ces achats n'ont pas de fiche fournisseur : il n'y a pas de releve a etablir.">
+                                    <i class="fas fa-folder-open"></i> Relevé
+                                </span>
+                                @endif
                                 <button type="button" class="btn btn-primary btn-sm" data-tier="{{ json_encode($df) }}" onclick="ouvrirModalReglement('fournisseur', this)">
                                     <i class="fas fa-wallet"></i> Enregistrer Règlement
                                 </button>
