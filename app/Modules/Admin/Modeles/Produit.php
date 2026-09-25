@@ -394,9 +394,13 @@ class Produit extends Model
         // l'adresse de développement faisait pointer la photo vers la machine
         // du développeur. Le navigateur, lui, résout `/storage/…` sur l'hôte
         // qu'il consulte.
-        return self::lienDeStockagePose()
-            ? '/storage/' . ltrim($this->photo, '/')
-            : route('admin.produits.photo.voir', $this);
+        // La regle vit dans `FichierPublic` : elle etait ecrite ici, et les
+        // logos ne l'avaient pas -- d'ou deux logos casses dans les parametres
+        // sur un serveur ou le lien de stockage manque.
+        return \App\Modules\Admin\Services\FichierPublic::url(
+            $this->photo,
+            route('admin.produits.photo.voir', $this)
+        );
     }
 
     /**
@@ -406,11 +410,9 @@ class Produit extends Model
      * une fois par article, et un accès disque par carte n'apprendrait rien de
      * neuf.
      */
-    private static ?bool $lienDeStockage = null;
-
     private static function lienDeStockagePose(): bool
     {
-        return self::$lienDeStockage ??= file_exists(public_path('storage'));
+        return \App\Modules\Admin\Services\FichierPublic::lienPose();
     }
 
     /**
@@ -422,7 +424,10 @@ class Produit extends Model
      */
     public static function oublierLeLienDeStockage(): void
     {
-        self::$lienDeStockage = null;
+        // La reponse est retenue par `FichierPublic`, qui la partage avec les
+        // logos, les avatars et la vitrine : deux souvenirs du meme lien
+        // auraient fini par se contredire.
+        \App\Modules\Admin\Services\FichierPublic::oublierLeLien();
     }
 
     // ─── Helpers Phase 1 ─────────────────────────────────────────────────────

@@ -175,7 +175,7 @@ class Utilisateur extends Authenticatable
     public function getAvatarUrlAttribute(): string
     {
         if ($this->avatar_path) {
-            return \Illuminate\Support\Facades\Storage::disk('public')->url($this->avatar_path);
+            return \App\Modules\Admin\Services\FichierPublic::url($this->avatar_path);
         }
         return 'data:image/svg+xml;utf8,' . rawurlencode($this->genererAvatarSvg());
     }

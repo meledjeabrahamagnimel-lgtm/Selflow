@@ -149,7 +149,7 @@
     $estNormalise = !isset($bl) && $vente->normalise && !empty($vente->numero_fne);
     $logoTicket = $entrepriseTicket->logo_path;
     if ($logoTicket && !\Illuminate\Support\Str::startsWith($logoTicket, ['http://', 'https://'])) {
-        $logoTicket = \Illuminate\Support\Facades\Storage::disk('public')->url($logoTicket);
+        $logoTicket = \App\Modules\Admin\Services\FichierPublic::url($logoTicket);
     }
 
     // Le visuel FNE — deuxieme des trois elements du sticker electronique, avec
@@ -163,7 +163,7 @@
     if ($estNormalise) {
         $visuelFne = $entrepriseTicket->logo_fne_path;
         if ($visuelFne && !\Illuminate\Support\Str::startsWith($visuelFne, ['http://', 'https://'])) {
-            $visuelFne = \Illuminate\Support\Facades\Storage::disk('public')->url($visuelFne);
+            $visuelFne = \App\Modules\Admin\Services\FichierPublic::url($visuelFne);
         }
         if (!$visuelFne && is_file(public_path('logo-FNE.png'))) {
             $visuelFne = asset('logo-FNE.png');

@@ -300,6 +300,23 @@ Route::prefix('admin')
         });
 
         // ── Gestion catalogue ──
+        /*
+         * Servir un fichier depose quand `public/storage` n'est pas pose.
+         *
+         * Le lien symbolique manque sur certains hebergements, et son absence
+         * ne se voit nulle part : l'image ne s'affiche pas, la page se charge.
+         * Plutot que d'exiger une commande dont personne ne se souvient,
+         * l'application sert ses propres fichiers.
+         *
+         * Le dossier et le nom sont bornes par la route elle-meme : un chemin
+         * libre, venu d'une colonne ecrite par un formulaire, laisserait
+         * remonter l'arborescence.
+         */
+        Route::get('/media/{dossier}/{fichier}', [\App\Modules\Admin\Controleurs\AdminControleur::class, 'servirUnFichier'])
+            ->where('dossier', 'logos|produits|avatars|vitrine')
+            ->where('fichier', '[A-Za-z0-9._-]+')
+            ->name('media');
+
         Route::prefix('produits')->name('produits.')->group(function () {
             Route::get('/calculer-reference', [ProduitControleur::class, 'calculerReference'])->name('calculer_reference');
             Route::get('/', [ProduitControleur::class, 'index'])->name('index');

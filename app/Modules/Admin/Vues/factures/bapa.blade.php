@@ -141,7 +141,7 @@
             $entrepriseBapa = $achat->pointDeVente->entreprise;
             $logoBapa = $entrepriseBapa->logo_path;
             if ($logoBapa && !str_starts_with($logoBapa, 'http://') && !str_starts_with($logoBapa, 'https://')) {
-                $logoBapa = \Illuminate\Support\Facades\Storage::disk('public')->url($logoBapa);
+                $logoBapa = \App\Modules\Admin\Services\FichierPublic::url($logoBapa);
             }
         @endphp
         <div style="display:flex; justify-content:space-between; align-items:flex-start; border-bottom:2px solid #000; padding-bottom:20px; margin-bottom:25px;">

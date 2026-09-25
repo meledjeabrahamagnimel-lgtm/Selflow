@@ -412,6 +412,30 @@ class AdminControleur
     /**
      * Afficher le profil de l'utilisateur connecté.
      */
+    /**
+     * Servir un fichier depose, quand `public/storage` n'est pas pose.
+     *
+     * Le chemin ne vient pas de la requete : la route ne laisse passer qu'un
+     * dossier connu et un nom de fichier sans separateur. Un chemin libre --
+     * lu dans une colonne ecrite par un formulaire -- laisserait remonter
+     * l'arborescence.
+     *
+     * L'acces reste celui de l'application : ces fichiers sont ceux des
+     * entreprises, et l'on n'y entre pas sans etre connecte.
+     */
+    public function servirUnFichier(string $dossier, string $fichier): \Symfony\Component\HttpFoundation\StreamedResponse
+    {
+        $chemin = $dossier . '/' . $fichier;
+
+        abort_unless(\App\Modules\Admin\Services\FichierPublic::existe($chemin), 404);
+
+        return \Illuminate\Support\Facades\Storage::disk('public')->response($chemin, null, [
+            // Une image deposee ne change pas : elle porte un identifiant
+            // tire au hasard, et un nouveau depot ecrit un nouveau nom.
+            'Cache-Control' => 'private, max-age=86400',
+        ]);
+    }
+
     public function monProfil(): View
     {
         $utilisateur = Auth::user();

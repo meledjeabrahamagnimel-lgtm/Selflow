@@ -302,6 +302,19 @@ class ComptabiliteControleur
     {
         $entreprise = Auth::user()->entreprise;
 
+        /*
+         * L'identifiant 0 designe « personne ».
+         *
+         * Les creances regroupent les ventes au comptoir sous `client_id`
+         * nul, qui devient 0 : le bouton « Releve » menait donc a
+         * `/tiers/client/0` et repondait 404 (Not Found - introuvable), sans
+         * qu'on comprenne pourquoi ce seul tiers n'avait pas de releve.
+         *
+         * L'ecran ne propose plus le bouton dans ce cas ; l'adresse, elle,
+         * reste atteignable a la main et doit dire ce qu'il en est.
+         */
+        abort_if($id <= 0, 404, "Ces pieces n'ont pas de fiche : elles ont ete etablies sans tiers, et il n'y a pas de releve a en tirer.");
+
         if ($type === 'client') {
             $tier = Client::where('entreprise_id', $entreprise->id)->findOrFail($id);
 

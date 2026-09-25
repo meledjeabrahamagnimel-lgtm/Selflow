@@ -53,6 +53,15 @@ echo "🔐 Permissions fichiers..."
 chmod -R 775 storage bootstrap/cache
 chown -R www-data:www-data storage bootstrap/cache
 
+# 7. Lien symbolique storage (si le serveur web le supporte)
+#
+# Sur un hébergement mutualisé, `php artisan storage:link` crée un symlink
+# que certains serveurs refusent de servir (403 Forbidden). Dans ce cas,
+# STORAGE_LINK_FORCED=false dans le .env force la route PHP.
+# Si le symlink fonctionne bien, mettre STORAGE_LINK_FORCED=true dans .env.
+echo "🔗 Lien symbolique storage..."
+php artisan storage:link --force || echo "  ⚠️  `storage:link` échoué (symlinks désactivés sur cet hébergement) — STORAGE_LINK_FORCED=false garantit que la route PHP prend le relais."
+
 echo ""
 echo "✅ Déploiement terminé !"
 echo ""

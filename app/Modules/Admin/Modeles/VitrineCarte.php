@@ -70,6 +70,6 @@ class VitrineCarte extends Model
             return $this->image_path;
         }
 
-        return \Illuminate\Support\Facades\Storage::disk('public')->url($this->image_path);
+        return \App\Modules\Admin\Services\FichierPublic::url($this->image_path);
     }
 }
