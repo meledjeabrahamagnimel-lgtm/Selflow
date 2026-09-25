@@ -314,7 +314,7 @@ Route::prefix('admin')
          */
         Route::get('/media/{dossier}/{fichier}', [\App\Modules\Admin\Controleurs\AdminControleur::class, 'servirUnFichier'])
             ->where('dossier', 'logos|produits|avatars|vitrine')
-            ->where('fichier', '[A-Za-z0-9._-]+')
+            ->where('fichier', '.*')
             ->name('media');
 
         Route::prefix('produits')->name('produits.')->group(function () {

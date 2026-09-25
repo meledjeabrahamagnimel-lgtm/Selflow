@@ -127,11 +127,13 @@ class LesImagesSAffichentSansLeLienTest extends TestCase
         foreach ([
             'logos/../../../.env',
             '../.env',
-            'logos/sous/dossier.png',
             'secrets/cle.txt',
         ] as $chemin) {
             $this->assertSame([null, null], FichierPublic::decouper($chemin), $chemin);
         }
+
+        // Les sous-dossiers (ex: logos/entreprises/file.png) sont acceptés
+        $this->assertSame(['logos', 'entreprises/logo.png'], FichierPublic::decouper('logos/entreprises/logo.png'));
     }
 
     public function test_la_route_refuse_un_dossier_inconnu(): void

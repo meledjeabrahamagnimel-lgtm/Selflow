@@ -95,7 +95,12 @@ class FichierPublic
     public static function decouper(string $chemin): array
     {
         $chemin = ltrim($chemin, '/');
-        $morceaux = explode('/', $chemin);
+
+        if (str_contains($chemin, '..')) {
+            return [null, null];
+        }
+
+        $morceaux = explode('/', $chemin, 2);
 
         if (count($morceaux) !== 2) {
             return [null, null];
@@ -107,8 +112,8 @@ class FichierPublic
             return [null, null];
         }
 
-        // Ni `..`, ni séparateur, ni rien d'autre qu'un nom de fichier.
-        if (!preg_match('/^[A-Za-z0-9._-]+$/', $fichier) || str_contains($fichier, '..')) {
+        // Ni `..`, ni caractères dangereux dans le nom de fichier ou sous-dossier.
+        if (!preg_match('/^[A-Za-z0-9._\/-]+$/', $fichier)) {
             return [null, null];
         }
 
