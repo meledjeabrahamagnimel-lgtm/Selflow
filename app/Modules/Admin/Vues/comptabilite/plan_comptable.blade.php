@@ -326,7 +326,7 @@ function lancerSyncPlan() {
     .then(data => {
         btn.disabled = false;
         if (icon) icon.classList.remove('fa-spin');
-        btn.innerHTML = '<i class="fas fa-sync-alt"></i> Synchroniser avec COMPTAFLOW';
+        btn.innerHTML = '<i class="fas fa-sync-alt"></i> Déverser le référentiel vers COMPTAFLOW';
 
         feedback.style.display = "block";
         if (data.success) {
@@ -350,7 +350,7 @@ function lancerSyncPlan() {
     .catch(err => {
         btn.disabled = false;
         if (icon) icon.classList.remove('fa-spin');
-        btn.innerHTML = '<i class="fas fa-sync-alt"></i> Synchroniser avec COMPTAFLOW';
+        btn.innerHTML = '<i class="fas fa-sync-alt"></i> Déverser le référentiel vers COMPTAFLOW';
         feedback.style.display = "block";
         feedback.style.background = "#fff5f5";
         feedback.style.color = "#e53e3e";
